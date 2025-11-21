@@ -56,7 +56,7 @@ interface UIResource {
   uri: string;           // MUST start with 'ui://'
   name: string;          // Human-readable identifier
   description?: string;  // Description of the UI resource
-  mimeType: string;      // SHOULD be 'text/html' in MVP
+  mimeType: string;      // SHOULD be 'text/vnd.mcp.ui+html' in MVP
   _meta?: UIResourceMeta // Resource Metadata
 }
 ```
@@ -166,11 +166,11 @@ Example:
     "uri": "ui://weather-server/dashboard-template",
     "mimeType": "text/vnd.mcp.ui+html",
     "text": "<!DOCTYPE html><html>...</html>",
-    _meta: {
+    "_meta": {
       "ui" : {
         "csp": {
-          connect_domains: ["https://api.openweathermap.org"],
-          resource_domains: ["https://cdn.jsdelivr.net"]
+          "connect_domains": ["https://api.openweathermap.org"],
+          "resource_domains": ["https://cdn.jsdelivr.net"]
         },
         "prefersBorder": true
       }
