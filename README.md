@@ -26,7 +26,7 @@ This repo provides:
 What this repo does NOT provide:
 
 - There's no host implementation here (beyond the `AppBridge` just used for communications).
-  - We have [contributed a tentative implementation](https://github.com/MCP-UI-Org/mcp-ui/pull/146) of hosting / iframing / sandboxing logic to the [MCP-UI](https://github.com/idosal/mcp-ui) repository, and expect OSS clients may use it, while other clients might roll their own hosting logic.
+  - We have [contributed a tentative implementation](https://github.com/MCP-UI-Org/mcp-ui/pull/147) of hosting / iframing / sandboxing logic to the [MCP-UI](https://github.com/idosal/mcp-ui) repository, and expect OSS clients may use it, while other clients might roll their own hosting logic.
   - A prior iteration of an e2e prototype w/ client, server and hosting parts is available [in this gist](https://gist.github.com/ochafik/a9603ba2d6757d6038ce066eded4c354)
 
 ## Installation
