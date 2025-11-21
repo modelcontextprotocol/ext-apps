@@ -51,7 +51,7 @@ As an extension, MCP Apps is optional and must be explicitly negotiated between 
 
 UI resources are declared using the standard MCP resource pattern with specific conventions:
 
-```
+```typescript
 interface UIResource {
   uri: string;           // MUST start with 'ui://'
   name: string;          // Human-readable identifier
@@ -59,8 +59,7 @@ interface UIResource {
   mimeType: string;      // SHOULD be 'text/vnd.mcp.ui+html' in MVP
   _meta?: UIResourceMeta // Resource Metadata
 }
-```
-```
+
 interface UiResourceMeta {
   csp?: {
     connectDomains?: string[],
