@@ -51,12 +51,23 @@ As an extension, MCP Apps is optional and must be explicitly negotiated between 
 
 UI resources are declared using the standard MCP resource pattern with specific conventions:
 
-```typescript
+```
 interface UIResource {
   uri: string;           // MUST start with 'ui://'
   name: string;          // Human-readable identifier
   description?: string;  // Description of the UI resource
-  mimeType: string;      // SHOULD be 'text/vnd.mcp.ui+html' in MVP
+  mimeType: string;      // SHOULD be 'text/html' in MVP
+  _meta?: UIResourceMeta // Resource Metadata
+}
+```
+```
+interface UiResourceMeta {
+  csp?: {
+    connectDomains?: string[],
+    resourceDomains?: string[],
+  },
+  domain?: string,
+  prefersBorder?: boolean,
 }
 ```
 
@@ -71,12 +82,14 @@ The resource content is returned via `resources/read`:
     text?: string;                // HTML content as string
     blob?: string;                // OR base64-encoded HTML
     _meta?: {
-      "ui/csp"?: {
-        connect_domains?: string[];   // Origins for fetch/XHR/WebSocket
-        resource_domains?: string[];  // Origins for images, scripts, styles
+      "ui"?: {
+        "csp"?: {
+          connect_domains?: string[];  // Origins for fetch/XHR/WebSocket
+          resource_domains?: string[]; // Origins for images, scripts, etc
+        };
+      "domain"?: string;	
+      "prefersBorder"?: boolean;
       };
-      "ui/domain"?: string;	
-      "ui/prefersBorder"?: boolean;
     };
   }];
 }
@@ -91,7 +104,7 @@ The resource content is returned via `resources/read`:
 
 #### Metadata Fields:
 
-**`ui/csp` - Content Security Policy configuration**
+**`ui.csp` - Content Security Policy configuration**
 
 Servers declare which external origins their UI needs to access. Hosts use this to enforce appropriate CSP headers.
 
@@ -106,14 +119,14 @@ Servers declare which external origins their UI needs to access. Hosts use this 
   - Wildcard subdomains supported: `https://*.example.com`
   - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src` directives
 
-**`ui/domain` - Dedicated origin for widget**
+**`ui.domain` - Dedicated origin for widget**
 
 Optional domain for the widget's sandbox origin. Useful when widgets need dedicated origins for API key allowlists or cross-origin isolation.
 
 - Example: `"https://weather-widget.example.com"`
 - If omitted, Host uses default sandbox origin
 
-**`ui/prefersBorder` - Visual boundary preference**
+**`ui.prefersBorder` - Visual boundary preference**
 
 Boolean indicating the UI prefers a visible border. Useful for widgets that might blend with host background.
 
@@ -123,7 +136,7 @@ Boolean indicating the UI prefers a visible border. Useful for widgets that migh
 #### Host Behavior:
 
 - **CSP Enforcement:** Host MUST construct CSP headers based on declared domains
-- **Restrictive Default:** If `ui/csp` is omitted, Host MUST use:
+- **Restrictive Default:** If `ui.csp` is omitted, Host MUST use:
 
   ```
   default-src 'none';
@@ -153,12 +166,14 @@ Example:
     "uri": "ui://weather-server/dashboard-template",
     "mimeType": "text/vnd.mcp.ui+html",
     "text": "<!DOCTYPE html><html>...</html>",
-    "_meta": {
-      "ui/csp": {
-        "connect_domains": ["https://api.openweathermap.org"],
-        "resource_domains": ["https://cdn.jsdelivr.net"]
-      },
-      "ui/prefersBorder": true
+    _meta: {
+      "ui" : {
+        "csp": {
+          connect_domains: ["https://api.openweathermap.org"],
+          resource_domains: ["https://cdn.jsdelivr.net"]
+        },
+        "prefersBorder": true
+      }
     }
   }]
 }
@@ -282,7 +297,7 @@ If the Host is a web page, it MUST wrap the Guest UI and communicate with it thr
 3. The Sandbox MUST send a `ui/sandbox-ready` notification to the host when it’s ready to process an `ui/sandbox-resource-ready` notification.
 4. Once the Sandbox is ready, the Host MUST send the raw HTML resource to load in a `ui/sandbox-resource-ready` notification.
 5. The Sandbox MUST load the raw HTML of the Guest UI with CSP settings that:
-   - Enforce the domains declared in `ui/csp` metadata
+   - Enforce the domains declared in `ui.csp` metadata
    - Prevent nested iframes (`frame-src 'none'`)
    - Block dangerous features (`object-src 'none'`, `base-uri 'self'`)
    - Apply restrictive defaults if no CSP metadata is provided
