@@ -6,9 +6,12 @@ import {
 
 import {
   CallToolRequest,
+  CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
   Implementation,
+  ListToolsRequest,
+  ListToolsRequestSchema,
   LoggingMessageNotification,
   Notification,
   PingRequestSchema,
@@ -103,6 +106,26 @@ export class App extends Protocol<Request, Notification, Result> {
     this.setNotificationHandler(
       McpUiHostContextChangedNotificationSchema,
       (n) => callback(n.params),
+    );
+  }
+  set oncalltool(
+    callback: (
+      params: CallToolRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<CallToolResult>,
+  ) {
+    this.setRequestHandler(CallToolRequestSchema, (request, extra) =>
+      callback(request.params, extra),
+    );
+  }
+  set onlisttools(
+    callback: (
+      params: ListToolsRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<{ tools: string[] }>,
+  ) {
+    this.setRequestHandler(ListToolsRequestSchema, (request, extra) =>
+      callback(request.params, extra),
     );
   }
 
