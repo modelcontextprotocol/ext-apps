@@ -3,12 +3,10 @@ import {
   JSONRPCMessageSchema,
   MessageExtraInfo,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import {
   Transport,
   TransportSendOptions,
 } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { z } from "zod";
 
 export class PostMessageTransport implements Transport {
   private messageListener: (
