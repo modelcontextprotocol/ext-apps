@@ -48,13 +48,6 @@ window.addEventListener("load", async () => {
     appendText(`Host context changed: ${JSON.stringify(params)}`);
   };
 
-  document.body.addEventListener("resize", () => {
-    app.sendSizeChange({
-      width: document.body.scrollWidth,
-      height: document.body.scrollHeight,
-    });
-  });
-
   root.appendChild(
     Object.assign(document.createElement("button"), {
       textContent: "Get Weather (Tool)",

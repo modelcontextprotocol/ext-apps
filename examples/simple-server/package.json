@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "NODE_ENV=development npm run build && npm run server",
     "build": "concurrently 'INPUT=ui-raw.html vite build' 'INPUT=ui-vanilla.html vite build' 'INPUT=ui-react.html vite build'",
-    "server": "bun server.ts",
-    "start": "npm run build && npm run server"
+    "server": "bun server.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "../..",

@@ -131,19 +131,11 @@ window.addEventListener("load", async () => {
   });
 
   new ResizeObserver(() => {
-    const { body, documentElement: html } = document;
-
-    const bodyStyle = getComputedStyle(body);
-    const htmlStyle = getComputedStyle(html);
-
-    const width = body.scrollWidth;
-    const height =
-      body.scrollHeight +
-      (parseFloat(bodyStyle.borderTop) || 0) +
-      (parseFloat(bodyStyle.borderBottom) || 0) +
-      (parseFloat(htmlStyle.borderTop) || 0) +
-      (parseFloat(htmlStyle.borderBottom) || 0);
-
+    const rect = (
+      document.body.parentElement ?? document.body
+    ).getBoundingClientRect();
+    const width = Math.ceil(rect.width);
+    const height = Math.ceil(rect.height);
     app.sendNotification<McpUiSizeChangeNotification>({
       method: "ui/notifications/size-change",
       params: { width, height },

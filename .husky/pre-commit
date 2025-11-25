@@ -1,0 +1,4 @@
+npm run build
+npm run prettier:fix
+( cd examples/simple-host && npm run build )
+( cd examples/simple-server && npm run build )
