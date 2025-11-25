@@ -256,7 +256,7 @@ function sendRequest(method: string, params: any) {
       if (event.data?.id === id) {
         window.removeEventListener('message', listener);
         if (event.data?.result) {
-          resolve(true);
+          resolve(event.data?.result);
         } else if (event.data?.error) {
           reject(new Error(event.data.error));
         }

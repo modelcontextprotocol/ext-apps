@@ -41,6 +41,8 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 export { PostMessageTransport } from "./message-transport.js";
 export * from "./types";
 
+export const RESOURCE_URI_META_KEY = "ui/resourceUri";
+
 type AppOptions = ProtocolOptions & {
   autoResize?: boolean;
 };
