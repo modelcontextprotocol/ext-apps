@@ -185,13 +185,6 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     };
   }
 
-  sendSizeChange(params: McpUiSizeChangeNotification["params"]) {
-    return this.notification(<McpUiSizeChangeNotification>{
-      method: "ui/notifications/size-change",
-      params,
-    });
-  }
-
   sendToolInput(params: McpUiToolInputNotification["params"]) {
     return this.notification(<McpUiToolInputNotification>{
       method: "ui/notifications/tool-input",

@@ -41,6 +41,8 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 export { PostMessageTransport } from "./message-transport.js";
 export * from "./types";
 
+export const RESOURCE_URI_META_KEY = "ui/resourceUri";
+
 type AppOptions = ProtocolOptions & {
   autoResize?: boolean;
 };
@@ -166,30 +168,20 @@ export class App extends Protocol<Request, Notification, Result> {
   }
 
   setupSizeChangeNotifications() {
+    let scheduled = false;
     const sendBodySizeChange = () => {
-      let rafId: number | null = null;
-
-      // Debounce using requestAnimationFrame to avoid duplicate messages
-      // when both documentElement and body fire resize events
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
+      if (scheduled) {
+        return;
       }
-      rafId = requestAnimationFrame(() => {
-        const { body, documentElement: html } = document;
-
-        const bodyStyle = getComputedStyle(body);
-        const htmlStyle = getComputedStyle(html);
-
-        const width = body.scrollWidth;
-        const height =
-          body.scrollHeight +
-          (parseFloat(bodyStyle.borderTop) || 0) +
-          (parseFloat(bodyStyle.borderBottom) || 0) +
-          (parseFloat(htmlStyle.borderTop) || 0) +
-          (parseFloat(htmlStyle.borderBottom) || 0);
-
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        const rect = (
+          document.body.parentElement ?? document.body
+        ).getBoundingClientRect();
+        const width = Math.ceil(rect.width);
+        const height = Math.ceil(rect.height);
         this.sendSizeChange({ width, height });
-        rafId = null;
       });
     };
 

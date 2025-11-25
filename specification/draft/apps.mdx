@@ -1,8 +1,8 @@
 # SEP-1865: MCP Apps: Interactive User Interfaces for MCP
 
-**Track:** Extensions  
-**Authors:** Ido Salomon, Liad Yosef, Olivier Chafik, Jerome Swannack, Jonathan Hefner, Anton Pidkuiko, Nick Cooper, Bryan Ashley, Alexei Christakis  
-**Status:** Draft  
+**Track:** Extensions
+**Authors:** Ido Salomon, Liad Yosef, Olivier Chafik, Jerome Swannack, Jonathan Hefner, Anton Pidkuiko, Nick Cooper, Bryan Ashley, Alexei Christakis
+**Status:** Draft
 **Created:** 2025-11-21
 
 ## Abstract
@@ -53,19 +53,110 @@ UI resources are declared using the standard MCP resource pattern with specific 
 
 ```typescript
 interface UIResource {
-  uri: string;           // MUST start with 'ui://'
-  name: string;          // Human-readable identifier
-  description?: string;  // Description of the UI resource
-  mimeType: string;      // SHOULD be 'text/html+mcp' in MVP
-  _meta?: UIResourceMeta // Resource Metadata
+  /**
+   * Unique identifier for the UI resource
+   *
+   * MUST use the `ui://` URI scheme to distinguish UI resources from other
+   * MCP resource types.
+   *
+   * @example
+   * "ui://weather-dashboard"
+   */
+  uri: string;
+
+  /**
+   * Human-readable display name for the UI resource
+   *
+   * Used for listing and identifying the resource in host interfaces.
+   *
+   * @example
+   * "Weather Dashboard"
+   */
+  name: string;
+
+  /**
+   * Optional description of the UI resource's purpose and functionality
+   *
+   * Provides context about what the UI does and when to use it.
+   *
+   * @example
+   * "Interactive weather visualization with real-time updates"
+   */
+  description?: string;
+
+  /**
+   * MIME type of the UI content
+   *
+   * SHOULD be `text/html+mcp` for HTML-based UIs in the initial MVP.
+   * Other content types are reserved for future extensions.
+   *
+   * @example
+   * "text/html+mcp"
+   */
+  mimeType: string;
+
+  /**
+   * Resource metadata for security and rendering configuration
+   *
+   * Includes Content Security Policy configuration, dedicated domain settings,
+   * and visual preferences.
+   */
+  _meta?: {
+    ui?: UIResourceMeta;
+  }
 }
 
 interface UIResourceMeta {
+  /**
+   * Content Security Policy configuration
+   *
+   * Servers declare which external origins their UI needs to access.
+   * Hosts use this to enforce appropriate CSP headers.
+   */
   csp?: {
+    /**
+     * Origins for network requests
+     *
+     * - Empty or omitted = no external connections (secure default)
+     * - Maps to CSP `connect-src` directive
+     *
+     * @example
+     * ["https://api.weather.com", "wss://realtime.service.com"]
+     */
     connectDomains?: string[],
+    /**
+     * Origins for static resources (images, scripts, stylesheets, fonts)
+     *
+     * - Empty or omitted = no external resources (secure default)
+     * - Wildcard subdomains supported: `https://*.example.com`
+     * - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src` directives
+     *
+     * @example
+     * ["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]
+     */
     resourceDomains?: string[],
   },
+  /**
+   * Dedicated origin for widget
+   *
+   * Optional domain for the widget's sandbox origin. Useful when widgets need
+   * dedicated origins for API key allowlists or cross-origin isolation.
+   *
+   * If omitted, Host uses default sandbox origin.
+   *
+   * @example
+   * "https://weather-widget.example.com"
+   */
   domain?: string,
+  /**
+   * Visual boundary preference
+   *
+   * Boolean indicating the UI prefers a visible border. Useful for widgets
+   * that might blend with host background.
+   *
+   * - `true`: Request visible border (host decides styling)
+   * - `false` or omitted: No preference
+   */
   prefersBorder?: boolean,
 }
 ```
@@ -81,13 +172,13 @@ The resource content is returned via `resources/read`:
     text?: string;                // HTML content as string
     blob?: string;                // OR base64-encoded HTML
     _meta?: {
-      "ui"?: {
-        "csp"?: {
+      ui?: {
+        csp?: {
           connect_domains?: string[];  // Origins for fetch/XHR/WebSocket
           resource_domains?: string[]; // Origins for images, scripts, etc
         };
-      "domain"?: string;	
-      "prefersBorder"?: boolean;
+        domain?: string;
+        prefersBorder?: boolean;
       };
     };
   }];
@@ -100,37 +191,6 @@ The resource content is returned via `resources/read`:
 - `mimeType` MUST be `text/html+mcp` (other types reserved for future extensions)
 - Content MUST be provided via either `text` (string) or `blob` (base64-encoded)
 - Content MUST be valid HTML5 document
-
-#### Metadata Fields:
-
-**`ui.csp` - Content Security Policy configuration**
-
-Servers declare which external origins their UI needs to access. Hosts use this to enforce appropriate CSP headers.
-
-- `connect_domains`: Origins for network requests
-  - Example: `["https://api.weather.com", "wss://realtime.service.com"]`
-  - Empty or omitted = no external connections (secure default)
-  - Maps to CSP `connect-src` directive
-
-- `resource_domains`: Origins for static resources (images, scripts, stylesheets, fonts)
-  - Example: `["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]`
-  - Empty or omitted = no external resources (secure default)
-  - Wildcard subdomains supported: `https://*.example.com`
-  - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src` directives
-
-**`ui.domain` - Dedicated origin for widget**
-
-Optional domain for the widget's sandbox origin. Useful when widgets need dedicated origins for API key allowlists or cross-origin isolation.
-
-- Example: `"https://weather-widget.example.com"`
-- If omitted, Host uses default sandbox origin
-
-**`ui.prefersBorder` - Visual boundary preference**
-
-Boolean indicating the UI prefers a visible border. Useful for widgets that might blend with host background.
-
-- `true`: Request visible border (host decides styling)
-- `false` or omitted: No preference
 
 #### Host Behavior:
 
@@ -219,7 +279,7 @@ Example:
 - Resource MUST exist on the server
 - Host MUST use `resources/read` to fetch the referenced resource URI.
 - Host MAY prefetch and cache UI resource content for performance optimization
-- Since UI resources are primarily discovered through tool metadata, Servers MAY omit UI-only resources from `resources/list` and `resources/notifications/list_changed`
+- Since UI resources are primarily discovered through tool metadata, Servers MAY omit UI-only resources from `resources/list` and `notifications/resources/list_changed`
 
 #### Benefits:
 
@@ -256,7 +316,7 @@ function sendRequest(method: string, params: any) {
       if (event.data?.id === id) {
         window.removeEventListener('message', listener);
         if (event.data?.result) {
-          resolve(true);
+          resolve(event.data?.result);
         } else if (event.data?.error) {
           reject(new Error(event.data.error));
         }
@@ -293,14 +353,14 @@ If the Host is a web page, it MUST wrap the Guest UI and communicate with it thr
 
 1. The Host and the Sandbox MUST have different origins.
 2. The Sandbox MUST have the following permissions: `allow-scripts`, `allow-same-origin`.
-3. The Sandbox MUST send a `ui/sandbox-ready` notification to the host when it’s ready to process an `ui/sandbox-resource-ready` notification.
-4. Once the Sandbox is ready, the Host MUST send the raw HTML resource to load in a `ui/sandbox-resource-ready` notification.
+3. The Sandbox MUST send a `ui/notifications/sandbox-ready` notification to the host when it’s ready to process an `ui/sandbox-resource-ready` notification.
+4. Once the Sandbox is ready, the Host MUST send the raw HTML resource to load in a `ui/notifications/sandbox-resource-ready` notification.
 5. The Sandbox MUST load the raw HTML of the Guest UI with CSP settings that:
    - Enforce the domains declared in `ui.csp` metadata
    - Prevent nested iframes (`frame-src 'none'`)
    - Block dangerous features (`object-src 'none'`, `base-uri 'self'`)
    - Apply restrictive defaults if no CSP metadata is provided
-6. The Sandbox MUST forward messages sent by the Host to the Guest UI, and vice versa, with any method that doesn’t start with `ui/sandbox-`. This includes lifecycle messages, e.g. `initialize` request & `initialized` notification both sent by the Guest UI. The Host MUST NOT send any request or notification to the Guest UI before it receives an `initialized` notification.
+6. The Sandbox MUST forward messages sent by the Host to the Guest UI, and vice versa, for any method that doesn’t start with `ui/notifications/sandbox-`. This includes lifecycle messages, e.g., `ui/initialize` request & `ui/notifications/initialized` notification both sent by the Guest UI. The Host MUST NOT send any request or notification to the Guest UI before it receives an `initialized` notification.
 7. The Sandbox SHOULD NOT create/send any requests to the Host or to the Guest UI (this would require synthesizing new request ids).
 8. The Host MAY forward any message from the Guest UI (coming via the Sandbox) to the MCP Apps server, for any method that doesn’t start with `ui/`. While the Host SHOULD ensure the Guest UI’s MCP connection is spec-compliant, it MAY decide to block some messages or subject them to further user approval.
 
@@ -325,7 +385,7 @@ UI iframes can use the following subset of standard MCP protocol messages:
 - `ui/initialize` → `ui/notifications/initialized` - MCP-like handshake (replaces custom iframe-ready pattern in MCP-UI)
 - `ping` - Connection health check
 
-### Host Context in McpUiInitializeResult
+### Host Context in `McpUiInitializeResult`
 
 When the Guest UI sends an `ui/initialize` request to the Host, the Host SHOULD include UI-specific context in the `McpUiInitializeResult`’s `hostContext` field:
 
@@ -476,26 +536,26 @@ Host SHOULD add the message to the conversation thread, preserving the specified
 
 `ui/notifications/tool-input` - Host MUST send this notification with the complete tool arguments after the Guest UI's initialize request completes.
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "method": "ui/notifications/tool-input",
-  "params": {
-    "arguments": "Record<string, unknown>"  // Tool input arguments
+  jsonrpc: "2.0",
+  method: "ui/notifications/tool-input",
+  params: {
+    arguments: Record<string, unknown>  // Tool input arguments
   }
 }
 ```
 
-Host sends this notification after the Guest UI's initialize request completes, when tool arguments become available. This notification is sent at most once and is required before sending `ui/tool-result`.
+Host sends this notification after the Guest UI's initialize request completes, when tool arguments become available. This notification is sent at most once and is required before sending `ui/notifications/tool-result`.
 
 `ui/notifications/tool-input-partial` - Host MAY send this notification zero or more times while the agent is streaming tool arguments, before `ui/notifications/tool-input` is sent.
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "method": "ui/notifications/tool-input-partial",
-  "params": {
-    "arguments": "Record<string, unknown>"  // Tool input arguments
+  jsonrpc: "2.0",
+  method: "ui/notifications/tool-input-partial",
+  params: {
+    arguments: Record<string, unknown>  // Tool input arguments
   }
 }
 ```
@@ -513,13 +573,13 @@ Guest UI behavior (optional):
 - MUST NOT rely on partial arguments for critical operations
 - SHOULD gracefully handle missing or changing fields between notifications
 
-`ui/tool-result` - Tool execution result
+`ui/notifications/tool-result` - Tool execution result
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "method": "ui/tool-result",
-  "params": "CallToolResult"  // Standard MCP type
+  jsonrpc: "2.0",
+  method: "ui/notifications/tool-result",
+  params: CallToolResult  // Standard MCP type
 }
 ```
 
@@ -527,12 +587,12 @@ Host MUST send this notification when tool execution completes (if UI is display
 
 `ui/tool-cancelled` - Tool execution was cancelled
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "method": "ui/tool-cancelled",
-  "params": {
-    "reason": "string"
+  jsonrpc: "2.0",
+  method: "ui/tool-cancelled",
+  params: {
+    reason: string
   }
 }
 ```
@@ -541,30 +601,30 @@ Host MUST send this notification if the tool execution was cancelled, for any re
 
 `ui/resource-teardown` - Host notifies UI before teardown
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "ui/resource-teardown",
-  "params": {
-    "reason": "string"
+  jsonrpc: "2.0",
+  id: 1,
+  method: "ui/resource-teardown",
+  params: {
+    reason: string
   }
 }
 
 // Success Response
 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {}  // Empty result on success
+  jsonrpc: "2.0",
+  id: 1,
+  result: {}  // Empty result on success
 }
 
 // Error Response (if failed)
 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "error": {
-    "code": -32000,  // Implementation-defined error
-    "message": "Teardown error"
+  jsonrpc: "2.0",
+  id: 1,
+  error: {
+    code: -32000,  // Implementation-defined error
+    message: "Teardown error"
   }
 }
 ```
@@ -574,13 +634,13 @@ Host SHOULD wait for a response before tearing down the resource (to prevent dat
 
 `ui/size-change` - UI’s size changed
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "method": "ui/size-change",
-  "params": {
-    "width": "number",   // Viewport width in pixels
-    "height": "number"   // Viewport height in pixels
+  jsonrpc: "2.0",
+  method: "ui/size-change",
+  params: {
+    width: number,   // Viewport width in pixels
+    height: number   // Viewport height in pixels
   }
 }
 ```
@@ -589,11 +649,11 @@ Guest UI SHOULD send this notification when rendered content body size changes (
 
 `ui/host-context-change` - Host context has changed
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "method": "ui/host-context-change",
-  "params": "Partial<HostContext>"  // See HostContext type above
+  jsonrpc: "2.0",
+  method: "ui/host-context-change",
+  params: Partial<HostContext>  // See HostContext type above
 }
 ```
 
@@ -603,25 +663,25 @@ Host MAY send this notification when any context field changes (e.g., theme togg
 
 These messages are reserved for web-based hosts that implement the recommended double-iframe sandbox architecture:
 
-`ui/sandbox-ready` - Sandbox proxy is ready
+`ui/notifications/sandbox-ready` (Sandbox Proxy → Host) - Sandbox proxy is ready
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "method": "ui/sandbox-ready",
-  "params": {}
+  jsonrpc: "2.0",
+  method: "ui/notifications/sandbox-ready",
+  params: {}
 }
 ```
 
-`ui/sandbox-resource-ready` - HTML resource ready to load
+`ui/notifications/sandbox-resource-ready` (Host → Sandbox Proxy) - HTML resource ready to load
 
-```json
+```typescript
 {
-  "jsonrpc": "2.0",
-  "method": "ui/sandbox-resource-ready",
-  "params": {
-    "html": "string",        // HTML content to load
-    "sandbox": "string"      // Optional override for inner iframe `sandbox` attribute
+  jsonrpc: "2.0",
+  method: "ui/notifications/sandbox-resource-ready",
+  params: {
+    html: string,        // HTML content to load
+    sandbox: string      // Optional override for inner iframe `sandbox` attribute
   }
 }
 ```
@@ -636,10 +696,10 @@ The typical lifecycle for rendering a UI resource:
 
 ```mermaid
 sequenceDiagram
- participant H as Host
- participant S as MCP Server
+  participant H as Host
+  participant S as MCP Server
 
- autonumber
+  autonumber
   S -->> H: resources/list (includes ui:// resources)
   S -->> H: tools/list (includes tools with ui/resourceUri metadata)
 ```
@@ -648,90 +708,90 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
- participant H as Host
- participant UI as Guest UI (iframe)
- participant P as Sandbox Proxy
- participant S as MCP Server
+  participant H as Host
+  participant UI as Guest UI (iframe)
+  participant P as Sandbox Proxy
+  participant S as MCP Server
 
- autonumber
- par UI Tool call
-   H ->> S: tools/call to Tool with ui/resourceUri metadata
- and UI initialization
-   alt Desktop/Native hosts
-   H ->> H: Render Guest UI in an iframe (HTML from the ui:// resource)
-   else Web hosts
-   H ->> H: Render Sandbox Proxy in an iframe (different origin)
-   P ->> H: ui/notifications/sandbox-ready
-   H -->> P: ui/notifications/sandbox-resource-ready (HTML content)
-   P -> P: Render inner iframe with HTML
+  autonumber
+  par UI Tool call
+    H ->> S: tools/call to Tool with ui/resourceUri metadata
+  and UI initialization
+    alt Desktop/Native hosts
+      H ->> H: Render Guest UI in an iframe (HTML from the ui:// resource)
+    else Web hosts
+      H ->> H: Render Sandbox Proxy in an iframe (different origin)
+      P ->> H: ui/notifications/sandbox-ready
+      H -->> P: ui/notifications/sandbox-resource-ready (HTML content)
+      P -> P: Render inner iframe with HTML
 
-   end
-   UI ->> H: initialize
-   H -->> UI: InitializeResult (e.g., host-context, capabilities, etc.)
-   UI ->> H: notifications/initialized
-   opt Stream Tool input to UI
-     H -->> UI: ui/notifications/tool-input-partial (0..n)
-   end
-   H -->> UI: ui/notifications/tool-input (complete)
- end
- alt Tool complete
-   H -->> UI: ui/notifications/tool-result
- else Tool cancelled
-   H -->> UI: ui/notifications/tool-cancelled
- end
+    end
+    UI ->> H: ui/initialize
+    H -->> UI: McpUiInitializeResult (e.g., host-context, capabilities, etc.)
+    UI ->> H: ui/notifications/initialized
+    opt Stream Tool input to UI
+      H -->> UI: ui/notifications/tool-input-partial (0..n)
+    end
+    H -->> UI: ui/notifications/tool-input (complete)
+  end
+  alt Tool complete
+    H -->> UI: ui/notifications/tool-result
+  else Tool cancelled
+    H -->> UI: ui/notifications/tool-cancelled
+  end
 ```
 
-Note: when the Guest UI is rendered inside a sandbox, the sandbox transparently passes events between the Guest UI and the Host (except for events that start with `sandbox-`)
+Note: when the Guest UI is rendered inside a sandbox, the sandbox transparently passes messages between the Guest UI and the Host, except for messages named `ui/notifications/sandbox-*`.
 
 #### 5. Interactive Phase
 
 ```mermaid
 sequenceDiagram
- actor U as User / Agent
- participant H as Host
- participant UI as Guest UI (iframe)
- participant S as MCP Server
- loop Interactive phase
-   U ->> UI: interaction (e.g., click)
-   alt Tool call
-     UI ->> H: tools/call
-     H ->> S: tools/call
-     opt Stream Tool input to UI
-       H -->> UI: ui/notifications/tool-input-partial (0..n)
-     end
-     H -->> UI: ui/notifications/tool-input (complete)
-     H-->>UI: ui/notifications/tool-result
- else Message
-   UI ->> H: ui/message
-   H -->> H: Process message and follow up
- else Notify
-     UI ->> H: notifications/message
-     H ->> H: Process notification and store in context
- else Resource read
-     UI ->> H: resources/read
-     H ->> S: resources/read
-     S --> H: resources/read response
-     H --> UI: resources/read response
-   end
-   opt UI notifications
-     UI ->> H: notifications (e.g., ui/notifications/size-change)
-   end
-   opt Host notifications
-     H ->> UI: notifications (e.g., ui/notifications/host-context-change)
-   end
- end
+  actor U as User / Agent
+  participant H as Host
+  participant UI as Guest UI (iframe)
+  participant S as MCP Server
+  loop Interactive phase
+    U ->> UI: interaction (e.g., click)
+    alt Tool call
+      UI ->> H: tools/call
+      H ->> S: tools/call
+      opt Stream Tool input to UI
+        H -->> UI: ui/notifications/tool-input-partial (0..n)
+      end
+      H -->> UI: ui/notifications/tool-input (complete)
+      H-->>UI: ui/notifications/tool-result
+    else Message
+      UI ->> H: ui/message
+      H -->> H: Process message and follow up
+    else Notify
+      UI ->> H: notifications/message
+      H ->> H: Process notification and store in context
+    else Resource read
+      UI ->> H: resources/read
+      H ->> S: resources/read
+      S --> H: resources/read response
+      H --> UI: resources/read response
+    end
+    opt UI notifications
+      UI ->> H: notifications (e.g., ui/notifications/size-change)
+    end
+    opt Host notifications
+      H ->> UI: notifications (e.g., ui/notifications/host-context-change)
+    end
+  end
 ```
 
 #### 6. Cleanup
 
 ```mermaid
 sequenceDiagram
- participant H as Host
- participant UI as Guest UI (iframe)
- H ->> UI: ui/resource-teardown
- UI --> UI: Graceful termination
- UI -->> H: ui/resource-teardown response
- H -x H: Tear down iframe and listeners
+  participant H as Host
+  participant UI as Guest UI (iframe)
+  H ->> UI: ui/resource-teardown
+  UI --> UI: Graceful termination
+  UI -->> H: ui/resource-teardown response
+  H -x H: Tear down iframe and listeners
 ```
 
 Note: Cleanup may be triggered at any point in the lifecycle following UI initialization.
@@ -746,48 +806,79 @@ Note: Cleanup may be triggered at any point in the lifecycle following UI initia
 
 Tool execution results are passed to the UI through two mechanisms:
 
-#### 1. Tool Input (via ui/notifications/tool-input notification)
+#### 1. Tool Input (via `ui/notifications/tool-input` notification)
 
 The original tool call arguments:
 
 ```typescript
-// Tool was called with:
-tools/call("get_weather", { location: "San Francisco" })
+// Tool was called with (JSON-RPC request from Host to Server):
+{
+  jsonrpc: "2.0",
+  id: 1,
+  method: "tools/call",
+  params: {
+    name: "get_weather",
+    arguments: {
+      location: "San Francisco"
+    }
+  }
+}
 
-// UI receives:
-notification: ui/notifications/tool-input
-params: {
-  arguments: { location: "San Francisco" }
+// UI receives (JSON-RPC notification from Host to UI):
+{
+  jsonrpc: "2.0",
+  method: "ui/notifications/tool-input",
+  params: {
+    arguments: {
+      location: "San Francisco"
+    }
+  }
 }
 ```
 
-#### 2. Tool Result (via ui/tool-result notification)
+#### 2. Tool Result (via `ui/notifications/tool-result` notification)
 
 The tool's execution result:
 
 ```typescript
-// Server returns from tool execution:
+// Server returns from tool execution (JSON-RPC response):
 {
-  content: [
-    { type: "text", text: "Current weather: Sunny, 72°F" }
-  ],
-  structuredContent: {
-    temperature: 72,
-    conditions: "sunny",
-    humidity: 45
-  },
-  _meta: {
-    timestamp: "2025-11-10T15:30:00Z",
-    source: "weather-api"
+  jsonrpc: "2.0",
+  id: 1,  // Matches the tools/call request id
+  result: {
+    content: [
+      { type: "text", text: "Current weather: Sunny, 72°F" }
+    ],
+    structuredContent: {
+      temperature: 72,
+      conditions: "sunny",
+      humidity: 45
+    },
+    _meta: {
+      timestamp: "2025-11-10T15:30:00Z",
+      source: "weather-api"
+    }
   }
 }
 
-// UI receives:
-Notification: ui/tool-result
-params: {
-  content: [...],  // Same as above
-  structuredContent: { temperature: 72, ... },
-  _meta: { timestamp: "...", ... }
+// UI receives (JSON-RPC notification):
+{
+  jsonrpc: "2.0",
+  method: "ui/notifications/tool-result",
+  params: {
+    content: [
+      { type: "text", text: "Current weather: Sunny, 72°F" }
+    ],
+    structuredContent: {
+      temperature: 72,
+      conditions: "sunny",
+      humidity: 45
+    },
+    _meta: {
+      timestamp: "2025-11-10T15:30:00Z",
+      source: "weather-api"
+    }
+  }
 }
 ```
 
@@ -812,7 +903,7 @@ This pattern enables interactive, self-updating widgets.
 
 Note: The called tool may not appear in `tools/list` responses. MCP servers MAY expose private tools specifically designed for UI interaction that are not visible to the agent. UI implementations SHOULD attempt to call tools by name regardless of discoverability. The specification for Private Tools will be covered in a future SEP.
 
-### Client<>Server Capability Negotiation
+### Client\<\>Server Capability Negotiation
 
 Clients and servers negotiate MCP Apps support through the standard MCP extensions capability mechanism (defined in SEP-1724).
 
@@ -1013,17 +1104,20 @@ Hosts MUST enforce Content Security Policies based on resource metadata.
 
 **CSP Construction from Metadata:**
 
-```yaml
-Content-Security-Policy:
+```typescript
+const csp = resource._meta?.ui?.csp;
+
+const cspValue = `
   default-src 'none';
   script-src 'self' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
-  connect-src 'self' ${csp.connect_domains?.join(' ') || ''};
-  img-src 'self' data: ${csp.resource_domains?.join(' ') || ''};
-  font-src 'self' ${csp.resource_domains?.join(' ') || ''};
+  connect-src 'self' ${csp?.connect_domains?.join(' ') || ''};
+  img-src 'self' data: ${csp?.resource_domains?.join(' ') || ''};
+  font-src 'self' ${csp?.resource_domains?.join(' ') || ''};
   frame-src 'none';
   object-src 'none';
   base-uri 'self';
+`;
 ```
 
 **Security Requirements:**

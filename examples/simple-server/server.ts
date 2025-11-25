@@ -14,6 +14,7 @@ import cors from "cors";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { RESOURCE_URI_META_KEY } from "@modelcontextprotocol/ext-apps";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,7 +82,7 @@ const getServer = async () => {
           message: z.string().describe("Message to display"),
         },
         _meta: {
-          "ui/resourceUri": rawResource.uri,
+          [RESOURCE_URI_META_KEY]: rawResource.uri,
         },
       },
       async ({ message }): Promise<CallToolResult> => ({
@@ -112,7 +113,7 @@ const getServer = async () => {
           message: z.string().describe("Message to display"),
         },
         _meta: {
-          "ui/resourceUri": vanillaResource.uri,
+          [RESOURCE_URI_META_KEY]: vanillaResource.uri,
         },
       },
       async ({ message }): Promise<CallToolResult> => ({
@@ -143,7 +144,7 @@ const getServer = async () => {
           message: z.string().describe("Message to display"),
         },
         _meta: {
-          "ui/resourceUri": reactResource.uri,
+          [RESOURCE_URI_META_KEY]: reactResource.uri,
         },
       },
       async ({ message }): Promise<CallToolResult> => ({
