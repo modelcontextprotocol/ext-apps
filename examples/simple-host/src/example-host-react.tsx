@@ -8,7 +8,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { AppRenderer, AppRendererProps } from "../src/AppRenderer";
 import { AppBridge } from "../../../dist/src/app-bridge";
 
-const SANDBOX_PROXY_URL = URL.parse("/sandbox.html", location.href)!;
+const SANDBOX_PROXY_URL = new URL("http://localhost:8081/sandbox.html");
 
 /**
  * Example React application demonstrating the AppRenderer component.

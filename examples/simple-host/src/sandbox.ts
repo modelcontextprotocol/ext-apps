@@ -15,6 +15,15 @@ if (!document.referrer.match(/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/)) {
   );
 }
 
+// Try and break out of this iframe
+try {
+  window.top!.alert("If you see this, the sandbox is not setup securely.");
+
+  throw new Error('Managed to break out of iframe, the sandbox is not setup securely.');
+} catch (e) {
+  // Ignore
+}
+
 const inner = document.createElement("iframe");
 inner.style = "width:100%; height:100%; border:none;";
 inner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");

@@ -18,7 +18,7 @@ import {
   McpUiSizeChangeNotificationSchema,
 } from "@modelcontextprotocol/ext-apps";
 
-const SANDBOX_PROXY_URL = URL.parse("/sandbox.html", location.href)!;
+const SANDBOX_PROXY_URL = new URL("http://localhost:8081/sandbox.html");
 
 window.addEventListener("load", async () => {
   const client = new Client({
