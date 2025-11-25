@@ -63,12 +63,13 @@ type HostOptions = ProtocolOptions;
 
 export const SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION];
 
-type RequestExtra = Parameters<
+type RequestHandlerExtra = Parameters<
   Parameters<AppBridge["setRequestHandler"]>[1]
 >[1];
 
 export class AppBridge extends Protocol<Request, Notification, Result> {
   private _appCapabilities?: McpUiAppCapabilities;
+  private _appInfo?: Implementation;
 
   constructor(
     private _client: Client,
@@ -88,7 +89,14 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     });
   }
 
-  onping?: (params: PingRequest["params"], extra: RequestExtra) => void;
+  getAppCapabilities(): McpUiAppCapabilities | undefined {
+    return this._appCapabilities;
+  }
+  getAppVersion(): Implementation | undefined {
+    return this._appInfo;
+  }
+
+  onping?: (params: PingRequest["params"], extra: RequestHandlerExtra) => void;
 
   set onsizechange(
     callback: (params: McpUiSizeChangeNotification["params"]) => void,
@@ -114,7 +122,7 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   set onmessage(
     callback: (
       params: McpUiMessageRequest["params"],
-      extra: RequestExtra,
+      extra: RequestHandlerExtra,
     ) => Promise<McpUiMessageResult>,
   ) {
     this.setRequestHandler(
@@ -127,7 +135,7 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   set onopenlink(
     callback: (
       params: McpUiOpenLinkRequest["params"],
-      extra: RequestExtra,
+      extra: RequestHandlerExtra,
     ) => Promise<McpUiOpenLinkResult>,
   ) {
     this.setRequestHandler(
@@ -168,6 +176,7 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     const requestedVersion = request.params.protocolVersion;
 
     this._appCapabilities = request.params.appCapabilities;
+    this._appInfo = request.params.appInfo;
 
     const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(
       requestedVersion,

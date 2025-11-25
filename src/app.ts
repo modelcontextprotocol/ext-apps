@@ -47,6 +47,10 @@ type AppOptions = ProtocolOptions & {
   autoResize?: boolean;
 };
 
+type RequestHandlerExtra = Parameters<
+  Parameters<App["setRequestHandler"]>[1]
+>[1];
+
 export class App extends Protocol<Request, Notification, Result> {
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
@@ -62,6 +66,14 @@ export class App extends Protocol<Request, Notification, Result> {
       console.log("Received ping:", request.params);
       return {};
     });
+  }
+
+  getHostCapabilities(): McpUiHostCapabilities | undefined {
+    return this._hostCapabilities;
+  }
+
+  getHostVersion(): Implementation | undefined {
+    return this._hostInfo;
   }
 
   set ontoolinput(
