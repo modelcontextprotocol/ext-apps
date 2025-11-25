@@ -19,22 +19,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
-      - run: npm ci
+      - run: npm install
 
       - run: npm run build
 
       - name: Build simple-host example
         working-directory: examples/simple-host
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Build simple-server example
         working-directory: examples/simple-server
         run: |
-          npm ci
+          npm install
           npm run build
 
       - run: npm run prettier
