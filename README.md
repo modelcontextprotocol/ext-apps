@@ -42,13 +42,14 @@ Run the examples in this repo end-to-end:
 ```
 npm i
 npm start
-open http://localhost:8080/
 ```
+
+open http://localhost:8080/
 
 > [!NOTE]  
 > Please bear with us while we add more examples!
 
-### Using the SDK in your project
+### Using the SDK in your project
 
 This repo is in flux and isn't published to npm yet: when it is, it will use the `@modelcontextprotocol/ext-apps` package.
 
