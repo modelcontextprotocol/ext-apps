@@ -25,7 +25,7 @@
   "scripts": {
     "start": "cd examples/simple-host && npm i && npm start",
     "build": "bun build.bun.ts",
-    "prepare": "npm run build",
+    "prepare": "npm run build && husky",
     "prettier:base-cmd": "prettier -u --ignore-path ./.gitignore --ignore-path ./.prettierignore",
     "prettier": "yarn prettier:base-cmd \"$(pwd)/**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
     "prettier:fix": "yarn prettier:base-cmd \"$(pwd)/**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write --list-different"
@@ -37,6 +37,7 @@
     "concurrently": "^9.2.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "husky": "^9.1.7",
     "prettier": "^3.6.2"
   },
   "dependencies": {

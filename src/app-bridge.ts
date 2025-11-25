@@ -273,10 +273,7 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
         ListResourceTemplatesRequestSchema,
         ListResourceTemplatesResultSchema,
       );
-      this.forwardRequest(
-        ReadResourceRequestSchema,
-        ReadResourceResultSchema,
-      );
+      this.forwardRequest(ReadResourceRequestSchema, ReadResourceResultSchema);
       if (serverCapabilities.resources.listChanged) {
         this.forwardNotification(ResourceListChangedNotificationSchema);
       }
