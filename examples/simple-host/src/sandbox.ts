@@ -19,7 +19,9 @@ if (!document.referrer.match(/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/)) {
 try {
   window.top!.alert("If you see this, the sandbox is not setup securely.");
 
-  throw new Error('Managed to break out of iframe, the sandbox is not setup securely.');
+  throw new Error(
+    "Managed to break out of iframe, the sandbox is not setup securely.",
+  );
 } catch (e) {
   // Ignore
 }
