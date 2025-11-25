@@ -22,6 +22,9 @@
   "files": [
     "dist"
   ],
+  "workspaces": [
+    "examples/*"
+  ],
   "scripts": {
     "start:example-host": "cd examples/simple-host && npm --registry=https://registry.npmjs.org/ i && npm start",
     "start:example-mcp-server": "cd examples//simple-server && npm --registry=https://registry.npmjs.org/ install && npm start",

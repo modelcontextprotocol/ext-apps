@@ -17,6 +17,7 @@ import {
   getToolUiResourceUri,
   readToolUiResourceHtml,
   setupSandboxProxyIframe,
+  ToolUiResourceInfo,
 } from "./app-host-utils";
 
 /**
@@ -249,7 +250,7 @@ export const AppRenderer = (props: AppRendererProps) => {
     const fetchAndSendResource = async () => {
       try {
         // Get the resource URI (use prop if provided, otherwise fetch)
-        let resourceInfo: { uri: string };
+        let resourceInfo: ToolUiResourceInfo;
 
         if (toolResourceUri) {
           // When URI is provided directly, assume it's NOT OpenAI Apps SDK format
