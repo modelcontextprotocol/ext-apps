@@ -18,7 +18,11 @@ import {
   McpUiSizeChangeNotificationSchema,
 } from "@modelcontextprotocol/ext-apps";
 
-const SANDBOX_PROXY_URL = new URL("http://localhost:8081/sandbox.html");
+// We use '[::1]' for the sandbox to ensure it's a different origin from 'localhost'.
+const SANDBOX_PROXY_URL = new URL(
+  "/sandbox.html",
+  location.href.replace("localhost:", "[::1]:"),
+);
 
 window.addEventListener("load", async () => {
   const client = new Client({

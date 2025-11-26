@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "NODE_ENV=development npm run build && concurrently 'npm run start:server'",
-    "start:server": "bun serve.ts",
-    "build": "concurrently 'INPUT=example-host-vanilla.html vite build' 'INPUT=example-host-react.html vite build' 'INPUT=sandbox.html vite build'"
+    "start": "vite dev",
+    "start:server": "vite preview",
+    "build": "vite build"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "../..",
