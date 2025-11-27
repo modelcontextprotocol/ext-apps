@@ -111,7 +111,7 @@ export const McpUiHostContextSchema = z.object({
       tool: ToolSchema, // contains name, inputSchema, etc…
     })
     .optional(),
-  theme: z.enum(["light", "dark", "system"]).optional(),
+  theme: z.enum(["light", "dark"]).optional(),
   displayMode: z.enum(["inline", "fullscreen", "pip", "carousel"]).optional(),
   availableDisplayModes: z.array(z.string()).optional(),
   viewport: z
