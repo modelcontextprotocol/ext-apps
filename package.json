@@ -26,6 +26,7 @@
     "examples/*"
   ],
   "scripts": {
+    "generate:schemas": "npx ts-to-zod src/spec.types.ts src/schemas.generated.ts && tsx scripts/postprocess-schemas.ts",
     "start:example-host": "cd examples/simple-host && npm start",
     "start:example-mcp-server": "cd examples/simple-server && npm start",
     "start": "NODE_ENV=development npm run build && concurrently 'npm run start:example-host' 'npm run start:example-mcp-server'",
@@ -47,6 +48,8 @@
     "express": "^5.1.0",
     "husky": "^9.1.7",
     "prettier": "^3.6.2",
+    "ts-to-zod": "^5.1.0",
+    "tsx": "^4.21.0",
     "typedoc": "^0.28.14",
     "typescript": "^5.9.3"
   },
