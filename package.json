@@ -31,6 +31,8 @@
     "start": "NODE_ENV=development npm run build && concurrently 'npm run start:example-host' 'npm run start:example-mcp-server'",
     "build": "bun build.bun.ts",
     "prepare": "npm run build && husky",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch",
     "prettier:base-cmd": "prettier -u --ignore-path ./.gitignore --ignore-path ./.prettierignore",
     "prettier": "yarn prettier:base-cmd \"$(pwd)/**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
     "prettier:fix": "yarn prettier:base-cmd \"$(pwd)/**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write --list-different"
@@ -45,10 +47,11 @@
     "express": "^5.1.0",
     "husky": "^9.1.7",
     "prettier": "^3.6.2",
+    "typedoc": "^0.28.14",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.22.0",
+    "@modelcontextprotocol/sdk": "^1.23.0",
     "bun": "^1.3.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

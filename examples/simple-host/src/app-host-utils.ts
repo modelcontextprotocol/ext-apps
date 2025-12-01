@@ -1,4 +1,4 @@
-import { McpUiSandboxProxyReadyNotificationSchema } from "@modelcontextprotocol/ext-apps";
+import type { McpUiSandboxProxyReadyNotification } from "@modelcontextprotocol/ext-apps";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { Tool } from "@modelcontextprotocol/sdk/types.js";
 
@@ -8,6 +8,9 @@ export async function setupSandboxProxyIframe(sandboxProxyUrl: URL): Promise<{
   iframe: HTMLIFrameElement;
   onReady: Promise<void>;
 }> {
+  const SANDBOX_PROXY_READY_METHOD: McpUiSandboxProxyReadyNotification["method"] =
+    "ui/notifications/sandbox-proxy-ready";
+
   const iframe = document.createElement("iframe");
   iframe.style.width = "100%";
   iframe.style.height = "600px";
@@ -18,11 +21,7 @@ export async function setupSandboxProxyIframe(sandboxProxyUrl: URL): Promise<{
   const onReady = new Promise<void>((resolve, _reject) => {
     const initialListener = async (event: MessageEvent) => {
       if (event.source === iframe.contentWindow) {
-        if (
-          event.data &&
-          event.data.method ===
-            McpUiSandboxProxyReadyNotificationSchema.shape.method._def.value
-        ) {
+        if (event.data && event.data.method === SANDBOX_PROXY_READY_METHOD) {
           window.removeEventListener("message", initialListener);
           resolve();
         }

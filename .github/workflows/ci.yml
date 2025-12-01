@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify no private URLs in package-lock.json
+        run: '! grep -E "\"resolved\": \"https?://" package-lock.json | grep -v registry.npmjs.org'
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest

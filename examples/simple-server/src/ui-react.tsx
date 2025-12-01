@@ -37,7 +37,7 @@ export function McpClientApp() {
     try {
       const result = await app.callServerTool({
         name: "get-weather",
-        arguments: { city: "Tokyo" },
+        arguments: { location: "Tokyo" },
       });
       setMessages((prev) => [
         ...prev,

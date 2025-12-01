@@ -1,0 +1,21 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/app.ts",
+    "src/app-bridge.ts",
+    "src/types.ts",
+    "src/message-transport.ts",
+    "src/react/index.tsx"
+  ],
+  "out": "docs/api",
+  "gitRevision": "main",
+  "excludePrivate": true,
+  "excludeInternal": false,
+  "categorizeByGroup": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/modelcontextprotocol/ext-apps",
+    "Specification": "https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx"
+  },
+  "readme": "README.md",
+  "includeVersion": true
+}

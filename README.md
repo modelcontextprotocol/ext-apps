@@ -1,59 +1,37 @@
 # @modelcontextprotocol/ext-apps
 
-This repo contains the SDK and [specification](./specification/draft/apps.mdx) for MCP Apps Extension ([SEP-1865](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865)).
+[![API Documentation](https://img.shields.io/badge/docs-API%20Reference-blue)](https://modelcontextprotocol.github.io/ext-apps/api/)
 
-MCP Apps are proposed standard inspired by [MCP-UI](https://mcpui.dev/) and [OpenAI's Apps SDK](https://developers.openai.com/apps-sdk/) to allow MCP Servers to display interactive UI elements in conversational MCP clients / chatbots.
+This repo contains the SDK and [specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx) for MCP Apps Extension ([SEP-1865](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865)).
 
-This repo provides:
+MCP Apps are a proposed standard inspired by [MCP-UI](https://mcpui.dev/) and [OpenAI's Apps SDK](https://developers.openai.com/apps-sdk/) to allow MCP Servers to display interactive UI elements in conversational MCP clients / chatbots.
 
-- [specification/draft/apps.mdx](./specification/draft/apps.mdx): The Draft Extension Specification. It's still... in flux! Feedback welcome! (also see discussions in [SEP-1865](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865)).
+## Overview
 
-- [types.ts](./src/types.ts): Types of JSON-RPC messages used to communicate between Apps & their host
-  - Note that MCP Apps also use some standard MCP messages (e.g. `tools/call` for the App to trigger actions on its originating Server - these calls are proxied through the Host), but these types are the additional messages defined by the extension
-- [examples/simple-example](./examples/simple-server): Example Server + Apps
-  - [server.ts](./examples/simple-server/server.ts): MCP server with three tools that declare UI resources of Apps to be show in the chat when called
-  - [ui-react.tsx](./examples/simple-server/src/ui-react.tsx): React App returned by the `create-ui-react` tool shows how to use the `useApp` hook to register MCP callbacks
-  - [ui-vanilla.tsx](./examples/simple-server/src/ui-vanilla.ts): vanilla App returned by the `create-ui-vanilla`
-  - [ui-raw.tsx](./examples/simple-server/src/ui-raw.ts): same as vanilla App but doesn't use the SDK runtime (just its types)
+This SDK serves two audiences:
 
-- [examples/simple-host](./examples/simple-host): bare-bone examples on how to host MCP Apps (both use the [AppBridge](./src/app-bridge.ts) class to talk to a hosted App)
-  - [example-host-react.tsx](./examples/simple-host/src/example-host-react.tsx) uses React (esp. [AppRenderer.tsx](./examples/simple-host/src/AppRenderer.tsx))
-  - [example-host-vanilla.tsx](./examples/simple-host/src/example-host-vanilla.tsx) doesn't use React
+### App Developers
 
-- [message-transport](./src/message-transport.ts): `PostMessageTransport` class that uses `postMessage` to exchange JSON-RPC messages between windows / iframes
+Build interactive UIs that run inside MCP-enabled chat clients.
 
-- [app.ts](./src/app.ts): `App` class used by an App to talk to its host
+- **SDK for Apps**: `@modelcontextprotocol/ext-apps` — [API Docs](https://modelcontextprotocol.github.io/ext-apps/api/modules/app.html)
+- **React hooks**: `@modelcontextprotocol/ext-apps/react` — [API Docs](https://modelcontextprotocol.github.io/ext-apps/api/modules/_modelcontextprotocol_ext-apps_react.html)
 
-- [app-bridge.ts](./src/app-bridge.ts): `AppBridge` class used by the host to talk to a single App
+### Host Developers
 
-- _Soon_: more examples!
+Embed and communicate with MCP Apps in your chat application.
 
-What this repo does NOT provide:
+- **SDK for Hosts**: `@modelcontextprotocol/ext-apps/app-bridge` — [API Docs](https://modelcontextprotocol.github.io/ext-apps/api/modules/app-bridge.html)
 
-- There's no _supported_ host implementation in this repo (beyond the [examples/simple-host](./examples/simple-host) example)
-  - We have [contributed a tentative implementation](https://github.com/MCP-UI-Org/mcp-ui/pull/147) of hosting / iframing / sandboxing logic to the [MCP-UI](https://github.com/idosal/mcp-ui) repository, and expect OSS clients may use it, while other clients might roll their own hosting logic.
+There's no _supported_ host implementation in this repo (beyond the [examples/simple-host](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/simple-host) example).
 
-## Using the SDK
+We have [contributed a tentative implementation](https://github.com/MCP-UI-Org/mcp-ui/pull/147) of hosting / iframing / sandboxing logic to the [MCP-UI](https://github.com/idosal/mcp-ui) repository, and expect OSS clients may use it, while other clients might roll their own hosting logic.
 
-### Run examples
+## Installation
 
-Run the examples in this repo end-to-end:
+This repo is in flux and isn't published to npm yet. When it is, it will use the `@modelcontextprotocol/ext-apps` package.
 
-```
-npm i
-npm start
-```
-
-open http://localhost:8080/
-
-> [!NOTE]  
-> Please bear with us while we add more examples!
-
-### Using the SDK in your project
-
-This repo is in flux and isn't published to npm yet: when it is, it will use the `@modelcontextprotocol/ext-apps` package.
-
-In the meantime you can depend on the SDK library in a Node.js project by installing it w/ its git URL:
+In the meantime you can depend on the SDK library in a Node.js project by installing it with its git URL:
 
 ```bash
 npm install -S git+https://github.com/modelcontextprotocol/ext-apps.git
@@ -63,15 +41,33 @@ Your `package.json` will then look like:
 
 ```json
 {
-  ...
   "dependencies": {
-    ...
     "@modelcontextprotocol/ext-apps": "git+https://github.com/modelcontextprotocol/ext-apps.git"
   }
 }
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > The build tools (`esbuild`, `tsx`, `typescript`) are in `dependencies` rather than `devDependencies`. This is intentional: it allows the `prepare` script to run when the package is installed from git, since npm doesn't install devDependencies for git dependencies.
 >
 > Once the package is published to npm with pre-built `dist/`, these can be moved back to `devDependencies`.
+
+## Examples
+
+- [examples/simple-server](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/simple-server) — Example MCP server with tools that return UI Apps
+- [examples/simple-host](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/simple-host) — Bare-bones example of hosting MCP Apps
+
+To run the examples end-to-end:
+
+```
+npm i
+npm start
+```
+
+Then open http://localhost:8080/
+
+## Resources
+
+- [API Documentation](https://modelcontextprotocol.github.io/ext-apps/api/)
+- [Draft Specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx)
+- [SEP-1865 Discussion](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865)
