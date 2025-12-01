@@ -26,7 +26,7 @@
     "examples/*"
   ],
   "scripts": {
-    "generate:schemas": "npx ts-to-zod src/spec.types.ts src/schemas.generated.ts && tsx scripts/postprocess-schemas.ts",
+    "generate:schemas": "tsx scripts/generate-schemas.ts",
     "start:example-host": "cd examples/simple-host && npm start",
     "start:example-mcp-server": "cd examples/simple-server && npm start",
     "start": "NODE_ENV=development npm run build && concurrently 'npm run start:example-host' 'npm run start:example-mcp-server'",

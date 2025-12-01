@@ -361,7 +361,12 @@ export interface McpUiResourceTeardownRequest {
  *
  * @see {@link McpUiResourceTeardownRequest}
  */
-export interface McpUiResourceTeardownResult {}
+export interface McpUiResourceTeardownResult {
+  /**
+   * Index signature required for MCP SDK `Protocol` class compatibility.
+   */
+  [key: string]: unknown;
+}
 
 /**
  * Capabilities supported by the host application.
