@@ -23,7 +23,7 @@
     "@types/node": "^22.0.0",
     "concurrently": "^9.2.1",
     "cors": "^2.8.5",
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
     "vite-plugin-singlefile": "^2.3.0"
