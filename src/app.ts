@@ -41,7 +41,7 @@ import {
 } from "./types";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-export { PostMessageTransport } from "./message-transport.js";
+export { PostMessageTransport } from "./message-transport";
 export * from "./types";
 
 /**
