@@ -154,8 +154,8 @@ type RequestHandlerExtra = Parameters<
  */
 export class AppBridge extends Protocol<Request, Notification, Result> {
   private _appCapabilities?: McpUiAppCapabilities;
+  private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
-  private _hostContext: McpUiHostContext;
 
   /**
    * Create a new AppBridge instance.
@@ -626,11 +626,21 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     }
     if (hasChanges) {
       this._hostContext = hostContext;
-      this.notification((<McpUiHostContextChangedNotification>{
-        method: "ui/notifications/host-context-changed",
-        params: changes,
-      }) as Notification); // Cast needed because McpUiHostContext is a params type that doesn't allow arbitrary keys.
+      this.sendHostContextChange(changes);
     }
+  }
+
+  /**
+   * Send a host context change notification to the app.
+   * Only sends the fields that have changed (partial update).
+   */
+  sendHostContextChange(
+    params: McpUiHostContextChangedNotification["params"],
+  ): Promise<void> | void {
+    return this.notification((<McpUiHostContextChangedNotification>{
+      method: "ui/notifications/host-context-changed",
+      params,
+    }) as Notification);
   }
 
   /**
