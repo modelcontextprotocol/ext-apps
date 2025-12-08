@@ -330,7 +330,11 @@ async function main() {
       }
     });
 
-    const httpServer = app.listen(PORT, () => {
+    const httpServer = app.listen(PORT, (err) => {
+      if (err) {
+        console.error("Error starting server:", err);
+        process.exit(1);
+      }
       console.log(
         `Budget Allocator Server listening on http://localhost:${PORT}/mcp`,
       );

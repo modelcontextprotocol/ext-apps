@@ -153,7 +153,11 @@ app.post("/mcp", async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 });
 
-app.listen(3001, () => {
+app.listen(3001, (err) => {
+  if (err) {
+    console.error("Error starting server:", err);
+    process.exit(1);
+  }
   console.log("Server listening on http://localhost:3001/mcp");
 });
 ```

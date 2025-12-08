@@ -70,11 +70,19 @@ sandboxApp.use((_req, res) => {
 });
 
 // ============ Start both servers ============
-hostApp.listen(HOST_PORT, () => {
+hostApp.listen(HOST_PORT, err => {
+  if (err) {
+    console.error("Error starting server:", err);
+    process.exit(1);
+  }
   console.log(`Host server:    http://localhost:${HOST_PORT}`);
 });
 
-sandboxApp.listen(SANDBOX_PORT, () => {
+sandboxApp.listen(SANDBOX_PORT, err => {
+  if (err) {
+    console.error("Error starting server:", err);
+    process.exit(1);
+  }
   console.log(`Sandbox server: http://localhost:${SANDBOX_PORT}`);
   console.log("\nPress Ctrl+C to stop\n");
 });
