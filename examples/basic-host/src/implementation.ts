@@ -17,6 +17,7 @@ export const log = {
 
 
 export interface ServerInfo {
+  name: string;
   client: Client;
   tools: Map<string, Tool>;
   appHtmlCache: Map<string, string>;
@@ -30,11 +31,13 @@ export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
   await client.connect(new StreamableHTTPClientTransport(serverUrl));
   log.info("Connection successful");
 
+  const name = client.getServerVersion()?.name ?? serverUrl.href;
+
   const toolsList = await client.listTools();
   const tools = new Map(toolsList.tools.map((tool) => [tool.name, tool]));
   log.info("Server tools:", Array.from(tools.keys()));
 
-  return { client, tools, appHtmlCache: new Map() };
+  return { name, client, tools, appHtmlCache: new Map() };
 }
 
 

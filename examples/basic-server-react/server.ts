@@ -12,7 +12,7 @@ const DIST_DIR = path.join(import.meta.dirname, "dist");
 
 
 const server = new McpServer({
-  name: "MCP App Server",
+  name: "Basic MCP App Server (React-based)",
   version: "1.0.0",
 });
 
@@ -85,7 +85,7 @@ app.post("/mcp", async (req: Request, res: Response) => {
   }
 });
 
-const httpServer = app.listen(PORT, err => {
+const httpServer = app.listen(PORT, (err) => {
   if (err) {
     console.error("Error starting server:", err);
     process.exit(1);

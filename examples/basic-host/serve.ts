@@ -18,6 +18,7 @@ const __dirname = dirname(__filename);
 const HOST_PORT = parseInt(process.env.HOST_PORT || "8080", 10);
 const SANDBOX_PORT = parseInt(process.env.SANDBOX_PORT || "8081", 10);
 const DIRECTORY = join(__dirname, "dist");
+const SERVERS: string[] = process.env.SERVERS ? JSON.parse(process.env.SERVERS) : [];
 
 // ============ Host Server (port 8080) ============
 const hostApp = express();
@@ -33,6 +34,11 @@ hostApp.use((req, res, next) => {
 });
 
 hostApp.use(express.static(DIRECTORY));
+
+// API endpoint to get configured server URLs
+hostApp.get("/api/servers", (_req, res) => {
+  res.json(SERVERS);
+});
 
 hostApp.get("/", (_req, res) => {
   res.redirect("/index.html");
@@ -70,7 +76,7 @@ sandboxApp.use((_req, res) => {
 });
 
 // ============ Start both servers ============
-hostApp.listen(HOST_PORT, err => {
+hostApp.listen(HOST_PORT, (err) => {
   if (err) {
     console.error("Error starting server:", err);
     process.exit(1);
@@ -78,7 +84,7 @@ hostApp.listen(HOST_PORT, err => {
   console.log(`Host server:    http://localhost:${HOST_PORT}`);
 });
 
-sandboxApp.listen(SANDBOX_PORT, err => {
+sandboxApp.listen(SANDBOX_PORT, (err) => {
   if (err) {
     console.error("Error starting server:", err);
     process.exit(1);

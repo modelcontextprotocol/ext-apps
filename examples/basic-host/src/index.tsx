@@ -4,117 +4,38 @@ import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy,
 import styles from "./index.module.css";
 
 
-// Available MCP servers - using ports 3101+ to avoid conflicts with common dev ports
-const SERVERS = [
-  { name: "Basic React", port: 3101 },
-  { name: "Vanilla JS", port: 3102 },
-  { name: "Budget Allocator", port: 3103 },
-  { name: "Cohort Heatmap", port: 3104 },
-  { name: "Customer Segmentation", port: 3105 },
-  { name: "Scenario Modeler", port: 3106 },
-  { name: "System Monitor", port: 3107 },
-  { name: "Three.js", port: 3109 },
-] as const;
-
-function serverUrl(port: number): string {
-  return `http://localhost:${port}/mcp`;
+// Host passes serversPromise to CallToolPanel
+interface HostProps {
+  serversPromise: Promise<ServerInfo[]>;
 }
-
-// Cache server connections to avoid reconnecting when switching between servers
-const serverInfoCache = new Map<number, Promise<ServerInfo>>();
-
-function getServerInfo(port: number): Promise<ServerInfo> {
-  let promise = serverInfoCache.get(port);
-  if (!promise) {
-    promise = connectToServer(new URL(serverUrl(port)));
-    // Remove from cache on failure so retry is possible
-    promise.catch(() => serverInfoCache.delete(port));
-    serverInfoCache.set(port, promise);
-  }
-  return promise;
-}
-
-
-// Wrapper to track server name with each tool call
-interface ToolCallEntry {
-  serverName: string;
-  info: ToolCallInfo;
-}
-
-// Host just manages tool call results - no server dependency
-function Host() {
-  const [toolCalls, setToolCalls] = useState<ToolCallEntry[]>([]);
+function Host({ serversPromise }: HostProps) {
+  const [toolCalls, setToolCalls] = useState<ToolCallInfo[]>([]);
 
   return (
     <>
-      {toolCalls.map((entry, i) => (
-        <ToolCallInfoPanel key={i} serverName={entry.serverName} toolCallInfo={entry.info} />
+      {toolCalls.map((info, i) => (
+        <ToolCallInfoPanel key={i} toolCallInfo={info} />
       ))}
       <CallToolPanel
-        addToolCall={(serverName, info) => setToolCalls([...toolCalls, { serverName, info }])}
+        serversPromise={serversPromise}
+        addToolCall={(info) => setToolCalls([...toolCalls, info])}
       />
     </>
   );
 }
 
 
-// CallToolPanel includes server selection with its own Suspense boundary
+// CallToolPanel renders the unified form with Suspense around ServerSelect
 interface CallToolPanelProps {
-  addToolCall: (serverName: string, info: ToolCallInfo) => void;
+  serversPromise: Promise<ServerInfo[]>;
+  addToolCall: (info: ToolCallInfo) => void;
 }
-function CallToolPanel({ addToolCall }: CallToolPanelProps) {
-  const [selectedServer, setSelectedServer] = useState(SERVERS[0]);
-  const [serverInfoPromise, setServerInfoPromise] = useState(
-    () => getServerInfo(selectedServer.port)
-  );
-
-  const handleServerChange = (port: number) => {
-    const server = SERVERS.find(s => s.port === port) ?? SERVERS[0];
-    setSelectedServer(server);
-    setServerInfoPromise(getServerInfo(port));
-  };
-
-  return (
-    <div className={styles.callToolPanel}>
-      <label>
-        Server
-        <select
-          value={selectedServer.port}
-          onChange={(e) => handleServerChange(Number(e.target.value))}
-        >
-          {SERVERS.map(({ name, port }) => (
-            <option key={port} value={port}>
-              {name} (:{port})
-            </option>
-          ))}
-        </select>
-      </label>
-      <ErrorBoundary>
-        <Suspense fallback={<p className={styles.connecting}>Connecting to {serverUrl(selectedServer.port)}...</p>}>
-          <ToolCallForm
-            key={selectedServer.port}
-            serverName={selectedServer.name}
-            serverInfoPromise={serverInfoPromise}
-            addToolCall={addToolCall}
-          />
-        </Suspense>
-      </ErrorBoundary>
-    </div>
-  );
-}
-
-
-// ToolCallForm renders inside Suspense - needs serverInfo for tool list
-interface ToolCallFormProps {
-  serverName: string;
-  serverInfoPromise: Promise<ServerInfo>;
-  addToolCall: (serverName: string, info: ToolCallInfo) => void;
-}
-function ToolCallForm({ serverName, serverInfoPromise, addToolCall }: ToolCallFormProps) {
-  const serverInfo = use(serverInfoPromise);
-  const toolNames = Array.from(serverInfo.tools.keys());
-  const [selectedTool, setSelectedTool] = useState(toolNames[0] ?? "");
+function CallToolPanel({ serversPromise, addToolCall }: CallToolPanelProps) {
+  const [selectedServer, setSelectedServer] = useState<ServerInfo | null>(null);
+  const [selectedTool, setSelectedTool] = useState("");
   const [inputJson, setInputJson] = useState("{}");
+
+  const toolNames = selectedServer ? Array.from(selectedServer.tools.keys()) : [];
 
   const isValidJson = useMemo(() => {
     try {
@@ -125,49 +46,104 @@ function ToolCallForm({ serverName, serverInfoPromise, addToolCall }: ToolCallFo
     }
   }, [inputJson]);
 
+  const handleServerSelect = (server: ServerInfo) => {
+    setSelectedServer(server);
+    const [firstTool] = server.tools.keys();
+    setSelectedTool(firstTool ?? "");
+  };
+
   const handleSubmit = () => {
-    const toolCallInfo = callTool(serverInfo, selectedTool, JSON.parse(inputJson));
-    addToolCall(serverName, toolCallInfo);
+    if (!selectedServer) return;
+    const toolCallInfo = callTool(selectedServer, selectedTool, JSON.parse(inputJson));
+    addToolCall(toolCallInfo);
   };
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-      <label>
-        Tool
-        <select
-          value={selectedTool}
-          onChange={(e) => setSelectedTool(e.target.value)}
-        >
-          {toolNames.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Input
-        <textarea
-          aria-invalid={!isValidJson}
-          value={inputJson}
-          onChange={(e) => setInputJson(e.target.value)}
-        />
-      </label>
-      <button type="submit" disabled={!selectedTool || !isValidJson}>
-        Call Tool
-      </button>
-    </form>
+    <div className={styles.callToolPanel}>
+      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+        <label>
+          Server
+          <Suspense fallback={<select disabled><option>Loading...</option></select>}>
+            <ServerSelect serversPromise={serversPromise} onSelect={handleServerSelect} />
+          </Suspense>
+        </label>
+        <label>
+          Tool
+          <select
+            className={styles.toolSelect}
+            value={selectedTool}
+            onChange={(e) => setSelectedTool(e.target.value)}
+          >
+            {selectedServer && toolNames.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Input
+          <textarea
+            className={styles.toolInput}
+            aria-invalid={!isValidJson}
+            value={inputJson}
+            onChange={(e) => setInputJson(e.target.value)}
+          />
+        </label>
+        <button type="submit" disabled={!selectedTool || !isValidJson}>
+          Call Tool
+        </button>
+      </form>
+    </div>
+  );
+}
+
+
+// ServerSelect calls use() and renders the server <select>
+interface ServerSelectProps {
+  serversPromise: Promise<ServerInfo[]>;
+  onSelect: (server: ServerInfo) => void;
+}
+function ServerSelect({ serversPromise, onSelect }: ServerSelectProps) {
+  const servers = use(serversPromise);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    if (servers.length > selectedIndex) {
+      onSelect(servers[selectedIndex]);
+    }
+  }, [servers]);
+
+  if (servers.length === 0) {
+    return <select disabled><option>No servers configured</option></select>;
+  }
+
+  return (
+    <select
+      value={selectedIndex}
+      onChange={(e) => {
+        const newIndex = Number(e.target.value);
+        setSelectedIndex(newIndex);
+        onSelect(servers[newIndex]);
+      }}
+    >
+      {servers.map((server, i) => (
+        <option key={i} value={i}>{server.name}</option>
+      ))}
+    </select>
   );
 }
 
 
 interface ToolCallInfoPanelProps {
-  serverName: string;
   toolCallInfo: ToolCallInfo;
 }
-function ToolCallInfoPanel({ serverName, toolCallInfo }: ToolCallInfoPanelProps) {
+function ToolCallInfoPanel({ toolCallInfo }: ToolCallInfoPanelProps) {
   return (
     <div className={styles.toolCallInfoPanel}>
       <div className={styles.inputInfoPanel}>
-        <h2 className={styles.toolName}>{serverName}:{toolCallInfo.tool.name}</h2>
+        <h2>
+          <span>{toolCallInfo.serverInfo.name}</span>
+          <span className={styles.toolName}>{toolCallInfo.tool.name}</span>
+        </h2>
         <JsonBlock value={toolCallInfo.input} />
       </div>
       <div className={styles.outputInfoPanel}>
@@ -264,8 +240,16 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 
+async function connectToAllServers(): Promise<ServerInfo[]> {
+  const serverUrlsResponse = await fetch("/api/servers");
+  const serverUrls = (await serverUrlsResponse.json()) as string[];
+  return Promise.all(serverUrls.map((url) => connectToServer(new URL(url))));
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Host />
+    <ErrorBoundary>
+      <Host serversPromise={connectToAllServers()} />
+    </ErrorBoundary>
   </StrictMode>,
 );
