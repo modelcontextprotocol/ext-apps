@@ -60,16 +60,21 @@ Please review our [Security Policy](SECURITY.md) for reporting security vulnerab
 
 ### Repository Setup
 
+This repository uses [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) with OIDC - no secrets required.
+
 Before publishing releases, ensure the following are configured:
 
-1. **NPM_TOKEN secret**: Add an npm automation token to the repository secrets
-   - Go to Settings � Secrets and variables � Actions
-   - Create a new secret named `NPM_TOKEN`
-   - Value: an npm automation token with publish permissions for `@modelcontextprotocol/ext-apps`
+1. **Trusted publisher on npm**: Configure the package to trust this GitHub repository
+   - Go to https://www.npmjs.com/package/@modelcontextprotocol/ext-apps/access
+   - Under "Trusted Publishers", click "Add trusted publisher"
+   - Select "GitHub Actions"
+   - Repository: `modelcontextprotocol/ext-apps`
+   - Workflow filename: `npm-publish.yml`
+   - Environment: `Release` (optional, for additional protection)
 
-2. **`release` environment** (optional): Create a protected environment for additional safeguards
-   - Go to Settings � Environments � New environment
-   - Name it `release`
+2. **`Release` environment** (optional): Create a protected environment for additional safeguards
+   - Go to Settings > Environments > New environment
+   - Name it `Release`
    - Add required reviewers or other protection rules as needed
 
 ### Publishing a Release
