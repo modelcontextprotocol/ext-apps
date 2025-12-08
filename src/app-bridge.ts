@@ -60,6 +60,7 @@ import {
   McpUiSizeChangedNotificationSchema,
 } from "./types";
 export * from "./types";
+export { RESOURCE_URI_META_KEY } from "./app";
 export { PostMessageTransport } from "./message-transport";
 
 /**
