@@ -63,12 +63,12 @@ Please review our [Security Policy](SECURITY.md) for reporting security vulnerab
 Before publishing releases, ensure the following are configured:
 
 1. **NPM_TOKEN secret**: Add an npm automation token to the repository secrets
-   - Go to Settings ’ Secrets and variables ’ Actions
+   - Go to Settings ï¿½ Secrets and variables ï¿½ Actions
    - Create a new secret named `NPM_TOKEN`
    - Value: an npm automation token with publish permissions for `@modelcontextprotocol/ext-apps`
 
 2. **`release` environment** (optional): Create a protected environment for additional safeguards
-   - Go to Settings ’ Environments ’ New environment
+   - Go to Settings ï¿½ Environments ï¿½ New environment
    - Name it `release`
    - Add required reviewers or other protection rules as needed
 
@@ -79,6 +79,7 @@ Releases are published automatically via GitHub Actions when a GitHub Release is
 #### Steps to publish:
 
 1. **Update the version** in `package.json`:
+
    ```bash
    # For a regular release
    npm version patch  # or minor, or major
@@ -88,6 +89,7 @@ Releases are published automatically via GitHub Actions when a GitHub Release is
    ```
 
 2. **Commit the version bump** (if not done by `npm version`):
+
    ```bash
    git add package.json
    git commit -m "Bump version to X.Y.Z"
@@ -111,10 +113,10 @@ Releases are published automatically via GitHub Actions when a GitHub Release is
 
 The workflow automatically determines the npm dist-tag:
 
-| Version Pattern | npm Tag | Install Command |
-|-----------------|---------|-----------------|
-| `X.Y.Z` (from main) | `latest` | `npm install @modelcontextprotocol/ext-apps` |
-| `X.Y.Z-beta.N` | `beta` | `npm install @modelcontextprotocol/ext-apps@beta` |
+| Version Pattern               | npm Tag       | Install Command                                          |
+| ----------------------------- | ------------- | -------------------------------------------------------- |
+| `X.Y.Z` (from main)           | `latest`      | `npm install @modelcontextprotocol/ext-apps`             |
+| `X.Y.Z-beta.N`                | `beta`        | `npm install @modelcontextprotocol/ext-apps@beta`        |
 | `X.Y.Z` (from release branch) | `release-X.Y` | `npm install @modelcontextprotocol/ext-apps@release-X.Y` |
 
 #### Maintenance Releases
