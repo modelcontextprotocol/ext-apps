@@ -1,3 +1,35 @@
+.serverSelector {
+  max-width: 480px;
+  margin: 0 auto 1rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-weight: 600;
+  }
+
+  select {
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: inherit;
+  }
+}
+
+.connecting {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1rem;
+  text-align: center;
+  color: #666;
+}
+
 .callToolPanel, .toolCallInfoPanel {
   margin: 0 auto;
   padding: 1rem;

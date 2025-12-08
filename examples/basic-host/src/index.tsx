@@ -4,7 +4,20 @@ import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy,
 import styles from "./index.module.css";
 
 
-const MCP_SERVER_URL = new URL("http://localhost:3001/mcp");
+// Available MCP servers - using ports 3101+ to avoid conflicts with common dev ports
+const SERVERS = [
+  { name: "Basic React", port: 3101 },
+  { name: "Vanilla JS", port: 3102 },
+  { name: "Budget Allocator", port: 3103 },
+  { name: "Cohort Heatmap", port: 3104 },
+  { name: "Customer Segmentation", port: 3105 },
+  { name: "Scenario Modeler", port: 3106 },
+  { name: "System Monitor", port: 3107 },
+] as const;
+
+function serverUrl(port: number): string {
+  return `http://localhost:${port}/mcp`;
+}
 
 
 interface HostProps {
@@ -186,10 +199,55 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 
+interface ServerSelectorProps {
+  selectedPort: number;
+  onSelect: (port: number) => void;
+}
+function ServerSelector({ selectedPort, onSelect }: ServerSelectorProps) {
+  return (
+    <div className={styles.serverSelector}>
+      <label>
+        Server
+        <select
+          value={selectedPort}
+          onChange={(e) => onSelect(Number(e.target.value))}
+        >
+          {SERVERS.map(({ name, port }) => (
+            <option key={port} value={port}>
+              {name} (:{port})
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+
+function App() {
+  const [selectedPort, setSelectedPort] = useState(SERVERS[0].port);
+  const [serverInfoPromise, setServerInfoPromise] = useState(
+    () => connectToServer(new URL(serverUrl(selectedPort)))
+  );
+
+  const handleServerChange = (port: number) => {
+    setSelectedPort(port);
+    setServerInfoPromise(connectToServer(new URL(serverUrl(port))));
+  };
+
+  return (
+    <>
+      <ServerSelector selectedPort={selectedPort} onSelect={handleServerChange} />
+      <Suspense fallback={<p className={styles.connecting}>Connecting to {serverUrl(selectedPort)}...</p>}>
+        <Host key={selectedPort} serverInfoPromise={serverInfoPromise} />
+      </Suspense>
+    </>
+  );
+}
+
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Suspense fallback={<p>Connecting to server ({MCP_SERVER_URL.href})...</p>}>
-      <Host serverInfoPromise={connectToServer(MCP_SERVER_URL)} />
-    </Suspense>
+    <App />
   </StrictMode>,
 );
