@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import si from "systeminformation";
 import { z } from "zod";
-import { RESOURCE_URI_META_KEY } from "../../dist/src/app";
+import { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY } from "../../dist/src/app";
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
@@ -167,7 +167,7 @@ const server = new McpServer({
         contents: [
           {
             uri: resourceUri,
-            mimeType: "text/html;profile=mcp-app",
+            mimeType: RESOURCE_MIME_TYPE,
             text: html,
           },
         ],
