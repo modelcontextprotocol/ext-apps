@@ -82,15 +82,15 @@ const TESTS_OUTPUT_FILE = join(
 
 /**
  * External types from MCP SDK that ts-to-zod can't resolve.
- * Maps the camelCase schema name ts-to-zod generates to the PascalCase export from MCP SDK.
+ * With PascalCase naming, the generated placeholder matches the MCP SDK export.
  */
-const EXTERNAL_TYPE_MAPPINGS: Record<string, string> = {
-  contentBlockSchema: "ContentBlockSchema",
-  callToolResultSchema: "CallToolResultSchema",
-  implementationSchema: "ImplementationSchema",
-  requestIdSchema: "RequestIdSchema",
-  toolSchema: "ToolSchema",
-};
+const EXTERNAL_TYPE_SCHEMAS = [
+  "ContentBlockSchema",
+  "CallToolResultSchema",
+  "ImplementationSchema",
+  "RequestIdSchema",
+  "ToolSchema",
+];
 
 function main() {
   console.log("🔧 Generating Zod schemas from spec.types.ts...\n");
@@ -103,6 +103,8 @@ function main() {
     sourceText,
     keepComments: true,
     skipParseJSDoc: false,
+    // Generate PascalCase schema names: McpUiOpenLinkRequest → McpUiOpenLinkRequestSchema
+    getSchemaName: (typeName: string) => `${typeName}Schema`,
   });
 
   // Report any errors
@@ -155,7 +157,7 @@ function postProcess(content: string): string {
 
   // 2. Add MCP SDK schema imports
   // WHY: ts-to-zod generates z.any() for external types; we need real schemas
-  const mcpImports = Object.values(EXTERNAL_TYPE_MAPPINGS).join(",\n  ");
+  const mcpImports = EXTERNAL_TYPE_SCHEMAS.join(",\n  ");
   content = content.replace(
     'import { z } from "zod/v4";',
     `import { z } from "zod/v4";
@@ -164,12 +166,14 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";`,
   );
 
-  // 3. Replace z.any() placeholders with MCP SDK schemas
-  // WHY: z.any() provides no validation; MCP SDK exports proper schemas
-  for (const [placeholder, schema] of Object.entries(EXTERNAL_TYPE_MAPPINGS)) {
+  // 3. Remove z.any() placeholders for external types (now imported from MCP SDK)
+  // WHY: ts-to-zod generates z.any() for types it can't resolve
+  // With PascalCase naming, the placeholder name matches the import directly
+  for (const schema of EXTERNAL_TYPE_SCHEMAS) {
+    // Remove both exported and non-exported declarations
     content = content.replace(
-      new RegExp(`const ${placeholder} = z\\.any\\(\\);`, "g"),
-      `const ${placeholder} = ${schema};`,
+      new RegExp(`(?:export )?const ${schema} = z\\.any\\(\\);\\n?`, "g"),
+      "",
     );
   }
 

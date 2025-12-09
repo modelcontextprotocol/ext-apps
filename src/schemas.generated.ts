@@ -18,7 +18,7 @@ import {
  *
  * @see {@link app.App.sendOpenLink} for the method that sends this request
  */
-export const mcpUiOpenLinkRequestSchema = z.object({
+export const McpUiOpenLinkRequestSchema = z.object({
   method: z.literal("ui/open-link"),
   params: z.object({
     /** URL to open in the host's browser */
@@ -33,7 +33,7 @@ export const mcpUiOpenLinkRequestSchema = z.object({
  *
  * @see {@link McpUiOpenLinkRequest}
  */
-export const mcpUiOpenLinkResultSchema = z.looseObject({
+export const McpUiOpenLinkResultSchema = z.looseObject({
   /**
    * True if the host failed to open the URL (e.g., due to security policy,
    * user cancellation, or system error). False or undefined indicates success.
@@ -49,7 +49,7 @@ export const mcpUiOpenLinkResultSchema = z.looseObject({
  *
  * @see {@link McpUiMessageRequest}
  */
-export const mcpUiMessageResultSchema = z.looseObject({
+export const McpUiMessageResultSchema = z.looseObject({
   /**
    * True if the host rejected or failed to deliver the message (e.g., due to
    * rate limiting, content policy, or system error). False or undefined
@@ -69,7 +69,7 @@ export const mcpUiMessageResultSchema = z.looseObject({
  * @internal
  * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
  */
-export const mcpUiSandboxProxyReadyNotificationSchema = z.object({
+export const McpUiSandboxProxyReadyNotificationSchema = z.object({
   method: z.literal("ui/notifications/sandbox-proxy-ready"),
   params: z.object({}),
 });
@@ -85,7 +85,7 @@ export const mcpUiSandboxProxyReadyNotificationSchema = z.object({
  * @internal
  * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
  */
-export const mcpUiSandboxResourceReadyNotificationSchema = z.object({
+export const McpUiSandboxResourceReadyNotificationSchema = z.object({
   method: z.literal("ui/notifications/sandbox-resource-ready"),
   params: z.object({
     /** HTML content to load into the inner iframe */
@@ -109,7 +109,7 @@ export const mcpUiSandboxResourceReadyNotificationSchema = z.object({
  * @see {@link app.App.sendSizeChanged} for the method to send this from Guest UI
  * @see {@link app.App.setupSizeChangedNotifications} for automatic size reporting
  */
-export const mcpUiSizeChangedNotificationSchema = z.object({
+export const McpUiSizeChangedNotificationSchema = z.object({
   method: z.literal("ui/notifications/size-changed"),
   params: z.object({
     /** New width in pixels */
@@ -129,7 +129,7 @@ export const mcpUiSizeChangedNotificationSchema = z.object({
  * The arguments object contains the complete tool call parameters that triggered
  * this App instance.
  */
-export const mcpUiToolInputNotificationSchema = z.object({
+export const McpUiToolInputNotificationSchema = z.object({
   method: z.literal("ui/notifications/tool-input"),
   params: z.object({
     /** Complete tool call arguments as key-value pairs */
@@ -151,7 +151,7 @@ export const mcpUiToolInputNotificationSchema = z.object({
  * Guest UIs MUST NOT rely on partial arguments for critical operations and SHOULD
  * gracefully handle missing or changing fields between notifications.
  */
-export const mcpUiToolInputPartialNotificationSchema = z.object({
+export const McpUiToolInputPartialNotificationSchema = z.object({
   method: z.literal("ui/notifications/tool-input-partial"),
   params: z.object({
     /** Partial tool call arguments (incomplete, may change) */
@@ -172,7 +172,7 @@ export const mcpUiToolInputPartialNotificationSchema = z.object({
  *
  * @see {@link app-bridge.AppBridge.sendResourceTeardown} for the host method that sends this
  */
-export const mcpUiResourceTeardownRequestSchema = z.object({
+export const McpUiResourceTeardownRequestSchema = z.object({
   method: z.literal("ui/resource-teardown"),
   params: z.object({}),
 });
@@ -185,7 +185,7 @@ export const mcpUiResourceTeardownRequestSchema = z.object({
  *
  * @see {@link McpUiResourceTeardownRequest}
  */
-export const mcpUiResourceTeardownResultSchema = z.record(
+export const McpUiResourceTeardownResultSchema = z.record(
   z.string(),
   z.unknown(),
 );
@@ -206,7 +206,7 @@ export const mcpUiResourceTeardownResultSchema = z.record(
  *
  * @see {@link McpUiInitializeResult} for the initialization result that includes these capabilities
  */
-export const mcpUiHostCapabilitiesSchema = z.object({
+export const McpUiHostCapabilitiesSchema = z.object({
   /** Experimental features (structure TBD) */
   experimental: z.object({}).optional(),
   /** Host supports opening external URLs via {@link app.App.sendOpenLink} */
@@ -245,7 +245,7 @@ export const mcpUiHostCapabilitiesSchema = z.object({
  *
  * @see {@link McpUiInitializeRequest} for the initialization request that includes these capabilities
  */
-export const mcpUiAppCapabilitiesSchema = z.object({
+export const McpUiAppCapabilitiesSchema = z.object({
   /** Experimental features (structure TBD) */
   experimental: z.object({}).optional(),
   /**
@@ -269,20 +269,10 @@ export const mcpUiAppCapabilitiesSchema = z.object({
  *
  * @see {@link app.App.connect} for the method that sends this notification
  */
-export const mcpUiInitializedNotificationSchema = z.object({
+export const McpUiInitializedNotificationSchema = z.object({
   method: z.literal("ui/notifications/initialized"),
   params: z.object({}).optional(),
 });
-
-const contentBlockSchema = ContentBlockSchema;
-
-const callToolResultSchema = CallToolResultSchema;
-
-const requestIdSchema = RequestIdSchema;
-
-const toolSchema = ToolSchema;
-
-const implementationSchema = ImplementationSchema;
 
 /**
  * Request to send a message to the host's chat interface.
@@ -293,13 +283,13 @@ const implementationSchema = ImplementationSchema;
  *
  * @see {@link app.App.sendMessage} for the method that sends this request
  */
-export const mcpUiMessageRequestSchema = z.object({
+export const McpUiMessageRequestSchema = z.object({
   method: z.literal("ui/message"),
   params: z.object({
     /** Message role, currently only "user" is supported */
     role: z.literal("user"),
     /** Message content blocks (text, image, etc.) */
-    content: z.array(contentBlockSchema),
+    content: z.array(ContentBlockSchema),
   }),
 });
 
@@ -314,10 +304,10 @@ export const mcpUiMessageRequestSchema = z.object({
  * The result follows the standard MCP CallToolResult format, containing content
  * for the model and optionally structuredContent optimized for UI rendering.
  */
-export const mcpUiToolResultNotificationSchema = z.object({
+export const McpUiToolResultNotificationSchema = z.object({
   method: z.literal("ui/notifications/tool-result"),
   /** Standard MCP tool execution result */
-  params: callToolResultSchema,
+  params: CallToolResultSchema,
 });
 
 /**
@@ -338,14 +328,14 @@ export const mcpUiToolResultNotificationSchema = z.object({
  * }
  * ```
  */
-export const mcpUiHostContextSchema = z.object({
+export const McpUiHostContextSchema = z.object({
   /** Metadata of the tool call that instantiated this App */
   toolInfo: z
     .object({
       /** JSON-RPC id of the tools/call request */
-      id: requestIdSchema,
+      id: RequestIdSchema,
       /** Tool definition including name, inputSchema, etc. */
-      tool: toolSchema,
+      tool: ToolSchema,
     })
     .optional(),
   /**
@@ -448,10 +438,10 @@ export const mcpUiHostContextSchema = z.object({
  *
  * @see {@link McpUiHostContext} for the full context structure
  */
-export const mcpUiHostContextChangedNotificationSchema = z.object({
+export const McpUiHostContextChangedNotificationSchema = z.object({
   method: z.literal("ui/notifications/host-context-changed"),
   /** Partial context update containing only changed fields */
-  params: mcpUiHostContextSchema,
+  params: McpUiHostContextSchema,
 });
 
 /**
@@ -466,13 +456,13 @@ export const mcpUiHostContextChangedNotificationSchema = z.object({
  *
  * @see {@link app.App.connect} for the method that sends this request
  */
-export const mcpUiInitializeRequestSchema = z.object({
+export const McpUiInitializeRequestSchema = z.object({
   method: z.literal("ui/initialize"),
   params: z.object({
     /** App identification (name and version) */
-    appInfo: implementationSchema,
+    appInfo: ImplementationSchema,
     /** Features and capabilities this app provides */
-    appCapabilities: mcpUiAppCapabilitiesSchema,
+    appCapabilities: McpUiAppCapabilitiesSchema,
     /** Protocol version this app supports */
     protocolVersion: z.string(),
   }),
@@ -486,13 +476,13 @@ export const mcpUiInitializeRequestSchema = z.object({
  *
  * @see {@link McpUiInitializeRequest}
  */
-export const mcpUiInitializeResultSchema = z.looseObject({
+export const McpUiInitializeResultSchema = z.looseObject({
   /** Negotiated protocol version string (e.g., "2025-11-21") */
   protocolVersion: z.string(),
   /** Host application identification and version */
-  hostInfo: implementationSchema,
+  hostInfo: ImplementationSchema,
   /** Features and capabilities provided by the host */
-  hostCapabilities: mcpUiHostCapabilitiesSchema,
+  hostCapabilities: McpUiHostCapabilitiesSchema,
   /** Rich context about the host environment */
-  hostContext: mcpUiHostContextSchema,
+  hostContext: McpUiHostContextSchema,
 });

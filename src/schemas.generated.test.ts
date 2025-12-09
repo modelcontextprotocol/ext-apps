@@ -11,185 +11,185 @@ function expectType<T>(_: T) {
   /* noop */
 }
 
-export type mcpUiOpenLinkRequestSchemaInferredType = z.infer<
-  typeof generated.mcpUiOpenLinkRequestSchema
+export type McpUiOpenLinkRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiOpenLinkRequestSchema
 >;
 
-export type mcpUiOpenLinkResultSchemaInferredType = z.infer<
-  typeof generated.mcpUiOpenLinkResultSchema
+export type McpUiOpenLinkResultSchemaInferredType = z.infer<
+  typeof generated.McpUiOpenLinkResultSchema
 >;
 
-export type mcpUiMessageResultSchemaInferredType = z.infer<
-  typeof generated.mcpUiMessageResultSchema
+export type McpUiMessageResultSchemaInferredType = z.infer<
+  typeof generated.McpUiMessageResultSchema
 >;
 
-export type mcpUiSandboxProxyReadyNotificationSchemaInferredType = z.infer<
-  typeof generated.mcpUiSandboxProxyReadyNotificationSchema
+export type McpUiSandboxProxyReadyNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiSandboxProxyReadyNotificationSchema
 >;
 
-export type mcpUiSandboxResourceReadyNotificationSchemaInferredType = z.infer<
-  typeof generated.mcpUiSandboxResourceReadyNotificationSchema
+export type McpUiSandboxResourceReadyNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiSandboxResourceReadyNotificationSchema
 >;
 
-export type mcpUiSizeChangedNotificationSchemaInferredType = z.infer<
-  typeof generated.mcpUiSizeChangedNotificationSchema
+export type McpUiSizeChangedNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiSizeChangedNotificationSchema
 >;
 
-export type mcpUiToolInputNotificationSchemaInferredType = z.infer<
-  typeof generated.mcpUiToolInputNotificationSchema
+export type McpUiToolInputNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiToolInputNotificationSchema
 >;
 
-export type mcpUiToolInputPartialNotificationSchemaInferredType = z.infer<
-  typeof generated.mcpUiToolInputPartialNotificationSchema
+export type McpUiToolInputPartialNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiToolInputPartialNotificationSchema
 >;
 
-export type mcpUiResourceTeardownRequestSchemaInferredType = z.infer<
-  typeof generated.mcpUiResourceTeardownRequestSchema
+export type McpUiResourceTeardownRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiResourceTeardownRequestSchema
 >;
 
-export type mcpUiResourceTeardownResultSchemaInferredType = z.infer<
-  typeof generated.mcpUiResourceTeardownResultSchema
+export type McpUiResourceTeardownResultSchemaInferredType = z.infer<
+  typeof generated.McpUiResourceTeardownResultSchema
 >;
 
-export type mcpUiHostCapabilitiesSchemaInferredType = z.infer<
-  typeof generated.mcpUiHostCapabilitiesSchema
+export type McpUiHostCapabilitiesSchemaInferredType = z.infer<
+  typeof generated.McpUiHostCapabilitiesSchema
 >;
 
-export type mcpUiAppCapabilitiesSchemaInferredType = z.infer<
-  typeof generated.mcpUiAppCapabilitiesSchema
+export type McpUiAppCapabilitiesSchemaInferredType = z.infer<
+  typeof generated.McpUiAppCapabilitiesSchema
 >;
 
-export type mcpUiInitializedNotificationSchemaInferredType = z.infer<
-  typeof generated.mcpUiInitializedNotificationSchema
+export type McpUiInitializedNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiInitializedNotificationSchema
 >;
 
-export type mcpUiMessageRequestSchemaInferredType = z.infer<
-  typeof generated.mcpUiMessageRequestSchema
+export type McpUiMessageRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiMessageRequestSchema
 >;
 
-export type mcpUiToolResultNotificationSchemaInferredType = z.infer<
-  typeof generated.mcpUiToolResultNotificationSchema
+export type McpUiToolResultNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiToolResultNotificationSchema
 >;
 
-export type mcpUiHostContextSchemaInferredType = z.infer<
-  typeof generated.mcpUiHostContextSchema
+export type McpUiHostContextSchemaInferredType = z.infer<
+  typeof generated.McpUiHostContextSchema
 >;
 
-export type mcpUiHostContextChangedNotificationSchemaInferredType = z.infer<
-  typeof generated.mcpUiHostContextChangedNotificationSchema
+export type McpUiHostContextChangedNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiHostContextChangedNotificationSchema
 >;
 
-export type mcpUiInitializeRequestSchemaInferredType = z.infer<
-  typeof generated.mcpUiInitializeRequestSchema
+export type McpUiInitializeRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiInitializeRequestSchema
 >;
 
-export type mcpUiInitializeResultSchemaInferredType = z.infer<
-  typeof generated.mcpUiInitializeResultSchema
+export type McpUiInitializeResultSchemaInferredType = z.infer<
+  typeof generated.McpUiInitializeResultSchema
 >;
 
 expectType<spec.McpUiOpenLinkRequest>(
-  {} as mcpUiOpenLinkRequestSchemaInferredType,
+  {} as McpUiOpenLinkRequestSchemaInferredType,
 );
-expectType<mcpUiOpenLinkRequestSchemaInferredType>(
+expectType<McpUiOpenLinkRequestSchemaInferredType>(
   {} as spec.McpUiOpenLinkRequest,
 );
 expectType<spec.McpUiOpenLinkResult>(
-  {} as mcpUiOpenLinkResultSchemaInferredType,
+  {} as McpUiOpenLinkResultSchemaInferredType,
 );
-expectType<mcpUiOpenLinkResultSchemaInferredType>(
+expectType<McpUiOpenLinkResultSchemaInferredType>(
   {} as spec.McpUiOpenLinkResult,
 );
-expectType<spec.McpUiMessageResult>({} as mcpUiMessageResultSchemaInferredType);
-expectType<mcpUiMessageResultSchemaInferredType>({} as spec.McpUiMessageResult);
+expectType<spec.McpUiMessageResult>({} as McpUiMessageResultSchemaInferredType);
+expectType<McpUiMessageResultSchemaInferredType>({} as spec.McpUiMessageResult);
 expectType<spec.McpUiSandboxProxyReadyNotification>(
-  {} as mcpUiSandboxProxyReadyNotificationSchemaInferredType,
+  {} as McpUiSandboxProxyReadyNotificationSchemaInferredType,
 );
-expectType<mcpUiSandboxProxyReadyNotificationSchemaInferredType>(
+expectType<McpUiSandboxProxyReadyNotificationSchemaInferredType>(
   {} as spec.McpUiSandboxProxyReadyNotification,
 );
 expectType<spec.McpUiSandboxResourceReadyNotification>(
-  {} as mcpUiSandboxResourceReadyNotificationSchemaInferredType,
+  {} as McpUiSandboxResourceReadyNotificationSchemaInferredType,
 );
-expectType<mcpUiSandboxResourceReadyNotificationSchemaInferredType>(
+expectType<McpUiSandboxResourceReadyNotificationSchemaInferredType>(
   {} as spec.McpUiSandboxResourceReadyNotification,
 );
 expectType<spec.McpUiSizeChangedNotification>(
-  {} as mcpUiSizeChangedNotificationSchemaInferredType,
+  {} as McpUiSizeChangedNotificationSchemaInferredType,
 );
-expectType<mcpUiSizeChangedNotificationSchemaInferredType>(
+expectType<McpUiSizeChangedNotificationSchemaInferredType>(
   {} as spec.McpUiSizeChangedNotification,
 );
 expectType<spec.McpUiToolInputNotification>(
-  {} as mcpUiToolInputNotificationSchemaInferredType,
+  {} as McpUiToolInputNotificationSchemaInferredType,
 );
-expectType<mcpUiToolInputNotificationSchemaInferredType>(
+expectType<McpUiToolInputNotificationSchemaInferredType>(
   {} as spec.McpUiToolInputNotification,
 );
 expectType<spec.McpUiToolInputPartialNotification>(
-  {} as mcpUiToolInputPartialNotificationSchemaInferredType,
+  {} as McpUiToolInputPartialNotificationSchemaInferredType,
 );
-expectType<mcpUiToolInputPartialNotificationSchemaInferredType>(
+expectType<McpUiToolInputPartialNotificationSchemaInferredType>(
   {} as spec.McpUiToolInputPartialNotification,
 );
 expectType<spec.McpUiResourceTeardownRequest>(
-  {} as mcpUiResourceTeardownRequestSchemaInferredType,
+  {} as McpUiResourceTeardownRequestSchemaInferredType,
 );
-expectType<mcpUiResourceTeardownRequestSchemaInferredType>(
+expectType<McpUiResourceTeardownRequestSchemaInferredType>(
   {} as spec.McpUiResourceTeardownRequest,
 );
 expectType<spec.McpUiResourceTeardownResult>(
-  {} as mcpUiResourceTeardownResultSchemaInferredType,
+  {} as McpUiResourceTeardownResultSchemaInferredType,
 );
-expectType<mcpUiResourceTeardownResultSchemaInferredType>(
+expectType<McpUiResourceTeardownResultSchemaInferredType>(
   {} as spec.McpUiResourceTeardownResult,
 );
 expectType<spec.McpUiHostCapabilities>(
-  {} as mcpUiHostCapabilitiesSchemaInferredType,
+  {} as McpUiHostCapabilitiesSchemaInferredType,
 );
-expectType<mcpUiHostCapabilitiesSchemaInferredType>(
+expectType<McpUiHostCapabilitiesSchemaInferredType>(
   {} as spec.McpUiHostCapabilities,
 );
 expectType<spec.McpUiAppCapabilities>(
-  {} as mcpUiAppCapabilitiesSchemaInferredType,
+  {} as McpUiAppCapabilitiesSchemaInferredType,
 );
-expectType<mcpUiAppCapabilitiesSchemaInferredType>(
+expectType<McpUiAppCapabilitiesSchemaInferredType>(
   {} as spec.McpUiAppCapabilities,
 );
 expectType<spec.McpUiInitializedNotification>(
-  {} as mcpUiInitializedNotificationSchemaInferredType,
+  {} as McpUiInitializedNotificationSchemaInferredType,
 );
-expectType<mcpUiInitializedNotificationSchemaInferredType>(
+expectType<McpUiInitializedNotificationSchemaInferredType>(
   {} as spec.McpUiInitializedNotification,
 );
 expectType<spec.McpUiMessageRequest>(
-  {} as mcpUiMessageRequestSchemaInferredType,
+  {} as McpUiMessageRequestSchemaInferredType,
 );
-expectType<mcpUiMessageRequestSchemaInferredType>(
+expectType<McpUiMessageRequestSchemaInferredType>(
   {} as spec.McpUiMessageRequest,
 );
 expectType<spec.McpUiToolResultNotification>(
-  {} as mcpUiToolResultNotificationSchemaInferredType,
+  {} as McpUiToolResultNotificationSchemaInferredType,
 );
-expectType<mcpUiToolResultNotificationSchemaInferredType>(
+expectType<McpUiToolResultNotificationSchemaInferredType>(
   {} as spec.McpUiToolResultNotification,
 );
-expectType<spec.McpUiHostContext>({} as mcpUiHostContextSchemaInferredType);
-expectType<mcpUiHostContextSchemaInferredType>({} as spec.McpUiHostContext);
+expectType<spec.McpUiHostContext>({} as McpUiHostContextSchemaInferredType);
+expectType<McpUiHostContextSchemaInferredType>({} as spec.McpUiHostContext);
 expectType<spec.McpUiHostContextChangedNotification>(
-  {} as mcpUiHostContextChangedNotificationSchemaInferredType,
+  {} as McpUiHostContextChangedNotificationSchemaInferredType,
 );
-expectType<mcpUiHostContextChangedNotificationSchemaInferredType>(
+expectType<McpUiHostContextChangedNotificationSchemaInferredType>(
   {} as spec.McpUiHostContextChangedNotification,
 );
 expectType<spec.McpUiInitializeRequest>(
-  {} as mcpUiInitializeRequestSchemaInferredType,
+  {} as McpUiInitializeRequestSchemaInferredType,
 );
-expectType<mcpUiInitializeRequestSchemaInferredType>(
+expectType<McpUiInitializeRequestSchemaInferredType>(
   {} as spec.McpUiInitializeRequest,
 );
 expectType<spec.McpUiInitializeResult>(
-  {} as mcpUiInitializeResultSchemaInferredType,
+  {} as McpUiInitializeResultSchemaInferredType,
 );
-expectType<mcpUiInitializeResultSchemaInferredType>(
+expectType<McpUiInitializeResultSchemaInferredType>(
   {} as spec.McpUiInitializeResult,
 );
