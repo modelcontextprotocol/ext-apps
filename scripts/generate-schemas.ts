@@ -59,11 +59,11 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
 
 const SPEC_TYPES_FILE = join(PROJECT_ROOT, "src", "spec.types.ts");
-const SCHEMAS_OUTPUT_FILE = join(PROJECT_ROOT, "src", "schemas.generated.ts");
-const TESTS_OUTPUT_FILE = join(
+const SCHEMA_OUTPUT_FILE = join(PROJECT_ROOT, "src", "schema.generated.ts");
+const SCHEMA_TEST_OUTPUT_FILE = join(
   PROJECT_ROOT,
   "src",
-  "schemas.generated.test.ts",
+  "schema.generated.test.ts",
 );
 const JSON_SCHEMA_OUTPUT_FILE = join(
   PROJECT_ROOT,
@@ -111,17 +111,17 @@ async function main() {
   let schemasContent = result.getZodSchemasFile("./spec.types.js");
   schemasContent = postProcess(schemasContent);
 
-  writeFileSync(SCHEMAS_OUTPUT_FILE, schemasContent, "utf-8");
-  console.log(`✅ Written: ${SCHEMAS_OUTPUT_FILE}`);
+  writeFileSync(SCHEMA_OUTPUT_FILE, schemasContent, "utf-8");
+  console.log(`✅ Written: ${SCHEMA_OUTPUT_FILE}`);
 
   const testsContent = result.getIntegrationTestFile(
     "./spec.types.js",
-    "./schemas.generated.js",
+    "./schema.generated.js",
   );
   if (testsContent) {
     const processedTests = postProcessTests(testsContent);
-    writeFileSync(TESTS_OUTPUT_FILE, processedTests, "utf-8");
-    console.log(`✅ Written: ${TESTS_OUTPUT_FILE}`);
+    writeFileSync(SCHEMA_TEST_OUTPUT_FILE, processedTests, "utf-8");
+    console.log(`✅ Written: ${SCHEMA_TEST_OUTPUT_FILE}`);
   }
 
   // Generate JSON Schema from the Zod schemas
@@ -137,7 +137,7 @@ async function main() {
 async function generateJsonSchema() {
   // Dynamic import of the generated schemas
   // tsx handles TypeScript imports at runtime
-  const schemas = await import("../src/schemas.generated.js");
+  const schemas = await import("../src/schema.generated.js");
 
   const jsonSchema: {
     $schema: string;

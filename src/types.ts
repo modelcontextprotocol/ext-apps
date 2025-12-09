@@ -1,12 +1,12 @@
 /**
  * MCP Apps Protocol Types and Schemas
  *
- * This file re-exports types from spec.types.ts and schemas from schemas.generated.ts.
- * Compile-time verification is handled by schemas.generated.test.ts.
+ * This file re-exports types from spec.types.ts and schemas from schema.generated.ts.
+ * Compile-time verification is handled by schema.generated.test.ts.
  *
  * @see spec.types.ts for the source of truth TypeScript interfaces
- * @see schemas.generated.ts for auto-generated Zod schemas
- * @see schemas.generated.test.ts for compile-time verification
+ * @see schema.generated.ts for auto-generated Zod schemas
+ * @see schema.generated.test.ts for compile-time verification
  */
 
 // Re-export all types from spec.types.ts
@@ -33,7 +33,7 @@ export {
   type McpUiInitializedNotification,
 } from "./spec.types.js";
 
-// Re-export all schemas from schemas.generated.ts (already PascalCase)
+// Re-export all schemas from schema.generated.ts (already PascalCase)
 export {
   McpUiOpenLinkRequestSchema,
   McpUiOpenLinkResultSchema,
@@ -54,4 +54,4 @@ export {
   McpUiInitializeRequestSchema,
   McpUiInitializeResultSchema,
   McpUiInitializedNotificationSchema,
-} from "./schemas.generated.js";
+} from "./schema.generated.js";
