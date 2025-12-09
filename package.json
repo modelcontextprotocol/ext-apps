@@ -22,7 +22,8 @@
     "./app-bridge": {
       "types": "./dist/src/app-bridge.d.ts",
       "default": "./dist/src/app-bridge.js"
-    }
+    },
+    "./schema.json": "./dist/src/schema.json"
   },
   "files": [
     "dist"

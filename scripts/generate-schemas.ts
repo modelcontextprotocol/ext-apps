@@ -52,6 +52,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generate } from "ts-to-zod";
+import { toJSONSchema, type $ZodType } from "zod/v4/core";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -64,6 +65,7 @@ const TESTS_OUTPUT_FILE = join(
   "src",
   "schemas.generated.test.ts",
 );
+const JSON_SCHEMA_OUTPUT_FILE = join(PROJECT_ROOT, "src", "schema.json");
 
 /**
  * External types from MCP SDK that ts-to-zod can't resolve.
@@ -77,7 +79,7 @@ const EXTERNAL_TYPE_SCHEMAS = [
   "ToolSchema",
 ];
 
-function main() {
+async function main() {
   console.log("🔧 Generating Zod schemas from spec.types.ts...\n");
 
   const sourceText = readFileSync(SPEC_TYPES_FILE, "utf-8");
@@ -118,7 +120,61 @@ function main() {
     console.log(`✅ Written: ${TESTS_OUTPUT_FILE}`);
   }
 
+  // Generate JSON Schema from the Zod schemas
+  await generateJsonSchema();
+
   console.log("\n🎉 Schema generation complete!");
+}
+
+/**
+ * Generate JSON Schema from the Zod schemas.
+ * Uses dynamic import to load the generated schemas after they're written.
+ */
+async function generateJsonSchema() {
+  // Dynamic import of the generated schemas
+  // tsx handles TypeScript imports at runtime
+  const schemas = await import("../src/schemas.generated.js");
+
+  const jsonSchema: {
+    $schema: string;
+    $id: string;
+    title: string;
+    description: string;
+    $defs: Record<string, unknown>;
+  } = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: "https://modelcontextprotocol.io/ext-apps/schema.json",
+    title: "MCP Apps Protocol",
+    description: "JSON Schema for MCP Apps UI protocol messages",
+    $defs: {},
+  };
+
+  // Convert each exported Zod schema to JSON Schema
+  for (const [name, schema] of Object.entries(schemas)) {
+    if (
+      name.endsWith("Schema") &&
+      typeof schema === "object" &&
+      schema !== null
+    ) {
+      const typeName = name.replace(/Schema$/, "");
+      try {
+        // Use unrepresentable: "any" to handle external types (MCP SDK schemas)
+        // that can't be directly represented in JSON Schema
+        jsonSchema.$defs[typeName] = toJSONSchema(schema as $ZodType, {
+          unrepresentable: "any",
+        });
+      } catch (error) {
+        console.warn(`⚠️  Could not convert ${name} to JSON Schema: ${error}`);
+      }
+    }
+  }
+
+  writeFileSync(
+    JSON_SCHEMA_OUTPUT_FILE,
+    JSON.stringify(jsonSchema, null, 2) + "\n",
+    "utf-8",
+  );
+  console.log(`✅ Written: ${JSON_SCHEMA_OUTPUT_FILE}`);
 }
 
 /**
@@ -222,4 +278,7 @@ function postProcessTests(content: string): string {
   return content;
 }
 
-main();
+main().catch((error) => {
+  console.error("❌ Schema generation failed:", error);
+  process.exit(1);
+});

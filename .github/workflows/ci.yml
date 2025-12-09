@@ -30,7 +30,7 @@ jobs:
       - name: Verify generated schemas are up-to-date
         run: |
           npm run generate:schemas
-          git diff --exit-code src/schemas.generated.ts src/schemas.generated.test.ts || (echo "Generated schemas are out of date. Run 'npm run generate:schemas' and commit." && exit 1)
+          git diff --exit-code src/schemas.generated.ts src/schemas.generated.test.ts src/schema.json || (echo "Generated schemas are out of date. Run 'npm run generate:schemas' and commit." && exit 1)
 
       - run: npm test
 
