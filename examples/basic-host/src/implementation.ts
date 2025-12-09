@@ -1,5 +1,4 @@
-import { RESOURCE_URI_META_KEY, type McpUiSandboxProxyReadyNotification } from "@modelcontextprotocol/ext-apps";
-import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
@@ -111,7 +110,7 @@ async function getUiResourceHtml(serverInfo: ServerInfo, uri: string): Promise<s
 
   // Per the MCP App specification, "text/html;profile=mcp-app" signals this
   // resource is indeed for an MCP App UI.
-  if (content.mimeType !== "text/html;profile=mcp-app") {
+  if (content.mimeType !== RESOURCE_MIME_TYPE) {
     throw new Error(`Unsupported MIME type: ${content.mimeType}`);
   }
 
