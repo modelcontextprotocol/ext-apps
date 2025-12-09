@@ -11,6 +11,14 @@ function expectType<T>(_: T) {
   /* noop */
 }
 
+export type McpUiThemeSchemaInferredType = z.infer<
+  typeof generated.McpUiThemeSchema
+>;
+
+export type McpUiDisplayModeSchemaInferredType = z.infer<
+  typeof generated.McpUiDisplayModeSchema
+>;
+
 export type McpUiOpenLinkRequestSchemaInferredType = z.infer<
   typeof generated.McpUiOpenLinkRequestSchema
 >;
@@ -63,6 +71,14 @@ export type McpUiInitializedNotificationSchemaInferredType = z.infer<
   typeof generated.McpUiInitializedNotificationSchema
 >;
 
+export type McpUiResourceCspSchemaInferredType = z.infer<
+  typeof generated.McpUiResourceCspSchema
+>;
+
+export type McpUiResourceMetaSchemaInferredType = z.infer<
+  typeof generated.McpUiResourceMetaSchema
+>;
+
 export type McpUiMessageRequestSchemaInferredType = z.infer<
   typeof generated.McpUiMessageRequestSchema
 >;
@@ -87,6 +103,10 @@ export type McpUiInitializeResultSchemaInferredType = z.infer<
   typeof generated.McpUiInitializeResultSchema
 >;
 
+expectType<spec.McpUiTheme>({} as McpUiThemeSchemaInferredType);
+expectType<McpUiThemeSchemaInferredType>({} as spec.McpUiTheme);
+expectType<spec.McpUiDisplayMode>({} as McpUiDisplayModeSchemaInferredType);
+expectType<McpUiDisplayModeSchemaInferredType>({} as spec.McpUiDisplayMode);
 expectType<spec.McpUiOpenLinkRequest>(
   {} as McpUiOpenLinkRequestSchemaInferredType,
 );
@@ -161,6 +181,10 @@ expectType<spec.McpUiInitializedNotification>(
 expectType<McpUiInitializedNotificationSchemaInferredType>(
   {} as spec.McpUiInitializedNotification,
 );
+expectType<spec.McpUiResourceCsp>({} as McpUiResourceCspSchemaInferredType);
+expectType<McpUiResourceCspSchemaInferredType>({} as spec.McpUiResourceCsp);
+expectType<spec.McpUiResourceMeta>({} as McpUiResourceMetaSchemaInferredType);
+expectType<McpUiResourceMetaSchemaInferredType>({} as spec.McpUiResourceMeta);
 expectType<spec.McpUiMessageRequest>(
   {} as McpUiMessageRequestSchemaInferredType,
 );

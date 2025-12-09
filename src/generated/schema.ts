@@ -11,6 +11,20 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 /**
+ * @description Color theme preference for the host environment.
+ */
+export const McpUiThemeSchema = z
+  .union([z.literal("light"), z.literal("dark")])
+  .describe("Color theme preference for the host environment.");
+
+/**
+ * @description Display mode for UI presentation.
+ */
+export const McpUiDisplayModeSchema = z
+  .union([z.literal("inline"), z.literal("fullscreen"), z.literal("pip")])
+  .describe("Display mode for UI presentation.");
+
+/**
  * @description Request to open an external URL in the host's default browser.
  * @see {@link app.App.sendOpenLink} for the method that sends this request
  */
@@ -238,6 +252,44 @@ export const McpUiInitializedNotificationSchema = z.object({
 });
 
 /**
+ * @description Content Security Policy configuration for UI resources.
+ */
+export const McpUiResourceCspSchema = z.object({
+  /** @description Origins for network requests (fetch/XHR/WebSocket). */
+  connectDomains: z
+    .array(z.string())
+    .optional()
+    .describe("Origins for network requests (fetch/XHR/WebSocket)."),
+  /** @description Origins for static resources (scripts, images, styles, fonts). */
+  resourceDomains: z
+    .array(z.string())
+    .optional()
+    .describe("Origins for static resources (scripts, images, styles, fonts)."),
+});
+
+/**
+ * @description UI Resource metadata for security and rendering configuration.
+ */
+export const McpUiResourceMetaSchema = z.object({
+  /** @description Content Security Policy configuration. */
+  csp: McpUiResourceCspSchema.optional().describe(
+    "Content Security Policy configuration.",
+  ),
+  /** @description Dedicated origin for widget sandbox. */
+  domain: z
+    .string()
+    .optional()
+    .describe("Dedicated origin for widget sandbox."),
+  /** @description Visual boundary preference - true if UI prefers a visible border. */
+  prefersBorder: z
+    .boolean()
+    .optional()
+    .describe(
+      "Visual boundary preference - true if UI prefers a visible border.",
+    ),
+});
+
+/**
  * @description Request to send a message to the host's chat interface.
  * @see {@link app.App.sendMessage} for the method that sends this request
  */
@@ -281,20 +333,13 @@ export const McpUiHostContextSchema = z.object({
     .optional()
     .describe("Metadata of the tool call that instantiated this App."),
   /** @description Current color theme preference. */
-  theme: z
-    .union([z.literal("light"), z.literal("dark"), z.literal("system")])
-    .optional()
-    .describe("Current color theme preference."),
+  theme: McpUiThemeSchema.optional().describe(
+    "Current color theme preference.",
+  ),
   /** @description How the UI is currently displayed. */
-  displayMode: z
-    .union([
-      z.literal("inline"),
-      z.literal("fullscreen"),
-      z.literal("pip"),
-      z.literal("carousel"),
-    ])
-    .optional()
-    .describe("How the UI is currently displayed."),
+  displayMode: McpUiDisplayModeSchema.optional().describe(
+    "How the UI is currently displayed.",
+  ),
   /** @description Display modes the host supports. */
   availableDisplayModes: z
     .array(z.string())

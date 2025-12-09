@@ -28,6 +28,24 @@
       },
       "additionalProperties": false
     },
+    "McpUiDisplayMode": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Display mode for UI presentation.",
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "inline"
+        },
+        {
+          "type": "string",
+          "const": "fullscreen"
+        },
+        {
+          "type": "string",
+          "const": "pip"
+        }
+      ]
+    },
     "McpUiHostCapabilities": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -243,10 +261,6 @@
                 {
                   "type": "string",
                   "const": "dark"
-                },
-                {
-                  "type": "string",
-                  "const": "system"
                 }
               ]
             },
@@ -264,10 +278,6 @@
                 {
                   "type": "string",
                   "const": "pip"
-                },
-                {
-                  "type": "string",
-                  "const": "carousel"
                 }
               ]
             },
@@ -537,10 +547,6 @@
             {
               "type": "string",
               "const": "dark"
-            },
-            {
-              "type": "string",
-              "const": "system"
             }
           ]
         },
@@ -558,10 +564,6 @@
             {
               "type": "string",
               "const": "pip"
-            },
-            {
-              "type": "string",
-              "const": "carousel"
             }
           ]
         },
@@ -1013,10 +1015,6 @@
                 {
                   "type": "string",
                   "const": "dark"
-                },
-                {
-                  "type": "string",
-                  "const": "system"
                 }
               ]
             },
@@ -1034,10 +1032,6 @@
                 {
                   "type": "string",
                   "const": "pip"
-                },
-                {
-                  "type": "string",
-                  "const": "carousel"
                 }
               ]
             },
@@ -1551,6 +1545,63 @@
       },
       "additionalProperties": {}
     },
+    "McpUiResourceCsp": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectDomains": {
+          "description": "Origins for network requests (fetch/XHR/WebSocket).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resourceDomains": {
+          "description": "Origins for static resources (scripts, images, styles, fonts).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "McpUiResourceMeta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "csp": {
+          "description": "Content Security Policy configuration.",
+          "type": "object",
+          "properties": {
+            "connectDomains": {
+              "description": "Origins for network requests (fetch/XHR/WebSocket).",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "resourceDomains": {
+              "description": "Origins for static resources (scripts, images, styles, fonts).",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "domain": {
+          "description": "Dedicated origin for widget sandbox.",
+          "type": "string"
+        },
+        "prefersBorder": {
+          "description": "Visual boundary preference - true if UI prefers a visible border.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "McpUiResourceTeardownRequest": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -1666,6 +1717,20 @@
       },
       "required": ["method", "params"],
       "additionalProperties": false
+    },
+    "McpUiTheme": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Color theme preference for the host environment.",
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "light"
+        },
+        {
+          "type": "string",
+          "const": "dark"
+        }
+      ]
     },
     "McpUiToolInputNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",

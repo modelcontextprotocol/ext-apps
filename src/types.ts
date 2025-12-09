@@ -12,6 +12,8 @@
 // Re-export all types from spec.types.ts
 export {
   LATEST_PROTOCOL_VERSION,
+  type McpUiTheme,
+  type McpUiDisplayMode,
   type McpUiOpenLinkRequest,
   type McpUiOpenLinkResult,
   type McpUiMessageRequest,
@@ -31,10 +33,14 @@ export {
   type McpUiInitializeRequest,
   type McpUiInitializeResult,
   type McpUiInitializedNotification,
+  type McpUiResourceCsp,
+  type McpUiResourceMeta,
 } from "./spec.types.js";
 
-// Re-export all schemas from schema.generated.ts (already PascalCase)
+// Re-export all schemas from generated/schema.ts (already PascalCase)
 export {
+  McpUiThemeSchema,
+  McpUiDisplayModeSchema,
   McpUiOpenLinkRequestSchema,
   McpUiOpenLinkResultSchema,
   McpUiMessageRequestSchema,
@@ -54,4 +60,6 @@ export {
   McpUiInitializeRequestSchema,
   McpUiInitializeResultSchema,
   McpUiInitializedNotificationSchema,
+  McpUiResourceCspSchema,
+  McpUiResourceMetaSchema,
 } from "./generated/schema.js";

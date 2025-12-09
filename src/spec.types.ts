@@ -27,6 +27,16 @@ import type {
 export const LATEST_PROTOCOL_VERSION = "2025-11-21";
 
 /**
+ * @description Color theme preference for the host environment.
+ */
+export type McpUiTheme = "light" | "dark";
+
+/**
+ * @description Display mode for UI presentation.
+ */
+export type McpUiDisplayMode = "inline" | "fullscreen" | "pip";
+
+/**
  * @description Request to open an external URL in the host's default browser.
  * @see {@link app.App.sendOpenLink} for the method that sends this request
  */
@@ -169,9 +179,9 @@ export interface McpUiHostContext {
     tool: Tool;
   };
   /** @description Current color theme preference. */
-  theme?: "light" | "dark" | "system";
+  theme?: McpUiTheme;
   /** @description How the UI is currently displayed. */
-  displayMode?: "inline" | "fullscreen" | "pip" | "carousel";
+  displayMode?: McpUiDisplayMode;
   /** @description Display modes the host supports. */
   availableDisplayModes?: string[];
   /** @description Current and maximum dimensions available to the UI. */
@@ -323,4 +333,26 @@ export interface McpUiInitializeResult {
 export interface McpUiInitializedNotification {
   method: "ui/notifications/initialized";
   params?: {};
+}
+
+/**
+ * @description Content Security Policy configuration for UI resources.
+ */
+export interface McpUiResourceCsp {
+  /** @description Origins for network requests (fetch/XHR/WebSocket). */
+  connectDomains?: string[];
+  /** @description Origins for static resources (scripts, images, styles, fonts). */
+  resourceDomains?: string[];
+}
+
+/**
+ * @description UI Resource metadata for security and rendering configuration.
+ */
+export interface McpUiResourceMeta {
+  /** @description Content Security Policy configuration. */
+  csp?: McpUiResourceCsp;
+  /** @description Dedicated origin for widget sandbox. */
+  domain?: string;
+  /** @description Visual boundary preference - true if UI prefers a visible border. */
+  prefersBorder?: boolean;
 }
