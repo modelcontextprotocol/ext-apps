@@ -92,6 +92,15 @@ export const McpUiSandboxResourceReadyNotificationSchema = z.object({
     html: z.string(),
     /** Optional override for the inner iframe's sandbox attribute */
     sandbox: z.string().optional(),
+    /** CSP configuration from resource metadata */
+    csp: z
+      .object({
+        /** Origins for network requests (fetch/XHR/WebSocket) */
+        connectDomains: z.array(z.string()).optional(),
+        /** Origins for static resources (scripts, images, styles, fonts) */
+        resourceDomains: z.array(z.string()).optional(),
+      })
+      .optional(),
   }),
 });
 

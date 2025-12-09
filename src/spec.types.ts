@@ -136,6 +136,13 @@ export interface McpUiSandboxResourceReadyNotification {
     html: string;
     /** Optional override for the inner iframe's sandbox attribute */
     sandbox?: string;
+    /** CSP configuration from resource metadata */
+    csp?: {
+      /** Origins for network requests (fetch/XHR/WebSocket) */
+      connectDomains?: string[];
+      /** Origins for static resources (scripts, images, styles, fonts) */
+      resourceDomains?: string[];
+    };
   };
 }
 

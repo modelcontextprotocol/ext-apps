@@ -13,10 +13,6 @@
  * **Problem**: ts-to-zod generates `import { z } from "zod"` but this project
  * uses the Zod v4 subpath import `"zod/v4"` for explicit version targeting.
  *
- * **Why it matters**: The `"zod"` import resolves based on package.json exports,
- * which may differ between environments. `"zod/v4"` is explicit and ensures
- * consistent Zod v4 behavior regardless of how the package is configured.
- *
  * **Solution**: Replace the import path in the generated output.
  *
  * ### 2. External Type References (`z.any()` → actual schemas)
@@ -26,44 +22,33 @@
  * `RequestId`, and `Tool` from `@modelcontextprotocol/sdk`, it generates `z.any()`
  * as a placeholder.
  *
- * **Why it matters**: `z.any()` provides no validation - it accepts anything.
- * The MCP SDK already exports Zod schemas for these types, so we should use them.
- *
- * **Solution**: Replace the `z.any()` placeholders with imports from MCP SDK:
- *   - `contentBlockSchema` → `ContentBlockSchema`
- *   - `callToolResultSchema` → `CallToolResultSchema`
- *   - `implementationSchema` → `ImplementationSchema`
- *   - `requestIdSchema` → `RequestIdSchema`
- *   - `toolSchema` → `ToolSchema`
+ * **Solution**: Import the schemas from MCP SDK and remove the z.any() placeholders.
  *
  * ### 3. Index Signatures (`z.record().and()` → `z.looseObject()`)
  *
  * **Problem**: TypeScript index signatures like `[key: string]: unknown` are
  * translated by ts-to-zod to `z.record(z.string(), z.unknown()).and(z.object({...}))`.
- * This creates a `ZodIntersection` type which:
- *   - Doesn't support `.extend()`, `.pick()`, `.omit()` methods
- *   - Has different runtime behavior than a simple object schema
- *   - Is more complex than needed for our use case
- *
- * **Why it matters**: Our interfaces use index signatures for MCP SDK Protocol
- * compatibility (allowing extra fields), but we don't need intersection semantics.
- * Zod v4's `z.looseObject()` is designed exactly for this: an object that allows
- * extra keys (like `z.object().passthrough()` but more ergonomic).
+ * This creates a `ZodIntersection` type which doesn't support `.extend()` etc.
  *
  * **Solution**: Replace the intersection pattern with `z.looseObject()`.
  *
- * ## Using ts-to-zod as a Library
+ * ## Adding Schema Descriptions
  *
- * Benefits of using the library API vs CLI:
- * - `generateIntegrationTests()`: Auto-generate tests verifying schemas match types
- * - `generateZodInferredType()`: Generate `type X = z.infer<typeof xSchema>` exports
- * - Programmatic error handling and reporting
- * - More control over the generation pipeline
+ * ts-to-zod supports `@description` JSDoc tags to generate `.describe()` calls:
+ *
+ * ```typescript
+ * interface MyType {
+ *   /​** @description The user's full name *​/
+ *   name: string;
+ * }
+ * ```
+ *
+ * Generates: `name: z.string().describe("The user's full name")`
  *
  * @see https://github.com/fabien0102/ts-to-zod
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generate } from "ts-to-zod";
@@ -82,7 +67,7 @@ const TESTS_OUTPUT_FILE = join(
 
 /**
  * External types from MCP SDK that ts-to-zod can't resolve.
- * With PascalCase naming, the generated placeholder matches the MCP SDK export.
+ * With PascalCase naming (via getSchemaName), generated placeholders match MCP SDK exports.
  */
 const EXTERNAL_TYPE_SCHEMAS = [
   "ContentBlockSchema",
@@ -95,10 +80,8 @@ const EXTERNAL_TYPE_SCHEMAS = [
 function main() {
   console.log("🔧 Generating Zod schemas from spec.types.ts...\n");
 
-  // Read source file
   const sourceText = readFileSync(SPEC_TYPES_FILE, "utf-8");
 
-  // Generate using ts-to-zod library API
   const result = generate({
     sourceText,
     keepComments: true,
@@ -107,7 +90,6 @@ function main() {
     getSchemaName: (typeName: string) => `${typeName}Schema`,
   });
 
-  // Report any errors
   if (result.errors.length > 0) {
     console.error("❌ Generation errors:");
     for (const error of result.errors) {
@@ -120,17 +102,12 @@ function main() {
     console.warn("⚠️  Warning: Circular dependencies detected in types");
   }
 
-  // Get the generated schema file content
   let schemasContent = result.getZodSchemasFile("./spec.types.js");
-
-  // Post-process the generated content
   schemasContent = postProcess(schemasContent);
 
-  // Write schemas file
   writeFileSync(SCHEMAS_OUTPUT_FILE, schemasContent, "utf-8");
   console.log(`✅ Written: ${SCHEMAS_OUTPUT_FILE}`);
 
-  // Generate integration tests
   const testsContent = result.getIntegrationTestFile(
     "./spec.types.js",
     "./schemas.generated.js",
@@ -149,14 +126,12 @@ function main() {
  */
 function postProcess(content: string): string {
   // 1. Update import to use zod/v4
-  // WHY: This project uses explicit zod/v4 subpath for version clarity
   content = content.replace(
     'import { z } from "zod";',
     'import { z } from "zod/v4";',
   );
 
   // 2. Add MCP SDK schema imports
-  // WHY: ts-to-zod generates z.any() for external types; we need real schemas
   const mcpImports = EXTERNAL_TYPE_SCHEMAS.join(",\n  ");
   content = content.replace(
     'import { z } from "zod/v4";',
@@ -167,25 +142,16 @@ import {
   );
 
   // 3. Remove z.any() placeholders for external types (now imported from MCP SDK)
-  // WHY: ts-to-zod generates z.any() for types it can't resolve
-  // With PascalCase naming, the placeholder name matches the import directly
   for (const schema of EXTERNAL_TYPE_SCHEMAS) {
-    // Remove both exported and non-exported declarations
     content = content.replace(
       new RegExp(`(?:export )?const ${schema} = z\\.any\\(\\);\\n?`, "g"),
       "",
     );
   }
 
-  // 4. Replace z.record().and(z.object()) with z.looseObject()
-  // WHY: Index signatures create ZodIntersection which lacks .extend() etc.
-  //      z.looseObject() is the Zod v4 idiom for objects allowing extra keys
-  content = content.replace(
-    /z\.record\(z\.string\(\), z\.unknown\(\)\)\.and\(z\.object\(\{([^}]*)\}\)\)/gs,
-    (_, objectContent) => {
-      return `z.looseObject({${objectContent}})`;
-    },
-  );
+  // 4. Replace z.record().and(z.object({...})) with z.looseObject({...})
+  // Uses brace-counting to handle nested objects correctly.
+  content = replaceRecordAndWithLooseObject(content);
 
   // 5. Add header comment
   content = content.replace(
@@ -199,16 +165,53 @@ import {
 }
 
 /**
+ * Replace z.record(z.string(), z.unknown()).and(z.object({...})) with z.looseObject({...})
+ * Uses brace-counting to handle nested objects correctly.
+ */
+function replaceRecordAndWithLooseObject(content: string): string {
+  const pattern = "z.record(z.string(), z.unknown()).and(z.object({";
+  let result = content;
+  let startIndex = 0;
+
+  while (true) {
+    const matchStart = result.indexOf(pattern, startIndex);
+    if (matchStart === -1) break;
+
+    // Find the matching closing brace for z.object({
+    const objectStart = matchStart + pattern.length;
+    let braceCount = 1;
+    let i = objectStart;
+
+    while (i < result.length && braceCount > 0) {
+      if (result[i] === "{") braceCount++;
+      else if (result[i] === "}") braceCount--;
+      i++;
+    }
+
+    // i now points after the closing } of z.object({...})
+    // Check if followed by ))
+    if (result.slice(i, i + 2) === "))") {
+      const objectContent = result.slice(objectStart, i - 1);
+      const replacement = `z.looseObject({${objectContent}})`;
+      result = result.slice(0, matchStart) + replacement + result.slice(i + 2);
+      startIndex = matchStart + replacement.length;
+    } else {
+      startIndex = i;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Post-process generated integration tests.
  */
 function postProcessTests(content: string): string {
-  // Update zod import for tests too
   content = content.replace(
     'import { z } from "zod";',
     'import { z } from "zod/v4";',
   );
 
-  // Add header
   content = content.replace(
     "// Generated by ts-to-zod",
     `// Generated by ts-to-zod
