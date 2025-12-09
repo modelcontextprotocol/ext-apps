@@ -59,17 +59,10 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
 
 const SPEC_TYPES_FILE = join(PROJECT_ROOT, "src", "spec.types.ts");
-const SCHEMA_OUTPUT_FILE = join(PROJECT_ROOT, "src", "schema.generated.ts");
-const SCHEMA_TEST_OUTPUT_FILE = join(
-  PROJECT_ROOT,
-  "src",
-  "schema.generated.test.ts",
-);
-const JSON_SCHEMA_OUTPUT_FILE = join(
-  PROJECT_ROOT,
-  "src",
-  "schema.generated.json",
-);
+const GENERATED_DIR = join(PROJECT_ROOT, "src", "generated");
+const SCHEMA_OUTPUT_FILE = join(GENERATED_DIR, "schema.ts");
+const SCHEMA_TEST_OUTPUT_FILE = join(GENERATED_DIR, "schema.test.ts");
+const JSON_SCHEMA_OUTPUT_FILE = join(GENERATED_DIR, "schema.json");
 
 /**
  * External types from MCP SDK that ts-to-zod can't resolve.
@@ -108,15 +101,15 @@ async function main() {
     console.warn("⚠️  Warning: Circular dependencies detected in types");
   }
 
-  let schemasContent = result.getZodSchemasFile("./spec.types.js");
+  let schemasContent = result.getZodSchemasFile("../spec.types.js");
   schemasContent = postProcess(schemasContent);
 
   writeFileSync(SCHEMA_OUTPUT_FILE, schemasContent, "utf-8");
   console.log(`✅ Written: ${SCHEMA_OUTPUT_FILE}`);
 
   const testsContent = result.getIntegrationTestFile(
-    "./spec.types.js",
-    "./schema.generated.js",
+    "../spec.types.js",
+    "./schema.js",
   );
   if (testsContent) {
     const processedTests = postProcessTests(testsContent);
@@ -137,7 +130,7 @@ async function main() {
 async function generateJsonSchema() {
   // Dynamic import of the generated schemas
   // tsx handles TypeScript imports at runtime
-  const schemas = await import("../src/schema.generated.js");
+  const schemas = await import("../src/generated/schema.js");
 
   const jsonSchema: {
     $schema: string;
