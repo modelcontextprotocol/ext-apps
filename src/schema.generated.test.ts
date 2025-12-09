@@ -4,7 +4,7 @@
 import { z } from "zod/v4";
 
 import * as spec from "./spec.types.js";
-import * as generated from "./schemas.generated.js";
+import * as generated from "./schema.generated.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function expectType<T>(_: T) {
