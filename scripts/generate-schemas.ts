@@ -65,7 +65,11 @@ const TESTS_OUTPUT_FILE = join(
   "src",
   "schemas.generated.test.ts",
 );
-const JSON_SCHEMA_OUTPUT_FILE = join(PROJECT_ROOT, "src", "schema.json");
+const JSON_SCHEMA_OUTPUT_FILE = join(
+  PROJECT_ROOT,
+  "src",
+  "schema.generated.json",
+);
 
 /**
  * External types from MCP SDK that ts-to-zod can't resolve.
