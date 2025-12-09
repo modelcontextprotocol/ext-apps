@@ -5,8 +5,7 @@ import cors from "cors";
 import express, { type Request, type Response } from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { RESOURCE_MIME_TYPE,
-RESOURCE_URI_META_KEY } from "../../dist/src/app";
+import { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY } from "../../dist/src/app";
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 const DIST_DIR = path.join(import.meta.dirname, "dist");

@@ -1,5 +1,4 @@
-import { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY, type McpUiSandboxProxyReadyNotification } from "@modelcontextprotocol/ext-apps";
-import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
