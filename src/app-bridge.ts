@@ -12,18 +12,18 @@ import {
   ListResourcesResultSchema,
   ListResourceTemplatesRequestSchema,
   ListResourceTemplatesResultSchema,
-  ReadResourceRequestSchema,
-  ReadResourceResultSchema,
   LoggingMessageNotification,
   LoggingMessageNotificationSchema,
   Notification,
   PingRequest,
   PingRequestSchema,
   PromptListChangedNotificationSchema,
+  ReadResourceRequestSchema,
+  ReadResourceResultSchema,
+  Request,
   ResourceListChangedNotificationSchema,
   Result,
   ToolListChangedNotificationSchema,
-  Request,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
   Protocol,
@@ -32,13 +32,16 @@ import {
 } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 import {
-  type McpUiToolInputNotification,
-  type McpUiToolResultNotification,
   type McpUiSandboxResourceReadyNotification,
-  type McpUiSizeChangeNotification,
+  type McpUiSizeChangedNotification,
+  type McpUiToolInputNotification,
+  type McpUiToolInputPartialNotification,
+  type McpUiToolResultNotification,
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
   McpUiHostCapabilities,
+  McpUiHostContext,
+  McpUiHostContextChangedNotification,
   McpUiInitializedNotification,
   McpUiInitializedNotificationSchema,
   McpUiInitializeRequest,
@@ -54,9 +57,10 @@ import {
   McpUiResourceTeardownResultSchema,
   McpUiSandboxProxyReadyNotification,
   McpUiSandboxProxyReadyNotificationSchema,
-  McpUiSizeChangeNotificationSchema,
+  McpUiSizeChangedNotificationSchema,
 } from "./types";
 export * from "./types";
+export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
 export { PostMessageTransport } from "./message-transport";
 
 /**
@@ -64,7 +68,9 @@ export { PostMessageTransport } from "./message-transport";
  *
  * @see ProtocolOptions from @modelcontextprotocol/sdk for available options
  */
-export type HostOptions = ProtocolOptions;
+export type HostOptions = ProtocolOptions & {
+  hostContext?: McpUiHostContext;
+};
 
 /**
  * Protocol versions supported by this AppBridge implementation.
@@ -148,6 +154,7 @@ type RequestHandlerExtra = Parameters<
  */
 export class AppBridge extends Protocol<Request, Notification, Result> {
   private _appCapabilities?: McpUiAppCapabilities;
+  private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
 
   /**
@@ -174,6 +181,8 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     options?: HostOptions,
   ) {
     super(options);
+
+    this._hostContext = options?.hostContext || {};
 
     this.setRequestHandler(McpUiInitializeRequestSchema, (request) =>
       this._oninitialize(request),
@@ -257,12 +266,12 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   /**
    * Register a handler for size change notifications from the Guest UI.
    *
-   * The Guest UI sends `ui/notifications/size-change` when its rendered content
+   * The Guest UI sends `ui/notifications/size-changed` when its rendered content
    * size changes, typically via ResizeObserver. Set this callback to dynamically
    * adjust the iframe container dimensions based on the Guest UI's content.
    *
    * Note: This is for Guest UI → Host communication. To notify the Guest UI of
-   * host viewport changes, use {@link app.App.sendSizeChange}.
+   * host viewport changes, use {@link app.App.sendSizeChanged}.
    *
    * @example
    * ```typescript
@@ -276,13 +285,13 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * };
    * ```
    *
-   * @see {@link McpUiSizeChangeNotification} for the notification type
-   * @see {@link app.App.sendSizeChange} for Host → Guest UI size notifications
+   * @see {@link McpUiSizeChangedNotification} for the notification type
+   * @see {@link app.App.sendSizeChanged} for Host → Guest UI size notifications
    */
   set onsizechange(
-    callback: (params: McpUiSizeChangeNotification["params"]) => void,
+    callback: (params: McpUiSizeChangedNotification["params"]) => void,
   ) {
-    this.setNotificationHandler(McpUiSizeChangeNotificationSchema, (n) =>
+    this.setNotificationHandler(McpUiSizeChangedNotificationSchema, (n) =>
       callback(n.params),
     );
   }
@@ -518,6 +527,22 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   }
 
   /**
+   * Verify that task creation is supported for the given request method.
+   * @internal
+   */
+  protected assertTaskCapability(_method: string): void {
+    throw new Error("Tasks are not supported in MCP Apps");
+  }
+
+  /**
+   * Verify that task handler is supported for the given method.
+   * @internal
+   */
+  protected assertTaskHandlerCapability(_method: string): void {
+    throw new Error("Task handlers are not supported in MCP Apps");
+  }
+
+  /**
    * Get the host capabilities passed to the constructor.
    *
    * @returns Host capabilities object
@@ -550,10 +575,72 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
       protocolVersion,
       hostCapabilities: this.getCapabilities(),
       hostInfo: this._hostInfo,
-      hostContext: {
-        // TODO
-      },
+      hostContext: this._hostContext,
     };
+  }
+
+  /**
+   * Update the host context and notify the Guest UI of changes.
+   *
+   * Compares the new context with the current context and sends a
+   * `ui/notifications/host-context-changed` notification containing only the
+   * fields that have changed. If no fields have changed, no notification is sent.
+   *
+   * Common use cases include notifying the Guest UI when:
+   * - Theme changes (light/dark mode toggle)
+   * - Viewport size changes (window resize)
+   * - Display mode changes (inline/fullscreen)
+   * - Locale or timezone changes
+   *
+   * @param hostContext - The complete new host context state
+   *
+   * @example Update theme when user toggles dark mode
+   * ```typescript
+   * bridge.setHostContext({ theme: "dark" });
+   * ```
+   *
+   * @example Update multiple context fields
+   * ```typescript
+   * bridge.setHostContext({
+   *   theme: "dark",
+   *   viewport: { width: 800, height: 600 }
+   * });
+   * ```
+   *
+   * @see {@link McpUiHostContext} for the context structure
+   * @see {@link McpUiHostContextChangedNotification} for the notification type
+   */
+  setHostContext(hostContext: McpUiHostContext) {
+    const changes: McpUiHostContext = {};
+    let hasChanges = false;
+    for (const key of Object.keys(hostContext) as Array<
+      keyof McpUiHostContext
+    >) {
+      const oldValue = this._hostContext[key];
+      const newValue = hostContext[key];
+      if (deepEqual(oldValue, newValue)) {
+        continue;
+      }
+      changes[key] = newValue as any;
+      hasChanges = true;
+    }
+    if (hasChanges) {
+      this._hostContext = hostContext;
+      this.sendHostContextChange(changes);
+    }
+  }
+
+  /**
+   * Send a host context change notification to the app.
+   * Only sends the fields that have changed (partial update).
+   */
+  sendHostContextChange(
+    params: McpUiHostContextChangedNotification["params"],
+  ): Promise<void> | void {
+    return this.notification((<McpUiHostContextChangedNotification>{
+      method: "ui/notifications/host-context-changed",
+      params,
+    }) as Notification);
   }
 
   /**
@@ -581,6 +668,40 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   sendToolInput(params: McpUiToolInputNotification["params"]) {
     return this.notification(<McpUiToolInputNotification>{
       method: "ui/notifications/tool-input",
+      params,
+    });
+  }
+
+  /**
+   * Send streaming partial tool arguments to the Guest UI.
+   *
+   * The host MAY send this notification zero or more times while tool arguments
+   * are being streamed, before {@link sendToolInput} is called with complete
+   * arguments. This enables progressive rendering of tool arguments in the
+   * Guest UI.
+   *
+   * The arguments represent best-effort recovery of incomplete JSON. Guest UIs
+   * SHOULD handle missing or changing fields gracefully between notifications.
+   *
+   * @param params - Partial tool call arguments (may be incomplete)
+   *
+   * @example Stream partial arguments as they arrive
+   * ```typescript
+   * // As streaming progresses...
+   * bridge.sendToolInputPartial({ arguments: { loc: "N" } });
+   * bridge.sendToolInputPartial({ arguments: { location: "New" } });
+   * bridge.sendToolInputPartial({ arguments: { location: "New York" } });
+   *
+   * // When complete, send final input
+   * bridge.sendToolInput({ arguments: { location: "New York", units: "metric" } });
+   * ```
+   *
+   * @see {@link McpUiToolInputPartialNotification} for the notification type
+   * @see {@link sendToolInput} for sending complete arguments
+   */
+  sendToolInputPartial(params: McpUiToolInputPartialNotification["params"]) {
+    return this.notification(<McpUiToolInputPartialNotification>{
+      method: "ui/notifications/tool-input-partial",
       params,
     });
   }
@@ -779,4 +900,8 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
 
     return super.connect(transport);
   }
+}
+
+function deepEqual(a: any, b: any): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }

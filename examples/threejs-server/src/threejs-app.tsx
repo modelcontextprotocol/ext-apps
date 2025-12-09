@@ -1,0 +1,161 @@
+/**
+ * Three.js App Component
+ *
+ * Renders interactive 3D scenes using Three.js with streaming code preview.
+ * Receives all MCP App props from the wrapper.
+ */
+import { useState, useEffect, useRef } from "react";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import type { WidgetProps } from "./mcp-app-wrapper.tsx";
+
+interface ThreeJSToolInput {
+  code?: string;
+  height?: number;
+}
+
+type ThreeJSAppProps = WidgetProps<ThreeJSToolInput>;
+
+const SHIMMER_STYLE = `
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+`;
+
+function LoadingShimmer({ height, code }: { height: number; code?: string }) {
+  const preRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    if (preRef.current) preRef.current.scrollTop = preRef.current.scrollHeight;
+  }, [code]);
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height,
+        borderRadius: 8,
+        padding: 16,
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        background:
+          "linear-gradient(90deg, #1a1a2e 25%, #2d2d44 50%, #1a1a2e 75%)",
+        backgroundSize: "200% 100%",
+        animation: "shimmer 1.5s ease-in-out infinite",
+      }}
+    >
+      <style>{SHIMMER_STYLE}</style>
+      <div
+        style={{
+          color: "#888",
+          fontFamily: "system-ui",
+          fontSize: 12,
+          marginBottom: 8,
+        }}
+      >
+        🎮 Three.js
+      </div>
+      {code && (
+        <pre
+          ref={preRef}
+          style={{
+            margin: 0,
+            padding: 0,
+            flex: 1,
+            overflow: "auto",
+            color: "#aaa",
+            fontFamily: "monospace",
+            fontSize: 11,
+            lineHeight: 1.4,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {code}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+// Context object passed to user code
+const threeContext = {
+  THREE,
+  OrbitControls,
+  EffectComposer,
+  RenderPass,
+  UnrealBloomPass,
+};
+
+async function executeThreeCode(
+  code: string,
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+): Promise<void> {
+  const fn = new Function(
+    "ctx",
+    "canvas",
+    "width",
+    "height",
+    `const { THREE, OrbitControls, EffectComposer, RenderPass, UnrealBloomPass } = ctx;
+     return (async () => { ${code} })();`,
+  );
+  await fn(threeContext, canvas, width, height);
+}
+
+export default function ThreeJSApp({
+  toolInputs,
+  toolInputsPartial,
+  toolResult: _toolResult,
+  hostContext: _hostContext,
+  callServerTool: _callServerTool,
+  sendMessage: _sendMessage,
+  sendOpenLink: _sendOpenLink,
+  sendLog: _sendLog,
+}: ThreeJSAppProps) {
+  const [error, setError] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const height = toolInputs?.height ?? toolInputsPartial?.height ?? 400;
+  const code = toolInputs?.code;
+  const partialCode = toolInputsPartial?.code;
+  const isStreaming = !toolInputs && !!toolInputsPartial;
+
+  useEffect(() => {
+    if (!code || !canvasRef.current || !containerRef.current) return;
+
+    setError(null);
+    const width = containerRef.current.offsetWidth || 800;
+    executeThreeCode(code, canvasRef.current, width, height).catch((e) =>
+      setError(e instanceof Error ? e.message : "Unknown error"),
+    );
+  }, [code, height]);
+
+  if (isStreaming || !code) {
+    return <LoadingShimmer height={height} code={partialCode} />;
+  }
+
+  return (
+    <div ref={containerRef} className="threejs-container">
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: "100%",
+          height,
+          borderRadius: 8,
+          display: "block",
+          background: "#1a1a2e",
+        }}
+      />
+      {error && <div className="error-overlay">Error: {error}</div>}
+    </div>
+  );
+}

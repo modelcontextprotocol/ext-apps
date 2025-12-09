@@ -19,7 +19,7 @@ export {
   type McpUiMessageResult,
   type McpUiSandboxProxyReadyNotification,
   type McpUiSandboxResourceReadyNotification,
-  type McpUiSizeChangeNotification,
+  type McpUiSizeChangedNotification,
   type McpUiToolInputNotification,
   type McpUiToolInputPartialNotification,
   type McpUiToolResultNotification,
@@ -42,7 +42,7 @@ export {
   mcpUiMessageResultSchema as McpUiMessageResultSchema,
   mcpUiSandboxProxyReadyNotificationSchema as McpUiSandboxProxyReadyNotificationSchema,
   mcpUiSandboxResourceReadyNotificationSchema as McpUiSandboxResourceReadyNotificationSchema,
-  mcpUiSizeChangeNotificationSchema as McpUiSizeChangeNotificationSchema,
+  mcpUiSizeChangedNotificationSchema as McpUiSizeChangedNotificationSchema,
   mcpUiToolInputNotificationSchema as McpUiToolInputNotificationSchema,
   mcpUiToolInputPartialNotificationSchema as McpUiToolInputPartialNotificationSchema,
   mcpUiToolResultNotificationSchema as McpUiToolResultNotificationSchema,
@@ -65,7 +65,7 @@ import type {
   McpUiMessageResult,
   McpUiSandboxProxyReadyNotification,
   McpUiSandboxResourceReadyNotification,
-  McpUiSizeChangeNotification,
+  McpUiSizeChangedNotification,
   McpUiToolInputNotification,
   McpUiToolInputPartialNotification,
   McpUiToolResultNotification,
@@ -87,7 +87,7 @@ import {
   mcpUiMessageResultSchema,
   mcpUiSandboxProxyReadyNotificationSchema,
   mcpUiSandboxResourceReadyNotificationSchema,
-  mcpUiSizeChangeNotificationSchema,
+  mcpUiSizeChangedNotificationSchema,
   mcpUiToolInputNotificationSchema,
   mcpUiToolInputPartialNotificationSchema,
   mcpUiToolResultNotificationSchema,
@@ -115,35 +115,100 @@ type VerifySchemaMatches<TSchema extends z.ZodTypeAny, TInterface> =
   z.infer<TSchema> extends TInterface
     ? TInterface extends z.infer<TSchema>
       ? true
-      : ["ERROR: Interface has fields not in schema", TInterface, z.infer<TSchema>]
-    : ["ERROR: Schema has fields not in interface", z.infer<TSchema>, TInterface];
+      : [
+          "ERROR: Interface has fields not in schema",
+          TInterface,
+          z.infer<TSchema>,
+        ]
+    : [
+        "ERROR: Schema has fields not in interface",
+        z.infer<TSchema>,
+        TInterface,
+      ];
 
 // Requests
-type _VerifyOpenLinkRequest = VerifySchemaMatches<typeof mcpUiOpenLinkRequestSchema, McpUiOpenLinkRequest>;
-type _VerifyMessageRequest = VerifySchemaMatches<typeof mcpUiMessageRequestSchema, McpUiMessageRequest>;
-type _VerifyResourceTeardownRequest = VerifySchemaMatches<typeof mcpUiResourceTeardownRequestSchema, McpUiResourceTeardownRequest>;
-type _VerifyInitializeRequest = VerifySchemaMatches<typeof mcpUiInitializeRequestSchema, McpUiInitializeRequest>;
+type _VerifyOpenLinkRequest = VerifySchemaMatches<
+  typeof mcpUiOpenLinkRequestSchema,
+  McpUiOpenLinkRequest
+>;
+type _VerifyMessageRequest = VerifySchemaMatches<
+  typeof mcpUiMessageRequestSchema,
+  McpUiMessageRequest
+>;
+type _VerifyResourceTeardownRequest = VerifySchemaMatches<
+  typeof mcpUiResourceTeardownRequestSchema,
+  McpUiResourceTeardownRequest
+>;
+type _VerifyInitializeRequest = VerifySchemaMatches<
+  typeof mcpUiInitializeRequestSchema,
+  McpUiInitializeRequest
+>;
 
 // Results
-type _VerifyOpenLinkResult = VerifySchemaMatches<typeof mcpUiOpenLinkResultSchema, McpUiOpenLinkResult>;
-type _VerifyMessageResult = VerifySchemaMatches<typeof mcpUiMessageResultSchema, McpUiMessageResult>;
-type _VerifyResourceTeardownResult = VerifySchemaMatches<typeof mcpUiResourceTeardownResultSchema, McpUiResourceTeardownResult>;
-type _VerifyInitializeResult = VerifySchemaMatches<typeof mcpUiInitializeResultSchema, McpUiInitializeResult>;
+type _VerifyOpenLinkResult = VerifySchemaMatches<
+  typeof mcpUiOpenLinkResultSchema,
+  McpUiOpenLinkResult
+>;
+type _VerifyMessageResult = VerifySchemaMatches<
+  typeof mcpUiMessageResultSchema,
+  McpUiMessageResult
+>;
+type _VerifyResourceTeardownResult = VerifySchemaMatches<
+  typeof mcpUiResourceTeardownResultSchema,
+  McpUiResourceTeardownResult
+>;
+type _VerifyInitializeResult = VerifySchemaMatches<
+  typeof mcpUiInitializeResultSchema,
+  McpUiInitializeResult
+>;
 
 // Notifications
-type _VerifySandboxProxyReadyNotification = VerifySchemaMatches<typeof mcpUiSandboxProxyReadyNotificationSchema, McpUiSandboxProxyReadyNotification>;
-type _VerifySandboxResourceReadyNotification = VerifySchemaMatches<typeof mcpUiSandboxResourceReadyNotificationSchema, McpUiSandboxResourceReadyNotification>;
-type _VerifySizeChangeNotification = VerifySchemaMatches<typeof mcpUiSizeChangeNotificationSchema, McpUiSizeChangeNotification>;
-type _VerifyToolInputNotification = VerifySchemaMatches<typeof mcpUiToolInputNotificationSchema, McpUiToolInputNotification>;
-type _VerifyToolInputPartialNotification = VerifySchemaMatches<typeof mcpUiToolInputPartialNotificationSchema, McpUiToolInputPartialNotification>;
-type _VerifyToolResultNotification = VerifySchemaMatches<typeof mcpUiToolResultNotificationSchema, McpUiToolResultNotification>;
-type _VerifyHostContextChangedNotification = VerifySchemaMatches<typeof mcpUiHostContextChangedNotificationSchema, McpUiHostContextChangedNotification>;
-type _VerifyInitializedNotification = VerifySchemaMatches<typeof mcpUiInitializedNotificationSchema, McpUiInitializedNotification>;
+type _VerifySandboxProxyReadyNotification = VerifySchemaMatches<
+  typeof mcpUiSandboxProxyReadyNotificationSchema,
+  McpUiSandboxProxyReadyNotification
+>;
+type _VerifySandboxResourceReadyNotification = VerifySchemaMatches<
+  typeof mcpUiSandboxResourceReadyNotificationSchema,
+  McpUiSandboxResourceReadyNotification
+>;
+type _VerifySizeChangedNotification = VerifySchemaMatches<
+  typeof mcpUiSizeChangedNotificationSchema,
+  McpUiSizeChangedNotification
+>;
+type _VerifyToolInputNotification = VerifySchemaMatches<
+  typeof mcpUiToolInputNotificationSchema,
+  McpUiToolInputNotification
+>;
+type _VerifyToolInputPartialNotification = VerifySchemaMatches<
+  typeof mcpUiToolInputPartialNotificationSchema,
+  McpUiToolInputPartialNotification
+>;
+type _VerifyToolResultNotification = VerifySchemaMatches<
+  typeof mcpUiToolResultNotificationSchema,
+  McpUiToolResultNotification
+>;
+type _VerifyHostContextChangedNotification = VerifySchemaMatches<
+  typeof mcpUiHostContextChangedNotificationSchema,
+  McpUiHostContextChangedNotification
+>;
+type _VerifyInitializedNotification = VerifySchemaMatches<
+  typeof mcpUiInitializedNotificationSchema,
+  McpUiInitializedNotification
+>;
 
 // Context and Capabilities
-type _VerifyHostContext = VerifySchemaMatches<typeof mcpUiHostContextSchema, McpUiHostContext>;
-type _VerifyHostCapabilities = VerifySchemaMatches<typeof mcpUiHostCapabilitiesSchema, McpUiHostCapabilities>;
-type _VerifyAppCapabilities = VerifySchemaMatches<typeof mcpUiAppCapabilitiesSchema, McpUiAppCapabilities>;
+type _VerifyHostContext = VerifySchemaMatches<
+  typeof mcpUiHostContextSchema,
+  McpUiHostContext
+>;
+type _VerifyHostCapabilities = VerifySchemaMatches<
+  typeof mcpUiHostCapabilitiesSchema,
+  McpUiHostCapabilities
+>;
+type _VerifyAppCapabilities = VerifySchemaMatches<
+  typeof mcpUiAppCapabilitiesSchema,
+  McpUiAppCapabilities
+>;
 
 // Force TypeScript to evaluate the type aliases (will error if any don't match)
 const _typeChecks: {
@@ -157,7 +222,7 @@ const _typeChecks: {
   initializeResult: _VerifyInitializeResult;
   sandboxProxyReadyNotification: _VerifySandboxProxyReadyNotification;
   sandboxResourceReadyNotification: _VerifySandboxResourceReadyNotification;
-  sizeChangeNotification: _VerifySizeChangeNotification;
+  sizeChangedNotification: _VerifySizeChangedNotification;
   toolInputNotification: _VerifyToolInputNotification;
   toolInputPartialNotification: _VerifyToolInputPartialNotification;
   toolResultNotification: _VerifyToolResultNotification;

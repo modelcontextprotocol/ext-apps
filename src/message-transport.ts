@@ -82,7 +82,7 @@ export class PostMessageTransport implements Transport {
       }
       const parsed = JSONRPCMessageSchema.safeParse(event.data);
       if (parsed.success) {
-        console.info("[host] Parsed message", parsed.data);
+        console.debug("Parsed message", parsed.data);
         this.onmessage?.(parsed.data);
       } else {
         console.error("Failed to parse message", parsed.error.message, event);
@@ -115,7 +115,7 @@ export class PostMessageTransport implements Transport {
    * @param options - Optional send options (currently unused)
    */
   async send(message: JSONRPCMessage, options?: TransportSendOptions) {
-    console.info("[host] Sending message", message);
+    console.debug("Sending message", message);
     this.eventTarget.postMessage(message, "*");
   }
 

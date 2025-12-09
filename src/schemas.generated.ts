@@ -19,11 +19,11 @@ import {
  * @see {@link app.App.sendOpenLink} for the method that sends this request
  */
 export const mcpUiOpenLinkRequestSchema = z.object({
-    method: z.literal("ui/open-link"),
-    params: z.object({
-        /** URL to open in the host's browser */
-        url: z.string()
-    })
+  method: z.literal("ui/open-link"),
+  params: z.object({
+    /** URL to open in the host's browser */
+    url: z.string(),
+  }),
 });
 
 /**
@@ -34,11 +34,11 @@ export const mcpUiOpenLinkRequestSchema = z.object({
  * @see {@link McpUiOpenLinkRequest}
  */
 export const mcpUiOpenLinkResultSchema = z.looseObject({
-    /**
-     * True if the host failed to open the URL (e.g., due to security policy,
-     * user cancellation, or system error). False or undefined indicates success.
-     */
-    isError: z.boolean().optional()
+  /**
+   * True if the host failed to open the URL (e.g., due to security policy,
+   * user cancellation, or system error). False or undefined indicates success.
+   */
+  isError: z.boolean().optional(),
 });
 
 /**
@@ -50,12 +50,12 @@ export const mcpUiOpenLinkResultSchema = z.looseObject({
  * @see {@link McpUiMessageRequest}
  */
 export const mcpUiMessageResultSchema = z.looseObject({
-    /**
-     * True if the host rejected or failed to deliver the message (e.g., due to
-     * rate limiting, content policy, or system error). False or undefined
-     * indicates the message was accepted.
-     */
-    isError: z.boolean().optional()
+  /**
+   * True if the host rejected or failed to deliver the message (e.g., due to
+   * rate limiting, content policy, or system error). False or undefined
+   * indicates the message was accepted.
+   */
+  isError: z.boolean().optional(),
 });
 
 /**
@@ -70,8 +70,8 @@ export const mcpUiMessageResultSchema = z.looseObject({
  * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
  */
 export const mcpUiSandboxProxyReadyNotificationSchema = z.object({
-    method: z.literal("ui/notifications/sandbox-proxy-ready"),
-    params: z.object({})
+  method: z.literal("ui/notifications/sandbox-proxy-ready"),
+  params: z.object({}),
 });
 
 /**
@@ -86,13 +86,13 @@ export const mcpUiSandboxProxyReadyNotificationSchema = z.object({
  * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
  */
 export const mcpUiSandboxResourceReadyNotificationSchema = z.object({
-    method: z.literal("ui/notifications/sandbox-resource-ready"),
-    params: z.object({
-        /** HTML content to load into the inner iframe */
-        html: z.string(),
-        /** Optional override for the inner iframe's sandbox attribute */
-        sandbox: z.string().optional()
-    })
+  method: z.literal("ui/notifications/sandbox-resource-ready"),
+  params: z.object({
+    /** HTML content to load into the inner iframe */
+    html: z.string(),
+    /** Optional override for the inner iframe's sandbox attribute */
+    sandbox: z.string().optional(),
+  }),
 });
 
 /**
@@ -106,17 +106,17 @@ export const mcpUiSandboxResourceReadyNotificationSchema = z.object({
  * **Host -> Guest UI**: Sent by the Host when the viewport size changes (e.g.,
  * window resize, orientation change). This allows the Guest UI to adjust its layout.
  *
- * @see {@link app.App.sendSizeChange} for the method to send this from Guest UI
- * @see {@link app.App.setupSizeChangeNotifications} for automatic size reporting
+ * @see {@link app.App.sendSizeChanged} for the method to send this from Guest UI
+ * @see {@link app.App.setupSizeChangedNotifications} for automatic size reporting
  */
-export const mcpUiSizeChangeNotificationSchema = z.object({
-    method: z.literal("ui/notifications/size-change"),
-    params: z.object({
-        /** New width in pixels */
-        width: z.number().optional(),
-        /** New height in pixels */
-        height: z.number().optional()
-    })
+export const mcpUiSizeChangedNotificationSchema = z.object({
+  method: z.literal("ui/notifications/size-changed"),
+  params: z.object({
+    /** New width in pixels */
+    width: z.number().optional(),
+    /** New height in pixels */
+    height: z.number().optional(),
+  }),
 });
 
 /**
@@ -130,11 +130,11 @@ export const mcpUiSizeChangeNotificationSchema = z.object({
  * this App instance.
  */
 export const mcpUiToolInputNotificationSchema = z.object({
-    method: z.literal("ui/notifications/tool-input"),
-    params: z.object({
-        /** Complete tool call arguments as key-value pairs */
-        arguments: z.record(z.string(), z.unknown()).optional()
-    })
+  method: z.literal("ui/notifications/tool-input"),
+  params: z.object({
+    /** Complete tool call arguments as key-value pairs */
+    arguments: z.record(z.string(), z.unknown()).optional(),
+  }),
 });
 
 /**
@@ -152,11 +152,11 @@ export const mcpUiToolInputNotificationSchema = z.object({
  * gracefully handle missing or changing fields between notifications.
  */
 export const mcpUiToolInputPartialNotificationSchema = z.object({
-    method: z.literal("ui/notifications/tool-input-partial"),
-    params: z.object({
-        /** Partial tool call arguments (incomplete, may change) */
-        arguments: z.record(z.string(), z.unknown()).optional()
-    })
+  method: z.literal("ui/notifications/tool-input-partial"),
+  params: z.object({
+    /** Partial tool call arguments (incomplete, may change) */
+    arguments: z.record(z.string(), z.unknown()).optional(),
+  }),
 });
 
 /**
@@ -173,8 +173,8 @@ export const mcpUiToolInputPartialNotificationSchema = z.object({
  * @see {@link app-bridge.AppBridge.sendResourceTeardown} for the host method that sends this
  */
 export const mcpUiResourceTeardownRequestSchema = z.object({
-    method: z.literal("ui/resource-teardown"),
-    params: z.object({})
+  method: z.literal("ui/resource-teardown"),
+  params: z.object({}),
 });
 
 /**
@@ -185,7 +185,10 @@ export const mcpUiResourceTeardownRequestSchema = z.object({
  *
  * @see {@link McpUiResourceTeardownRequest}
  */
-export const mcpUiResourceTeardownResultSchema = z.record(z.string(), z.unknown());
+export const mcpUiResourceTeardownResultSchema = z.record(
+  z.string(),
+  z.unknown(),
+);
 
 /**
  * Capabilities supported by the host application.
@@ -204,22 +207,26 @@ export const mcpUiResourceTeardownResultSchema = z.record(z.string(), z.unknown(
  * @see {@link McpUiInitializeResult} for the initialization result that includes these capabilities
  */
 export const mcpUiHostCapabilitiesSchema = z.object({
-    /** Experimental features (structure TBD) */
-    experimental: z.object({}).optional(),
-    /** Host supports opening external URLs via {@link app.App.sendOpenLink} */
-    openLinks: z.object({}).optional(),
-    /** Host can proxy tool calls to the MCP server */
-    serverTools: z.object({
-        /** Host supports tools/list_changed notifications */
-        listChanged: z.boolean().optional()
-    }).optional(),
-    /** Host can proxy resource reads to the MCP server */
-    serverResources: z.object({
-        /** Host supports resources/list_changed notifications */
-        listChanged: z.boolean().optional()
-    }).optional(),
-    /** Host accepts log messages via {@link app.App.sendLog} */
-    logging: z.object({}).optional()
+  /** Experimental features (structure TBD) */
+  experimental: z.object({}).optional(),
+  /** Host supports opening external URLs via {@link app.App.sendOpenLink} */
+  openLinks: z.object({}).optional(),
+  /** Host can proxy tool calls to the MCP server */
+  serverTools: z
+    .object({
+      /** Host supports tools/list_changed notifications */
+      listChanged: z.boolean().optional(),
+    })
+    .optional(),
+  /** Host can proxy resource reads to the MCP server */
+  serverResources: z
+    .object({
+      /** Host supports resources/list_changed notifications */
+      listChanged: z.boolean().optional(),
+    })
+    .optional(),
+  /** Host accepts log messages via {@link app.App.sendLog} */
+  logging: z.object({}).optional(),
 });
 
 /**
@@ -239,16 +246,18 @@ export const mcpUiHostCapabilitiesSchema = z.object({
  * @see {@link McpUiInitializeRequest} for the initialization request that includes these capabilities
  */
 export const mcpUiAppCapabilitiesSchema = z.object({
-    /** Experimental features (structure TBD) */
-    experimental: z.object({}).optional(),
-    /**
-     * App exposes MCP-style tools that the host can call.
-     * These are app-specific tools, not proxied from the server.
-     */
-    tools: z.object({
-        /** App supports tools/list_changed notifications */
-        listChanged: z.boolean().optional()
-    }).optional()
+  /** Experimental features (structure TBD) */
+  experimental: z.object({}).optional(),
+  /**
+   * App exposes MCP-style tools that the host can call.
+   * These are app-specific tools, not proxied from the server.
+   */
+  tools: z
+    .object({
+      /** App supports tools/list_changed notifications */
+      listChanged: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -261,8 +270,8 @@ export const mcpUiAppCapabilitiesSchema = z.object({
  * @see {@link app.App.connect} for the method that sends this notification
  */
 export const mcpUiInitializedNotificationSchema = z.object({
-    method: z.literal("ui/notifications/initialized"),
-    params: z.object({}).optional()
+  method: z.literal("ui/notifications/initialized"),
+  params: z.object({}).optional(),
 });
 
 const contentBlockSchema = ContentBlockSchema;
@@ -285,13 +294,13 @@ const implementationSchema = ImplementationSchema;
  * @see {@link app.App.sendMessage} for the method that sends this request
  */
 export const mcpUiMessageRequestSchema = z.object({
-    method: z.literal("ui/message"),
-    params: z.object({
-        /** Message role, currently only "user" is supported */
-        role: z.literal("user"),
-        /** Message content blocks (text, image, etc.) */
-        content: z.array(contentBlockSchema)
-    })
+  method: z.literal("ui/message"),
+  params: z.object({
+    /** Message role, currently only "user" is supported */
+    role: z.literal("user"),
+    /** Message content blocks (text, image, etc.) */
+    content: z.array(contentBlockSchema),
+  }),
 });
 
 /**
@@ -306,9 +315,9 @@ export const mcpUiMessageRequestSchema = z.object({
  * for the model and optionally structuredContent optimized for UI rendering.
  */
 export const mcpUiToolResultNotificationSchema = z.object({
-    method: z.literal("ui/notifications/tool-result"),
-    /** Standard MCP tool execution result */
-    params: callToolResultSchema
+  method: z.literal("ui/notifications/tool-result"),
+  /** Standard MCP tool execution result */
+  params: callToolResultSchema,
 });
 
 /**
@@ -330,80 +339,99 @@ export const mcpUiToolResultNotificationSchema = z.object({
  * ```
  */
 export const mcpUiHostContextSchema = z.object({
-    /** Metadata of the tool call that instantiated this App */
-    toolInfo: z.object({
-        /** JSON-RPC id of the tools/call request */
-        id: requestIdSchema,
-        /** Tool definition including name, inputSchema, etc. */
-        tool: toolSchema
-    }).optional(),
-    /**
-     * Current color theme preference.
-     * @example "dark"
-     */
-    theme: z.union([z.literal("light"), z.literal("dark"), z.literal("system")]).optional(),
-    /**
-     * How the UI is currently displayed.
-     * @example "inline"
-     */
-    displayMode: z.union([z.literal("inline"), z.literal("fullscreen"), z.literal("pip"), z.literal("carousel")]).optional(),
-    /**
-     * Display modes the host supports.
-     * Apps can use this to offer mode-switching UI if applicable.
-     */
-    availableDisplayModes: z.array(z.string()).optional(),
-    /** Current and maximum dimensions available to the UI */
-    viewport: z.object({
-        /** Current viewport width in pixels */
-        width: z.number(),
-        /** Current viewport height in pixels */
-        height: z.number(),
-        /** Maximum available height in pixels (if constrained) */
-        maxHeight: z.number().optional(),
-        /** Maximum available width in pixels (if constrained) */
-        maxWidth: z.number().optional()
-    }).optional(),
-    /**
-     * User's language and region preference in BCP 47 format.
-     * @example "en-US", "fr-CA", "ja-JP"
-     */
-    locale: z.string().optional(),
-    /**
-     * User's timezone in IANA format.
-     * @example "America/New_York", "Europe/London", "Asia/Tokyo"
-     */
-    timeZone: z.string().optional(),
-    /**
-     * Host application identifier.
-     * @example "claude-desktop/1.0.0"
-     */
-    userAgent: z.string().optional(),
-    /**
-     * Platform type for responsive design decisions.
-     * @example "desktop"
-     */
-    platform: z.union([z.literal("web"), z.literal("desktop"), z.literal("mobile")]).optional(),
-    /** Device input capabilities */
-    deviceCapabilities: z.object({
-        /** Whether the device supports touch input */
-        touch: z.boolean().optional(),
-        /** Whether the device supports hover interactions */
-        hover: z.boolean().optional()
-    }).optional(),
-    /**
-     * Mobile safe area boundaries in pixels.
-     * Used to avoid notches, rounded corners, and system UI on mobile devices.
-     */
-    safeAreaInsets: z.object({
-        /** Top safe area inset in pixels */
-        top: z.number(),
-        /** Right safe area inset in pixels */
-        right: z.number(),
-        /** Bottom safe area inset in pixels */
-        bottom: z.number(),
-        /** Left safe area inset in pixels */
-        left: z.number()
-    }).optional()
+  /** Metadata of the tool call that instantiated this App */
+  toolInfo: z
+    .object({
+      /** JSON-RPC id of the tools/call request */
+      id: requestIdSchema,
+      /** Tool definition including name, inputSchema, etc. */
+      tool: toolSchema,
+    })
+    .optional(),
+  /**
+   * Current color theme preference.
+   * @example "dark"
+   */
+  theme: z
+    .union([z.literal("light"), z.literal("dark"), z.literal("system")])
+    .optional(),
+  /**
+   * How the UI is currently displayed.
+   * @example "inline"
+   */
+  displayMode: z
+    .union([
+      z.literal("inline"),
+      z.literal("fullscreen"),
+      z.literal("pip"),
+      z.literal("carousel"),
+    ])
+    .optional(),
+  /**
+   * Display modes the host supports.
+   * Apps can use this to offer mode-switching UI if applicable.
+   */
+  availableDisplayModes: z.array(z.string()).optional(),
+  /** Current and maximum dimensions available to the UI */
+  viewport: z
+    .object({
+      /** Current viewport width in pixels */
+      width: z.number(),
+      /** Current viewport height in pixels */
+      height: z.number(),
+      /** Maximum available height in pixels (if constrained) */
+      maxHeight: z.number().optional(),
+      /** Maximum available width in pixels (if constrained) */
+      maxWidth: z.number().optional(),
+    })
+    .optional(),
+  /**
+   * User's language and region preference in BCP 47 format.
+   * @example "en-US", "fr-CA", "ja-JP"
+   */
+  locale: z.string().optional(),
+  /**
+   * User's timezone in IANA format.
+   * @example "America/New_York", "Europe/London", "Asia/Tokyo"
+   */
+  timeZone: z.string().optional(),
+  /**
+   * Host application identifier.
+   * @example "claude-desktop/1.0.0"
+   */
+  userAgent: z.string().optional(),
+  /**
+   * Platform type for responsive design decisions.
+   * @example "desktop"
+   */
+  platform: z
+    .union([z.literal("web"), z.literal("desktop"), z.literal("mobile")])
+    .optional(),
+  /** Device input capabilities */
+  deviceCapabilities: z
+    .object({
+      /** Whether the device supports touch input */
+      touch: z.boolean().optional(),
+      /** Whether the device supports hover interactions */
+      hover: z.boolean().optional(),
+    })
+    .optional(),
+  /**
+   * Mobile safe area boundaries in pixels.
+   * Used to avoid notches, rounded corners, and system UI on mobile devices.
+   */
+  safeAreaInsets: z
+    .object({
+      /** Top safe area inset in pixels */
+      top: z.number(),
+      /** Right safe area inset in pixels */
+      right: z.number(),
+      /** Bottom safe area inset in pixels */
+      bottom: z.number(),
+      /** Left safe area inset in pixels */
+      left: z.number(),
+    })
+    .optional(),
 });
 
 /**
@@ -421,9 +449,9 @@ export const mcpUiHostContextSchema = z.object({
  * @see {@link McpUiHostContext} for the full context structure
  */
 export const mcpUiHostContextChangedNotificationSchema = z.object({
-    method: z.literal("ui/notifications/host-context-changed"),
-    /** Partial context update containing only changed fields */
-    params: mcpUiHostContextSchema
+  method: z.literal("ui/notifications/host-context-changed"),
+  /** Partial context update containing only changed fields */
+  params: mcpUiHostContextSchema,
 });
 
 /**
@@ -439,15 +467,15 @@ export const mcpUiHostContextChangedNotificationSchema = z.object({
  * @see {@link app.App.connect} for the method that sends this request
  */
 export const mcpUiInitializeRequestSchema = z.object({
-    method: z.literal("ui/initialize"),
-    params: z.object({
-        /** App identification (name and version) */
-        appInfo: implementationSchema,
-        /** Features and capabilities this app provides */
-        appCapabilities: mcpUiAppCapabilitiesSchema,
-        /** Protocol version this app supports */
-        protocolVersion: z.string()
-    })
+  method: z.literal("ui/initialize"),
+  params: z.object({
+    /** App identification (name and version) */
+    appInfo: implementationSchema,
+    /** Features and capabilities this app provides */
+    appCapabilities: mcpUiAppCapabilitiesSchema,
+    /** Protocol version this app supports */
+    protocolVersion: z.string(),
+  }),
 });
 
 /**
@@ -459,12 +487,12 @@ export const mcpUiInitializeRequestSchema = z.object({
  * @see {@link McpUiInitializeRequest}
  */
 export const mcpUiInitializeResultSchema = z.looseObject({
-    /** Negotiated protocol version string (e.g., "2025-11-21") */
-    protocolVersion: z.string(),
-    /** Host application identification and version */
-    hostInfo: implementationSchema,
-    /** Features and capabilities provided by the host */
-    hostCapabilities: mcpUiHostCapabilitiesSchema,
-    /** Rich context about the host environment */
-    hostContext: mcpUiHostContextSchema
+  /** Negotiated protocol version string (e.g., "2025-11-21") */
+  protocolVersion: z.string(),
+  /** Host application identification and version */
+  hostInfo: implementationSchema,
+  /** Features and capabilities provided by the host */
+  hostCapabilities: mcpUiHostCapabilitiesSchema,
+  /** Rich context about the host environment */
+  hostContext: mcpUiHostContextSchema,
 });

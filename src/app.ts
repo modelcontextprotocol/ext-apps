@@ -31,7 +31,7 @@ import {
   McpUiMessageResultSchema,
   McpUiOpenLinkRequest,
   McpUiOpenLinkResultSchema,
-  McpUiSizeChangeNotification,
+  McpUiSizeChangedNotification,
   McpUiToolInputNotification,
   McpUiToolInputNotificationSchema,
   McpUiToolInputPartialNotification,
@@ -41,7 +41,7 @@ import {
 } from "./types";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-export { PostMessageTransport } from "./message-transport.js";
+export { PostMessageTransport } from "./message-transport";
 export * from "./types";
 
 /**
@@ -77,6 +77,11 @@ export * from "./types";
 export const RESOURCE_URI_META_KEY = "ui/resourceUri";
 
 /**
+ * MIME type for MCP UI resources.
+ */
+export const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
+
+/**
  * Options for configuring App behavior.
  *
  * Extends ProtocolOptions from the MCP SDK with App-specific configuration.
@@ -88,7 +93,7 @@ type AppOptions = ProtocolOptions & {
    * Automatically report size changes to the host using ResizeObserver.
    *
    * When enabled, the App monitors `document.body` and `document.documentElement`
-   * for size changes and automatically sends `ui/notifications/size-change`
+   * for size changes and automatically sends `ui/notifications/size-changed`
    * notifications to the host.
    *
    * @default true
@@ -543,6 +548,22 @@ export class App extends Protocol<Request, Notification, Result> {
   }
 
   /**
+   * Verify that task creation is supported for the given request method.
+   * @internal
+   */
+  protected assertTaskCapability(_method: string): void {
+    throw new Error("Tasks are not supported in MCP Apps");
+  }
+
+  /**
+   * Verify that task handler is supported for the given method.
+   * @internal
+   */
+  protected assertTaskHandlerCapability(_method: string): void {
+    throw new Error("Task handlers are not supported in MCP Apps");
+  }
+
+  /**
    * Call a tool on the originating MCP server (proxied through the host).
    *
    * Apps can call tools to fetch fresh data or trigger server-side actions.
@@ -701,7 +722,7 @@ export class App extends Protocol<Request, Notification, Result> {
    *
    * @example Manually notify host of size change
    * ```typescript
-   * app.sendSizeChange({
+   * app.sendSizeChanged({
    *   width: 400,
    *   height: 600
    * });
@@ -709,11 +730,11 @@ export class App extends Protocol<Request, Notification, Result> {
    *
    * @returns Promise that resolves when the notification is sent
    *
-   * @see {@link McpUiSizeChangeNotification} for notification structure
+   * @see {@link McpUiSizeChangedNotification} for notification structure
    */
-  sendSizeChange(params: McpUiSizeChangeNotification["params"]) {
-    return this.notification(<McpUiSizeChangeNotification>{
-      method: "ui/notifications/size-change",
+  sendSizeChanged(params: McpUiSizeChangedNotification["params"]) {
+    return this.notification(<McpUiSizeChangedNotification>{
+      method: "ui/notifications/size-changed",
       params,
     });
   }
@@ -722,7 +743,7 @@ export class App extends Protocol<Request, Notification, Result> {
    * Set up automatic size change notifications using ResizeObserver.
    *
    * Observes both `document.documentElement` and `document.body` for size changes
-   * and automatically sends `ui/notifications/size-change` notifications to the host.
+   * and automatically sends `ui/notifications/size-changed` notifications to the host.
    * The notifications are debounced using requestAnimationFrame to avoid duplicates.
    *
    * Note: This method is automatically called by `connect()` if the `autoResize`
@@ -737,40 +758,56 @@ export class App extends Protocol<Request, Notification, Result> {
    * await app.connect(transport);
    *
    * // Later, enable auto-resize manually
-   * const cleanup = app.setupSizeChangeNotifications();
+   * const cleanup = app.setupSizeChangedNotifications();
    *
    * // Clean up when done
    * cleanup();
    * ```
    */
-  setupSizeChangeNotifications() {
+  setupSizeChangedNotifications() {
     let scheduled = false;
+    let lastWidth = 0;
+    let lastHeight = 0;
 
-    const sendBodySizeChange = () => {
+    const sendBodySizeChanged = () => {
       if (scheduled) {
         return;
       }
       scheduled = true;
       requestAnimationFrame(() => {
         scheduled = false;
-        const el = document.body.parentElement ?? document.body;
-        const rect = el.getBoundingClientRect();
-        // Compensate for viewport scrollbar on Linux/Windows where scrollbars
-        // consume space. window.innerWidth includes scrollbar, clientWidth excludes it.
-        const scrollbarWidth =
-          window.innerWidth - document.documentElement.clientWidth;
-        // Use max of rect (includes CSS transforms) and scroll dimensions (content overflow).
-        const width = Math.ceil(
-          Math.max(rect.width, el.scrollWidth) + scrollbarWidth,
-        );
-        const height = Math.ceil(Math.max(rect.height, el.scrollHeight));
-        this.sendSizeChange({ width, height });
+        const html = document.documentElement;
+
+        // Measure actual content size by temporarily setting html to fit-content.
+        // This shrinks html to fit body (including body margins), giving us the
+        // true minimum size needed by the content.
+        const originalWidth = html.style.width;
+        const originalHeight = html.style.height;
+        html.style.width = "fit-content";
+        html.style.height = "fit-content";
+        const rect = html.getBoundingClientRect();
+        html.style.width = originalWidth;
+        html.style.height = originalHeight;
+
+        // Compensate for scrollbar width on Linux/Windows where scrollbars consume space.
+        // On systems with overlay scrollbars (macOS), this will be 0.
+        const scrollbarWidth = window.innerWidth - html.clientWidth;
+
+        const width = Math.ceil(rect.width + scrollbarWidth);
+        const height = Math.ceil(rect.height);
+
+        // Only send if size actually changed (prevents feedback loops from style changes)
+        if (width !== lastWidth || height !== lastHeight) {
+          lastWidth = width;
+          lastHeight = height;
+          this.sendSizeChanged({ width, height });
+        }
       });
     };
 
-    sendBodySizeChange();
+    sendBodySizeChanged();
 
-    const resizeObserver = new ResizeObserver(sendBodySizeChange);
+    const resizeObserver = new ResizeObserver(sendBodySizeChanged);
     // Observe both html and body to catch all size changes
     resizeObserver.observe(document.documentElement);
     resizeObserver.observe(document.body);
@@ -786,7 +823,7 @@ export class App extends Protocol<Request, Notification, Result> {
    * 2. Sends `ui/initialize` request with app info and capabilities
    * 3. Receives host capabilities and context in response
    * 4. Sends `ui/notifications/initialized` notification
-   * 5. Sets up auto-resize using {@link setupSizeChangeNotifications} if enabled (default)
+   * 5. Sets up auto-resize using {@link setupSizeChangedNotifications} if enabled (default)
    *
    * If initialization fails, the connection is automatically closed and an error
    * is thrown.
@@ -847,7 +884,7 @@ export class App extends Protocol<Request, Notification, Result> {
       });
 
       if (this.options?.autoResize) {
-        this.setupSizeChangeNotifications();
+        this.setupSizeChangedNotifications();
       }
     } catch (error) {
       // Disconnect if initialization fails.

@@ -1,0 +1,6 @@
+examples/basic-host/**/*.ts
+examples/basic-host/**/*.tsx
+examples/basic-server-react/**/*.ts
+examples/basic-server-react/**/*.tsx
+examples/basic-server-vanillajs/**/*.ts
+examples/basic-server-vanillajs/**/*.tsx

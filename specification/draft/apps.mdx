@@ -7,7 +7,7 @@
 
 ## Abstract
 
-This SEP proposes an extension (per SEP-1724) to MCP that enables servers to deliver interactive user interfaces to hosts. MCP Apps introduces a standardized pattern for declaring UI resources via the `ui://` URI scheme, associating them with tools through metadata, and facilitating bidirectional communication between the UI and the host using MCP's JSON-RPC base protocol. This extension addresses the growing community need for rich, interactive experiences in MCP-enabled applications, maintaining security, auditability, and alignment with MCP's core architecture. The initial specification focuses on HTML resources (`text/html+mcp`) with a clear path for future extensions.
+This SEP proposes an extension (per SEP-1724) to MCP that enables servers to deliver interactive user interfaces to hosts. MCP Apps introduces a standardized pattern for declaring UI resources via the `ui://` URI scheme, associating them with tools through metadata, and facilitating bidirectional communication between the UI and the host using MCP's JSON-RPC base protocol. This extension addresses the growing community need for rich, interactive experiences in MCP-enabled applications, maintaining security, auditability, and alignment with MCP's core architecture. The initial specification focuses on HTML resources (`text/html;profile=mcp-app`) with a clear path for future extensions.
 
 ## Motivation
 
@@ -43,7 +43,7 @@ MCP Apps extends the Model Context Protocol to enable servers to deliver interac
 - **Bidirectional Communication:** UI iframes communicate with hosts using standard MCP JSON-RPC protocol
 - **Security Model:** Mandatory iframe sandboxing with auditable communication
 
-This specification focuses on HTML content (`text/html+mcp`) as the initial content type, with extensibility for future formats.
+This specification focuses on HTML content (`text/html;profile=mcp-app`) as the initial content type, with extensibility for future formats.
 
 As an extension, MCP Apps is optional and must be explicitly negotiated between clients and servers through the extension capabilities mechanism (see Capability Negotiation section).
 
@@ -87,11 +87,11 @@ interface UIResource {
   /**
    * MIME type of the UI content
    *
-   * SHOULD be `text/html+mcp` for HTML-based UIs in the initial MVP.
+   * SHOULD be `text/html;profile=mcp-app` for HTML-based UIs in the initial MVP.
    * Other content types are reserved for future extensions.
    *
    * @example
-   * "text/html+mcp"
+   * "text/html;profile=mcp-app"
    */
   mimeType: string;
 
@@ -168,7 +168,7 @@ The resource content is returned via `resources/read`:
 {
   contents: [{
     uri: string;                  // Matching UI resource URI
-    mimeType: "text/html+mcp";  // MUST be "text/html+mcp"
+    mimeType: "text/html;profile=mcp-app";  // MUST be "text/html;profile=mcp-app"
     text?: string;                // HTML content as string
     blob?: string;                // OR base64-encoded HTML
     _meta?: {
@@ -188,7 +188,7 @@ The resource content is returned via `resources/read`:
 #### Content Requirements:
 
 - URI MUST start with `ui://` scheme
-- `mimeType` MUST be `text/html+mcp` (other types reserved for future extensions)
+- `mimeType` MUST be `text/html;profile=mcp-app` (other types reserved for future extensions)
 - Content MUST be provided via either `text` (string) or `blob` (base64-encoded)
 - Content MUST be valid HTML5 document
 
@@ -216,14 +216,14 @@ Example:
   "uri": "ui://weather-server/dashboard-template",
   "name": "weather_dashboard",
   "description": "Interactive weather dashboard widget",
-  "mimeType": "text/html+mcp"
+  "mimeType": "text/html;profile=mcp-app"
 }
 
 // Resource content with metadata
 {
   "contents": [{
     "uri": "ui://weather-server/dashboard-template",
-    "mimeType": "text/html+mcp",
+    "mimeType": "text/html;profile=mcp-app",
     "text": "<!DOCTYPE html><html>...</html>",
     "_meta": {
       "ui" : {
@@ -399,9 +399,9 @@ interface HostContext {
     tool: Tool,
   };
   /** Current color theme preference */
-  theme?: "light" | "dark" | "system";
+  theme?: "light" | "dark";
   /** How the UI is currently displayed */
-  displayMode?: "inline" | "fullscreen" | "pip" | "carousel";
+  displayMode?: "inline" | "fullscreen" | "pip";
   /** Display modes the host supports */
   availableDisplayModes?: string[];
   /** Current and maximum dimensions available to the UI */
@@ -424,7 +424,7 @@ interface HostContext {
     touch?: boolean;
     hover?: boolean;
   }
-  /** Mobile safe area boundaries in pixels */
+  /** Safe area boundaries in pixels */
   safeAreaInsets?: {
     top: number;
     right: number;
@@ -632,12 +632,12 @@ Host MUST send this notification if the tool execution was cancelled, for any re
 Host MUST send this notification before tearing down the UI resource, for any reason, including user action, resource re-allocation, etc. The Host MAY specify the reason.
 Host SHOULD wait for a response before tearing down the resource (to prevent data loss).
 
-`ui/size-change` - UI’s size changed
+`ui/notifications/size-changed` - UI’s size changed
 
 ```typescript
 {
   jsonrpc: "2.0",
-  method: "ui/size-change",
+  method: "ui/notifications/size-changed",
   params: {
     width: number,   // Viewport width in pixels
     height: number   // Viewport height in pixels
@@ -647,12 +647,12 @@ Host SHOULD wait for a response before tearing down the resource (to prevent dat
 
 Guest UI SHOULD send this notification when rendered content body size changes (e.g. using ResizeObserver API to report up to date size).
 
-`ui/host-context-change` - Host context has changed
+`ui/notifications/host-context-changed` - Host context has changed
 
 ```typescript
 {
   jsonrpc: "2.0",
-  method: "ui/host-context-change",
+  method: "ui/notifications/host-context-changed",
   params: Partial<HostContext>  // See HostContext type above
 }
 ```
@@ -774,10 +774,10 @@ sequenceDiagram
       H --> UI: resources/read response
     end
     opt UI notifications
-      UI ->> H: notifications (e.g., ui/notifications/size-change)
+      UI ->> H: notifications (e.g., ui/notifications/size-changed)
     end
     opt Host notifications
-      H ->> UI: notifications (e.g., ui/notifications/host-context-change)
+      H ->> UI: notifications (e.g., ui/notifications/host-context-changed)
     end
   end
 ```
@@ -919,7 +919,7 @@ Clients advertise MCP Apps support in the initialize request using the extension
     "capabilities": {
       "extensions": {
         "io.modelcontextprotocol/ui": {
-          "mimeTypes": ["text/html+mcp"]
+          "mimeTypes": ["text/html;profile=mcp-app"]
         }
       }
     },
@@ -933,7 +933,7 @@ Clients advertise MCP Apps support in the initialize request using the extension
 
 **Extension Settings:**
 
-- `mimeTypes`: Array of supported content types (REQUIRED, e.g., `["text/html+mcp"]`)
+- `mimeTypes`: Array of supported content types (REQUIRED, e.g., `["text/html;profile=mcp-app"]`)
 
 Future versions may add additional settings:
 
@@ -946,7 +946,7 @@ Servers SHOULD check client (host would-be) capabilities before registering UI-e
 
 ```typescript
 const hasUISupport =
-  clientCapabilities?.extensions?.["io.modelcontextprotocol/ui"]?.mimeTypes?.includes("text/html+mcp");
+  clientCapabilities?.extensions?.["io.modelcontextprotocol/ui"]?.mimeTypes?.includes("text/html;profile=mcp-app");
 
 if (hasUISupport) {
   // Register tools with UI templates
@@ -1030,7 +1030,7 @@ This proposal synthesizes feedback from the UI CWG and MCP-UI community, host im
 
 #### 3. Support Raw HTML Content Type
 
-**Decision:** MVP supports only `text/html+mcp` (rawHtml), with other types explicitly deferred.
+**Decision:** MVP supports only `text/html;profile=mcp-app` (rawHtml), with other types explicitly deferred.
 
 **Rationale:**
 

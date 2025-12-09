@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Get Time App</title>
+</head>
+<body>
+  <main class="main">
+    <p class="notice">Watch activity in the DevTools console!</p>
+
+    <div class="action">
+      <p><strong>Server Time:</strong> <code id="server-time">Loading...</code></p>
+      <button id="get-time-btn">Get Server Time</button>
+    </div>
+
+    <div class="action">
+      <textarea id="message-text">This is message text.</textarea>
+      <button id="send-message-btn">Send Message</button>
+    </div>
+
+    <div class="action">
+      <input type="text" id="log-text" value="This is log text.">
+      <button id="send-log-btn">Send Log</button>
+    </div>
+
+    <div class="action">
+      <input type="url" id="link-url" value="https://modelcontextprotocol.io/">
+      <button id="open-link-btn">Open Link</button>
+    </div>
+  </main>
+  <script type="module" src="/src/mcp-app.ts"></script>
+</body>
+</html>

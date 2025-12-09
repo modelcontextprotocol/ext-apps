@@ -25,23 +25,13 @@ jobs:
 
       - run: npm install
 
-      - run: npm run build
+      - run: npm run build:all
 
       - name: Verify generated schemas are up-to-date
         run: |
           npm run generate:schemas
           git diff --exit-code src/schemas.generated.ts src/schemas.generated.test.ts || (echo "Generated schemas are out of date. Run 'npm run generate:schemas' and commit." && exit 1)
 
-      - name: Build simple-host example
-        working-directory: examples/simple-host
-        run: |
-          npm install
-          npm run build
-
-      - name: Build simple-server example
-        working-directory: examples/simple-server
-        run: |
-          npm install
-          npm run build
+      - run: npm test
 
       - run: npm run prettier

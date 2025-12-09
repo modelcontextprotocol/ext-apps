@@ -1,0 +1,34 @@
+{
+  "name": "budget-allocator-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "INPUT=mcp-app.html vite build",
+    "watch": "INPUT=mcp-app.html vite build --watch",
+    "serve:http": "bun server.ts",
+    "serve:stdio": "bun server.ts --stdio",
+    "start": "npm run start:http",
+    "start:http": "NODE_ENV=development npm run build && npm run serve:http",
+    "start:stdio": "NODE_ENV=development npm run build && npm run serve:stdio",
+    "dev": "NODE_ENV=development concurrently 'npm run watch' 'npm run serve:http'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "../..",
+    "@modelcontextprotocol/sdk": "^1.22.0",
+    "chart.js": "^4.4.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "bun": "^1.3.2",
+    "concurrently": "^9.2.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}

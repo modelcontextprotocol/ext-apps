@@ -1,0 +1,240 @@
+/**
+ * Three.js MCP Server
+ *
+ * Provides tools for rendering interactive 3D scenes using Three.js.
+ */
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import cors from "cors";
+import express, { type Request, type Response } from "express";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { z } from "zod";
+import { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY } from "../../dist/src/app";
+
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+const DIST_DIR = path.join(import.meta.dirname, "dist");
+
+const THREEJS_DOCUMENTATION = `# Three.js Widget Documentation
+
+## Available Globals
+- \`THREE\` - Three.js library (r181)
+- \`canvas\` - Pre-created canvas element
+- \`width\`, \`height\` - Canvas dimensions in pixels
+- \`OrbitControls\` - Interactive camera controls
+- \`EffectComposer\`, \`RenderPass\`, \`UnrealBloomPass\` - Post-processing effects
+
+## Basic Template
+\`\`\`javascript
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(width, height);
+renderer.setClearColor(0x1a1a2e);  // Dark background
+
+// Add objects here...
+
+camera.position.z = 5;
+renderer.render(scene, camera);  // Static render
+\`\`\`
+
+## Example: Rotating Cube with Lighting
+\`\`\`javascript
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(width, height);
+renderer.setClearColor(0x1a1a2e);
+
+const cube = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshStandardMaterial({ color: 0x00ff88 })
+);
+scene.add(cube);
+
+// Lighting - keep intensity at 1 or below
+scene.add(new THREE.DirectionalLight(0xffffff, 1));
+scene.add(new THREE.AmbientLight(0x404040));
+
+camera.position.z = 3;
+
+function animate() {
+  requestAnimationFrame(animate);
+  cube.rotation.x += 0.01;
+  cube.rotation.y += 0.01;
+  renderer.render(scene, camera);
+}
+animate();
+\`\`\`
+
+## Example: Interactive OrbitControls
+\`\`\`javascript
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(width, height);
+renderer.setClearColor(0x2d2d44);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+const sphere = new THREE.Mesh(
+  new THREE.SphereGeometry(1, 32, 32),
+  new THREE.MeshStandardMaterial({ color: 0xff6b6b, roughness: 0.4 })
+);
+scene.add(sphere);
+
+scene.add(new THREE.DirectionalLight(0xffffff, 1));
+scene.add(new THREE.AmbientLight(0x404040));
+
+camera.position.z = 4;
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+\`\`\`
+
+## Tips
+- Always set \`renderer.setClearColor()\` to a dark color
+- Keep light intensity ≤ 1 to avoid washed-out scenes
+- Use \`MeshStandardMaterial\` for realistic lighting
+- For animations, use \`requestAnimationFrame\`
+`;
+
+const server = new McpServer({
+  name: "Three.js Server",
+  version: "1.0.0",
+});
+
+// Register tool and resource
+{
+  const resourceUri = "ui://threejs/mcp-app.html";
+
+  // Tool 1: show_threejs_scene
+  server.registerTool(
+    "show_threejs_scene",
+    {
+      title: "Show Three.js Scene",
+      description:
+        "Render an interactive 3D scene with custom Three.js code. Available globals: THREE, OrbitControls, EffectComposer, RenderPass, UnrealBloomPass, canvas, width, height.",
+      inputSchema: {
+        code: z.string().describe("JavaScript code to render the 3D scene"),
+        height: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Height in pixels (default: 400)"),
+      },
+      _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+    },
+    async ({ code, height }) => {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ code, height: height || 400 }),
+          },
+        ],
+      };
+    },
+  );
+
+  // Tool 2: learn_threejs
+  server.registerTool(
+    "learn_threejs",
+    {
+      title: "Learn Three.js",
+      description:
+        "Get documentation and examples for using the Three.js widget",
+      inputSchema: {},
+    },
+    async () => {
+      return {
+        content: [{ type: "text", text: THREEJS_DOCUMENTATION }],
+      };
+    },
+  );
+
+  // Resource registration
+  server.registerResource(
+    resourceUri,
+    resourceUri,
+    { description: "Three.js Widget UI" },
+    async (): Promise<ReadResourceResult> => {
+      const html = await fs.readFile(
+        path.join(DIST_DIR, "mcp-app.html"),
+        "utf-8",
+      );
+
+      return {
+        contents: [
+          {
+            uri: resourceUri,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: html,
+          },
+        ],
+      };
+    },
+  );
+}
+
+async function main() {
+  if (process.argv.includes("--stdio")) {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("Three.js Server running in stdio mode");
+  } else {
+    const app = express();
+    app.use(cors());
+    app.use(express.json());
+
+    app.post("/mcp", async (req: Request, res: Response) => {
+      try {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true,
+        });
+        res.on("close", () => {
+          transport.close();
+        });
+
+        await server.connect(transport);
+
+        await transport.handleRequest(req, res, req.body);
+      } catch (error) {
+        console.error("Error handling MCP request:", error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: "2.0",
+            error: { code: -32603, message: "Internal server error" },
+            id: null,
+          });
+        }
+      }
+    });
+
+    const httpServer = app.listen(PORT, () => {
+      console.log(`Three.js Server listening on http://localhost:${PORT}/mcp`);
+    });
+
+    function shutdown() {
+      console.log("\nShutting down...");
+      httpServer.close(() => {
+        console.log("Server closed");
+        process.exit(0);
+      });
+    }
+
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+  }
+}
+
+main().catch(console.error);
