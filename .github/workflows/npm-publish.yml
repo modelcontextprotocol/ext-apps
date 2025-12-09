@@ -83,3 +83,5 @@ jobs:
       # Uses OIDC trusted publishing - no NPM_TOKEN needed
       # Configure at: https://www.npmjs.com/package/@modelcontextprotocol/ext-apps/access
       - run: npm publish --provenance --access public ${{ steps.npm-tag.outputs.tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
