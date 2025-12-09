@@ -1,2 +1,5 @@
 npm run build:all
 npm run prettier:fix
+
+# Stage any changes to generated files (they may have been reformatted by prettier)
+git add src/generated/
