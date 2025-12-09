@@ -29,28 +29,19 @@ We have [contributed a tentative implementation](https://github.com/MCP-UI-Org/m
 
 ## Installation
 
-This repo is in flux and isn't published to npm yet. When it is, it will use the `@modelcontextprotocol/ext-apps` package.
-
-In the meantime you can depend on the SDK library in a Node.js project by installing it with its git URL:
-
 ```bash
-npm install -S git+https://github.com/modelcontextprotocol/ext-apps.git
+npm install -S @modelcontextprotocol/ext-apps
 ```
 
-Your `package.json` will then look like:
+Or edit your `package.json` manually:
 
 ```json
 {
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "git+https://github.com/modelcontextprotocol/ext-apps.git"
+    "@modelcontextprotocol/ext-apps": "^0.0.1"
   }
 }
 ```
-
-> [!NOTE]
-> The build tools (`esbuild`, `tsx`, `typescript`) are in `dependencies` rather than `devDependencies`. This is intentional: it allows the `prepare` script to run when the package is installed from git, since npm doesn't install devDependencies for git dependencies.
->
-> Once the package is published to npm with pre-built `dist/`, these can be moved back to `devDependencies`.
 
 ## Examples
 
