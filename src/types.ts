@@ -837,7 +837,7 @@ type _VerifyInitializedNotification = VerifySchemaMatches<
 export const McpUiResourceCspSchema = z.object({
   /** Origins for network requests (fetch/XHR/WebSocket). Maps to CSP connect-src */
   connectDomains: z.array(z.string()).optional(),
-  /** Origins for static resources (images, scripts, stylesheets, fonts). Maps to CSP img-src, script-src, style-src, font-src */
+  /** Origins for static resources (images, scripts, stylesheets, fonts, media). Maps to CSP img-src, script-src, style-src, font-src, media-src */
   resourceDomains: z.array(z.string()).optional(),
 });
 export type McpUiResourceCsp = z.infer<typeof McpUiResourceCspSchema>;
