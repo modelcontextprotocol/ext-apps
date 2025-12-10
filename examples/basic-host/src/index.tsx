@@ -8,17 +8,41 @@ import styles from "./index.module.css";
 interface HostProps {
   serversPromise: Promise<ServerInfo[]>;
 }
+
+type ToolCallEntry = ToolCallInfo & { id: number };
+let nextToolCallId = 0;
+
 function Host({ serversPromise }: HostProps) {
-  const [toolCalls, setToolCalls] = useState<ToolCallInfo[]>([]);
+  const [toolCalls, setToolCalls] = useState<ToolCallEntry[]>([]);
+  const [destroyingIds, setDestroyingIds] = useState<Set<number>>(new Set());
+
+  const requestClose = (id: number) => {
+    setDestroyingIds((s) => new Set(s).add(id));
+  };
+
+  const completeClose = (id: number) => {
+    setDestroyingIds((s) => {
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+    setToolCalls((calls) => calls.filter((c) => c.id !== id));
+  };
 
   return (
     <>
-      {toolCalls.map((info, i) => (
-        <ToolCallInfoPanel key={i} toolCallInfo={info} />
+      {toolCalls.map((info) => (
+        <ToolCallInfoPanel
+          key={info.id}
+          toolCallInfo={info}
+          isDestroying={destroyingIds.has(info.id)}
+          onRequestClose={() => requestClose(info.id)}
+          onCloseComplete={() => completeClose(info.id)}
+        />
       ))}
       <CallToolPanel
         serversPromise={serversPromise}
-        addToolCall={(info) => setToolCalls([...toolCalls, info])}
+        addToolCall={(info) => setToolCalls([...toolCalls, { ...info, id: nextToolCallId++ }])}
       />
     </>
   );
@@ -135,14 +159,38 @@ function ServerSelect({ serversPromise, onSelect }: ServerSelectProps) {
 
 interface ToolCallInfoPanelProps {
   toolCallInfo: ToolCallInfo;
+  isDestroying?: boolean;
+  onRequestClose?: () => void;
+  onCloseComplete?: () => void;
 }
-function ToolCallInfoPanel({ toolCallInfo }: ToolCallInfoPanelProps) {
+function ToolCallInfoPanel({ toolCallInfo, isDestroying, onRequestClose, onCloseComplete }: ToolCallInfoPanelProps) {
+  const isApp = hasAppHtml(toolCallInfo);
+
+  // For non-app tool calls, close immediately when isDestroying becomes true
+  useEffect(() => {
+    if (isDestroying && !isApp) {
+      onCloseComplete?.();
+    }
+  }, [isDestroying, isApp, onCloseComplete]);
+
   return (
-    <div className={styles.toolCallInfoPanel}>
+    <div
+      className={styles.toolCallInfoPanel}
+      style={isDestroying ? { opacity: 0.5, pointerEvents: "none" } : undefined}
+    >
       <div className={styles.inputInfoPanel}>
         <h2>
           <span>{toolCallInfo.serverInfo.name}</span>
           <span className={styles.toolName}>{toolCallInfo.tool.name}</span>
+          {onRequestClose && !isDestroying && (
+            <button
+              className={styles.closeButton}
+              onClick={onRequestClose}
+              title="Close"
+            >
+              ×
+            </button>
+          )}
         </h2>
         <JsonBlock value={toolCallInfo.input} />
       </div>
@@ -150,8 +198,12 @@ function ToolCallInfoPanel({ toolCallInfo }: ToolCallInfoPanelProps) {
         <ErrorBoundary>
           <Suspense fallback="Loading...">
             {
-              hasAppHtml(toolCallInfo)
-                ? <AppIFramePanel toolCallInfo={toolCallInfo} />
+              isApp
+                ? <AppIFramePanel
+                    toolCallInfo={toolCallInfo}
+                    isDestroying={isDestroying}
+                    onTeardownComplete={onCloseComplete}
+                  />
                 : <ToolResultPanel toolCallInfo={toolCallInfo} />
             }
           </Suspense>
@@ -173,8 +225,10 @@ function JsonBlock({ value }: { value: object }) {
 
 interface AppIFramePanelProps {
   toolCallInfo: Required<ToolCallInfo>;
+  isDestroying?: boolean;
+  onTeardownComplete?: () => void;
 }
-function AppIFramePanel({ toolCallInfo }: AppIFramePanelProps) {
+function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppIFramePanelProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const appBridgeRef = useRef<ReturnType<typeof newAppBridge> | null>(null);
 
@@ -191,17 +245,29 @@ function AppIFramePanel({ toolCallInfo }: AppIFramePanelProps) {
         initializeApp(iframe, appBridge, toolCallInfo);
       }
     });
-
-    // Cleanup: send teardown notification before unmounting
-    return () => {
-      if (appBridgeRef.current) {
-        log.info("Sending teardown notification to MCP App");
-        appBridgeRef.current.sendResourceTeardown({}).catch((err) => {
-          log.warn("Teardown request failed (app may have already closed):", err);
-        });
-      }
-    };
   }, [toolCallInfo]);
+
+  // Graceful teardown: wait for guest to respond before unmounting
+  // This follows the spec: "Host SHOULD wait for a response before tearing
+  // down the resource (to prevent data loss)."
+  useEffect(() => {
+    if (!isDestroying) return;
+
+    if (!appBridgeRef.current) {
+      // Bridge not ready yet (e.g., user closed before iframe loaded)
+      onTeardownComplete?.();
+      return;
+    }
+
+    log.info("Sending teardown notification to MCP App");
+    appBridgeRef.current.sendResourceTeardown({})
+      .catch((err) => {
+        log.warn("Teardown request failed (app may have already closed):", err);
+      })
+      .finally(() => {
+        onTeardownComplete?.();
+      });
+  }, [isDestroying, onTeardownComplete]);
 
   return (
     <div className={styles.appIframePanel}>

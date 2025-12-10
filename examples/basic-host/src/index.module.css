@@ -92,9 +92,31 @@
     flex-direction: column;
     margin: 0;
     font-size: 1.5rem;
+    position: relative;
 
     .toolName {
       font-family: monospace;
+    }
+
+    .closeButton {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 1.5rem;
+      height: 1.5rem;
+      padding: 0;
+      border: none;
+      border-radius: 4px;
+      background: #e0e0e0;
+      font-size: 1.25rem;
+      line-height: 1;
+      color: #666;
+      cursor: pointer;
+
+      &:hover {
+        background: #d0d0d0;
+        color: #333;
+      }
     }
   }
 }
