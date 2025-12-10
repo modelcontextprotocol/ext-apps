@@ -125,11 +125,11 @@ interface UIResourceMeta {
      */
     connectDomains?: string[],
     /**
-     * Origins for static resources (images, scripts, stylesheets, fonts)
+     * Origins for static resources (images, scripts, stylesheets, fonts, media)
      *
      * - Empty or omitted = no external resources (secure default)
      * - Wildcard subdomains supported: `https://*.example.com`
-     * - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src` directives
+     * - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives
      *
      * @example
      * ["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]
@@ -202,6 +202,7 @@ The resource content is returned via `resources/read`:
   script-src 'self' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
   img-src 'self' data:;
+  media-src 'self' data:;
   connect-src 'none';
   ```
 
@@ -1114,6 +1115,7 @@ const cspValue = `
   connect-src 'self' ${csp?.connectDomains?.join(' ') || ''};
   img-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};
   font-src 'self' ${csp?.resourceDomains?.join(' ') || ''};
+  media-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};
   frame-src 'none';
   object-src 'none';
   base-uri 'self';
