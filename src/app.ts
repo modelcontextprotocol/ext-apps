@@ -31,6 +31,9 @@ import {
   McpUiMessageResultSchema,
   McpUiOpenLinkRequest,
   McpUiOpenLinkResultSchema,
+  McpUiResourceTeardownRequest,
+  McpUiResourceTeardownRequestSchema,
+  McpUiResourceTeardownResult,
   McpUiSizeChangedNotification,
   McpUiToolCancelledNotification,
   McpUiToolCancelledNotificationSchema,
@@ -465,6 +468,48 @@ export class App extends Protocol<Request, Notification, Result> {
   }
 
   /**
+   * Convenience handler for graceful shutdown requests from the host.
+   *
+   * Set this property to register a handler that will be called when the host
+   * requests the app to prepare for teardown. This allows the app to perform
+   * cleanup operations (save state, close connections, etc.) before being unmounted.
+   *
+   * The handler can be sync or async. The host will wait for the returned promise
+   * to resolve before proceeding with teardown.
+   *
+   * This setter is a convenience wrapper around `setRequestHandler()` that
+   * automatically handles the request schema.
+   *
+   * Register handlers before calling {@link connect} to avoid missing requests.
+   *
+   * @param callback - Function called when teardown is requested.
+   *   Can return void or a Promise that resolves when cleanup is complete.
+   *
+   * @example Perform cleanup before teardown
+   * ```typescript
+   * app.onteardown = async () => {
+   *   await saveState();
+   *   closeConnections();
+   *   console.log("App ready for teardown");
+   * };
+   * ```
+   *
+   * @see {@link setRequestHandler} for the underlying method
+   * @see {@link McpUiResourceTeardownRequest} for the request structure
+   */
+  set onteardown(
+    callback: (
+      params: McpUiResourceTeardownRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => McpUiResourceTeardownResult | Promise<McpUiResourceTeardownResult>,
+  ) {
+    this.setRequestHandler(
+      McpUiResourceTeardownRequestSchema,
+      (request, extra) => callback(request.params, extra),
+    );
+  }
+
+  /**
    * Convenience handler for tool call requests from the host.
    *
    * Set this property to register a handler that will be called when the host
@@ -570,6 +615,7 @@ export class App extends Protocol<Request, Notification, Result> {
         }
         return;
       case "ping":
+      case "ui/resource-teardown":
         return;
       default:
         throw new Error(`No handler for method ${method} registered`);

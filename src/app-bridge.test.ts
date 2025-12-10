@@ -203,6 +203,34 @@ describe("App <-> AppBridge integration", () => {
         { theme: "light" },
       ]);
     });
+
+    it("sendResourceTeardown triggers app.onteardown", async () => {
+      let teardownCalled = false;
+      app.onteardown = async () => {
+        teardownCalled = true;
+        return {};
+      };
+
+      await app.connect(appTransport);
+      await bridge.sendResourceTeardown({});
+
+      expect(teardownCalled).toBe(true);
+    });
+
+    it("sendResourceTeardown waits for async cleanup", async () => {
+      const cleanupSteps: string[] = [];
+      app.onteardown = async () => {
+        cleanupSteps.push("start");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        cleanupSteps.push("done");
+        return {};
+      };
+
+      await app.connect(appTransport);
+      await bridge.sendResourceTeardown({});
+
+      expect(cleanupSteps).toEqual(["start", "done"]);
+    });
   });
 
   describe("App -> Host notifications", () => {
