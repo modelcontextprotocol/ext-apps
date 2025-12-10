@@ -176,6 +176,7 @@ interface AppIFramePanelProps {
 }
 function AppIFramePanel({ toolCallInfo }: AppIFramePanelProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const appBridgeRef = useRef<ReturnType<typeof newAppBridge> | null>(null);
 
   useEffect(() => {
     const iframe = iframeRef.current!;
@@ -186,9 +187,20 @@ function AppIFramePanel({ toolCallInfo }: AppIFramePanelProps) {
       // `toolCallInfo`.
       if (firstTime) {
         const appBridge = newAppBridge(toolCallInfo.serverInfo, iframe);
+        appBridgeRef.current = appBridge;
         initializeApp(iframe, appBridge, toolCallInfo);
       }
     });
+
+    // Cleanup: send teardown notification before unmounting
+    return () => {
+      if (appBridgeRef.current) {
+        log.info("Sending teardown notification to MCP App");
+        appBridgeRef.current.sendResourceTeardown({}).catch((err) => {
+          log.warn("Teardown request failed (app may have already closed):", err);
+        });
+      }
+    };
   }, [toolCallInfo]);
 
   return (

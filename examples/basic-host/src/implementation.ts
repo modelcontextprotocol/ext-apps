@@ -186,11 +186,19 @@ export async function initializeApp(
   log.info("Sending tool call input to MCP App:", input);
   appBridge.sendToolInput({ arguments: input });
 
-  // Schedule tool call result to be sent to MCP App
-  resultPromise.then((result) => {
-    log.info("Sending tool call result to MCP App:", result);
-    appBridge.sendToolResult(result);
-  });
+  // Schedule tool call result (or cancellation) to be sent to MCP App
+  resultPromise.then(
+    (result) => {
+      log.info("Sending tool call result to MCP App:", result);
+      appBridge.sendToolResult(result);
+    },
+    (error) => {
+      log.error("Tool call failed, sending cancellation to MCP App:", error);
+      appBridge.sendToolCancelled({
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    },
+  );
 }
 
 /**
