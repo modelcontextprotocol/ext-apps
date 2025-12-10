@@ -140,6 +140,36 @@ describe("App <-> AppBridge integration", () => {
       });
     });
 
+    it("sendToolCancelled triggers app.ontoolcancelled", async () => {
+      const receivedCancellations: unknown[] = [];
+      app.ontoolcancelled = (params) => {
+        receivedCancellations.push(params);
+      };
+
+      await app.connect(appTransport);
+      await bridge.sendToolCancelled({
+        reason: "User cancelled the operation",
+      });
+
+      expect(receivedCancellations).toHaveLength(1);
+      expect(receivedCancellations[0]).toEqual({
+        reason: "User cancelled the operation",
+      });
+    });
+
+    it("sendToolCancelled works without reason", async () => {
+      const receivedCancellations: unknown[] = [];
+      app.ontoolcancelled = (params) => {
+        receivedCancellations.push(params);
+      };
+
+      await app.connect(appTransport);
+      await bridge.sendToolCancelled({});
+
+      expect(receivedCancellations).toHaveLength(1);
+      expect(receivedCancellations[0]).toEqual({});
+    });
+
     it("setHostContext triggers app.onhostcontextchanged", async () => {
       const receivedContexts: unknown[] = [];
       app.onhostcontextchanged = (params) => {

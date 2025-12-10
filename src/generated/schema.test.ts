@@ -51,6 +51,10 @@ export type McpUiToolInputPartialNotificationSchemaInferredType = z.infer<
   typeof generated.McpUiToolInputPartialNotificationSchema
 >;
 
+export type McpUiToolCancelledNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiToolCancelledNotificationSchema
+>;
+
 export type McpUiResourceTeardownRequestSchemaInferredType = z.infer<
   typeof generated.McpUiResourceTeardownRequestSchema
 >;
@@ -150,6 +154,12 @@ expectType<spec.McpUiToolInputPartialNotification>(
 );
 expectType<McpUiToolInputPartialNotificationSchemaInferredType>(
   {} as spec.McpUiToolInputPartialNotification,
+);
+expectType<spec.McpUiToolCancelledNotification>(
+  {} as McpUiToolCancelledNotificationSchemaInferredType,
+);
+expectType<McpUiToolCancelledNotificationSchemaInferredType>(
+  {} as spec.McpUiToolCancelledNotification,
 );
 expectType<spec.McpUiResourceTeardownRequest>(
   {} as McpUiResourceTeardownRequestSchemaInferredType,

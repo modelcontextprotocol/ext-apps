@@ -1732,6 +1732,28 @@
         }
       ]
     },
+    "McpUiToolCancelledNotification": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/notifications/tool-cancelled"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "reason": {
+              "description": "Optional reason for the cancellation (e.g., \"user action\", \"timeout\").",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
     "McpUiToolInputNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

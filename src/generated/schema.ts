@@ -161,6 +161,24 @@ export const McpUiToolInputPartialNotificationSchema = z.object({
 });
 
 /**
+ * @description Notification that tool execution was cancelled (Host -> Guest UI).
+ * Host MUST send this if tool execution was cancelled for any reason (user action,
+ * sampling error, classifier intervention, etc.).
+ */
+export const McpUiToolCancelledNotificationSchema = z.object({
+  method: z.literal("ui/notifications/tool-cancelled"),
+  params: z.object({
+    /** @description Optional reason for the cancellation (e.g., "user action", "timeout"). */
+    reason: z
+      .string()
+      .optional()
+      .describe(
+        'Optional reason for the cancellation (e.g., "user action", "timeout").',
+      ),
+  }),
+});
+
+/**
  * @description Request for graceful shutdown of the Guest UI (Host -> Guest UI).
  * @see {@link app-bridge.AppBridge.sendResourceTeardown} for the host method that sends this
  */

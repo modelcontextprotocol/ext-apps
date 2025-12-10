@@ -34,6 +34,7 @@ import {
 import {
   type McpUiSandboxResourceReadyNotification,
   type McpUiSizeChangedNotification,
+  type McpUiToolCancelledNotification,
   type McpUiToolInputNotification,
   type McpUiToolInputPartialNotification,
   type McpUiToolResultNotification,
@@ -733,6 +734,43 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   sendToolResult(params: McpUiToolResultNotification["params"]) {
     return this.notification(<McpUiToolResultNotification>{
       method: "ui/notifications/tool-result",
+      params,
+    });
+  }
+
+  /**
+   * Notify the Guest UI that tool execution was cancelled.
+   *
+   * The host MUST send this notification if tool execution was cancelled for any
+   * reason, including user action, sampling error, classifier intervention, or
+   * any other interruption. This allows the Guest UI to update its state and
+   * display appropriate feedback to the user.
+   *
+   * @param params - Optional cancellation details:
+   *   - `reason`: Human-readable explanation for why the tool was cancelled
+   *
+   * @example User-initiated cancellation
+   * ```typescript
+   * // User clicked "Cancel" button
+   * bridge.sendToolCancelled({ reason: "User cancelled the operation" });
+   * ```
+   *
+   * @example System-level cancellation
+   * ```typescript
+   * // Sampling error or timeout
+   * bridge.sendToolCancelled({ reason: "Request timeout after 30 seconds" });
+   *
+   * // Classifier intervention
+   * bridge.sendToolCancelled({ reason: "Content policy violation detected" });
+   * ```
+   *
+   * @see {@link McpUiToolCancelledNotification} for the notification type
+   * @see {@link sendToolResult} for sending successful results
+   * @see {@link sendToolInput} for sending tool arguments
+   */
+  sendToolCancelled(params: McpUiToolCancelledNotification["params"]) {
+    return this.notification(<McpUiToolCancelledNotification>{
+      method: "ui/notifications/tool-cancelled",
       params,
     });
   }

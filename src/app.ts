@@ -32,6 +32,8 @@ import {
   McpUiOpenLinkRequest,
   McpUiOpenLinkResultSchema,
   McpUiSizeChangedNotification,
+  McpUiToolCancelledNotification,
+  McpUiToolCancelledNotificationSchema,
   McpUiToolInputNotification,
   McpUiToolInputNotificationSchema,
   McpUiToolInputPartialNotification,
@@ -384,6 +386,41 @@ export class App extends Protocol<Request, Notification, Result> {
     callback: (params: McpUiToolResultNotification["params"]) => void,
   ) {
     this.setNotificationHandler(McpUiToolResultNotificationSchema, (n) =>
+      callback(n.params),
+    );
+  }
+
+  /**
+   * Convenience handler for receiving tool cancellation notifications from the host.
+   *
+   * Set this property to register a handler that will be called when the host
+   * notifies that tool execution was cancelled. This can occur for various reasons
+   * including user action, sampling error, classifier intervention, or other
+   * interruptions. Apps should update their state and display appropriate feedback.
+   *
+   * This setter is a convenience wrapper around `setNotificationHandler()` that
+   * automatically handles the notification schema and extracts the params for you.
+   *
+   * Register handlers before calling {@link connect} to avoid missing notifications.
+   *
+   * @param callback - Function called when tool execution is cancelled
+   *
+   * @example Handle tool cancellation
+   * ```typescript
+   * app.ontoolcancelled = (params) => {
+   *   console.log("Tool cancelled:", params.reason);
+   *   showCancelledMessage(params.reason ?? "Operation was cancelled");
+   * };
+   * ```
+   *
+   * @see {@link setNotificationHandler} for the underlying method
+   * @see {@link McpUiToolCancelledNotification} for the notification structure
+   * @see {@link ontoolresult} for successful tool completion
+   */
+  set ontoolcancelled(
+    callback: (params: McpUiToolCancelledNotification["params"]) => void,
+  ) {
+    this.setNotificationHandler(McpUiToolCancelledNotificationSchema, (n) =>
       callback(n.params),
     );
   }
