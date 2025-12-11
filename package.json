@@ -32,7 +32,7 @@
     "examples/*"
   ],
   "scripts": {
-    "generate:schemas": "tsx scripts/generate-schemas.ts",
+    "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write 'src/generated/**/*'",
     "build": "npm run generate:schemas && bun build.bun.ts",
     "prepack": "npm run build",
     "build:all": "npm run build && npm run examples:build",

@@ -30,7 +30,6 @@ jobs:
       - name: Verify generated schemas are up-to-date
         run: |
           npm run generate:schemas
-          npm run prettier:fix
           git diff --exit-code src/generated/ || (echo "Generated schemas are out of date. Run 'npm run generate:schemas' and commit." && exit 1)
 
       - run: npm test
