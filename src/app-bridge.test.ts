@@ -337,19 +337,18 @@ describe("App <-> AppBridge integration", () => {
       await newBridge.connect(newBridgeTransport);
       await newApp.connect(newAppTransport);
 
-      // Update only theme
-      newBridge.setHostContext({ ...initialContext, theme: "dark" });
+      // Send partial update: only theme changes
+      newBridge.sendHostContextChange({ theme: "dark" });
       await flush();
 
-      // Update viewport
-      newBridge.setHostContext({
-        theme: "dark",
-        locale: "en-US",
-        viewport: { width: 1024, height: 768 },
-      });
+      // Send another partial update: only viewport changes
+      newBridge.sendHostContextChange({ viewport: { width: 1024, height: 768 } });
       await flush();
 
-      // getHostContext should have all updates merged
+      // getHostContext should have accumulated all updates:
+      // - locale from initial (unchanged)
+      // - theme from first partial update
+      // - viewport from second partial update
       const context = newApp.getHostContext();
       expect(context?.theme).toBe("dark");
       expect(context?.locale).toBe("en-US");
