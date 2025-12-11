@@ -22,6 +22,7 @@ import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
   McpUiHostCapabilities,
+  McpUiHostContext,
   McpUiHostContextChangedNotification,
   McpUiHostContextChangedNotificationSchema,
   McpUiInitializedNotification,
@@ -191,6 +192,7 @@ type RequestHandlerExtra = Parameters<
 export class App extends Protocol<Request, Notification, Result> {
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
+  private _hostContext?: McpUiHostContext;
 
   /**
    * Create a new MCP App instance.
@@ -219,6 +221,10 @@ export class App extends Protocol<Request, Notification, Result> {
       console.log("Received ping:", request.params);
       return {};
     });
+
+    // Set up default handler to update _hostContext when notifications arrive.
+    // Users can override this by setting onhostcontextchanged.
+    this.onhostcontextchanged = () => {};
   }
 
   /**
@@ -274,6 +280,42 @@ export class App extends Protocol<Request, Notification, Result> {
    */
   getHostVersion(): Implementation | undefined {
     return this._hostInfo;
+  }
+
+  /**
+   * Get the host context discovered during initialization.
+   *
+   * Returns the host context that was provided in the initialization response,
+   * including tool info, theme, viewport, locale, and other environment details.
+   * This context is automatically updated when the host sends
+   * `ui/notifications/host-context-changed` notifications.
+   *
+   * Returns `undefined` if called before connection is established.
+   *
+   * @returns Host context, or `undefined` if not yet connected
+   *
+   * @example Access host context after connection
+   * ```typescript
+   * await app.connect(transport);
+   * const context = app.getHostContext();
+   * if (context === undefined) {
+   *   console.error("Not connected");
+   *   return;
+   * }
+   * if (context.theme === "dark") {
+   *   document.body.classList.add("dark-theme");
+   * }
+   * if (context.toolInfo) {
+   *   console.log("Tool:", context.toolInfo.tool.name);
+   * }
+   * ```
+   *
+   * @see {@link connect} for the initialization handshake
+   * @see {@link onhostcontextchanged} for context change notifications
+   * @see {@link McpUiHostContext} for the context structure
+   */
+  getHostContext(): McpUiHostContext | undefined {
+    return this._hostContext;
   }
 
   /**
@@ -463,7 +505,11 @@ export class App extends Protocol<Request, Notification, Result> {
   ) {
     this.setNotificationHandler(
       McpUiHostContextChangedNotificationSchema,
-      (n) => callback(n.params),
+      (n) => {
+        // Merge the partial update into the stored context
+        this._hostContext = { ...this._hostContext, ...n.params };
+        callback(n.params);
+      },
     );
   }
 
@@ -961,6 +1007,7 @@ export class App extends Protocol<Request, Notification, Result> {
 
       this._hostCapabilities = result.hostCapabilities;
       this._hostInfo = result.hostInfo;
+      this._hostContext = result.hostContext;
 
       await this.notification(<McpUiInitializedNotification>{
         method: "ui/notifications/initialized",
