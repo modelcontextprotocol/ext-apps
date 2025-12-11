@@ -91,6 +91,38 @@ describe("App <-> AppBridge integration", () => {
       const appCaps = bridge.getAppCapabilities();
       expect(appCaps).toEqual(appCapabilities);
     });
+
+    it("App receives initial hostContext after connect", async () => {
+      // Need fresh transports for new bridge
+      const [newAppTransport, newBridgeTransport] =
+        InMemoryTransport.createLinkedPair();
+
+      const testHostContext = {
+        theme: "dark" as const,
+        locale: "en-US",
+        viewport: { width: 800, height: 600 },
+      };
+      const newBridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+        { hostContext: testHostContext },
+      );
+      const newApp = new App(testAppInfo, {}, { autoResize: false });
+
+      await newBridge.connect(newBridgeTransport);
+      await newApp.connect(newAppTransport);
+
+      const hostContext = newApp.getHostContext();
+      expect(hostContext).toEqual(testHostContext);
+
+      await newAppTransport.close();
+      await newBridgeTransport.close();
+    });
+
+    it("getHostContext returns undefined before connect", () => {
+      expect(app.getHostContext()).toBeUndefined();
+    });
   });
 
   describe("Host -> App notifications", () => {
@@ -202,6 +234,128 @@ describe("App <-> AppBridge integration", () => {
         { theme: "dark", locale: "en-US" },
         { theme: "light" },
       ]);
+    });
+
+    it("getHostContext merges updates from onhostcontextchanged", async () => {
+      // Need fresh transports for new bridge
+      const [newAppTransport, newBridgeTransport] =
+        InMemoryTransport.createLinkedPair();
+
+      // Set up bridge with initial context
+      const initialContext = {
+        theme: "light" as const,
+        locale: "en-US",
+      };
+      const newBridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+        { hostContext: initialContext },
+      );
+      const newApp = new App(testAppInfo, {}, { autoResize: false });
+
+      await newBridge.connect(newBridgeTransport);
+
+      // Set up handler before connecting app
+      newApp.onhostcontextchanged = () => {
+        // User handler (can be empty, we're testing getHostContext behavior)
+      };
+
+      await newApp.connect(newAppTransport);
+
+      // Verify initial context
+      expect(newApp.getHostContext()).toEqual(initialContext);
+
+      // Update context
+      newBridge.setHostContext({ theme: "dark", locale: "en-US" });
+      await flush();
+
+      // getHostContext should reflect merged state
+      const updatedContext = newApp.getHostContext();
+      expect(updatedContext?.theme).toBe("dark");
+      expect(updatedContext?.locale).toBe("en-US");
+
+      await newAppTransport.close();
+      await newBridgeTransport.close();
+    });
+
+    it("getHostContext updates even without user setting onhostcontextchanged", async () => {
+      // Need fresh transports for new bridge
+      const [newAppTransport, newBridgeTransport] =
+        InMemoryTransport.createLinkedPair();
+
+      // Set up bridge with initial context
+      const initialContext = {
+        theme: "light" as const,
+        locale: "en-US",
+      };
+      const newBridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+        { hostContext: initialContext },
+      );
+      const newApp = new App(testAppInfo, {}, { autoResize: false });
+
+      await newBridge.connect(newBridgeTransport);
+      // Note: We do NOT set app.onhostcontextchanged here
+      await newApp.connect(newAppTransport);
+
+      // Verify initial context
+      expect(newApp.getHostContext()).toEqual(initialContext);
+
+      // Update context from bridge
+      newBridge.setHostContext({ theme: "dark", locale: "en-US" });
+      await flush();
+
+      // getHostContext should still update (default handler should work)
+      const updatedContext = newApp.getHostContext();
+      expect(updatedContext?.theme).toBe("dark");
+
+      await newAppTransport.close();
+      await newBridgeTransport.close();
+    });
+
+    it("getHostContext accumulates multiple partial updates", async () => {
+      // Need fresh transports for new bridge
+      const [newAppTransport, newBridgeTransport] =
+        InMemoryTransport.createLinkedPair();
+
+      const initialContext = {
+        theme: "light" as const,
+        locale: "en-US",
+        viewport: { width: 800, height: 600 },
+      };
+      const newBridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+        { hostContext: initialContext },
+      );
+      const newApp = new App(testAppInfo, {}, { autoResize: false });
+
+      await newBridge.connect(newBridgeTransport);
+      await newApp.connect(newAppTransport);
+
+      // Send partial update: only theme changes
+      newBridge.sendHostContextChange({ theme: "dark" });
+      await flush();
+
+      // Send another partial update: only viewport changes
+      newBridge.sendHostContextChange({ viewport: { width: 1024, height: 768 } });
+      await flush();
+
+      // getHostContext should have accumulated all updates:
+      // - locale from initial (unchanged)
+      // - theme from first partial update
+      // - viewport from second partial update
+      const context = newApp.getHostContext();
+      expect(context?.theme).toBe("dark");
+      expect(context?.locale).toBe("en-US");
+      expect(context?.viewport).toEqual({ width: 1024, height: 768 });
+
+      await newAppTransport.close();
+      await newBridgeTransport.close();
     });
 
     it("sendResourceTeardown triggers app.onteardown", async () => {
