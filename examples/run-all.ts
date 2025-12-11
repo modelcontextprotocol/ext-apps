@@ -9,7 +9,7 @@
  */
 
 import { readdirSync, statSync, existsSync } from "fs";
-import { spawn, type ChildProcess } from "child_process";
+import concurrently from "concurrently";
 
 const BASE_PORT = 3101;
 const BASIC_HOST = "basic-host";
@@ -36,55 +36,7 @@ const command = process.argv[2];
 
 if (!command || !COMMANDS.includes(command)) {
   console.error(`Usage: bun examples/run-all.ts <${COMMANDS.join("|")}>`);
-
   process.exit(1);
-}
-
-const processes: ChildProcess[] = [];
-
-// Handle cleanup on exit
-function cleanup() {
-  for (const proc of processes) {
-    proc.kill();
-  }
-}
-process.on("SIGINT", cleanup);
-process.on("SIGTERM", cleanup);
-
-// Spawn a process and track it
-function spawnProcess(
-  cmd: string,
-  args: string[],
-  env: Record<string, string> = {},
-  prefix: string,
-): ChildProcess {
-  const proc = spawn(cmd, args, {
-    env: { ...process.env, ...env },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  proc.stdout?.on("data", (data) => {
-    const lines = data.toString().trim().split("\n");
-    for (const line of lines) {
-      console.log(`[${prefix}] ${line}`);
-    }
-  });
-
-  proc.stderr?.on("data", (data) => {
-    const lines = data.toString().trim().split("\n");
-    for (const line of lines) {
-      console.error(`[${prefix}] ${line}`);
-    }
-  });
-
-  proc.on("exit", (code) => {
-    if (code !== 0 && code !== null) {
-      console.error(`[${prefix}] exited with code ${code}`);
-    }
-  });
-
-  processes.push(proc);
-  return proc;
 }
 
 // Build the SERVERS environment variable (JSON array of URLs)
@@ -96,25 +48,34 @@ console.log(
 );
 console.log("");
 
+// Build command list for concurrently
+const commands: Parameters<typeof concurrently>[0] = [
+  // Server examples
+  ...servers.map(({ dir, port }) => ({
+    command: `npm run --workspace examples/${dir} ${command}`,
+    name: dir,
+    env: { PORT: String(port) },
+  })),
+  // Basic host with SERVERS env
+  {
+    command: `npm run --workspace examples/${BASIC_HOST} ${command}`,
+    name: BASIC_HOST,
+    env: { SERVERS: serversEnv },
+  },
+];
+
 // If dev mode, also run the main library watcher
 if (command === "dev") {
-  spawnProcess("npm", ["run", "watch"], {}, "lib");
+  commands.unshift({
+    command: "npm run watch",
+    name: "lib",
+  });
 }
 
-// Run each server example
-for (const { dir, port } of servers) {
-  spawnProcess(
-    "npm",
-    ["run", "--workspace", `examples/${dir}`, command],
-    { PORT: String(port) },
-    dir,
-  );
-}
+const { result } = concurrently(commands, {
+  prefix: "name",
+  // For build command, we want all to complete; for start/dev, kill all on failure
+  killOthersOnFail: command !== "build",
+});
 
-// Run basic-host with the SERVERS env var
-spawnProcess(
-  "npm",
-  ["run", "--workspace", `examples/${BASIC_HOST}`, command],
-  { SERVERS: serversEnv },
-  BASIC_HOST,
-);
+result.catch(() => process.exit(1));
