@@ -1,7 +1,7 @@
 /**
  * @file App that demonstrates a few features using MCP Apps SDK + React.
  */
-import type { App } from "@modelcontextprotocol/ext-apps";
+import type { App, McpUiResourceTeardownResult } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { StrictMode, useCallback, useEffect, useState } from "react";
@@ -35,6 +35,12 @@ function GetTimeApp() {
     appInfo: IMPLEMENTATION,
     capabilities: {},
     onAppCreated: (app) => {
+      app.onteardown = async () => {
+        log.info("App is being torn down");
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate cleanup work
+        log.info("App teardown complete");
+        return {};
+      };
       app.ontoolinput = async (input) => {
         log.info("Received tool call input:", input);
       };
