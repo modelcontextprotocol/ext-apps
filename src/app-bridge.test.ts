@@ -342,7 +342,9 @@ describe("App <-> AppBridge integration", () => {
       await flush();
 
       // Send another partial update: only viewport changes
-      newBridge.sendHostContextChange({ viewport: { width: 1024, height: 768 } });
+      newBridge.sendHostContextChange({
+        viewport: { width: 1024, height: 768 },
+      });
       await flush();
 
       // getHostContext should have accumulated all updates:
