@@ -52,12 +52,18 @@ const platformPackages = {
 
 function findBunBinary() {
   const packages = platformPackages[os]?.[arch] || [];
+  console.log(
+    `Looking for bun packages: ${packages.join(", ") || "(none for this platform)"}`,
+  );
 
   for (const pkg of packages) {
     const binPath = join(nodeModules, "@oven", pkg, "bin", bunExe);
+    console.log(`  Checking: ${binPath}`);
     if (existsSync(binPath)) {
-      console.log(`Found bun at: ${binPath}`);
+      console.log(`  Found bun at: ${binPath}`);
       return binPath;
+    } else {
+      console.log(`  Not found`);
     }
   }
 
@@ -177,7 +183,9 @@ function setupBinLink(bunPath) {
 }
 
 async function main() {
-  console.log(`Setting up bun for ${os} ${arch}...`);
+  console.log(`[setup-bun] Setting up bun for ${os} ${arch}...`);
+  console.log(`[setup-bun] Project root: ${projectRoot}`);
+  console.log(`[setup-bun] Node modules: ${nodeModules}`);
 
   let bunPath = findBunBinary();
 
