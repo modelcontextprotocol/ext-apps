@@ -182,10 +182,13 @@ function setupBinLink(bunPath) {
   console.log(`Bun linked to: ${bunLink}`);
 }
 
+// Force immediate output
+process.stdout.write("[setup-bun] Script starting...\n");
+
 async function main() {
-  console.log(`[setup-bun] Setting up bun for ${os} ${arch}...`);
-  console.log(`[setup-bun] Project root: ${projectRoot}`);
-  console.log(`[setup-bun] Node modules: ${nodeModules}`);
+  process.stdout.write(`[setup-bun] Setting up bun for ${os} ${arch}...\n`);
+  process.stdout.write(`[setup-bun] Project root: ${projectRoot}\n`);
+  process.stdout.write(`[setup-bun] Node modules: ${nodeModules}\n`);
 
   let bunPath = findBunBinary();
 
