@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "INPUT=mcp-app.html vite build",
-    "watch": "INPUT=mcp-app.html vite build --watch",
+    "build": "cross-env INPUT=mcp-app.html vite build",
+    "watch": "cross-env INPUT=mcp-app.html vite build --watch",
     "serve": "bun server.ts",
-    "start": "NODE_ENV=development npm run build && npm run serve",
-    "dev": "NODE_ENV=development concurrently 'npm run watch' 'npm run serve'"
+    "start": "cross-env NODE_ENV=development npm run build && npm run serve",
+    "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve'"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "../..",

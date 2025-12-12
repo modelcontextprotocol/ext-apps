@@ -42,12 +42,9 @@ jobs:
 
       - run: npm install
 
-      # Build SDK (all platforms) and examples (Unix only - they use INPUT=... syntax)
       - run: npm run build
 
-      - name: Build examples
-        if: runner.os != 'Windows'
-        run: npm run examples:build
+      - run: npm run examples:build
 
       - name: Verify generated schemas are up-to-date
         shell: bash
@@ -112,6 +109,7 @@ jobs:
         run: |
           npm install
           npm run build
+          npm run examples:build
           npm test
           npm run prettier
 
