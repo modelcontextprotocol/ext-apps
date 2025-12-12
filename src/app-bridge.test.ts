@@ -3,7 +3,6 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
 import {
-  CallToolResultSchema,
   EmptyResultSchema,
   ListPromptsResultSchema,
   ListResourcesResultSchema,
