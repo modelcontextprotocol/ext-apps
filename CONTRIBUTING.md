@@ -2,6 +2,39 @@
 
 We welcome contributions to the MCP Apps SDK! This document outlines the process for contributing to the project.
 
+## Prerequisites
+
+Development requires [Bun](https://bun.sh) (used for building and testing).
+
+<details>
+<summary><strong>macOS / Linux</strong></summary>
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (native)</strong></summary>
+
+```powershell
+powershell -c "irm bun.sh/install.ps1 | iex"
+```
+
+> **ARM64 note**: Native binaries aren't available yet; the x64 build runs via emulation.
+
+</details>
+
+<details>
+<summary><strong>Windows (WSL)</strong></summary>
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+</details>
+
 ## Getting Started
 
 1. Fork the repository
