@@ -23,8 +23,6 @@ jobs:
             name: Windows x64
           - os: windows-11-arm
             name: Windows ARM64
-            # Use x64-baseline build via emulation (native ARM64 not yet available)
-            bun-download-url: https://github.com/oven-sh/bun/releases/latest/download/bun-windows-x64-baseline.zip
           - os: macos-latest
             name: macOS ARM64
 
@@ -37,11 +35,6 @@ jobs:
       - name: Verify no private URLs in package-lock.json
         shell: bash
         run: '! grep -E "\"resolved\": \"https?://" package-lock.json | grep -v registry.npmjs.org'
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-          bun-download-url: ${{ matrix.bun-download-url }}
 
       - uses: actions/setup-node@v4
         with:
@@ -107,23 +100,16 @@ jobs:
         with:
           distribution: Ubuntu-24.04
 
-      - name: Install dependencies in WSL
+      - name: Install Node.js in WSL
         shell: wsl-bash {0}
         run: |
-          # Install Node.js and Bun
           sudo apt-get update
-          sudo apt-get install -y unzip
           curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
           sudo apt-get install -y nodejs
-          curl -fsSL https://bun.sh/install | bash
-          echo 'export BUN_INSTALL="$HOME/.bun"' >> ~/.bashrc
-          echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> ~/.bashrc
 
       - name: Build and test in WSL
         shell: wsl-bash {0}
         run: |
-          export BUN_INSTALL="$HOME/.bun"
-          export PATH="$BUN_INSTALL/bin:$PATH"
           npm install
           npm run build
           npm test
@@ -143,7 +129,6 @@ jobs:
             name: Windows x64
           - os: windows-11-arm
             name: Windows ARM64
-            bun-download-url: https://github.com/oven-sh/bun/releases/latest/download/bun-windows-x64-baseline.zip
           - os: macos-latest
             name: macOS ARM64
 
@@ -151,11 +136,6 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-          bun-download-url: ${{ matrix.bun-download-url }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"

@@ -56,7 +56,6 @@ The [`examples/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/exa
 To run all examples together:
 
 ```bash
-# Bun is required for development (see CONTRIBUTING.md for install instructions)
 npm install
 npm run examples:start
 ```
