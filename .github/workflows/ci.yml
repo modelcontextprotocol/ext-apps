@@ -17,8 +17,12 @@ jobs:
         include:
           - os: ubuntu-latest
             name: Linux x64
+          - os: ubuntu-24.04-arm
+            name: Linux ARM64
           - os: windows-latest
             name: Windows x64
+          - os: windows-11-arm
+            name: Windows ARM64
           - os: macos-latest
             name: macOS ARM64
           - os: macos-13
@@ -98,8 +102,12 @@ jobs:
         include:
           - os: ubuntu-latest
             name: Linux x64
+          - os: ubuntu-24.04-arm
+            name: Linux ARM64
           - os: windows-latest
             name: Windows x64
+          - os: windows-11-arm
+            name: Windows ARM64
           - os: macos-latest
             name: macOS ARM64
 
