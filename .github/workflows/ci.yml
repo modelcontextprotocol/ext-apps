@@ -18,8 +18,9 @@ jobs:
             name: Linux ARM64
           - os: windows-latest
             name: Windows x64
-          - os: windows-11-arm
-            name: Windows ARM64
+          # Windows ARM64 disabled: Bun doesn't have stable ARM64 binaries yet (setup-bun fails with 404)
+          # - os: windows-11-arm
+          #   name: Windows ARM64
           - os: macos-latest
             name: macOS ARM64
           - os: macos-13
@@ -74,8 +75,9 @@ jobs:
             name: Linux ARM64
           - os: windows-latest
             name: Windows x64
-          - os: windows-11-arm
-            name: Windows ARM64
+          # Windows ARM64 disabled: Bun doesn't have stable ARM64 binaries yet (setup-bun fails with 404)
+          # - os: windows-11-arm
+          #   name: Windows ARM64
           - os: macos-latest
             name: macOS ARM64
 
