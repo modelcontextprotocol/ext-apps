@@ -95,6 +95,38 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  # Test build in Windows WSL (Ubuntu)
+  build-wsl:
+    name: Build (Windows WSL)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Vampire/setup-wsl@v5
+        with:
+          distribution: Ubuntu-24.04
+
+      - name: Install dependencies in WSL
+        shell: wsl-bash {0}
+        run: |
+          # Install Node.js and Bun
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          curl -fsSL https://bun.sh/install | bash
+          echo 'export BUN_INSTALL="$HOME/.bun"' >> ~/.bashrc
+          echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> ~/.bashrc
+
+      - name: Build and test in WSL
+        shell: wsl-bash {0}
+        run: |
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          npm install
+          npm run build
+          npm test
+          npm run prettier
+
   # Test that the package can be installed from git (triggers prepare script)
   test-git-install:
     strategy:
