@@ -21,9 +21,10 @@ jobs:
             name: Linux ARM64
           - os: windows-latest
             name: Windows x64
-          # Windows ARM64 disabled: Bun doesn't have stable ARM64 binaries yet (setup-bun fails with 404)
-          # - os: windows-11-arm
-          #   name: Windows ARM64
+          - os: windows-11-arm
+            name: Windows ARM64
+            # Use x64-baseline build via emulation (native ARM64 not yet available)
+            bun-download-url: https://github.com/oven-sh/bun/releases/latest/download/bun-windows-x64-baseline.zip
           - os: macos-latest
             name: macOS ARM64
           - os: macos-13
@@ -42,6 +43,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+          bun-download-url: ${{ matrix.bun-download-url }}
 
       - uses: actions/setup-node@v4
         with:
@@ -141,9 +143,9 @@ jobs:
             name: Linux ARM64
           - os: windows-latest
             name: Windows x64
-          # Windows ARM64 disabled: Bun doesn't have stable ARM64 binaries yet (setup-bun fails with 404)
-          # - os: windows-11-arm
-          #   name: Windows ARM64
+          - os: windows-11-arm
+            name: Windows ARM64
+            bun-download-url: https://github.com/oven-sh/bun/releases/latest/download/bun-windows-x64-baseline.zip
           - os: macos-latest
             name: macOS ARM64
 
@@ -154,6 +156,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+          bun-download-url: ${{ matrix.bun-download-url }}
 
       - uses: actions/setup-node@v4
         with:
