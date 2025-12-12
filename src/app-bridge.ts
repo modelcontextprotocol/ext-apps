@@ -1,28 +1,39 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import * as z from "zod/v4/core";
-
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
+  CallToolRequest,
   CallToolRequestSchema,
+  CallToolResult,
   CallToolResultSchema,
   Implementation,
+  ListPromptsRequest,
   ListPromptsRequestSchema,
+  ListPromptsResult,
   ListPromptsResultSchema,
+  ListResourcesRequest,
   ListResourcesRequestSchema,
+  ListResourcesResult,
   ListResourcesResultSchema,
+  ListResourceTemplatesRequest,
   ListResourceTemplatesRequestSchema,
+  ListResourceTemplatesResult,
   ListResourceTemplatesResultSchema,
   LoggingMessageNotification,
   LoggingMessageNotificationSchema,
   Notification,
   PingRequest,
   PingRequestSchema,
+  PromptListChangedNotification,
   PromptListChangedNotificationSchema,
+  ReadResourceRequest,
   ReadResourceRequestSchema,
+  ReadResourceResult,
   ReadResourceResultSchema,
   Request,
+  ResourceListChangedNotification,
   ResourceListChangedNotificationSchema,
   Result,
+  ToolListChangedNotification,
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
@@ -161,12 +172,15 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   /**
    * Create a new AppBridge instance.
    *
-   * @param _client - MCP client connected to the server (for proxying requests)
+   * @param _client - MCP client connected to the server, or `null`. When provided,
+   *   {@link connect} will automatically set up forwarding of MCP requests/notifications
+   *   between the Guest UI and the server. When `null`, you must register handlers
+   *   manually using the `oncalltool`, `onlistresources`, etc. setters.
    * @param _hostInfo - Host application identification (name and version)
    * @param _capabilities - Features and capabilities the host supports
    * @param options - Configuration options (inherited from Protocol)
    *
-   * @example
+   * @example With MCP client (automatic forwarding)
    * ```typescript
    * const bridge = new AppBridge(
    *   mcpClient,
@@ -174,9 +188,19 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    *   { openLinks: {}, serverTools: {}, logging: {} }
    * );
    * ```
+   *
+   * @example Without MCP client (manual handlers)
+   * ```typescript
+   * const bridge = new AppBridge(
+   *   null,
+   *   { name: "MyHost", version: "1.0.0" },
+   *   { openLinks: {}, serverTools: {}, logging: {} }
+   * );
+   * bridge.oncalltool = async (params, extra) => { ... };
+   * ```
    */
   constructor(
-    private _client: Client,
+    private _client: Client | null,
     private _hostInfo: Implementation,
     private _capabilities: McpUiHostCapabilities,
     options?: HostOptions,
@@ -501,6 +525,281 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
         callback(notification.params);
       },
     );
+  }
+
+  /**
+   * Register a handler for tool call requests from the Guest UI.
+   *
+   * The Guest UI sends `tools/call` requests to execute MCP server tools. This
+   * handler allows the host to intercept and process these requests, typically
+   * by forwarding them to the MCP server.
+   *
+   * @param callback - Handler that receives tool call params and returns a result
+   *   - params.name - Name of the tool to call
+   *   - params.arguments - Tool arguments
+   *   - extra - Request metadata (abort signal, session info)
+   *   - Returns: Promise<CallToolResult> with tool execution result
+   *
+   * @example
+   * ```typescript
+   * bridge.oncalltool = async ({ name, arguments: args }, extra) => {
+   *   return mcpClient.request(
+   *     { method: "tools/call", params: { name, arguments: args } },
+   *     CallToolResultSchema,
+   *     { signal: extra.signal }
+   *   );
+   * };
+   * ```
+   *
+   * @see {@link CallToolRequest} for the request type
+   * @see {@link CallToolResult} for the result type
+   */
+  set oncalltool(
+    callback: (
+      params: CallToolRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<CallToolResult>,
+  ) {
+    this.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+      return callback(request.params, extra);
+    });
+  }
+
+  /**
+   * Notify the Guest UI that the MCP server's tool list has changed.
+   *
+   * The host sends `notifications/tools/list_changed` to the Guest UI when it
+   * receives this notification from the MCP server. This allows the Guest UI
+   * to refresh its tool cache or UI accordingly.
+   *
+   * @param params - Optional notification params (typically empty)
+   *
+   * @example
+   * ```typescript
+   * // In your MCP client notification handler:
+   * mcpClient.setNotificationHandler(ToolListChangedNotificationSchema, () => {
+   *   bridge.sendToolListChanged();
+   * });
+   * ```
+   *
+   * @see {@link ToolListChangedNotification} for the notification type
+   */
+  sendToolListChanged(params: ToolListChangedNotification["params"] = {}) {
+    return this.notification({
+      method: "notifications/tools/list_changed",
+      params,
+    } as Notification);
+  }
+
+  /**
+   * Register a handler for list resources requests from the Guest UI.
+   *
+   * The Guest UI sends `resources/list` requests to enumerate available MCP
+   * resources. This handler allows the host to intercept and process these
+   * requests, typically by forwarding them to the MCP server.
+   *
+   * @param callback - Handler that receives list params and returns resources
+   *   - params - Request params (may include cursor for pagination)
+   *   - extra - Request metadata (abort signal, session info)
+   *   - Returns: Promise<ListResourcesResult> with available resources
+   *
+   * @example
+   * ```typescript
+   * bridge.onlistresources = async (params, extra) => {
+   *   return mcpClient.request(
+   *     { method: "resources/list", params },
+   *     ListResourcesResultSchema,
+   *     { signal: extra.signal }
+   *   );
+   * };
+   * ```
+   *
+   * @see {@link ListResourcesRequest} for the request type
+   * @see {@link ListResourcesResult} for the result type
+   */
+  set onlistresources(
+    callback: (
+      params: ListResourcesRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<ListResourcesResult>,
+  ) {
+    this.setRequestHandler(
+      ListResourcesRequestSchema,
+      async (request, extra) => {
+        return callback(request.params, extra);
+      },
+    );
+  }
+
+  /**
+   * Register a handler for list resource templates requests from the Guest UI.
+   *
+   * The Guest UI sends `resources/templates/list` requests to enumerate available
+   * MCP resource templates. This handler allows the host to intercept and process
+   * these requests, typically by forwarding them to the MCP server.
+   *
+   * @param callback - Handler that receives list params and returns templates
+   *   - params - Request params (may include cursor for pagination)
+   *   - extra - Request metadata (abort signal, session info)
+   *   - Returns: Promise<ListResourceTemplatesResult> with available templates
+   *
+   * @example
+   * ```typescript
+   * bridge.onlistresourcetemplates = async (params, extra) => {
+   *   return mcpClient.request(
+   *     { method: "resources/templates/list", params },
+   *     ListResourceTemplatesResultSchema,
+   *     { signal: extra.signal }
+   *   );
+   * };
+   * ```
+   *
+   * @see {@link ListResourceTemplatesRequest} for the request type
+   * @see {@link ListResourceTemplatesResult} for the result type
+   */
+  set onlistresourcetemplates(
+    callback: (
+      params: ListResourceTemplatesRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<ListResourceTemplatesResult>,
+  ) {
+    this.setRequestHandler(
+      ListResourceTemplatesRequestSchema,
+      async (request, extra) => {
+        return callback(request.params, extra);
+      },
+    );
+  }
+
+  /**
+   * Register a handler for read resource requests from the Guest UI.
+   *
+   * The Guest UI sends `resources/read` requests to retrieve the contents of an
+   * MCP resource. This handler allows the host to intercept and process these
+   * requests, typically by forwarding them to the MCP server.
+   *
+   * @param callback - Handler that receives read params and returns resource content
+   *   - params.uri - URI of the resource to read
+   *   - extra - Request metadata (abort signal, session info)
+   *   - Returns: Promise<ReadResourceResult> with resource contents
+   *
+   * @example
+   * ```typescript
+   * bridge.onreadresource = async ({ uri }, extra) => {
+   *   return mcpClient.request(
+   *     { method: "resources/read", params: { uri } },
+   *     ReadResourceResultSchema,
+   *     { signal: extra.signal }
+   *   );
+   * };
+   * ```
+   *
+   * @see {@link ReadResourceRequest} for the request type
+   * @see {@link ReadResourceResult} for the result type
+   */
+  set onreadresource(
+    callback: (
+      params: ReadResourceRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<ReadResourceResult>,
+  ) {
+    this.setRequestHandler(
+      ReadResourceRequestSchema,
+      async (request, extra) => {
+        return callback(request.params, extra);
+      },
+    );
+  }
+
+  /**
+   * Notify the Guest UI that the MCP server's resource list has changed.
+   *
+   * The host sends `notifications/resources/list_changed` to the Guest UI when it
+   * receives this notification from the MCP server. This allows the Guest UI
+   * to refresh its resource cache or UI accordingly.
+   *
+   * @param params - Optional notification params (typically empty)
+   *
+   * @example
+   * ```typescript
+   * // In your MCP client notification handler:
+   * mcpClient.setNotificationHandler(ResourceListChangedNotificationSchema, () => {
+   *   bridge.sendResourceListChanged();
+   * });
+   * ```
+   *
+   * @see {@link ResourceListChangedNotification} for the notification type
+   */
+  sendResourceListChanged(
+    params: ResourceListChangedNotification["params"] = {},
+  ) {
+    return this.notification({
+      method: "notifications/resources/list_changed",
+      params,
+    } as Notification);
+  }
+
+  /**
+   * Register a handler for list prompts requests from the Guest UI.
+   *
+   * The Guest UI sends `prompts/list` requests to enumerate available MCP
+   * prompts. This handler allows the host to intercept and process these
+   * requests, typically by forwarding them to the MCP server.
+   *
+   * @param callback - Handler that receives list params and returns prompts
+   *   - params - Request params (may include cursor for pagination)
+   *   - extra - Request metadata (abort signal, session info)
+   *   - Returns: Promise<ListPromptsResult> with available prompts
+   *
+   * @example
+   * ```typescript
+   * bridge.onlistprompts = async (params, extra) => {
+   *   return mcpClient.request(
+   *     { method: "prompts/list", params },
+   *     ListPromptsResultSchema,
+   *     { signal: extra.signal }
+   *   );
+   * };
+   * ```
+   *
+   * @see {@link ListPromptsRequest} for the request type
+   * @see {@link ListPromptsResult} for the result type
+   */
+  set onlistprompts(
+    callback: (
+      params: ListPromptsRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<ListPromptsResult>,
+  ) {
+    this.setRequestHandler(ListPromptsRequestSchema, async (request, extra) => {
+      return callback(request.params, extra);
+    });
+  }
+
+  /**
+   * Notify the Guest UI that the MCP server's prompt list has changed.
+   *
+   * The host sends `notifications/prompts/list_changed` to the Guest UI when it
+   * receives this notification from the MCP server. This allows the Guest UI
+   * to refresh its prompt cache or UI accordingly.
+   *
+   * @param params - Optional notification params (typically empty)
+   *
+   * @example
+   * ```typescript
+   * // In your MCP client notification handler:
+   * mcpClient.setNotificationHandler(PromptListChangedNotificationSchema, () => {
+   *   bridge.sendPromptListChanged();
+   * });
+   * ```
+   *
+   * @see {@link PromptListChangedNotification} for the notification type
+   */
+  sendPromptListChanged(params: PromptListChangedNotification["params"] = {}) {
+    return this.notification({
+      method: "notifications/prompts/list_changed",
+      params,
+    } as Notification);
   }
 
   /**
@@ -837,39 +1136,19 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     );
   }
 
-  private forwardRequest<
-    Req extends z.$ZodObject<{
-      method: z.$ZodLiteral<string>;
-    }>,
-    Res extends z.$ZodObject<{}>,
-  >(requestSchema: Req, resultSchema: Res) {
-    this.setRequestHandler(requestSchema, async (request, extra) => {
-      console.log(`Forwarding request ${request.method} from MCP UI client`);
-      return this._client.request(request, resultSchema, {
-        signal: extra.signal,
-      });
-    });
-  }
-  private forwardNotification<
-    N extends z.$ZodObject<{ method: z.$ZodLiteral<string> }>,
-  >(notificationSchema: N) {
-    this.setNotificationHandler(notificationSchema, async (notification) => {
-      console.log(
-        `Forwarding notification ${notification.method} from MCP UI client`,
-      );
-      await this._client.notification(notification);
-    });
-  }
-
   /**
-   * Connect to the Guest UI via transport and set up message forwarding.
+   * Connect to the Guest UI via transport and optionally set up message forwarding.
    *
-   * This method establishes the transport connection and automatically sets up
-   * request/notification forwarding based on the MCP server's capabilities.
-   * It proxies the following server capabilities to the Guest UI:
-   * - Tools (tools/call, tools/list_changed)
-   * - Resources (resources/list, resources/read, resources/templates/list, resources/list_changed)
-   * - Prompts (prompts/list, prompts/list_changed)
+   * This method establishes the transport connection. If an MCP client was passed
+   * to the constructor, it also automatically sets up request/notification forwarding
+   * based on the MCP server's capabilities, proxying the following to the Guest UI:
+   * - Tools (tools/call, notifications/tools/list_changed)
+   * - Resources (resources/list, resources/read, resources/templates/list, notifications/resources/list_changed)
+   * - Prompts (prompts/list, notifications/prompts/list_changed)
+   *
+   * If no client was passed to the constructor, no automatic forwarding is set up
+   * and you must register handlers manually using the `oncalltool`, `onlistresources`,
+   * etc. setters.
    *
    * After calling connect, wait for the `oninitialized` callback before sending
    * tool input and other data to the Guest UI.
@@ -877,12 +1156,12 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * @param transport - Transport layer (typically PostMessageTransport)
    * @returns Promise resolving when connection is established
    *
-   * @throws {Error} If server capabilities are not available. This occurs when
-   *   connect() is called before the MCP client has completed its initialization
-   *   with the server. Ensure `await client.connect()` completes before calling
-   *   `bridge.connect()`.
+   * @throws {Error} If a client was passed but server capabilities are not available.
+   *   This occurs when connect() is called before the MCP client has completed its
+   *   initialization with the server. Ensure `await client.connect()` completes
+   *   before calling `bridge.connect()`.
    *
-   * @example
+   * @example With MCP client (automatic forwarding)
    * ```typescript
    * const bridge = new AppBridge(mcpClient, hostInfo, capabilities);
    * const transport = new PostMessageTransport(
@@ -897,38 +1176,86 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    *
    * await bridge.connect(transport);
    * ```
+   *
+   * @example Without MCP client (manual handlers)
+   * ```typescript
+   * const bridge = new AppBridge(null, hostInfo, capabilities);
+   *
+   * // Register handlers manually
+   * bridge.oncalltool = async (params, extra) => {
+   *   // Custom tool call handling
+   * };
+   *
+   * await bridge.connect(transport);
+   * ```
    */
   async connect(transport: Transport) {
-    // Forward core available MCP features
-    const serverCapabilities = this._client.getServerCapabilities();
-    if (!serverCapabilities) {
-      throw new Error("Client server capabilities not available");
-    }
+    if (this._client) {
+      // When a client was passed to the constructor, automatically forward
+      // MCP requests/notifications between the Guest UI and the server
+      const serverCapabilities = this._client.getServerCapabilities();
+      if (!serverCapabilities) {
+        throw new Error("Client server capabilities not available");
+      }
 
-    if (serverCapabilities.tools) {
-      this.forwardRequest(CallToolRequestSchema, CallToolResultSchema);
-      if (serverCapabilities.tools.listChanged) {
-        this.forwardNotification(ToolListChangedNotificationSchema);
+      if (serverCapabilities.tools) {
+        this.oncalltool = async (params, extra) => {
+          return this._client!.request(
+            { method: "tools/call", params },
+            CallToolResultSchema,
+            { signal: extra.signal },
+          );
+        };
+        if (serverCapabilities.tools.listChanged) {
+          this._client.setNotificationHandler(
+            ToolListChangedNotificationSchema,
+            (n) => this.sendToolListChanged(n.params),
+          );
+        }
       }
-    }
-    if (serverCapabilities.resources) {
-      this.forwardRequest(
-        ListResourcesRequestSchema,
-        ListResourcesResultSchema,
-      );
-      this.forwardRequest(
-        ListResourceTemplatesRequestSchema,
-        ListResourceTemplatesResultSchema,
-      );
-      this.forwardRequest(ReadResourceRequestSchema, ReadResourceResultSchema);
-      if (serverCapabilities.resources.listChanged) {
-        this.forwardNotification(ResourceListChangedNotificationSchema);
+      if (serverCapabilities.resources) {
+        this.onlistresources = async (params, extra) => {
+          return this._client!.request(
+            { method: "resources/list", params },
+            ListResourcesResultSchema,
+            { signal: extra.signal },
+          );
+        };
+        this.onlistresourcetemplates = async (params, extra) => {
+          return this._client!.request(
+            { method: "resources/templates/list", params },
+            ListResourceTemplatesResultSchema,
+            { signal: extra.signal },
+          );
+        };
+        this.onreadresource = async (params, extra) => {
+          return this._client!.request(
+            { method: "resources/read", params },
+            ReadResourceResultSchema,
+            { signal: extra.signal },
+          );
+        };
+        if (serverCapabilities.resources.listChanged) {
+          this._client.setNotificationHandler(
+            ResourceListChangedNotificationSchema,
+            (n) => this.sendResourceListChanged(n.params),
+          );
+        }
       }
-    }
-    if (serverCapabilities.prompts) {
-      this.forwardRequest(ListPromptsRequestSchema, ListPromptsResultSchema);
-      if (serverCapabilities.prompts.listChanged) {
-        this.forwardNotification(PromptListChangedNotificationSchema);
+      if (serverCapabilities.prompts) {
+        this.onlistprompts = async (params, extra) => {
+          return this._client!.request(
+            { method: "prompts/list", params },
+            ListPromptsResultSchema,
+            { signal: extra.signal },
+          );
+        };
+        if (serverCapabilities.prompts.listChanged) {
+          this._client.setNotificationHandler(
+            PromptListChangedNotificationSchema,
+            (n) => this.sendPromptListChanged(n.params),
+          );
+        }
       }
     }
 
