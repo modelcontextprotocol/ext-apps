@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Immediate log to verify script execution
+console.log("[setup-bun] Script loaded");
+
 /**
  * Postinstall script to set up bun from platform-specific optional dependencies.
  * Handles Windows ARM64 by downloading x64-baseline via emulation.

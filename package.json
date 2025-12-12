@@ -32,7 +32,7 @@
     "examples/*"
   ],
   "scripts": {
-    "postinstall": "node scripts/setup-bun.mjs",
+    "postinstall": "node scripts/setup-bun.mjs || echo 'setup-bun.mjs failed or not available'",
     "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
     "build": "npm run generate:schemas && bun build.bun.ts",
     "prepack": "npm run build",
