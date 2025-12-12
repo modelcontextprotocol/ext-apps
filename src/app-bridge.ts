@@ -54,6 +54,9 @@ import {
   McpUiOpenLinkRequest,
   McpUiOpenLinkRequestSchema,
   McpUiOpenLinkResult,
+  McpUiRequestDisplayModeRequest,
+  McpUiRequestDisplayModeRequestSchema,
+  McpUiRequestDisplayModeResult,
   McpUiResourceTeardownRequest,
   McpUiResourceTeardownResultSchema,
   McpUiSandboxProxyReadyNotification,
@@ -459,6 +462,48 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   ) {
     this.setRequestHandler(
       McpUiOpenLinkRequestSchema,
+      async (request, extra) => {
+        return callback(request.params, extra);
+      },
+    );
+  }
+
+  /**
+   * Register a handler for display mode requests from the Guest UI.
+   *
+   * The Guest UI sends `ui/request-display-mode` requests when it wants to change
+   * its display mode (e.g., fullscreen, picture-in-picture). The handler should
+   * evaluate the request based on the host's capabilities and user preferences,
+   * then return the result indicating success or denial.
+   *
+   * @param callback - Handler that receives display mode params and returns a result
+   *   - params.displayMode - Requested display mode ("inline", "fullscreen", "pip")
+   *   - extra - Request metadata (abort signal, session info)
+   *   - Returns: Promise<McpUiRequestDisplayModeResult> with success flag and current mode
+   *
+   * @example
+   * ```typescript
+   * bridge.onrequestdisplaymode = async ({ displayMode }, extra) => {
+   *   if (displayMode === "fullscreen" && !hostSupportsFullscreen()) {
+   *     return { success: false, currentDisplayMode: "inline" };
+   *   }
+   *
+   *   await setAppDisplayMode(displayMode);
+   *   return { success: true, currentDisplayMode: displayMode };
+   * };
+   * ```
+   *
+   * @see {@link McpUiRequestDisplayModeRequest} for the request type
+   * @see {@link McpUiRequestDisplayModeResult} for the result type
+   */
+  set onrequestdisplaymode(
+    callback: (
+      params: McpUiRequestDisplayModeRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<McpUiRequestDisplayModeResult>,
+  ) {
+    this.setRequestHandler(
+      McpUiRequestDisplayModeRequestSchema,
       async (request, extra) => {
         return callback(request.params, extra);
       },

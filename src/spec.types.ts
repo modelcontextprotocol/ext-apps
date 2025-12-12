@@ -63,6 +63,37 @@ export interface McpUiOpenLinkResult {
 }
 
 /**
+ * @description Request to change the display mode of the Guest UI.
+ * Sent from the Guest UI to the Host when requesting a change in how the UI is
+ * displayed, such as switching to fullscreen or picture-in-picture mode.
+ * The host may deny the request based on user preferences or capabilities.
+ * @see {@link app.App.requestDisplayMode} for the method that sends this request
+ */
+export interface McpUiRequestDisplayModeRequest {
+  method: "ui/request-display-mode";
+  params: {
+    /** @description Requested display mode. */
+    displayMode: McpUiDisplayMode;
+  };
+}
+
+/**
+ * @description Result from a display mode change request.
+ * @see {@link McpUiRequestDisplayModeRequest}
+ */
+export interface McpUiRequestDisplayModeResult {
+  /** @description Whether the display mode change was successful. */
+  success: boolean;
+  /** @description The current display mode after the request. */
+  currentDisplayMode: string;
+  /**
+   * Index signature required for MCP SDK `Protocol` class compatibility.
+   * Note: The schema intentionally omits this to enforce strict validation.
+   */
+  [key: string]: unknown;
+}
+
+/**
  * @description Request to send a message to the host's chat interface.
  * @see {@link app.App.sendMessage} for the method that sends this request
  */

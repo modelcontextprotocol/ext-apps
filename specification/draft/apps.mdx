@@ -496,6 +496,48 @@ MCP Apps introduces additional JSON-RPC methods for UI-specific functionality:
 
 Host SHOULD open the URL in the user's default browser or a new tab.
 
+`ui/request-display-mode` - Request display mode change
+
+```typescript
+// Request
+{
+  jsonrpc: "2.0",
+  id: 2,
+  method: "ui/request-display-mode",
+  params: {
+    displayMode: "inline" | "fullscreen" | "pip"
+  }
+}
+
+// Success Response
+{
+  jsonrpc: "2.0",
+  id: 2,
+  result: {
+    success: boolean,           // Whether the request was honored
+    currentDisplayMode: string  // The actual display mode after the request
+  }
+}
+
+// Error Response (if denied or failed)
+{
+  jsonrpc: "2.0",
+  id: 2,
+  error: {
+    code: -32000,  // Implementation-defined error
+    message: "Display mode change denied" | "Unsupported display mode"
+  }
+}
+```
+
+Guest UI can request a display mode change from the Host. The Host maintains full control and MAY deny the request based on:
+- User preferences or policies
+- Platform constraints (e.g., mobile platforms may not support fullscreen)
+- Current application state
+- Security considerations
+
+The Host SHOULD return `success: true` and update `currentDisplayMode` if the request is honored. If denied, the Host SHOULD return `success: false` with the current (unchanged) display mode. The Host MAY send a `ui/notifications/host-context-changed` notification after honoring the request to update all context fields.
+
 `ui/message` - Send message content to the host's chat interface
 
 ```typescript

@@ -27,6 +27,14 @@ export type McpUiOpenLinkResultSchemaInferredType = z.infer<
   typeof generated.McpUiOpenLinkResultSchema
 >;
 
+export type McpUiRequestDisplayModeRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiRequestDisplayModeRequestSchema
+>;
+
+export type McpUiRequestDisplayModeResultSchemaInferredType = z.infer<
+  typeof generated.McpUiRequestDisplayModeResultSchema
+>;
+
 export type McpUiMessageResultSchemaInferredType = z.infer<
   typeof generated.McpUiMessageResultSchema
 >;
@@ -122,6 +130,18 @@ expectType<spec.McpUiOpenLinkResult>(
 );
 expectType<McpUiOpenLinkResultSchemaInferredType>(
   {} as spec.McpUiOpenLinkResult,
+);
+expectType<spec.McpUiRequestDisplayModeRequest>(
+  {} as McpUiRequestDisplayModeRequestSchemaInferredType,
+);
+expectType<McpUiRequestDisplayModeRequestSchemaInferredType>(
+  {} as spec.McpUiRequestDisplayModeRequest,
+);
+expectType<spec.McpUiRequestDisplayModeResult>(
+  {} as McpUiRequestDisplayModeResultSchemaInferredType,
+);
+expectType<McpUiRequestDisplayModeResultSchemaInferredType>(
+  {} as spec.McpUiRequestDisplayModeResult,
 );
 expectType<spec.McpUiMessageResult>({} as McpUiMessageResultSchemaInferredType);
 expectType<McpUiMessageResultSchemaInferredType>({} as spec.McpUiMessageResult);

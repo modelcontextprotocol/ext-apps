@@ -51,6 +51,36 @@ export const McpUiOpenLinkResultSchema = z.looseObject({
 });
 
 /**
+ * @description Request to change the display mode of the Guest UI.
+ * Sent from the Guest UI to the Host when requesting a change in how the UI is
+ * displayed, such as switching to fullscreen or picture-in-picture mode.
+ * The host may deny the request based on user preferences or capabilities.
+ * @see {@link app.App.requestDisplayMode} for the method that sends this request
+ */
+export const McpUiRequestDisplayModeRequestSchema = z.object({
+  method: z.literal("ui/request-display-mode"),
+  params: z.object({
+    /** @description Requested display mode. */
+    displayMode: McpUiDisplayModeSchema.describe("Requested display mode."),
+  }),
+});
+
+/**
+ * @description Result from a display mode change request.
+ * @see {@link McpUiRequestDisplayModeRequest}
+ */
+export const McpUiRequestDisplayModeResultSchema = z.looseObject({
+  /** @description Whether the display mode change was successful. */
+  success: z
+    .boolean()
+    .describe("Whether the display mode change was successful."),
+  /** @description The current display mode after the request. */
+  currentDisplayMode: z
+    .string()
+    .describe("The current display mode after the request."),
+});
+
+/**
  * @description Result from sending a message.
  * @see {@link McpUiMessageRequest}
  */

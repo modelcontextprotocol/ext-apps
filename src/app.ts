@@ -32,6 +32,8 @@ import {
   McpUiMessageResultSchema,
   McpUiOpenLinkRequest,
   McpUiOpenLinkResultSchema,
+  McpUiRequestDisplayModeRequest,
+  McpUiRequestDisplayModeResultSchema,
   McpUiResourceTeardownRequest,
   McpUiResourceTeardownRequestSchema,
   McpUiResourceTeardownResult,
@@ -837,6 +839,48 @@ export class App extends Protocol<Request, Notification, Result> {
         params,
       },
       McpUiOpenLinkResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * Request the host to change the app's display mode.
+   *
+   * Apps can request different display modes (inline, fullscreen, pip) to optimize
+   * their UI for various contexts. The host may accept or reject the request based
+   * on user preferences or platform capabilities.
+   *
+   * @param params - Desired display mode
+   * @param options - Request options (timeout, etc.)
+   * @returns Result indicating success and the current display mode
+   *
+   * @throws {Error} If the host denies the request (e.g., unsupported mode)
+   * @throws {Error} If the request times out or the connection is lost
+   *
+   * @example Request fullscreen mode
+   * ```typescript
+   * try {
+   *   const result = await app.requestDisplayMode({ displayMode: "fullscreen" });
+   *   if (result.success) {
+   *     console.log("Now in", result.currentDisplayMode, "mode");
+   *   }
+   * } catch (error) {
+   *   console.error("Failed to change display mode:", error);
+   * }
+   * ```
+   *
+   * @see {@link McpUiRequestDisplayModeRequest} for request structure
+   */
+  requestDisplayMode(
+    params: McpUiRequestDisplayModeRequest["params"],
+    options?: RequestOptions,
+  ) {
+    return this.request(
+      <McpUiRequestDisplayModeRequest>{
+        method: "ui/request-display-mode",
+        params,
+      },
+      McpUiRequestDisplayModeResultSchema,
       options,
     );
   }
