@@ -16,9 +16,8 @@ import {
   writeFileSync,
 } from "fs";
 import { join, dirname } from "path";
-import { execSync, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
-import { createWriteStream } from "fs";
 import { get } from "https";
 import { createGunzip } from "zlib";
 
