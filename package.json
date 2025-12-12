@@ -32,7 +32,7 @@
     "examples/*"
   ],
   "scripts": {
-    "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write 'src/generated/**/*'",
+    "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
     "build": "npm run generate:schemas && bun build.bun.ts",
     "prepack": "npm run build",
     "build:all": "npm run build && npm run examples:build",
@@ -49,9 +49,8 @@
     "prepare": "npm run build && husky",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
-    "prettier:base-cmd": "prettier -u --ignore-path ./.gitignore --ignore-path ./.prettierignore",
-    "prettier": "yarn prettier:base-cmd \"$(pwd)/**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
-    "prettier:fix": "yarn prettier:base-cmd \"$(pwd)/**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write --list-different"
+    "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
+    "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write"
   },
   "author": "Olivier Chafik",
   "devDependencies": {

@@ -11,11 +11,27 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux x64
+          - os: windows-latest
+            name: Windows x64
+          - os: macos-latest
+            name: macOS ARM64
+          - os: macos-13
+            name: macOS x64
+
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Verify no private URLs in package-lock.json
+        shell: bash
         run: '! grep -E "\"resolved\": \"https?://" package-lock.json | grep -v registry.npmjs.org'
 
       - uses: oven-sh/setup-bun@v2
@@ -31,6 +47,7 @@ jobs:
       - run: npm run build:all
 
       - name: Verify generated schemas are up-to-date
+        shell: bash
         run: |
           npm run generate:schemas
           git diff --exit-code src/generated/ || (echo "Generated schemas are out of date. Run 'npm run generate:schemas' and commit." && exit 1)
