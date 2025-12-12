@@ -24,8 +24,6 @@ jobs:
             bun-download-url: https://github.com/oven-sh/bun/releases/latest/download/bun-windows-x64-baseline.zip
           - os: macos-latest
             name: macOS ARM64
-          - os: macos-13
-            name: macOS x64
 
     name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
