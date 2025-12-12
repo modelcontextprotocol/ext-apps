@@ -47,7 +47,7 @@
     "examples:start": "NODE_ENV=development npm run build && bun examples/run-all.ts start",
     "examples:dev": "NODE_ENV=development bun examples/run-all.ts dev",
     "watch": "nodemon --watch src --ext ts,tsx --exec 'bun build.bun.ts'",
-    "prepare": "npm run build && husky",
+    "prepare": "node scripts/setup-bun.mjs && npm run build && husky",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
     "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
