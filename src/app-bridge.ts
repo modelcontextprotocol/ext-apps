@@ -534,11 +534,10 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * handler allows the host to intercept and process these requests, typically
    * by forwarding them to the MCP server.
    *
-   * @param callback - Handler that receives tool call params and returns a result
-   *   - params.name - Name of the tool to call
-   *   - params.arguments - Tool arguments
-   *   - extra - Request metadata (abort signal, session info)
-   *   - Returns: Promise<CallToolResult> with tool execution result
+   * @param callback - Handler that receives tool call params and returns a
+   *   {@link CallToolResult}
+   * @param callback.params - Tool call parameters (name and arguments)
+   * @param callback.extra - Request metadata (abort signal, session info)
    *
    * @example
    * ```typescript
@@ -598,10 +597,10 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * resources. This handler allows the host to intercept and process these
    * requests, typically by forwarding them to the MCP server.
    *
-   * @param callback - Handler that receives list params and returns resources
-   *   - params - Request params (may include cursor for pagination)
-   *   - extra - Request metadata (abort signal, session info)
-   *   - Returns: Promise<ListResourcesResult> with available resources
+   * @param callback - Handler that receives list params and returns a
+   *   {@link ListResourcesResult}
+   * @param callback.params - Request params (may include cursor for pagination)
+   * @param callback.extra - Request metadata (abort signal, session info)
    *
    * @example
    * ```typescript
@@ -638,10 +637,10 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * MCP resource templates. This handler allows the host to intercept and process
    * these requests, typically by forwarding them to the MCP server.
    *
-   * @param callback - Handler that receives list params and returns templates
-   *   - params - Request params (may include cursor for pagination)
-   *   - extra - Request metadata (abort signal, session info)
-   *   - Returns: Promise<ListResourceTemplatesResult> with available templates
+   * @param callback - Handler that receives list params and returns a
+   *   {@link ListResourceTemplatesResult}
+   * @param callback.params - Request params (may include cursor for pagination)
+   * @param callback.extra - Request metadata (abort signal, session info)
    *
    * @example
    * ```typescript
@@ -678,10 +677,10 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * MCP resource. This handler allows the host to intercept and process these
    * requests, typically by forwarding them to the MCP server.
    *
-   * @param callback - Handler that receives read params and returns resource content
-   *   - params.uri - URI of the resource to read
-   *   - extra - Request metadata (abort signal, session info)
-   *   - Returns: Promise<ReadResourceResult> with resource contents
+   * @param callback - Handler that receives read params and returns a
+   *   {@link ReadResourceResult}
+   * @param callback.params - Read parameters including the resource URI
+   * @param callback.extra - Request metadata (abort signal, session info)
    *
    * @example
    * ```typescript
@@ -734,9 +733,9 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     params: ResourceListChangedNotification["params"] = {},
   ) {
     return this.notification({
-      method: "notifications/resources/list_changed",
+      method: "notifications/resources/list_changed" as const,
       params,
-    } as Notification);
+    });
   }
 
   /**
@@ -746,10 +745,10 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * prompts. This handler allows the host to intercept and process these
    * requests, typically by forwarding them to the MCP server.
    *
-   * @param callback - Handler that receives list params and returns prompts
-   *   - params - Request params (may include cursor for pagination)
-   *   - extra - Request metadata (abort signal, session info)
-   *   - Returns: Promise<ListPromptsResult> with available prompts
+   * @param callback - Handler that receives list params and returns a
+   *   {@link ListPromptsResult}
+   * @param callback.params - Request params (may include cursor for pagination)
+   * @param callback.extra - Request metadata (abort signal, session info)
    *
    * @example
    * ```typescript
@@ -797,9 +796,9 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    */
   sendPromptListChanged(params: PromptListChangedNotification["params"] = {}) {
     return this.notification({
-      method: "notifications/prompts/list_changed",
+      method: "notifications/prompts/list_changed" as const,
       params,
-    } as Notification);
+    });
   }
 
   /**
@@ -937,10 +936,10 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   sendHostContextChange(
     params: McpUiHostContextChangedNotification["params"],
   ): Promise<void> | void {
-    return this.notification((<McpUiHostContextChangedNotification>{
-      method: "ui/notifications/host-context-changed",
+    return this.notification({
+      method: "ui/notifications/host-context-changed" as const,
       params,
-    }) as Notification);
+    } as Notification);
   }
 
   /**
