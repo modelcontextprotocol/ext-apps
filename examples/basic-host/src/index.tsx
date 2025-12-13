@@ -1,7 +1,28 @@
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo } from "./implementation";
 import styles from "./index.module.css";
+
+
+/**
+ * Extract default values from a tool's JSON Schema inputSchema.
+ * Returns a formatted JSON string with defaults, or "{}" if none found.
+ */
+function getToolDefaults(tool: Tool | undefined): string {
+  if (!tool?.inputSchema?.properties) return "{}";
+
+  const defaults: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(tool.inputSchema.properties)) {
+    if (prop && typeof prop === "object" && "default" in prop) {
+      defaults[key] = prop.default;
+    }
+  }
+
+  return Object.keys(defaults).length > 0
+    ? JSON.stringify(defaults, null, 2)
+    : "{}";
+}
 
 
 // Host passes serversPromise to CallToolPanel
@@ -74,6 +95,14 @@ function CallToolPanel({ serversPromise, addToolCall }: CallToolPanelProps) {
     setSelectedServer(server);
     const [firstTool] = server.tools.keys();
     setSelectedTool(firstTool ?? "");
+    // Set input JSON to tool defaults (if any)
+    setInputJson(getToolDefaults(server.tools.get(firstTool ?? "")));
+  };
+
+  const handleToolSelect = (toolName: string) => {
+    setSelectedTool(toolName);
+    // Set input JSON to tool defaults (if any)
+    setInputJson(getToolDefaults(selectedServer?.tools.get(toolName)));
   };
 
   const handleSubmit = () => {
@@ -96,7 +125,7 @@ function CallToolPanel({ serversPromise, addToolCall }: CallToolPanelProps) {
           <select
             className={styles.toolSelect}
             value={selectedTool}
-            onChange={(e) => setSelectedTool(e.target.value)}
+            onChange={(e) => handleToolSelect(e.target.value)}
           >
             {selectedServer && toolNames.map((name) => (
               <option key={name} value={name}>{name}</option>

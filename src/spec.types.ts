@@ -184,6 +184,8 @@ export interface McpUiToolCancelledNotification {
  * @description Rich context about the host environment provided to Guest UIs.
  */
 export interface McpUiHostContext {
+  /** @description Allow additional properties for forward compatibility. */
+  [key: string]: unknown;
   /** @description Metadata of the tool call that instantiated this App. */
   toolInfo?: {
     /** @description JSON-RPC id of the tools/call request. */
