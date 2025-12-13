@@ -162,7 +162,7 @@ const server = new McpServer({
   server.registerResource(
     resourceUri,
     resourceUri,
-    { description: "Three.js Widget UI" },
+    { mimeType: RESOURCE_MIME_TYPE, description: "Three.js Widget UI" },
     async (): Promise<ReadResourceResult> => {
       const html = await fs.readFile(
         path.join(DIST_DIR, "mcp-app.html"),

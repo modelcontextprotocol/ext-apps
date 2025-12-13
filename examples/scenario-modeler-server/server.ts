@@ -286,7 +286,7 @@ const server = new McpServer({
   server.registerResource(
     resourceUri,
     resourceUri,
-    { description: "SaaS Scenario Modeler UI" },
+    { mimeType: RESOURCE_MIME_TYPE, description: "SaaS Scenario Modeler UI" },
     async (): Promise<ReadResourceResult> => {
       const html = await fs.readFile(
         path.join(DIST_DIR, "mcp-app.html"),

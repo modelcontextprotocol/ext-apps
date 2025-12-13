@@ -130,17 +130,22 @@ server.registerTool(
   },
 );
 
-server.registerResource(resourceUri, resourceUri, {}, async () => {
-  const html = await fs.readFile(
-    path.join(import.meta.dirname, "dist", "mcp-app.html"),
-    "utf-8",
-  );
-  return {
-    contents: [
-      { uri: resourceUri, mimeType: "text/html;profile=mcp-app", text: html },
-    ],
-  };
-});
+server.registerResource(
+  resourceUri,
+  resourceUri,
+  { mimeType: "text/html;profile=mcp-app" },
+  async () => {
+    const html = await fs.readFile(
+      path.join(import.meta.dirname, "dist", "mcp-app.html"),
+      "utf-8",
+    );
+    return {
+      contents: [
+        { uri: resourceUri, mimeType: "text/html;profile=mcp-app", text: html },
+      ],
+    };
+  },
+);
 
 // Express server for MCP endpoint
 const app = express();

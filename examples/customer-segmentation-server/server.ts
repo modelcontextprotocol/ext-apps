@@ -81,7 +81,10 @@ const server = new McpServer({
   server.registerResource(
     resourceUri,
     resourceUri,
-    { description: "Customer Segmentation Explorer UI" },
+    {
+      mimeType: RESOURCE_MIME_TYPE,
+      description: "Customer Segmentation Explorer UI",
+    },
     async (): Promise<ReadResourceResult> => {
       const html = await fs.readFile(
         path.join(DIST_DIR, "mcp-app.html"),
