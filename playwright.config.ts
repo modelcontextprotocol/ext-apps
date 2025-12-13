@@ -21,10 +21,8 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
-        launchOptions: {
-          // Use system Chrome on macOS for stability, default chromium in CI
-          ...(process.platform === "darwin" ? { channel: "chrome" } : {}),
-        },
+        // Use default Chromium everywhere for consistent screenshot rendering
+        // Run `npm run test:e2e:docker` locally for CI-identical results
       },
     },
   ],

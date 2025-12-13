@@ -40,6 +40,8 @@
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:docker": "docker run --rm -v $(pwd):/work -w /work -it mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'npm i -g bun && npm ci && npx playwright test'",
+    "test:e2e:docker:update": "docker run --rm -v $(pwd):/work -w /work -it mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'npm i -g bun && npm ci && npx playwright test --update-snapshots'",
     "examples:build": "bun examples/run-all.ts build",
     "examples:start": "NODE_ENV=development npm run build && bun examples/run-all.ts start",
     "examples:dev": "NODE_ENV=development bun examples/run-all.ts dev",
