@@ -38,6 +38,27 @@ export {
   type McpUiResourceMeta,
 } from "./spec.types.js";
 
+// Import types needed for protocol type unions (not re-exported, just used internally)
+import type {
+  McpUiInitializeRequest,
+  McpUiOpenLinkRequest,
+  McpUiMessageRequest,
+  McpUiResourceTeardownRequest,
+  McpUiHostContextChangedNotification,
+  McpUiToolInputNotification,
+  McpUiToolInputPartialNotification,
+  McpUiToolResultNotification,
+  McpUiToolCancelledNotification,
+  McpUiSandboxResourceReadyNotification,
+  McpUiInitializedNotification,
+  McpUiSizeChangedNotification,
+  McpUiSandboxProxyReadyNotification,
+  McpUiInitializeResult,
+  McpUiOpenLinkResult,
+  McpUiMessageResult,
+  McpUiResourceTeardownResult,
+} from "./spec.types.js";
+
 // Re-export all schemas from generated/schema.ts (already PascalCase)
 export {
   McpUiThemeSchema,
@@ -65,3 +86,92 @@ export {
   McpUiResourceCspSchema,
   McpUiResourceMetaSchema,
 } from "./generated/schema.js";
+
+// Re-export SDK types used in protocol type unions
+import {
+  CallToolRequest,
+  CallToolResult,
+  EmptyResult,
+  ListPromptsRequest,
+  ListPromptsResult,
+  ListResourcesRequest,
+  ListResourcesResult,
+  ListResourceTemplatesRequest,
+  ListResourceTemplatesResult,
+  ListToolsRequest,
+  ListToolsResult,
+  LoggingMessageNotification,
+  PingRequest,
+  PromptListChangedNotification,
+  ReadResourceRequest,
+  ReadResourceResult,
+  ResourceListChangedNotification,
+  ToolListChangedNotification,
+} from "@modelcontextprotocol/sdk/types.js";
+
+/**
+ * All request types in the MCP Apps protocol.
+ *
+ * Includes:
+ * - MCP UI requests (initialize, open-link, message, resource-teardown)
+ * - MCP server requests forwarded from the app (tools/call, resources/*, prompts/list)
+ * - Protocol requests (ping)
+ */
+export type AppRequest =
+  | McpUiInitializeRequest
+  | McpUiOpenLinkRequest
+  | McpUiMessageRequest
+  | McpUiResourceTeardownRequest
+  | CallToolRequest
+  | ListToolsRequest
+  | ListResourcesRequest
+  | ListResourceTemplatesRequest
+  | ReadResourceRequest
+  | ListPromptsRequest
+  | PingRequest;
+
+/**
+ * All notification types in the MCP Apps protocol.
+ *
+ * Host to app:
+ * - Tool lifecycle (input, input-partial, result, cancelled)
+ * - Host context changes
+ * - MCP list changes (tools, resources, prompts)
+ * - Sandbox resource ready
+ *
+ * App to host:
+ * - Initialized, size-changed, sandbox-proxy-ready
+ * - Logging messages
+ */
+export type AppNotification =
+  // Sent to app
+  | McpUiHostContextChangedNotification
+  | McpUiToolInputNotification
+  | McpUiToolInputPartialNotification
+  | McpUiToolResultNotification
+  | McpUiToolCancelledNotification
+  | McpUiSandboxResourceReadyNotification
+  | ToolListChangedNotification
+  | ResourceListChangedNotification
+  | PromptListChangedNotification
+  // Received from app
+  | McpUiInitializedNotification
+  | McpUiSizeChangedNotification
+  | McpUiSandboxProxyReadyNotification
+  | LoggingMessageNotification;
+
+/**
+ * All result types in the MCP Apps protocol.
+ */
+export type AppResult =
+  | McpUiInitializeResult
+  | McpUiOpenLinkResult
+  | McpUiMessageResult
+  | McpUiResourceTeardownResult
+  | CallToolResult
+  | ListToolsResult
+  | ListResourcesResult
+  | ListResourceTemplatesResult
+  | ReadResourceResult
+  | ListPromptsResult
+  | EmptyResult;

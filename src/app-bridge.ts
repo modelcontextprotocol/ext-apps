@@ -5,7 +5,6 @@ import {
   CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
-  EmptyResult,
   Implementation,
   ListPromptsRequest,
   ListPromptsRequestSchema,
@@ -19,8 +18,6 @@ import {
   ListResourceTemplatesRequestSchema,
   ListResourceTemplatesResult,
   ListResourceTemplatesResultSchema,
-  ListToolsRequest,
-  ListToolsResult,
   LoggingMessageNotification,
   LoggingMessageNotificationSchema,
   PingRequest,
@@ -43,6 +40,9 @@ import {
 } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 import {
+  type AppNotification,
+  type AppRequest,
+  type AppResult,
   type McpUiSandboxResourceReadyNotification,
   type McpUiSizeChangedNotification,
   type McpUiToolCancelledNotification,
@@ -75,73 +75,6 @@ import {
 export * from "./types";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
 export { PostMessageTransport } from "./message-transport";
-
-/**
- * All request types in the MCP Apps protocol.
- *
- * Includes:
- * - MCP UI requests (initialize, open-link, message, resource-teardown)
- * - MCP server requests forwarded from the app (tools/call, resources/*, prompts/list)
- * - Protocol requests (ping)
- */
-export type AppRequest =
-  | McpUiInitializeRequest
-  | McpUiOpenLinkRequest
-  | McpUiMessageRequest
-  | McpUiResourceTeardownRequest
-  | CallToolRequest
-  | ListToolsRequest
-  | ListResourcesRequest
-  | ListResourceTemplatesRequest
-  | ReadResourceRequest
-  | ListPromptsRequest
-  | PingRequest;
-
-/**
- * All notification types in the MCP Apps protocol.
- *
- * Host to app:
- * - Tool lifecycle (input, input-partial, result, cancelled)
- * - Host context changes
- * - MCP list changes (tools, resources, prompts)
- * - Sandbox resource ready
- *
- * App to host:
- * - Initialized, size-changed, sandbox-proxy-ready
- * - Logging messages
- */
-export type AppNotification =
-  // Sent to app
-  | McpUiHostContextChangedNotification
-  | McpUiToolInputNotification
-  | McpUiToolInputPartialNotification
-  | McpUiToolResultNotification
-  | McpUiToolCancelledNotification
-  | McpUiSandboxResourceReadyNotification
-  | ToolListChangedNotification
-  | ResourceListChangedNotification
-  | PromptListChangedNotification
-  // Received from app
-  | McpUiInitializedNotification
-  | McpUiSizeChangedNotification
-  | McpUiSandboxProxyReadyNotification
-  | LoggingMessageNotification;
-
-/**
- * All result types in the MCP Apps protocol.
- */
-export type AppResult =
-  | McpUiInitializeResult
-  | McpUiOpenLinkResult
-  | McpUiMessageResult
-  | McpUiResourceTeardownResult
-  | CallToolResult
-  | ListToolsResult
-  | ListResourcesResult
-  | ListResourceTemplatesResult
-  | ReadResourceResult
-  | ListPromptsResult
-  | EmptyResult;
 
 /**
  * Options for configuring AppBridge behavior.

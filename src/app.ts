@@ -15,11 +15,7 @@ import {
   LoggingMessageNotification,
   PingRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import {
-  AppNotification,
-  AppRequest,
-  AppResult,
-} from "./app-bridge";
+import { AppNotification, AppRequest, AppResult } from "./types";
 import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
