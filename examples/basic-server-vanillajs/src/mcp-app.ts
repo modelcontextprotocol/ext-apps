@@ -38,6 +38,12 @@ const openLinkBtn = document.getElementById("open-link-btn")!;
 // Create app instance
 const app = new App({ name: "Get Time App", version: "1.0.0" });
 
+app.onteardown = async () => {
+  log.info("App is being torn down");
+  await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate cleanup work
+  log.info("App teardown complete");
+  return {};
+};
 
 // Register handlers BEFORE connecting
 app.ontoolinput = (params) => {

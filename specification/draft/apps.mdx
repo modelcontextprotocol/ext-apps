@@ -530,8 +530,9 @@ Host SHOULD open the URL in the user's default browser or a new tab.
   }
 }
 ```
-
-Host SHOULD add the message to the conversation thread, preserving the specified role.
+Host behavior:
+* Host SHOULD add the message to the conversation context, preserving the specified role.
+* Host MAY request user consent.
 
 #### Notifications (Host → UI)
 

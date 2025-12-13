@@ -168,6 +168,19 @@ export interface McpUiToolResultNotification {
 }
 
 /**
+ * @description Notification that tool execution was cancelled (Host -> Guest UI).
+ * Host MUST send this if tool execution was cancelled for any reason (user action,
+ * sampling error, classifier intervention, etc.).
+ */
+export interface McpUiToolCancelledNotification {
+  method: "ui/notifications/tool-cancelled";
+  params: {
+    /** @description Optional reason for the cancellation (e.g., "user action", "timeout"). */
+    reason?: string;
+  };
+}
+
+/**
  * @description Rich context about the host environment provided to Guest UIs.
  */
 export interface McpUiHostContext {

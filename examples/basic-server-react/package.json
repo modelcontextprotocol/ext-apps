@@ -15,7 +15,7 @@
     "@modelcontextprotocol/sdk": "^1.22.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "zod": "^3.25.0"
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

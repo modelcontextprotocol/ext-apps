@@ -17,7 +17,7 @@
     "@modelcontextprotocol/ext-apps": "../..",
     "@modelcontextprotocol/sdk": "^1.22.0",
     "chart.js": "^4.4.0",
-    "zod": "^3.25.0"
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
