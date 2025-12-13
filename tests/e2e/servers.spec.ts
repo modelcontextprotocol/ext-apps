@@ -76,6 +76,8 @@ async function waitForAppLoad(page: Page) {
  */
 async function loadServer(page: Page, serverIndex: number) {
   await page.goto("/");
+  // Wait for servers to connect (select becomes enabled when servers are ready)
+  await expect(page.locator("select").first()).toBeEnabled({ timeout: 30000 });
   await page.locator("select").first().selectOption({ index: serverIndex });
   await page.click('button:has-text("Call Tool")');
   await waitForAppLoad(page);
@@ -123,7 +125,7 @@ SERVERS.forEach((server) => {
 
       await expect(page).toHaveScreenshot(`${server.key}.png`, {
         mask,
-        maxDiffPixelRatio: 0.06, // 6% tolerance for cross-platform font rendering differences
+        maxDiffPixelRatio: 0.06,
       });
     });
   });

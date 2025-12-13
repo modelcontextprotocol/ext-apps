@@ -223,71 +223,79 @@ function generateHistory(
 // MCP Server Setup
 // ---------------------------------------------------------------------------
 
-const server = new McpServer({
-  name: "Budget Allocator Server",
-  version: "1.0.0",
-});
-
 const resourceUri = "ui://budget-allocator/mcp-app.html";
 
-server.registerTool(
-  "get-budget-data",
-  {
-    title: "Get Budget Data",
-    description:
-      "Returns budget configuration with 24 months of historical allocations and industry benchmarks by company stage",
-    inputSchema: {},
-    _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
-  },
-  async (): Promise<CallToolResult> => {
-    const response: BudgetDataResponse = {
-      config: {
-        categories: CATEGORIES.map(({ id, name, color, defaultPercent }) => ({
-          id,
-          name,
-          color,
-          defaultPercent,
-        })),
-        presetBudgets: [50000, 100000, 250000, 500000],
-        defaultBudget: 100000,
-        currency: "USD",
-        currencySymbol: "$",
-      },
-      analytics: {
-        history: generateHistory(CATEGORIES),
-        benchmarks: BENCHMARKS,
-        stages: ["Seed", "Series A", "Series B", "Growth"],
-        defaultStage: "Series A",
-      },
-    };
+/**
+ * Creates a new MCP server instance with tools and resources registered.
+ * Each HTTP session needs its own server instance because McpServer only supports one transport.
+ */
+function createServer(): McpServer {
+  const server = new McpServer({
+    name: "Budget Allocator Server",
+    version: "1.0.0",
+  });
 
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(response),
+  server.registerTool(
+    "get-budget-data",
+    {
+      title: "Get Budget Data",
+      description:
+        "Returns budget configuration with 24 months of historical allocations and industry benchmarks by company stage",
+      inputSchema: {},
+      _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+    },
+    async (): Promise<CallToolResult> => {
+      const response: BudgetDataResponse = {
+        config: {
+          categories: CATEGORIES.map(({ id, name, color, defaultPercent }) => ({
+            id,
+            name,
+            color,
+            defaultPercent,
+          })),
+          presetBudgets: [50000, 100000, 250000, 500000],
+          defaultBudget: 100000,
+          currency: "USD",
+          currencySymbol: "$",
         },
-      ],
-    };
-  },
-);
+        analytics: {
+          history: generateHistory(CATEGORIES),
+          benchmarks: BENCHMARKS,
+          stages: ["Seed", "Series A", "Series B", "Growth"],
+          defaultStage: "Series A",
+        },
+      };
 
-server.registerResource(
-  resourceUri,
-  resourceUri,
-  { description: "Interactive Budget Allocator UI" },
-  async (): Promise<ReadResourceResult> => {
-    const html = await fs.readFile(
-      path.join(DIST_DIR, "mcp-app.html"),
-      "utf-8",
-    );
-    return {
-      contents: [
-        { uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: html },
-      ],
-    };
-  },
-);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerResource(
+    resourceUri,
+    resourceUri,
+    { description: "Interactive Budget Allocator UI" },
+    async (): Promise<ReadResourceResult> => {
+      const html = await fs.readFile(
+        path.join(DIST_DIR, "mcp-app.html"),
+        "utf-8",
+      );
+      return {
+        contents: [
+          { uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: html },
+        ],
+      };
+    },
+  );
+
+  return server;
+}
 
 // ---------------------------------------------------------------------------
 // Server Startup
@@ -295,10 +303,10 @@ server.registerResource(
 
 async function main() {
   if (process.argv.includes("--stdio")) {
-    await server.connect(new StdioServerTransport());
+    await createServer().connect(new StdioServerTransport());
   } else {
     const port = parseInt(process.env.PORT ?? "3103", 10);
-    await startServer(server, { port, name: "Budget Allocator Server" });
+    await startServer(createServer, { port, name: "Budget Allocator Server" });
   }
 }
 

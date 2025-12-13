@@ -7,25 +7,28 @@ import { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY } from "../../dist/src/app";
 import { startServer } from "../shared/server-utils.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
+const RESOURCE_URI = "ui://get-time/mcp-app.html";
 
-const server = new McpServer({
-  name: "Basic MCP App Server (React-based)",
-  version: "1.0.0",
-});
+/**
+ * Creates a new MCP server instance with tools and resources registered.
+ * Each HTTP session needs its own server instance because McpServer only supports one transport.
+ */
+function createServer(): McpServer {
+  const server = new McpServer({
+    name: "Basic MCP App Server (React-based)",
+    version: "1.0.0",
+  });
 
-// MCP Apps require two-part registration: a tool (what the LLM calls) and a
-// resource (the UI it renders). The `_meta` field on the tool links to the
-// resource URI, telling hosts which UI to display when the tool executes.
-{
-  const resourceUri = "ui://get-time/mcp-app.html";
-
+  // MCP Apps require two-part registration: a tool (what the LLM calls) and a
+  // resource (the UI it renders). The `_meta` field on the tool links to the
+  // resource URI, telling hosts which UI to display when the tool executes.
   server.registerTool(
     "get-time",
     {
       title: "Get Time",
       description: "Returns the current server time as an ISO 8601 string.",
       inputSchema: {},
-      _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+      _meta: { [RESOURCE_URI_META_KEY]: RESOURCE_URI },
     },
     async (): Promise<CallToolResult> => {
       const time = new Date().toISOString();
@@ -36,8 +39,8 @@ const server = new McpServer({
   );
 
   server.registerResource(
-    resourceUri,
-    resourceUri,
+    RESOURCE_URI,
+    RESOURCE_URI,
     {},
     async (): Promise<ReadResourceResult> => {
       const html = await fs.readFile(path.join(DIST_DIR, "mcp-app.html"), "utf-8");
@@ -46,19 +49,21 @@ const server = new McpServer({
         contents: [
           // Per the MCP App specification, "text/html;profile=mcp-app" signals
           // to the Host that this resource is indeed for an MCP App UI.
-          { uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: html },
+          { uri: RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: html },
         ],
       };
     },
   );
+
+  return server;
 }
 
 async function main() {
   if (process.argv.includes("--stdio")) {
-    await server.connect(new StdioServerTransport());
+    await createServer().connect(new StdioServerTransport());
   } else {
     const port = parseInt(process.env.PORT ?? "3101", 10);
-    await startServer(server, { port, name: "Basic MCP App Server (React-based)" });
+    await startServer(createServer, { port, name: "Basic MCP App Server (React-based)" });
   }
 }
 

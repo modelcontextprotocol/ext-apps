@@ -2,10 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true, // Tests are independent, can run in parallel
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : 4, // More workers locally, fewer in CI
+  workers: process.env.CI ? 2 : 4, // Parallel execution now works with factory pattern
   timeout: 30000, // 30s per test
   reporter: process.env.CI ? "list" : "html",
   // Use platform-agnostic snapshot names (no -darwin/-linux suffix)
@@ -32,15 +32,14 @@ export default defineConfig({
   webServer: {
     command: "npm run examples:start",
     url: "http://localhost:8080",
-    reuseExistingServer: !process.env.CI,
+    // Always start fresh servers to avoid stale state issues
+    reuseExistingServer: false,
     timeout: 120000,
   },
   // Snapshot configuration
   expect: {
     toHaveScreenshot: {
-      // Allow 5% pixel difference for cross-platform rendering differences
-      maxDiffPixelRatio: 0.05,
-      // Animation stabilization
+      maxDiffPixelRatio: 0.06,
       animations: "disabled",
     },
   },

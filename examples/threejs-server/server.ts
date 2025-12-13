@@ -129,14 +129,17 @@ animate();
 - For animations, use \`requestAnimationFrame\`
 `;
 
-const server = new McpServer({
-  name: "Three.js Server",
-  version: "1.0.0",
-});
+const resourceUri = "ui://threejs/mcp-app.html";
 
-// Register tool and resource
-{
-  const resourceUri = "ui://threejs/mcp-app.html";
+/**
+ * Creates a new MCP server instance with tools and resources registered.
+ * Each HTTP session needs its own server instance because McpServer only supports one transport.
+ */
+function createServer(): McpServer {
+  const server = new McpServer({
+    name: "Three.js Server",
+    version: "1.0.0",
+  });
 
   // Tool 1: show_threejs_scene
   server.registerTool(
@@ -209,14 +212,16 @@ const server = new McpServer({
       };
     },
   );
+
+  return server;
 }
 
 async function main() {
   if (process.argv.includes("--stdio")) {
-    await server.connect(new StdioServerTransport());
+    await createServer().connect(new StdioServerTransport());
   } else {
     const port = parseInt(process.env.PORT ?? "3108", 10);
-    await startServer(server, { port, name: "Three.js Server" });
+    await startServer(createServer, { port, name: "Three.js Server" });
   }
 }
 

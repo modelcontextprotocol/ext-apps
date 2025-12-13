@@ -51,62 +51,73 @@ function getCustomerData(segmentFilter?: string): {
   };
 }
 
-const server = new McpServer({
-  name: "Customer Segmentation Server",
-  version: "1.0.0",
-});
+/**
+ * Creates a new MCP server instance with tools and resources registered.
+ * Each HTTP session needs its own server instance because McpServer only supports one transport.
+ */
+function createServer(): McpServer {
+  const server = new McpServer({
+    name: "Customer Segmentation Server",
+    version: "1.0.0",
+  });
 
-// Register the get-customer-data tool and its associated UI resource
-{
-  const resourceUri = "ui://customer-segmentation/mcp-app.html";
+  // Register the get-customer-data tool and its associated UI resource
+  {
+    const resourceUri = "ui://customer-segmentation/mcp-app.html";
 
-  server.registerTool(
-    "get-customer-data",
-    {
-      title: "Get Customer Data",
-      description:
-        "Returns customer data with segment information for visualization. Optionally filter by segment.",
-      inputSchema: GetCustomerDataInputSchema.shape,
-      _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
-    },
-    async ({ segment }): Promise<CallToolResult> => {
-      const data = getCustomerData(segment);
+    server.registerTool(
+      "get-customer-data",
+      {
+        title: "Get Customer Data",
+        description:
+          "Returns customer data with segment information for visualization. Optionally filter by segment.",
+        inputSchema: GetCustomerDataInputSchema.shape,
+        _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+      },
+      async ({ segment }): Promise<CallToolResult> => {
+        const data = getCustomerData(segment);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(data) }],
-      };
-    },
-  );
+        return {
+          content: [{ type: "text", text: JSON.stringify(data) }],
+        };
+      },
+    );
 
-  server.registerResource(
-    resourceUri,
-    resourceUri,
-    { description: "Customer Segmentation Explorer UI" },
-    async (): Promise<ReadResourceResult> => {
-      const html = await fs.readFile(
-        path.join(DIST_DIR, "mcp-app.html"),
-        "utf-8",
-      );
+    server.registerResource(
+      resourceUri,
+      resourceUri,
+      { description: "Customer Segmentation Explorer UI" },
+      async (): Promise<ReadResourceResult> => {
+        const html = await fs.readFile(
+          path.join(DIST_DIR, "mcp-app.html"),
+          "utf-8",
+        );
 
-      return {
-        contents: [
-          {
-            uri: resourceUri,
-            mimeType: RESOURCE_MIME_TYPE,
-            text: html,
-          },
-        ],
-      };
-    },
-  );
+        return {
+          contents: [
+            {
+              uri: resourceUri,
+              mimeType: RESOURCE_MIME_TYPE,
+              text: html,
+            },
+          ],
+        };
+      },
+    );
+  }
+
+  return server;
 }
 
 async function main() {
   if (process.argv.includes("--stdio")) {
-    await server.connect(new StdioServerTransport());
+    await createServer().connect(new StdioServerTransport());
   } else {
     const port = parseInt(process.env.PORT ?? "3105", 10);
-    await startServer(server, { port, name: "Customer Segmentation Server" });
+    await startServer(createServer, {
+      port,
+      name: "Customer Segmentation Server",
+    });
   }
 }
 

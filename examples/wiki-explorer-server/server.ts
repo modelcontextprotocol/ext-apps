@@ -67,13 +67,13 @@ function extractWikiLinks(pageUrl: URL, html: string): PageInfo[] {
   }));
 }
 
-const server = new McpServer({
-  name: "Wiki Explorer",
-  version: "1.0.0",
-});
+function createServer(): McpServer {
+  const server = new McpServer({
+    name: "Wiki Explorer",
+    version: "1.0.0",
+  });
 
-// Register the get-first-degree-links tool and its associated UI resource
-{
+  // Register the get-first-degree-links tool and its associated UI resource
   const resourceUri = "ui://wiki-explorer/mcp-app.html";
 
   server.registerTool(
@@ -141,14 +141,16 @@ const server = new McpServer({
       };
     },
   );
+
+  return server;
 }
 
 async function main() {
   if (process.argv.includes("--stdio")) {
-    await server.connect(new StdioServerTransport());
+    await createServer().connect(new StdioServerTransport());
   } else {
     const port = parseInt(process.env.PORT ?? "3109", 10);
-    await startServer(server, { port, name: "Wiki Explorer" });
+    await startServer(createServer, { port, name: "Wiki Explorer" });
   }
 }
 
