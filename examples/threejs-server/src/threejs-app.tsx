@@ -17,6 +17,32 @@ interface ThreeJSToolInput {
   height?: number;
 }
 
+// Default demo code shown when no code is provided
+const DEFAULT_THREEJS_CODE = `const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(width, height);
+renderer.setClearColor(0x1a1a2e);
+
+const cube = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshStandardMaterial({ color: 0x00ff88 })
+);
+scene.add(cube);
+
+scene.add(new THREE.DirectionalLight(0xffffff, 1));
+scene.add(new THREE.AmbientLight(0x404040));
+
+camera.position.z = 3;
+
+function animate() {
+  requestAnimationFrame(animate);
+  cube.rotation.x += 0.01;
+  cube.rotation.y += 0.01;
+  renderer.render(scene, camera);
+}
+animate();`;
+
 type ThreeJSAppProps = WidgetProps<ThreeJSToolInput>;
 
 const SHIMMER_STYLE = `
@@ -125,7 +151,7 @@ export default function ThreeJSApp({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const height = toolInputs?.height ?? toolInputsPartial?.height ?? 400;
-  const code = toolInputs?.code;
+  const code = toolInputs?.code || DEFAULT_THREEJS_CODE;
   const partialCode = toolInputsPartial?.code;
   const isStreaming = !toolInputs && !!toolInputsPartial;
 

@@ -242,67 +242,75 @@ const DEFAULT_INPUTS: ScenarioInputs = {
 // MCP Server
 // ============================================================================
 
-const server = new McpServer({
-  name: "SaaS Scenario Modeler",
-  version: "1.0.0",
-});
+/**
+ * Creates a new MCP server instance with tools and resources registered.
+ * Each HTTP session needs its own server instance because McpServer only supports one transport.
+ */
+function createServer(): McpServer {
+  const server = new McpServer({
+    name: "SaaS Scenario Modeler",
+    version: "1.0.0",
+  });
 
-// Register tool and resource
-{
-  const resourceUri = "ui://scenario-modeler/mcp-app.html";
+  // Register tool and resource
+  {
+    const resourceUri = "ui://scenario-modeler/mcp-app.html";
 
-  server.registerTool(
-    "get-scenario-data",
-    {
-      title: "Get Scenario Data",
-      description:
-        "Returns SaaS scenario templates and optionally computes custom projections for given inputs",
-      inputSchema: GetScenarioDataInputSchema.shape,
-      _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
-    },
-    async (args: {
-      customInputs?: ScenarioInputs;
-    }): Promise<CallToolResult> => {
-      const customScenario = args.customInputs
-        ? calculateScenario(args.customInputs)
-        : undefined;
+    server.registerTool(
+      "get-scenario-data",
+      {
+        title: "Get Scenario Data",
+        description:
+          "Returns SaaS scenario templates and optionally computes custom projections for given inputs",
+        inputSchema: GetScenarioDataInputSchema.shape,
+        _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+      },
+      async (args: {
+        customInputs?: ScenarioInputs;
+      }): Promise<CallToolResult> => {
+        const customScenario = args.customInputs
+          ? calculateScenario(args.customInputs)
+          : undefined;
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              templates: SCENARIO_TEMPLATES,
-              defaultInputs: DEFAULT_INPUTS,
-              customProjections: customScenario?.projections,
-              customSummary: customScenario?.summary,
-            }),
-          },
-        ],
-      };
-    },
-  );
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                templates: SCENARIO_TEMPLATES,
+                defaultInputs: DEFAULT_INPUTS,
+                customProjections: customScenario?.projections,
+                customSummary: customScenario?.summary,
+              }),
+            },
+          ],
+        };
+      },
+    );
 
-  server.registerResource(
-    resourceUri,
-    resourceUri,
-    { description: "SaaS Scenario Modeler UI" },
-    async (): Promise<ReadResourceResult> => {
-      const html = await fs.readFile(
-        path.join(DIST_DIR, "mcp-app.html"),
-        "utf-8",
-      );
-      return {
-        contents: [
-          {
-            uri: resourceUri,
-            mimeType: RESOURCE_MIME_TYPE,
-            text: html,
-          },
-        ],
-      };
-    },
-  );
+    server.registerResource(
+      resourceUri,
+      resourceUri,
+      { description: "SaaS Scenario Modeler UI" },
+      async (): Promise<ReadResourceResult> => {
+        const html = await fs.readFile(
+          path.join(DIST_DIR, "mcp-app.html"),
+          "utf-8",
+        );
+        return {
+          contents: [
+            {
+              uri: resourceUri,
+              mimeType: RESOURCE_MIME_TYPE,
+              text: html,
+            },
+          ],
+        };
+      },
+    );
+  }
+
+  return server;
 }
 
 // ============================================================================
@@ -311,10 +319,13 @@ const server = new McpServer({
 
 async function main() {
   if (process.argv.includes("--stdio")) {
-    await server.connect(new StdioServerTransport());
+    await createServer().connect(new StdioServerTransport());
   } else {
     const port = parseInt(process.env.PORT ?? "3106", 10);
-    await startServer(server, { port, name: "SaaS Scenario Modeler Server" });
+    await startServer(createServer, {
+      port,
+      name: "SaaS Scenario Modeler Server",
+    });
   }
 }
 

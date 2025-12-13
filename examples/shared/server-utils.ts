@@ -24,21 +24,31 @@ export interface ServerOptions {
 
 type Transport = StreamableHTTPServerTransport | SSEServerTransport;
 
+/** Session state: transport + its dedicated server instance */
+interface Session {
+  transport: Transport;
+  server: McpServer;
+}
+
 /**
  * Starts an MCP server with HTTP transports.
  *
  * Provides:
  * - /mcp (GET/POST/DELETE): Streamable HTTP with stateful sessions
  * - /sse (GET) + /messages (POST): Legacy SSE for older clients
+ *
+ * @param createServer - Factory function that creates a new McpServer instance per session.
+ *                       Each session needs its own server because McpServer only supports
+ *                       one transport at a time.
  */
 export async function startServer(
-  server: McpServer,
+  createServer: () => McpServer,
   options: ServerOptions,
 ): Promise<void> {
   const { port, name = "MCP Server" } = options;
 
-  // Unified session store for both transport types
-  const sessions = new Map<string, Transport>();
+  // Session store: each session has its own transport AND server instance
+  const sessions = new Map<string, Session>();
 
   // Express app - bind to all interfaces for development/testing
   const app = createMcpExpressApp({ host: "0.0.0.0" });
@@ -52,12 +62,13 @@ export async function startServer(
   app.all("/mcp", async (req: Request, res: Response) => {
     try {
       const sessionId = req.headers["mcp-session-id"] as string | undefined;
-      let transport = sessionId
-        ? (sessions.get(sessionId) as StreamableHTTPServerTransport | undefined)
-        : undefined;
+      let session = sessionId ? sessions.get(sessionId) : undefined;
 
       // Session exists but wrong transport type
-      if (sessionId && sessions.has(sessionId) && !transport) {
+      if (
+        session &&
+        !(session.transport instanceof StreamableHTTPServerTransport)
+      ) {
         return res.status(400).json({
           jsonrpc: "2.0",
           error: { code: -32000, message: "Session uses different transport" },
@@ -66,7 +77,7 @@ export async function startServer(
       }
 
       // New session requires initialize request
-      if (!transport) {
+      if (!session) {
         if (req.method !== "POST" || !isInitializeRequest(req.body)) {
           return res.status(400).json({
             jsonrpc: "2.0",
@@ -75,20 +86,27 @@ export async function startServer(
           });
         }
 
-        transport = new StreamableHTTPServerTransport({
+        // Create new server instance for this session (McpServer supports only one transport)
+        const serverInstance = createServer();
+
+        const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (id) => {
-            sessions.set(id, transport!);
+            sessions.set(id, { transport, server: serverInstance });
           },
         });
-        const t = transport;
-        t.onclose = () => {
-          if (t.sessionId) sessions.delete(t.sessionId);
+        transport.onclose = () => {
+          if (transport.sessionId) sessions.delete(transport.sessionId);
         };
-        await server.connect(transport);
+        await serverInstance.connect(transport);
+        session = { transport, server: serverInstance };
       }
 
-      await transport.handleRequest(req, res, req.body);
+      await (session.transport as StreamableHTTPServerTransport).handleRequest(
+        req,
+        res,
+        req.body,
+      );
     } catch (error) {
       console.error("MCP error:", error);
       if (!res.headersSent) {
@@ -104,10 +122,12 @@ export async function startServer(
   // Legacy SSE
   app.get("/sse", async (_req: Request, res: Response) => {
     try {
+      // Create new server instance for this session (McpServer supports only one transport)
+      const serverInstance = createServer();
       const transport = new SSEServerTransport("/messages", res);
-      sessions.set(transport.sessionId, transport);
+      sessions.set(transport.sessionId, { transport, server: serverInstance });
       res.on("close", () => sessions.delete(transport.sessionId));
-      await server.connect(transport);
+      await serverInstance.connect(transport);
     } catch (error) {
       console.error("SSE error:", error);
       if (!res.headersSent) res.status(500).end();
@@ -116,15 +136,15 @@ export async function startServer(
 
   app.post("/messages", async (req: Request, res: Response) => {
     try {
-      const transport = sessions.get(req.query.sessionId as string);
-      if (!(transport instanceof SSEServerTransport)) {
+      const session = sessions.get(req.query.sessionId as string);
+      if (!session || !(session.transport instanceof SSEServerTransport)) {
         return res.status(404).json({
           jsonrpc: "2.0",
           error: { code: -32001, message: "Session not found" },
           id: null,
         });
       }
-      await transport.handlePostMessage(req, res, req.body);
+      await session.transport.handlePostMessage(req, res, req.body);
     } catch (error) {
       console.error("Message error:", error);
       if (!res.headersSent) {
@@ -151,7 +171,7 @@ export async function startServer(
 
     const shutdown = () => {
       console.log("\nShutting down...");
-      sessions.forEach((t) => t.close().catch(() => {}));
+      sessions.forEach((session) => session.transport.close().catch(() => {}));
       httpServer.close(() => process.exit(0));
     };
 
