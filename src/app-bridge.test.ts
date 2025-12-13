@@ -546,27 +546,24 @@ describe("App <-> AppBridge integration", () => {
     });
 
     it("oncalltool setter registers handler for tools/call requests", async () => {
+      const toolCall = { name: "test-tool", arguments: { arg: "value" } };
+      const resultContent = [{ type: "text", text: "result" }];
       const receivedCalls: unknown[] = [];
+      
       bridge.oncalltool = async (params) => {
         receivedCalls.push(params);
-        return { content: [{ type: "text", text: "result" }] };
+        return { content: resultContent };
       };
 
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
 
       // App calls a tool via callServerTool
-      const result = await app.callServerTool({
-        name: "test-tool",
-        arguments: { arg: "value" },
-      });
+      const result = await app.callServerTool(toolCall);
 
       expect(receivedCalls).toHaveLength(1);
-      expect(receivedCalls[0]).toMatchObject({
-        name: "test-tool",
-        arguments: { arg: "value" },
-      });
-      expect(result.content).toEqual([{ type: "text", text: "result" }]);
+      expect(receivedCalls[0]).toMatchObject(toolCall);
+      expect(result.content).toEqual(resultContent);
     });
 
     it("onlistresources setter registers handler for resources/list requests", async () => {

@@ -586,9 +586,9 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    */
   sendToolListChanged(params: ToolListChangedNotification["params"] = {}) {
     return this.notification({
-      method: "notifications/tools/list_changed",
+      method: "notifications/tools/list_changed" as const,
       params,
-    } as Notification);
+    });
   }
 
   /**
