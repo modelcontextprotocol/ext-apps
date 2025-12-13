@@ -337,7 +337,7 @@ export const McpUiToolResultNotificationSchema = z.object({
 /**
  * @description Rich context about the host environment provided to Guest UIs.
  */
-export const McpUiHostContextSchema = z.object({
+export const McpUiHostContextSchema = z.looseObject({
   /** @description Metadata of the tool call that instantiated this App. */
   toolInfo: z
     .object({

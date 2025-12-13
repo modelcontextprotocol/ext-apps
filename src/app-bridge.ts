@@ -5,6 +5,7 @@ import {
   CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
+  EmptyResult,
   Implementation,
   ListPromptsRequest,
   ListPromptsRequestSchema,
@@ -18,9 +19,10 @@ import {
   ListResourceTemplatesRequestSchema,
   ListResourceTemplatesResult,
   ListResourceTemplatesResultSchema,
+  ListToolsRequest,
+  ListToolsResult,
   LoggingMessageNotification,
   LoggingMessageNotificationSchema,
-  Notification,
   PingRequest,
   PingRequestSchema,
   PromptListChangedNotification,
@@ -29,10 +31,8 @@ import {
   ReadResourceRequestSchema,
   ReadResourceResult,
   ReadResourceResultSchema,
-  Request,
   ResourceListChangedNotification,
   ResourceListChangedNotificationSchema,
-  Result,
   ToolListChangedNotification,
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -66,6 +66,7 @@ import {
   McpUiOpenLinkRequestSchema,
   McpUiOpenLinkResult,
   McpUiResourceTeardownRequest,
+  McpUiResourceTeardownResult,
   McpUiResourceTeardownResultSchema,
   McpUiSandboxProxyReadyNotification,
   McpUiSandboxProxyReadyNotificationSchema,
@@ -74,6 +75,73 @@ import {
 export * from "./types";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
 export { PostMessageTransport } from "./message-transport";
+
+/**
+ * All request types in the MCP Apps protocol.
+ *
+ * Includes:
+ * - MCP UI requests (initialize, open-link, message, resource-teardown)
+ * - MCP server requests forwarded from the app (tools/call, resources/*, prompts/list)
+ * - Protocol requests (ping)
+ */
+export type AppRequest =
+  | McpUiInitializeRequest
+  | McpUiOpenLinkRequest
+  | McpUiMessageRequest
+  | McpUiResourceTeardownRequest
+  | CallToolRequest
+  | ListToolsRequest
+  | ListResourcesRequest
+  | ListResourceTemplatesRequest
+  | ReadResourceRequest
+  | ListPromptsRequest
+  | PingRequest;
+
+/**
+ * All notification types in the MCP Apps protocol.
+ *
+ * Host to app:
+ * - Tool lifecycle (input, input-partial, result, cancelled)
+ * - Host context changes
+ * - MCP list changes (tools, resources, prompts)
+ * - Sandbox resource ready
+ *
+ * App to host:
+ * - Initialized, size-changed, sandbox-proxy-ready
+ * - Logging messages
+ */
+export type AppNotification =
+  // Sent to app
+  | McpUiHostContextChangedNotification
+  | McpUiToolInputNotification
+  | McpUiToolInputPartialNotification
+  | McpUiToolResultNotification
+  | McpUiToolCancelledNotification
+  | McpUiSandboxResourceReadyNotification
+  | ToolListChangedNotification
+  | ResourceListChangedNotification
+  | PromptListChangedNotification
+  // Received from app
+  | McpUiInitializedNotification
+  | McpUiSizeChangedNotification
+  | McpUiSandboxProxyReadyNotification
+  | LoggingMessageNotification;
+
+/**
+ * All result types in the MCP Apps protocol.
+ */
+export type AppResult =
+  | McpUiInitializeResult
+  | McpUiOpenLinkResult
+  | McpUiMessageResult
+  | McpUiResourceTeardownResult
+  | CallToolResult
+  | ListToolsResult
+  | ListResourcesResult
+  | ListResourceTemplatesResult
+  | ReadResourceResult
+  | ListPromptsResult
+  | EmptyResult;
 
 /**
  * Options for configuring AppBridge behavior.
@@ -164,7 +232,11 @@ type RequestHandlerExtra = Parameters<
  * await bridge.connect(transport);
  * ```
  */
-export class AppBridge extends Protocol<Request, Notification, Result> {
+export class AppBridge extends Protocol<
+  AppRequest,
+  AppNotification,
+  AppResult
+> {
   private _appCapabilities?: McpUiAppCapabilities;
   private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
@@ -805,7 +877,7 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * Verify that the guest supports the capability required for the given request method.
    * @internal
    */
-  assertCapabilityForMethod(method: Request["method"]): void {
+  assertCapabilityForMethod(method: AppRequest["method"]): void {
     // TODO
   }
 
@@ -813,7 +885,7 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * Verify that a request handler is registered and supported for the given method.
    * @internal
    */
-  assertRequestHandlerCapability(method: Request["method"]): void {
+  assertRequestHandlerCapability(method: AppRequest["method"]): void {
     // TODO
   }
 
@@ -821,7 +893,7 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * Verify that the host supports the capability required for the given notification method.
    * @internal
    */
-  assertNotificationCapability(method: Notification["method"]): void {
+  assertNotificationCapability(method: AppNotification["method"]): void {
     // TODO
   }
 
@@ -939,7 +1011,7 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     return this.notification({
       method: "ui/notifications/host-context-changed" as const,
       params,
-    } as Notification);
+    });
   }
 
   /**
@@ -965,8 +1037,8 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * @see {@link sendToolResult} for sending results after execution
    */
   sendToolInput(params: McpUiToolInputNotification["params"]) {
-    return this.notification(<McpUiToolInputNotification>{
-      method: "ui/notifications/tool-input",
+    return this.notification({
+      method: "ui/notifications/tool-input" as const,
       params,
     });
   }
@@ -999,8 +1071,8 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * @see {@link sendToolInput} for sending complete arguments
    */
   sendToolInputPartial(params: McpUiToolInputPartialNotification["params"]) {
-    return this.notification(<McpUiToolInputPartialNotification>{
-      method: "ui/notifications/tool-input-partial",
+    return this.notification({
+      method: "ui/notifications/tool-input-partial" as const,
       params,
     });
   }
@@ -1030,8 +1102,8 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * @see {@link sendToolInput} for sending tool arguments before results
    */
   sendToolResult(params: McpUiToolResultNotification["params"]) {
-    return this.notification(<McpUiToolResultNotification>{
-      method: "ui/notifications/tool-result",
+    return this.notification({
+      method: "ui/notifications/tool-result" as const,
       params,
     });
   }
@@ -1067,8 +1139,8 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
    * @see {@link sendToolInput} for sending tool arguments
    */
   sendToolCancelled(params: McpUiToolCancelledNotification["params"]) {
-    return this.notification(<McpUiToolCancelledNotification>{
-      method: "ui/notifications/tool-cancelled",
+    return this.notification({
+      method: "ui/notifications/tool-cancelled" as const,
       params,
     });
   }
@@ -1091,8 +1163,8 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
   sendSandboxResourceReady(
     params: McpUiSandboxResourceReadyNotification["params"],
   ) {
-    return this.notification(<McpUiSandboxResourceReadyNotification>{
-      method: "ui/notifications/sandbox-resource-ready",
+    return this.notification({
+      method: "ui/notifications/sandbox-resource-ready" as const,
       params,
     });
   }
@@ -1126,8 +1198,8 @@ export class AppBridge extends Protocol<Request, Notification, Result> {
     options?: RequestOptions,
   ) {
     return this.request(
-      <McpUiResourceTeardownRequest>{
-        method: "ui/resource-teardown",
+      {
+        method: "ui/resource-teardown" as const,
         params,
       },
       McpUiResourceTeardownResultSchema,

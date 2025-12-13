@@ -381,7 +381,7 @@
               "additionalProperties": false
             }
           },
-          "additionalProperties": false
+          "additionalProperties": {}
         }
       },
       "required": ["method", "params"],
@@ -667,7 +667,7 @@
           "additionalProperties": false
         }
       },
-      "additionalProperties": false
+      "additionalProperties": {}
     },
     "McpUiInitializeRequest": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1135,7 +1135,7 @@
               "additionalProperties": false
             }
           },
-          "additionalProperties": false
+          "additionalProperties": {}
         }
       },
       "required": [
