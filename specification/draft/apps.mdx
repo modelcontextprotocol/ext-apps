@@ -536,7 +536,7 @@ Guest UI can request a display mode change from the Host. The Host maintains ful
 - Current application state
 - Security considerations
 
-The Host SHOULD return `success: true` and update `currentDisplayMode` if the request is honored. If denied, the Host SHOULD return `success: false` with the current (unchanged) display mode. The Host MAY send a `ui/notifications/host-context-changed` notification after honoring the request to update all context fields.
+The Host MUST return `success: true` if the request was honored.  If denied, the Host MUST return `success: false`. The Host SHOULD return the updated `currentDisplayMode`. The Host MAY send a `ui/notifications/host-context-changed` notification after honoring the request to update all context fields.
 
 `ui/message` - Send message content to the host's chat interface
 
