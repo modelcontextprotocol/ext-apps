@@ -147,13 +147,13 @@ function generateCohortData(
   };
 }
 
-const server = new McpServer({
-  name: "Cohort Heatmap Server",
-  version: "1.0.0",
-});
+function createServer(): McpServer {
+  const server = new McpServer({
+    name: "Cohort Heatmap Server",
+    version: "1.0.0",
+  });
 
-// Register tool and resource
-{
+  // Register tool and resource
   const resourceUri = "ui://get-cohort-data/mcp-app.html";
 
   server.registerTool(
@@ -182,7 +182,7 @@ const server = new McpServer({
   server.registerResource(
     resourceUri,
     resourceUri,
-    {},
+    { mimeType: RESOURCE_MIME_TYPE },
     async (): Promise<ReadResourceResult> => {
       const html = await fs.readFile(
         path.join(DIST_DIR, "mcp-app.html"),
@@ -200,14 +200,16 @@ const server = new McpServer({
       };
     },
   );
+
+  return server;
 }
 
 async function main() {
   if (process.argv.includes("--stdio")) {
-    await server.connect(new StdioServerTransport());
+    await createServer().connect(new StdioServerTransport());
   } else {
     const port = parseInt(process.env.PORT ?? "3104", 10);
-    await startServer(server, { port, name: "Cohort Heatmap Server" });
+    await startServer(createServer, { port, name: "Cohort Heatmap Server" });
   }
 }
 

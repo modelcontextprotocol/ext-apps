@@ -3,7 +3,9 @@
   --color-primary-hover: #1d4ed8;
   --color-notice-bg: #eff6ff;
 
-  min-width: 425px;
+  width: 100%;
+  max-width: 425px;
+  box-sizing: border-box;
 
   > * {
     margin-top: 0;

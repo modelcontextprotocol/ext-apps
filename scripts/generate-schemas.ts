@@ -181,14 +181,14 @@ function postProcess(content: string): string {
   // 1. Update import to use zod/v4
   content = content.replace(
     'import { z } from "zod";',
-    'import { z } from "zod/v4";',
+    'import * as z from "zod/v4";',
   );
 
   // 2. Add MCP SDK schema imports
   const mcpImports = EXTERNAL_TYPE_SCHEMAS.join(",\n  ");
   content = content.replace(
-    'import { z } from "zod/v4";',
-    `import { z } from "zod/v4";
+    'import * as z from "zod/v4";',
+    `import * as z from "zod/v4";
 import {
   ${mcpImports},
 } from "@modelcontextprotocol/sdk/types.js";`,
@@ -262,7 +262,7 @@ function replaceRecordAndWithLooseObject(content: string): string {
 function postProcessTests(content: string): string {
   content = content.replace(
     'import { z } from "zod";',
-    'import { z } from "zod/v4";',
+    'import * as z from "zod/v4";',
   );
 
   content = content.replace(

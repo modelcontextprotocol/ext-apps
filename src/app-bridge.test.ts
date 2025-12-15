@@ -2,7 +2,16 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
-import { EmptyResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  EmptyResultSchema,
+  ListPromptsResultSchema,
+  ListResourcesResultSchema,
+  ListResourceTemplatesResultSchema,
+  PromptListChangedNotificationSchema,
+  ReadResourceResultSchema,
+  ResourceListChangedNotificationSchema,
+  ToolListChangedNotificationSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 
 import { App } from "./app";
 import { AppBridge, type McpUiHostCapabilities } from "./app-bridge";
@@ -506,6 +515,195 @@ describe("App <-> AppBridge integration", () => {
       );
 
       expect(result).toEqual({});
+    });
+  });
+
+  describe("AppBridge without MCP client (manual handlers)", () => {
+    let app: App;
+    let bridge: AppBridge;
+    let appTransport: InMemoryTransport;
+    let bridgeTransport: InMemoryTransport;
+
+    beforeEach(() => {
+      [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+      app = new App(testAppInfo, {}, { autoResize: false });
+      // Pass null instead of a client - manual handler registration
+      bridge = new AppBridge(null, testHostInfo, testHostCapabilities);
+    });
+
+    afterEach(async () => {
+      await appTransport.close();
+      await bridgeTransport.close();
+    });
+
+    it("connect() works without client", async () => {
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      // Initialization should still work
+      const hostInfo = app.getHostVersion();
+      expect(hostInfo).toEqual(testHostInfo);
+    });
+
+    it("oncalltool setter registers handler for tools/call requests", async () => {
+      const toolCall = { name: "test-tool", arguments: { arg: "value" } };
+      const resultContent = [{ type: "text" as const, text: "result" }];
+      const receivedCalls: unknown[] = [];
+
+      bridge.oncalltool = async (params) => {
+        receivedCalls.push(params);
+        return { content: resultContent };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      // App calls a tool via callServerTool
+      const result = await app.callServerTool(toolCall);
+
+      expect(receivedCalls).toHaveLength(1);
+      expect(receivedCalls[0]).toMatchObject(toolCall);
+      expect(result.content).toEqual(resultContent);
+    });
+
+    it("onlistresources setter registers handler for resources/list requests", async () => {
+      const requestParams = {};
+      const resources = [{ uri: "test://resource", name: "Test" }];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onlistresources = async (params) => {
+        receivedRequests.push(params);
+        return { resources };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      // App sends resources/list request via the protocol's request method
+      const result = await app.request(
+        { method: "resources/list", params: requestParams },
+        ListResourcesResultSchema,
+      );
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(receivedRequests[0]).toMatchObject(requestParams);
+      expect(result.resources).toEqual(resources);
+    });
+
+    it("onreadresource setter registers handler for resources/read requests", async () => {
+      const requestParams = { uri: "test://resource" };
+      const contents = [{ uri: "test://resource", text: "content" }];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onreadresource = async (params) => {
+        receivedRequests.push(params);
+        return { contents: [{ uri: params.uri, text: "content" }] };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.request(
+        { method: "resources/read", params: requestParams },
+        ReadResourceResultSchema,
+      );
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(receivedRequests[0]).toMatchObject(requestParams);
+      expect(result.contents).toEqual(contents);
+    });
+
+    it("onlistresourcetemplates setter registers handler for resources/templates/list requests", async () => {
+      const requestParams = {};
+      const resourceTemplates = [
+        { uriTemplate: "test://{id}", name: "Test Template" },
+      ];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onlistresourcetemplates = async (params) => {
+        receivedRequests.push(params);
+        return { resourceTemplates };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.request(
+        { method: "resources/templates/list", params: requestParams },
+        ListResourceTemplatesResultSchema,
+      );
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(receivedRequests[0]).toMatchObject(requestParams);
+      expect(result.resourceTemplates).toEqual(resourceTemplates);
+    });
+
+    it("onlistprompts setter registers handler for prompts/list requests", async () => {
+      const requestParams = {};
+      const prompts = [{ name: "test-prompt" }];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onlistprompts = async (params) => {
+        receivedRequests.push(params);
+        return { prompts };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.request(
+        { method: "prompts/list", params: requestParams },
+        ListPromptsResultSchema,
+      );
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(receivedRequests[0]).toMatchObject(requestParams);
+      expect(result.prompts).toEqual(prompts);
+    });
+
+    it("sendToolListChanged sends notification to app", async () => {
+      const receivedNotifications: unknown[] = [];
+      app.setNotificationHandler(ToolListChangedNotificationSchema, (n) => {
+        receivedNotifications.push(n.params);
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.sendToolListChanged();
+      await flush();
+
+      expect(receivedNotifications).toHaveLength(1);
+    });
+
+    it("sendResourceListChanged sends notification to app", async () => {
+      const receivedNotifications: unknown[] = [];
+      app.setNotificationHandler(ResourceListChangedNotificationSchema, (n) => {
+        receivedNotifications.push(n.params);
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.sendResourceListChanged();
+      await flush();
+
+      expect(receivedNotifications).toHaveLength(1);
+    });
+
+    it("sendPromptListChanged sends notification to app", async () => {
+      const receivedNotifications: unknown[] = [];
+      app.setNotificationHandler(PromptListChangedNotificationSchema, (n) => {
+        receivedNotifications.push(n.params);
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.sendPromptListChanged();
+      await flush();
+
+      expect(receivedNotifications).toHaveLength(1);
     });
   });
 });

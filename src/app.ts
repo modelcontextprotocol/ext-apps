@@ -13,11 +13,9 @@ import {
   ListToolsRequest,
   ListToolsRequestSchema,
   LoggingMessageNotification,
-  Notification,
   PingRequestSchema,
-  Request,
-  Result,
 } from "@modelcontextprotocol/sdk/types.js";
+import { AppNotification, AppRequest, AppResult } from "./types";
 import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
@@ -191,7 +189,7 @@ type RequestHandlerExtra = Parameters<
  * });
  * ```
  */
-export class App extends Protocol<Request, Notification, Result> {
+export class App extends Protocol<AppRequest, AppNotification, AppResult> {
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
@@ -644,7 +642,7 @@ export class App extends Protocol<Request, Notification, Result> {
    * Verify that the host supports the capability required for the given request method.
    * @internal
    */
-  assertCapabilityForMethod(method: Request["method"]): void {
+  assertCapabilityForMethod(method: AppRequest["method"]): void {
     // TODO
   }
 
@@ -652,7 +650,7 @@ export class App extends Protocol<Request, Notification, Result> {
    * Verify that the app declared the capability required for the given request method.
    * @internal
    */
-  assertRequestHandlerCapability(method: Request["method"]): void {
+  assertRequestHandlerCapability(method: AppRequest["method"]): void {
     switch (method) {
       case "tools/call":
       case "tools/list":
@@ -674,7 +672,7 @@ export class App extends Protocol<Request, Notification, Result> {
    * Verify that the app supports the capability required for the given notification method.
    * @internal
    */
-  assertNotificationCapability(method: Notification["method"]): void {
+  assertNotificationCapability(method: AppNotification["method"]): void {
     // TODO
   }
 
