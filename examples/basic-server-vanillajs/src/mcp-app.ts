@@ -75,7 +75,7 @@ sendMessageBtn.addEventListener("click", async () => {
   const signal = AbortSignal.timeout(5000);
   try {
     log.info("Sending message text to Host:", messageText.value);
-    const { isError } = await app.message(
+    const { isError } = await app.sendMessage(
       { role: "user", content: [{ type: "text", text: messageText.value }] },
       { signal },
     );

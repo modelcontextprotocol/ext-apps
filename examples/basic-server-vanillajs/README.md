@@ -9,7 +9,7 @@ An MCP App example with a vanilla JavaScript UI (no framework).
 
 - Tool registration with a linked UI resource
 - Vanilla JS UI using the [`App`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html) class directly
-- App communication APIs: [`callServerTool`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html#callservertool), [`message`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html#message), [`sendLog`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html#sendlog), [`openLink`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html#openlink)
+- App communication APIs: [`callServerTool`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html#callservertool), [`sendMessage`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html#sendmessage), [`sendLog`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html#sendlog), [`openLink`](https://modelcontextprotocol.github.io/ext-apps/api/classes/app.App.html#openlink)
 
 ## Key Files
 

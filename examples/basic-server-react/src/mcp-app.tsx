@@ -93,7 +93,7 @@ function GetTimeAppInner({ app, toolResult }: GetTimeAppInnerProps) {
     const signal = AbortSignal.timeout(5000);
     try {
       log.info("Sending message text to Host:", messageText);
-      const { isError } = await app.message(
+      const { isError } = await app.sendMessage(
         { role: "user", content: [{ type: "text", text: messageText }] },
         { signal },
       );
