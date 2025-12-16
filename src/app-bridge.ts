@@ -1197,8 +1197,6 @@ export class AppBridge extends Protocol<
   }
 
   /** @deprecated Use {@link teardownResource} instead */
-  resourceTeardown: AppBridge["teardownResource"] = this.teardownResource;
-  /** @deprecated Use {@link teardownResource} instead */
   sendResourceTeardown: AppBridge["teardownResource"] = this.teardownResource;
 
   /**

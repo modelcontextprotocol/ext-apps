@@ -513,10 +513,6 @@ describe("App <-> AppBridge integration", () => {
       expect(app.sendOpenLink).toBe(app.openLink);
     });
 
-    it("bridge.resourceTeardown is a deprecated alias for bridge.teardownResource", () => {
-      expect(bridge.resourceTeardown).toBe(bridge.teardownResource);
-    });
-
     it("bridge.sendResourceTeardown is a deprecated alias for bridge.teardownResource", () => {
       expect(bridge.sendResourceTeardown).toBe(bridge.teardownResource);
     });
