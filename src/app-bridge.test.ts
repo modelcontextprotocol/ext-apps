@@ -442,7 +442,7 @@ describe("App <-> AppBridge integration", () => {
       await bridge.connect(bridgeTransport);
     });
 
-    it("app.sendMessage triggers bridge.onmessage and returns result", async () => {
+    it("app.message triggers bridge.onmessage and returns result", async () => {
       const receivedMessages: unknown[] = [];
       bridge.onmessage = async (params) => {
         receivedMessages.push(params);
@@ -450,7 +450,7 @@ describe("App <-> AppBridge integration", () => {
       };
 
       await app.connect(appTransport);
-      const result = await app.sendMessage({
+      const result = await app.message({
         role: "user",
         content: [{ type: "text", text: "Hello from app" }],
       });
@@ -463,13 +463,13 @@ describe("App <-> AppBridge integration", () => {
       expect(result).toEqual({});
     });
 
-    it("app.sendMessage returns error result when handler indicates error", async () => {
+    it("app.message returns error result when handler indicates error", async () => {
       bridge.onmessage = async () => {
         return { isError: true };
       };
 
       await app.connect(appTransport);
-      const result = await app.sendMessage({
+      const result = await app.message({
         role: "user",
         content: [{ type: "text", text: "Test" }],
       });
@@ -477,7 +477,7 @@ describe("App <-> AppBridge integration", () => {
       expect(result.isError).toBe(true);
     });
 
-    it("app.sendOpenLink triggers bridge.onopenlink and returns result", async () => {
+    it("app.openLink triggers bridge.onopenlink and returns result", async () => {
       const receivedLinks: string[] = [];
       bridge.onopenlink = async (params) => {
         receivedLinks.push(params.url);
@@ -485,21 +485,67 @@ describe("App <-> AppBridge integration", () => {
       };
 
       await app.connect(appTransport);
-      const result = await app.sendOpenLink({ url: "https://example.com" });
+      const result = await app.openLink({ url: "https://example.com" });
 
       expect(receivedLinks).toEqual(["https://example.com"]);
       expect(result).toEqual({});
     });
 
-    it("app.sendOpenLink returns error when host denies", async () => {
+    it("app.openLink returns error when host denies", async () => {
       bridge.onopenlink = async () => {
         return { isError: true };
       };
 
       await app.connect(appTransport);
-      const result = await app.sendOpenLink({ url: "https://blocked.com" });
+      const result = await app.openLink({ url: "https://blocked.com" });
 
       expect(result.isError).toBe(true);
+    });
+  });
+
+  describe("deprecated method aliases", () => {
+    beforeEach(async () => {
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+    });
+
+    it("app.sendMessage is an alias for app.message", async () => {
+      expect(app.sendMessage).toBe(app.message);
+    });
+
+    it("app.sendOpenLink is an alias for app.openLink", async () => {
+      expect(app.sendOpenLink).toBe(app.openLink);
+    });
+
+    it("bridge.sendResourceTeardown is an alias for bridge.resourceTeardown", () => {
+      expect(bridge.sendResourceTeardown).toBe(bridge.resourceTeardown);
+    });
+
+    it("app.sendMessage works as deprecated alias", async () => {
+      const receivedMessages: unknown[] = [];
+      bridge.onmessage = async (params) => {
+        receivedMessages.push(params);
+        return {};
+      };
+
+      await app.sendMessage({
+        role: "user",
+        content: [{ type: "text", text: "Via deprecated alias" }],
+      });
+
+      expect(receivedMessages).toHaveLength(1);
+    });
+
+    it("app.sendOpenLink works as deprecated alias", async () => {
+      const receivedLinks: string[] = [];
+      bridge.onopenlink = async (params) => {
+        receivedLinks.push(params.url);
+        return {};
+      };
+
+      await app.sendOpenLink({ url: "https://example.com" });
+
+      expect(receivedLinks).toEqual(["https://example.com"]);
     });
   });
 
