@@ -1,1 +1,5 @@
+# Force LF line endings for all text files (for consistent prettier formatting)
+* text=auto eol=lf
+
 package-lock.json linguist-generated=true
+src/generated/** linguist-generated=true

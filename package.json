@@ -32,8 +32,9 @@
     "examples/*"
   ],
   "scripts": {
-    "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write 'src/generated/**/*'",
-    "build": "npm run generate:schemas && bun build.bun.ts",
+    "postinstall": "node scripts/setup-bun.mjs || echo 'setup-bun.mjs failed or not available'",
+    "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
+    "build": "npm run generate:schemas && node scripts/run-bun.mjs build.bun.ts",
     "prepack": "npm run build",
     "build:all": "npm run build && npm run examples:build",
     "test": "bun test src",
@@ -46,12 +47,11 @@
     "examples:start": "NODE_ENV=development npm run build && bun examples/run-all.ts start",
     "examples:dev": "NODE_ENV=development bun examples/run-all.ts dev",
     "watch": "nodemon --watch src --ext ts,tsx --exec 'bun build.bun.ts'",
-    "prepare": "npm run build && husky",
+    "prepare": "node scripts/setup-bun.mjs && npm run build && husky",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
-    "prettier:base-cmd": "prettier -u --ignore-path ./.gitignore --ignore-path ./.prettierignore",
-    "prettier": "yarn prettier:base-cmd \"$(pwd)/**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
-    "prettier:fix": "yarn prettier:base-cmd \"$(pwd)/**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write --list-different"
+    "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
+    "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write"
   },
   "author": "Olivier Chafik",
   "devDependencies": {
@@ -59,9 +59,11 @@
     "@types/bun": "^1.3.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "bun": "^1.3.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "concurrently": "^9.2.1",
     "cors": "^2.8.5",
+    "cross-env": "^10.1.0",
     "esbuild": "^0.25.12",
     "express": "^5.1.0",
     "husky": "^9.1.7",
@@ -73,15 +75,34 @@
     "zod": "^4.1.13"
   },
   "peerDependencies": {
+    "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
+    "react-dom": "^17.0.0 || ^18.0.0 || ^19.0.0",
     "zod": "^3.25.0 || ^4.0.0"
   },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
   "dependencies": {
-    "prettier": "^3.6.2",
     "@modelcontextprotocol/sdk": "^1.24.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "prettier": "^3.6.2"
   },
   "optionalDependencies": {
+    "@oven/bun-darwin-aarch64": "^1.3.4",
+    "@oven/bun-darwin-x64": "^1.3.4",
+    "@oven/bun-darwin-x64-baseline": "^1.3.4",
+    "@oven/bun-linux-aarch64": "^1.3.4",
+    "@oven/bun-linux-aarch64-musl": "^1.3.4",
+    "@oven/bun-linux-x64": "^1.3.4",
+    "@oven/bun-linux-x64-baseline": "^1.3.4",
+    "@oven/bun-linux-x64-musl": "^1.3.4",
+    "@oven/bun-linux-x64-musl-baseline": "^1.3.4",
+    "@oven/bun-windows-x64": "^1.3.4",
+    "@oven/bun-windows-x64-baseline": "^1.3.4",
     "@rollup/rollup-darwin-arm64": "^4.53.3",
     "@rollup/rollup-darwin-x64": "^4.53.3",
     "@rollup/rollup-linux-arm64-gnu": "^4.53.3",

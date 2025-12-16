@@ -1,3 +1,10 @@
+# Verify no private registry URLs in package-lock.json
+if grep -E '"resolved": "https?://' package-lock.json | grep -v registry.npmjs.org > /dev/null; then
+  echo "ERROR: package-lock.json contains non-npmjs.org URLs"
+  echo "Run: docker run --rm -i -v \$PWD:/src -w /src node:latest npm i --registry=https://registry.npmjs.org/"
+  exit 1
+fi
+
 npm run build:all
 npm run prettier:fix
 

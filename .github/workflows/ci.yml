@@ -11,16 +11,30 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux x64
+          - os: ubuntu-24.04-arm
+            name: Linux ARM64
+          - os: windows-latest
+            name: Windows x64
+          - os: windows-11-arm
+            name: Windows ARM64
+          - os: macos-latest
+            name: macOS ARM64
+
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Verify no private URLs in package-lock.json
+        shell: bash
         run: '! grep -E "\"resolved\": \"https?://" package-lock.json | grep -v registry.npmjs.org'
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       - uses: actions/setup-node@v4
         with:
@@ -28,9 +42,12 @@ jobs:
 
       - run: npm install
 
-      - run: npm run build:all
+      - run: npm run build
+
+      - run: npm run examples:build
 
       - name: Verify generated schemas are up-to-date
+        shell: bash
         run: |
           npm run generate:schemas
           git diff --exit-code src/generated/ || (echo "Generated schemas are out of date. Run 'npm run generate:schemas' and commit." && exit 1)
@@ -67,3 +84,67 @@ jobs:
           name: test-results
           path: test-results/
           retention-days: 7
+
+  # Test build in Windows WSL (Ubuntu)
+  build-wsl:
+    name: Build (Windows WSL)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Vampire/setup-wsl@v5
+        with:
+          distribution: Ubuntu-24.04
+
+      - name: Install Node.js in WSL
+        shell: wsl-bash {0}
+        run: |
+          sudo apt-get update
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+
+      - name: Build and test in WSL
+        shell: wsl-bash {0}
+        run: |
+          npm install
+          npm run build
+          npm run examples:build
+          npm test
+          npm run prettier
+
+  # Test that the package can be installed from git (triggers prepare script)
+  test-git-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux x64
+          - os: ubuntu-24.04-arm
+            name: Linux ARM64
+          - os: windows-latest
+            name: Windows x64
+          - os: windows-11-arm
+            name: Windows ARM64
+          - os: macos-latest
+            name: macOS ARM64
+
+    name: Test git install (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Create test project and install from git
+        shell: bash
+        run: |
+          mkdir test-project
+          cd test-project
+          npm init -y
+          # Install from the PR branch
+          npm install "git+https://github.com/${{ github.repository }}#${{ github.head_ref || github.ref_name }}"
+          # Verify the package is usable (ESM import)
+          node --input-type=module -e "import { App } from '@modelcontextprotocol/ext-apps'; console.log('Import successful:', typeof App)"
