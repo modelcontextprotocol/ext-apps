@@ -5,9 +5,9 @@
  */
 
 import {
-  RESOURCE_URI_META_KEY as _RESOURCE_URI_META_KEY,
-  McpUiResourceMeta,
+  RESOURCE_URI_META_KEY,
   RESOURCE_MIME_TYPE,
+  McpUiResourceMeta,
 } from "../app.js";
 import type {
   McpServer,
@@ -22,8 +22,7 @@ import type { ZodRawShape } from "zod";
 export type { ResourceMetadata, ToolCallback, ReadResourceCallback };
 
 // Re-export for convenience
-export const RESOURCE_URI_META_KEY = _RESOURCE_URI_META_KEY;
-export { RESOURCE_MIME_TYPE };
+export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
 
 /**
  * Tool configuration (same as McpServer.registerTool).
