@@ -142,7 +142,7 @@ export default function ThreeJSApp({
   toolResult: _toolResult,
   hostContext: _hostContext,
   callServerTool: _callServerTool,
-  message: _message,
+  sendMessage: _sendMessage,
   openLink: _openLink,
   sendLog: _sendLog,
 }: ThreeJSAppProps) {
