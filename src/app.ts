@@ -781,9 +781,6 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     );
   }
 
-  /** @deprecated Use {@link sendMessage} instead */
-  message: App["sendMessage"] = this.sendMessage;
-
   /**
    * Send log messages to the host for debugging and telemetry.
    *

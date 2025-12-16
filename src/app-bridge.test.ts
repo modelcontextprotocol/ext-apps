@@ -509,10 +509,6 @@ describe("App <-> AppBridge integration", () => {
       await app.connect(appTransport);
     });
 
-    it("app.message is a deprecated alias for app.sendMessage", async () => {
-      expect(app.message).toBe(app.sendMessage);
-    });
-
     it("app.sendOpenLink is an alias for app.openLink", async () => {
       expect(app.sendOpenLink).toBe(app.openLink);
     });
@@ -523,21 +519,6 @@ describe("App <-> AppBridge integration", () => {
 
     it("bridge.sendResourceTeardown is a deprecated alias for bridge.teardownResource", () => {
       expect(bridge.sendResourceTeardown).toBe(bridge.teardownResource);
-    });
-
-    it("app.message works as deprecated alias", async () => {
-      const receivedMessages: unknown[] = [];
-      bridge.onmessage = async (params) => {
-        receivedMessages.push(params);
-        return {};
-      };
-
-      await app.message({
-        role: "user",
-        content: [{ type: "text", text: "Via deprecated alias" }],
-      });
-
-      expect(receivedMessages).toHaveLength(1);
     });
 
     it("app.sendOpenLink works as deprecated alias", async () => {
