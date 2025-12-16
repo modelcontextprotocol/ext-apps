@@ -1174,7 +1174,7 @@ export class AppBridge extends Protocol<
    * @example
    * ```typescript
    * try {
-   *   await bridge.sendResourceTeardown({});
+   *   await bridge.resourceTeardown({});
    *   // Guest UI is ready, safe to unmount iframe
    *   iframe.remove();
    * } catch (error) {
@@ -1182,7 +1182,7 @@ export class AppBridge extends Protocol<
    * }
    * ```
    */
-  sendResourceTeardown(
+  resourceTeardown(
     params: McpUiResourceTeardownRequest["params"],
     options?: RequestOptions,
   ) {
@@ -1195,6 +1195,9 @@ export class AppBridge extends Protocol<
       options,
     );
   }
+
+  /** @deprecated Use {@link resourceTeardown} instead */
+  sendResourceTeardown: AppBridge["resourceTeardown"] = this.resourceTeardown;
 
   /**
    * Connect to the Guest UI via transport and optionally set up message forwarding.

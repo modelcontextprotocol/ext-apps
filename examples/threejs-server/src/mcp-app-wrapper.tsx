@@ -30,9 +30,9 @@ export interface WidgetProps<TToolInput = Record<string, unknown>> {
   /** Call a tool on the MCP server */
   callServerTool: App["callServerTool"];
   /** Send a message to the host's chat */
-  sendMessage: App["sendMessage"];
+  message: App["message"];
   /** Request the host to open a URL */
-  sendOpenLink: App["sendOpenLink"];
+  openLink: App["openLink"];
   /** Send log messages to the host */
   sendLog: App["sendLog"];
 }
@@ -77,12 +77,12 @@ function McpAppWrapper() {
     (params, options) => app!.callServerTool(params, options),
     [app],
   );
-  const sendMessage = useCallback<App["sendMessage"]>(
-    (params, options) => app!.sendMessage(params, options),
+  const message = useCallback<App["message"]>(
+    (params, options) => app!.message(params, options),
     [app],
   );
-  const sendOpenLink = useCallback<App["sendOpenLink"]>(
-    (params, options) => app!.sendOpenLink(params, options),
+  const openLink = useCallback<App["openLink"]>(
+    (params, options) => app!.openLink(params, options),
     [app],
   );
   const sendLog = useCallback<App["sendLog"]>(
@@ -105,8 +105,8 @@ function McpAppWrapper() {
       toolResult={toolResult}
       hostContext={hostContext}
       callServerTool={callServerTool}
-      sendMessage={sendMessage}
-      sendOpenLink={sendOpenLink}
+      message={message}
+      openLink={openLink}
       sendLog={sendLog}
     />
   );

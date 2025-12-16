@@ -75,7 +75,7 @@ sendMessageBtn.addEventListener("click", async () => {
   const signal = AbortSignal.timeout(5000);
   try {
     log.info("Sending message text to Host:", messageText.value);
-    const { isError } = await app.sendMessage(
+    const { isError } = await app.message(
       { role: "user", content: [{ type: "text", text: messageText.value }] },
       { signal },
     );
@@ -92,7 +92,7 @@ sendLogBtn.addEventListener("click", async () => {
 
 openLinkBtn.addEventListener("click", async () => {
   log.info("Sending open link request to Host:", linkUrl.value);
-  const { isError } = await app.sendOpenLink({ url: linkUrl.value });
+  const { isError } = await app.openLink({ url: linkUrl.value });
   log.info("Open link request", isError ? "rejected" : "accepted");
 });
 

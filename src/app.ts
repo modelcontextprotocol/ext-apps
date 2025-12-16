@@ -758,7 +758,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Send a text message from user interaction
    * ```typescript
    * try {
-   *   await app.sendMessage({
+   *   await app.message({
    *     role: "user",
    *     content: [{ type: "text", text: "Show me details for item #42" }]
    *   });
@@ -770,7 +770,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * @see {@link McpUiMessageRequest} for request structure
    */
-  sendMessage(params: McpUiMessageRequest["params"], options?: RequestOptions) {
+  message(params: McpUiMessageRequest["params"], options?: RequestOptions) {
     return this.request(
       <McpUiMessageRequest>{
         method: "ui/message",
@@ -780,6 +780,9 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
       options,
     );
   }
+
+  /** @deprecated Use {@link message} instead */
+  sendMessage: App["message"] = this.message;
 
   /**
    * Send log messages to the host for debugging and telemetry.
@@ -823,7 +826,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Open documentation link
    * ```typescript
    * try {
-   *   await app.sendOpenLink({ url: "https://docs.example.com" });
+   *   await app.openLink({ url: "https://docs.example.com" });
    * } catch (error) {
    *   console.error("Failed to open link:", error);
    *   // Optionally show fallback: display URL for manual copy
@@ -832,10 +835,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * @see {@link McpUiOpenLinkRequest} for request structure
    */
-  sendOpenLink(
-    params: McpUiOpenLinkRequest["params"],
-    options?: RequestOptions,
-  ) {
+  openLink(params: McpUiOpenLinkRequest["params"], options?: RequestOptions) {
     return this.request(
       <McpUiOpenLinkRequest>{
         method: "ui/open-link",
@@ -845,6 +845,9 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
       options,
     );
   }
+
+  /** @deprecated Use {@link openLink} instead */
+  sendOpenLink: App["openLink"] = this.openLink;
 
   /**
    * Request a change to the display mode.

@@ -93,7 +93,7 @@ function GetTimeAppInner({ app, toolResult }: GetTimeAppInnerProps) {
     const signal = AbortSignal.timeout(5000);
     try {
       log.info("Sending message text to Host:", messageText);
-      const { isError } = await app.sendMessage(
+      const { isError } = await app.message(
         { role: "user", content: [{ type: "text", text: messageText }] },
         { signal },
       );
@@ -110,7 +110,7 @@ function GetTimeAppInner({ app, toolResult }: GetTimeAppInnerProps) {
 
   const handleOpenLink = useCallback(async () => {
     log.info("Sending open link request to Host:", linkUrl);
-    const { isError } = await app.sendOpenLink({ url: linkUrl });
+    const { isError } = await app.openLink({ url: linkUrl });
     log.info("Open link request", isError ? "rejected" : "accepted");
   }, [app, linkUrl]);
 
