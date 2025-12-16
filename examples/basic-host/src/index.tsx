@@ -289,7 +289,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
     }
 
     log.info("Sending teardown notification to MCP App");
-    appBridgeRef.current.resourceTeardown({})
+    appBridgeRef.current.teardownResource({})
       .catch((err) => {
         log.warn("Teardown request failed (app may have already closed):", err);
       })
