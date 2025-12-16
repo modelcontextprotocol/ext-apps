@@ -4,7 +4,12 @@ import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE, type McpUiToolMeta } from "@modelcontextprotocol/ext-apps/server";
+import {
+  registerAppTool,
+  registerAppResource,
+  RESOURCE_MIME_TYPE,
+  type McpUiToolMeta,
+} from "@modelcontextprotocol/ext-apps/server";
 import { startServer } from "../shared/server-utils.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");

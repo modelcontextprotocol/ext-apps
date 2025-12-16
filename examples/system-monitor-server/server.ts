@@ -9,7 +9,12 @@ import os from "node:os";
 import path from "node:path";
 import si from "systeminformation";
 import { z } from "zod";
-import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE, type McpUiToolMeta } from "@modelcontextprotocol/ext-apps/server";
+import {
+  registerAppTool,
+  registerAppResource,
+  RESOURCE_MIME_TYPE,
+  type McpUiToolMeta,
+} from "@modelcontextprotocol/ext-apps/server";
 import { startServer } from "../shared/server-utils.js";
 
 // Schemas - types are derived from these using z.infer
