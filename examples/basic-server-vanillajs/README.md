@@ -52,5 +52,5 @@ button.addEventListener("click", () => {
 });
 
 // Connect to host
-app.connect(new PostMessageTransport(window.parent));
+app.connect();
 ```

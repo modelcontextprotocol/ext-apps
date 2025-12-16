@@ -1,7 +1,7 @@
 /**
  * Wiki Explorer - Force-directed graph visualization of Wikipedia link networks
  */
-import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
+import { App } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
   forceCenter,
@@ -367,4 +367,4 @@ app.onerror = (err) => {
 };
 
 // Connect to host
-app.connect(new PostMessageTransport(window.parent));
+app.connect();

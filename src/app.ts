@@ -16,6 +16,7 @@ import {
   PingRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { AppNotification, AppRequest, AppResult } from "./types";
+import { PostMessageTransport } from "./message-transport";
 import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
@@ -1025,7 +1026,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @see {@link PostMessageTransport} for the typical transport implementation
    */
   override async connect(
-    transport: Transport,
+    transport: Transport = new PostMessageTransport(window.parent),
     options?: RequestOptions,
   ): Promise<void> {
     await super.connect(transport);

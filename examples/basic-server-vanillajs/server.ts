@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { RESOURCE_MIME_TYPE, type McpUiToolMeta } from "../../dist/src/app";
+import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE, type McpUiToolMeta } from "@modelcontextprotocol/ext-apps/server";
 import { startServer } from "../shared/server-utils.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
@@ -22,7 +22,7 @@ function createServer(): McpServer {
   // MCP Apps require two-part registration: a tool (what the LLM calls) and a
   // resource (the UI it renders). The `_meta` field on the tool links to the
   // resource URI, telling hosts which UI to display when the tool executes.
-  server.registerTool(
+  registerAppTool(server,
     "get-time",
     {
       title: "Get Time",
@@ -38,7 +38,7 @@ function createServer(): McpServer {
     },
   );
 
-  server.registerResource(
+  registerAppResource(server,
     RESOURCE_URI,
     RESOURCE_URI,
     { mimeType: RESOURCE_MIME_TYPE },

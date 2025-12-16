@@ -463,7 +463,7 @@ app.onhostcontextchanged = (params) => {
   }
 };
 
-app.connect(new PostMessageTransport(window.parent)).then(() => {
+app.connect().then(() => {
   // Apply initial host context after connection
   const ctx = app.getHostContext();
   if (ctx?.theme) {

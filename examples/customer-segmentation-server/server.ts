@@ -7,7 +7,7 @@ import type {
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { RESOURCE_MIME_TYPE, type McpUiToolMeta } from "../../dist/src/app";
+import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE, type McpUiToolMeta } from "@modelcontextprotocol/ext-apps/server";
 import { startServer } from "../shared/server-utils.js";
 import {
   generateCustomers,
@@ -65,7 +65,8 @@ function createServer(): McpServer {
   {
     const resourceUri = "ui://customer-segmentation/mcp-app.html";
 
-    server.registerTool(
+    registerAppTool(
+      server,
       "get-customer-data",
       {
         title: "Get Customer Data",
@@ -83,7 +84,8 @@ function createServer(): McpServer {
       },
     );
 
-    server.registerResource(
+    registerAppResource(
+      server,
       resourceUri,
       resourceUri,
       {

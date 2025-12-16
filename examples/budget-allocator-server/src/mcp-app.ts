@@ -1,7 +1,7 @@
 /**
  * Budget Allocator App - Interactive budget allocation with real-time visualization
  */
-import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
+import { App } from "@modelcontextprotocol/ext-apps";
 import { Chart, registerables } from "chart.js";
 import "./global.css";
 import "./mcp-app.css";
@@ -631,4 +631,4 @@ window
   });
 
 // Connect to host
-app.connect(new PostMessageTransport(window.parent));
+app.connect();

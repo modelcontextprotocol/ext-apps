@@ -7,7 +7,7 @@ import type {
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { RESOURCE_MIME_TYPE, type McpUiToolMeta } from "../../dist/src/app";
+import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE, type McpUiToolMeta } from "@modelcontextprotocol/ext-apps/server";
 import { startServer } from "../shared/server-utils.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
@@ -256,7 +256,8 @@ function createServer(): McpServer {
   {
     const resourceUri = "ui://scenario-modeler/mcp-app.html";
 
-    server.registerTool(
+    registerAppTool(
+      server,
       "get-scenario-data",
       {
         title: "Get Scenario Data",
@@ -288,7 +289,8 @@ function createServer(): McpServer {
       },
     );
 
-    server.registerResource(
+    registerAppResource(
+      server,
       resourceUri,
       resourceUri,
       { mimeType: RESOURCE_MIME_TYPE, description: "SaaS Scenario Modeler UI" },

@@ -23,6 +23,10 @@
       "types": "./dist/src/app-bridge.d.ts",
       "default": "./dist/src/app-bridge.js"
     },
+    "./server": {
+      "types": "./dist/src/server/index.d.ts",
+      "default": "./dist/src/server/index.js"
+    },
     "./schema.json": "./dist/src/generated/schema.json"
   },
   "files": [

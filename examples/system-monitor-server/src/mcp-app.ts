@@ -1,7 +1,7 @@
 /**
  * @file System Monitor App - displays real-time OS metrics with Chart.js
  */
-import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
+import { App } from "@modelcontextprotocol/ext-apps";
 import { Chart, registerables } from "chart.js";
 import "./global.css";
 import "./mcp-app.css";
@@ -360,7 +360,7 @@ window
 // Register handlers and connect
 app.onerror = log.error;
 
-app.connect(new PostMessageTransport(window.parent));
+app.connect();
 
 // Auto-start polling after a short delay
 setTimeout(startPolling, 500);
