@@ -21,8 +21,9 @@ jobs:
             name: Linux ARM64
           - os: windows-latest
             name: Windows x64
-          - os: windows-11-arm
-            name: Windows ARM64
+          # Windows ARM64 disabled: Bun doesn't support this platform yet
+          # - os: windows-11-arm
+          #   name: Windows ARM64
           - os: macos-latest
             name: macOS ARM64
 
@@ -35,6 +36,10 @@ jobs:
       - name: Verify no private URLs in package-lock.json
         shell: bash
         run: '! grep -E "\"resolved\": \"https?://" package-lock.json | grep -v registry.npmjs.org'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - uses: actions/setup-node@v4
         with:
@@ -97,16 +102,21 @@ jobs:
         with:
           distribution: Ubuntu-24.04
 
-      - name: Install Node.js in WSL
+      - name: Install Node.js and Bun in WSL
         shell: wsl-bash {0}
         run: |
           sudo apt-get update
           curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-          sudo apt-get install -y nodejs
+          sudo apt-get install -y nodejs unzip
+          curl -fsSL https://bun.sh/install | bash
+          echo 'export BUN_INSTALL="$HOME/.bun"' >> ~/.bashrc
+          echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> ~/.bashrc
 
       - name: Build and test in WSL
         shell: wsl-bash {0}
         run: |
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
           npm install
           npm run build
           npm run examples:build
@@ -125,8 +135,9 @@ jobs:
             name: Linux ARM64
           - os: windows-latest
             name: Windows x64
-          - os: windows-11-arm
-            name: Windows ARM64
+          # Windows ARM64 disabled: Bun doesn't support this platform yet
+          # - os: windows-11-arm
+          #   name: Windows ARM64
           - os: macos-latest
             name: macOS ARM64
 
@@ -134,6 +145,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
