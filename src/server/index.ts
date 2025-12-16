@@ -6,10 +6,9 @@
 
 import {
   RESOURCE_URI_META_KEY as _RESOURCE_URI_META_KEY,
-  McpUiResourceMeta,
-  McpUiToolMeta,
   RESOURCE_MIME_TYPE,
 } from "../app.js";
+import type { McpUiResourceMeta, McpUiToolMeta } from "../app.js";
 import type {
   McpServer,
   ResourceMetadata,
@@ -24,7 +23,8 @@ export type { ResourceMetadata, ToolCallback, ReadResourceCallback };
 
 // Re-export for convenience
 export const RESOURCE_URI_META_KEY = _RESOURCE_URI_META_KEY;
-export { RESOURCE_MIME_TYPE, McpUiToolMeta };
+export { RESOURCE_MIME_TYPE };
+export type { McpUiToolMeta };
 
 /**
  * Tool configuration (same as McpServer.registerTool).
