@@ -364,7 +364,7 @@ export interface McpUiHostContextChangedNotification {
 
 /**
  * @description Request for graceful shutdown of the Guest UI (Host -> Guest UI).
- * @see {@link app-bridge.AppBridge.sendResourceTeardown} for the host method that sends this
+ * @see {@link app-bridge.AppBridge.teardownResource} for the host method that sends this
  */
 export interface McpUiResourceTeardownRequest {
   method: "ui/resource-teardown";

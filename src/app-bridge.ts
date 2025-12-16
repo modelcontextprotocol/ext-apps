@@ -131,7 +131,7 @@ type RequestHandlerExtra = Parameters<
  * 2. **Connect**: Call `connect()` with transport to establish communication
  * 3. **Wait for init**: Guest UI sends initialize request, bridge responds
  * 4. **Send data**: Call `sendToolInput()`, `sendToolResult()`, etc.
- * 5. **Teardown**: Call `sendResourceTeardown()` before unmounting iframe
+ * 5. **Teardown**: Call `teardownResource()` before unmounting iframe
  *
  * @example Basic usage
  * ```typescript
@@ -1174,7 +1174,7 @@ export class AppBridge extends Protocol<
    * @example
    * ```typescript
    * try {
-   *   await bridge.resourceTeardown({});
+   *   await bridge.teardownResource({});
    *   // Guest UI is ready, safe to unmount iframe
    *   iframe.remove();
    * } catch (error) {
@@ -1182,7 +1182,7 @@ export class AppBridge extends Protocol<
    * }
    * ```
    */
-  resourceTeardown(
+  teardownResource(
     params: McpUiResourceTeardownRequest["params"],
     options?: RequestOptions,
   ) {
@@ -1196,8 +1196,10 @@ export class AppBridge extends Protocol<
     );
   }
 
-  /** @deprecated Use {@link resourceTeardown} instead */
-  sendResourceTeardown: AppBridge["resourceTeardown"] = this.resourceTeardown;
+  /** @deprecated Use {@link teardownResource} instead */
+  resourceTeardown: AppBridge["teardownResource"] = this.teardownResource;
+  /** @deprecated Use {@link teardownResource} instead */
+  sendResourceTeardown: AppBridge["teardownResource"] = this.teardownResource;
 
   /**
    * Connect to the Guest UI via transport and optionally set up message forwarding.

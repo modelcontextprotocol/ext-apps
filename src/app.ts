@@ -758,7 +758,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Send a text message from user interaction
    * ```typescript
    * try {
-   *   await app.message({
+   *   await app.sendMessage({
    *     role: "user",
    *     content: [{ type: "text", text: "Show me details for item #42" }]
    *   });
@@ -770,7 +770,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * @see {@link McpUiMessageRequest} for request structure
    */
-  message(params: McpUiMessageRequest["params"], options?: RequestOptions) {
+  sendMessage(params: McpUiMessageRequest["params"], options?: RequestOptions) {
     return this.request(
       <McpUiMessageRequest>{
         method: "ui/message",
@@ -781,8 +781,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     );
   }
 
-  /** @deprecated Use {@link message} instead */
-  sendMessage: App["message"] = this.message;
+  /** @deprecated Use {@link sendMessage} instead */
+  message: App["sendMessage"] = this.sendMessage;
 
   /**
    * Send log messages to the host for debugging and telemetry.

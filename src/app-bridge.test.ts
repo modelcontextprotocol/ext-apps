@@ -369,7 +369,7 @@ describe("App <-> AppBridge integration", () => {
       await newBridgeTransport.close();
     });
 
-    it("sendResourceTeardown triggers app.onteardown", async () => {
+    it("teardownResource triggers app.onteardown", async () => {
       let teardownCalled = false;
       app.onteardown = async () => {
         teardownCalled = true;
@@ -377,12 +377,12 @@ describe("App <-> AppBridge integration", () => {
       };
 
       await app.connect(appTransport);
-      await bridge.sendResourceTeardown({});
+      await bridge.teardownResource({});
 
       expect(teardownCalled).toBe(true);
     });
 
-    it("sendResourceTeardown waits for async cleanup", async () => {
+    it("teardownResource waits for async cleanup", async () => {
       const cleanupSteps: string[] = [];
       app.onteardown = async () => {
         cleanupSteps.push("start");
@@ -392,7 +392,7 @@ describe("App <-> AppBridge integration", () => {
       };
 
       await app.connect(appTransport);
-      await bridge.sendResourceTeardown({});
+      await bridge.teardownResource({});
 
       expect(cleanupSteps).toEqual(["start", "done"]);
     });
@@ -442,7 +442,7 @@ describe("App <-> AppBridge integration", () => {
       await bridge.connect(bridgeTransport);
     });
 
-    it("app.message triggers bridge.onmessage and returns result", async () => {
+    it("app.sendMessage triggers bridge.onmessage and returns result", async () => {
       const receivedMessages: unknown[] = [];
       bridge.onmessage = async (params) => {
         receivedMessages.push(params);
@@ -450,7 +450,7 @@ describe("App <-> AppBridge integration", () => {
       };
 
       await app.connect(appTransport);
-      const result = await app.message({
+      const result = await app.sendMessage({
         role: "user",
         content: [{ type: "text", text: "Hello from app" }],
       });
@@ -463,13 +463,13 @@ describe("App <-> AppBridge integration", () => {
       expect(result).toEqual({});
     });
 
-    it("app.message returns error result when handler indicates error", async () => {
+    it("app.sendMessage returns error result when handler indicates error", async () => {
       bridge.onmessage = async () => {
         return { isError: true };
       };
 
       await app.connect(appTransport);
-      const result = await app.message({
+      const result = await app.sendMessage({
         role: "user",
         content: [{ type: "text", text: "Test" }],
       });
@@ -509,26 +509,30 @@ describe("App <-> AppBridge integration", () => {
       await app.connect(appTransport);
     });
 
-    it("app.sendMessage is an alias for app.message", async () => {
-      expect(app.sendMessage).toBe(app.message);
+    it("app.message is a deprecated alias for app.sendMessage", async () => {
+      expect(app.message).toBe(app.sendMessage);
     });
 
     it("app.sendOpenLink is an alias for app.openLink", async () => {
       expect(app.sendOpenLink).toBe(app.openLink);
     });
 
-    it("bridge.sendResourceTeardown is an alias for bridge.resourceTeardown", () => {
-      expect(bridge.sendResourceTeardown).toBe(bridge.resourceTeardown);
+    it("bridge.resourceTeardown is a deprecated alias for bridge.teardownResource", () => {
+      expect(bridge.resourceTeardown).toBe(bridge.teardownResource);
     });
 
-    it("app.sendMessage works as deprecated alias", async () => {
+    it("bridge.sendResourceTeardown is a deprecated alias for bridge.teardownResource", () => {
+      expect(bridge.sendResourceTeardown).toBe(bridge.teardownResource);
+    });
+
+    it("app.message works as deprecated alias", async () => {
       const receivedMessages: unknown[] = [];
       bridge.onmessage = async (params) => {
         receivedMessages.push(params);
         return {};
       };
 
-      await app.sendMessage({
+      await app.message({
         role: "user",
         content: [{ type: "text", text: "Via deprecated alias" }],
       });
