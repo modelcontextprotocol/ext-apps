@@ -49,7 +49,7 @@ export interface McpUiAppToolConfig extends ToolConfig {
      *
      * @example "ui://weather/widget.html"
      */
-    [RESOURCE_URI_META_KEY]?: string;
+    [RESOURCE_URI_META_KEY]: string;
     [key: string]: unknown;
   };
 }
@@ -58,8 +58,8 @@ export interface McpUiAppToolConfig extends ToolConfig {
  * MCP App Resource configuration for `registerAppResource`.
  */
 export interface McpUiAppResourceConfig extends ResourceMetadata {
-  _meta: {
-    ui: McpUiResourceMeta;
+  _meta?: {
+    ui?: McpUiResourceMeta;
     [key: string]: unknown;
   };
 }
