@@ -31,20 +31,45 @@ const arch = process.arch;
 const isWindows = os === "win32";
 const bunExe = isWindows ? "bun.exe" : "bun";
 
+// Detect libc type on Linux (glibc vs musl)
+function detectLibc() {
+  if (os !== "linux") return null;
+
+  // Check for musl-specific loader
+  const muslLoaders = [
+    `/lib/ld-musl-${arch === "arm64" ? "aarch64" : "x86_64"}.so.1`,
+    "/lib/ld-musl-x86_64.so.1",
+    "/lib/ld-musl-aarch64.so.1",
+  ];
+
+  for (const loader of muslLoaders) {
+    if (existsSync(loader)) {
+      console.log(`  Detected musl libc (found ${loader})`);
+      return "musl";
+    }
+  }
+
+  // Default to glibc on Linux
+  console.log("  Detected glibc (no musl loader found)");
+  return "glibc";
+}
+
 // Platform to package mapping (matches @oven/bun-* package names)
+// For Linux, separate glibc and musl packages
 const platformPackages = {
   darwin: {
     arm64: ["bun-darwin-aarch64"],
     x64: ["bun-darwin-x64", "bun-darwin-x64-baseline"],
   },
   linux: {
-    arm64: ["bun-linux-aarch64", "bun-linux-aarch64-musl"],
-    x64: [
-      "bun-linux-x64",
-      "bun-linux-x64-baseline",
-      "bun-linux-x64-musl",
-      "bun-linux-x64-musl-baseline",
-    ],
+    arm64: {
+      glibc: ["bun-linux-aarch64"],
+      musl: ["bun-linux-aarch64-musl"],
+    },
+    x64: {
+      glibc: ["bun-linux-x64", "bun-linux-x64-baseline"],
+      musl: ["bun-linux-x64-musl", "bun-linux-x64-musl-baseline"],
+    },
   },
   win32: {
     x64: ["bun-windows-x64", "bun-windows-x64-baseline"],
@@ -53,7 +78,15 @@ const platformPackages = {
 };
 
 function findBunBinary() {
-  const packages = platformPackages[os]?.[arch] || [];
+  let packages = platformPackages[os]?.[arch];
+
+  // For Linux, select packages based on libc type
+  if (os === "linux" && packages && typeof packages === "object") {
+    const libc = detectLibc();
+    packages = packages[libc] || [];
+  }
+
+  packages = packages || [];
   console.log(
     `Looking for bun packages: ${packages.join(", ") || "(none for this platform)"}`,
   );

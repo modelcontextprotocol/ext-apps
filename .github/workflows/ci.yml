@@ -21,9 +21,8 @@ jobs:
             name: Linux ARM64
           - os: windows-latest
             name: Windows x64
-          # Windows ARM64 disabled: Bun doesn't support this platform yet
-          # - os: windows-11-arm
-          #   name: Windows ARM64
+          - os: windows-11-arm
+            name: Windows ARM64
           - os: macos-latest
             name: macOS ARM64
 
@@ -36,10 +35,6 @@ jobs:
       - name: Verify no private URLs in package-lock.json
         shell: bash
         run: '! grep -E "\"resolved\": \"https?://" package-lock.json | grep -v registry.npmjs.org'
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       - uses: actions/setup-node@v4
         with:
@@ -135,9 +130,8 @@ jobs:
             name: Linux ARM64
           - os: windows-latest
             name: Windows x64
-          # Windows ARM64 disabled: Bun doesn't support this platform yet
-          # - os: windows-11-arm
-          #   name: Windows ARM64
+          - os: windows-11-arm
+            name: Windows ARM64
           - os: macos-latest
             name: macOS ARM64
 
@@ -145,10 +139,6 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
