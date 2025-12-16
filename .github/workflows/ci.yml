@@ -97,21 +97,16 @@ jobs:
         with:
           distribution: Ubuntu-24.04
 
-      - name: Install Node.js and Bun in WSL
+      - name: Install Node.js in WSL
         shell: wsl-bash {0}
         run: |
           sudo apt-get update
           curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-          sudo apt-get install -y nodejs unzip
-          curl -fsSL https://bun.sh/install | bash
-          echo 'export BUN_INSTALL="$HOME/.bun"' >> ~/.bashrc
-          echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> ~/.bashrc
+          sudo apt-get install -y nodejs
 
       - name: Build and test in WSL
         shell: wsl-bash {0}
         run: |
-          export BUN_INSTALL="$HOME/.bun"
-          export PATH="$BUN_INSTALL/bin:$PATH"
           npm install
           npm run build
           npm run examples:build
