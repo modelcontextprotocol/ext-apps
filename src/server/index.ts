@@ -18,11 +18,9 @@ import type {
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { ZodRawShape } from "zod";
 
-// Re-export SDK types for convenience
-export type { ResourceMetadata, ToolCallback, ReadResourceCallback };
-
-// Re-export for convenience
+// Re-exports for convenience
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
+export type { ResourceMetadata, ToolCallback, ReadResourceCallback };
 
 /**
  * Tool configuration (same as McpServer.registerTool).
