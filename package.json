@@ -71,6 +71,7 @@
     "express": "^5.1.0",
     "husky": "^9.1.7",
     "nodemon": "^3.1.0",
+    "prettier": "^3.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "ts-to-zod": "^5.1.0",
@@ -92,9 +93,6 @@
     "react-dom": {
       "optional": true
     }
-  },
-  "dependencies": {
-    "prettier": "^3.6.2"
   },
   "optionalDependencies": {
     "@oven/bun-darwin-aarch64": "^1.2.21",
