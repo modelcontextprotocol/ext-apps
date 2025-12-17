@@ -12,6 +12,8 @@ import { z } from "zod";
 import {
   RESOURCE_MIME_TYPE,
   RESOURCE_URI_META_KEY,
+  registerAppResource,
+  registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
 import { startServer } from "../shared/server-utils.js";
 
