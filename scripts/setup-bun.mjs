@@ -108,7 +108,7 @@ function findBunBinary() {
 async function downloadBunForWindowsArm64() {
   // Windows ARM64 can run x64 binaries via emulation
   const pkg = "bun-windows-x64-baseline";
-  const version = "1.3.4";
+  const version = "1.2.21";
   const url = `https://registry.npmjs.org/@oven/${pkg}/-/${pkg}-${version}.tgz`;
   const destDir = join(nodeModules, "@oven", pkg);
 
