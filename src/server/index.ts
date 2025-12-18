@@ -16,8 +16,11 @@ import type {
   ToolCallback,
   ReadResourceCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type {
+  AnySchema,
+  ZodRawShapeCompat,
+} from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import type { ZodRawShape } from "zod";
 
 // Re-exports for convenience
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
@@ -29,7 +32,7 @@ export type { ResourceMetadata, ToolCallback, ReadResourceCallback };
 export interface ToolConfig {
   title?: string;
   description?: string;
-  inputSchema?: ZodRawShape;
+  inputSchema?: ZodRawShapeCompat | AnySchema;
   annotations?: ToolAnnotations;
   _meta?: Record<string, unknown>;
 }
@@ -62,8 +65,8 @@ export interface McpUiAppToolConfig extends ToolConfig {
  * MCP App Resource configuration for `registerAppResource`.
  */
 export interface McpUiAppResourceConfig extends ResourceMetadata {
-  _meta: {
-    ui: McpUiResourceMeta;
+  _meta?: {
+    ui?: McpUiResourceMeta;
     [key: string]: unknown;
   };
 }
@@ -96,11 +99,15 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  * });
  * ```
  */
-export function registerAppTool(
+export function registerAppTool<
+  TInputSchema extends ZodRawShapeCompat | AnySchema | undefined = undefined,
+>(
   server: Pick<McpServer, "registerTool">,
   name: string,
-  config: McpUiAppToolConfig,
-  handler: ToolCallback<ZodRawShape>,
+  config: Omit<McpUiAppToolConfig, "inputSchema"> & {
+    inputSchema?: TInputSchema;
+  },
+  handler: ToolCallback<TInputSchema>,
 ): void {
   // Normalize metadata for backward compatibility:
   // - If _meta.ui.resourceUri is set, also set the legacy flat key

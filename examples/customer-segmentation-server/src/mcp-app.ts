@@ -3,7 +3,6 @@
  */
 import {
   App,
-  PostMessageTransport,
   applyHostStyleVariables,
   applyHostFonts,
   applyDocumentTheme,
