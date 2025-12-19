@@ -57,7 +57,8 @@
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
     "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
-    "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write"
+    "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write",
+    "check:versions": "node scripts/check-versions.mjs"
   },
   "author": "Olivier Chafik",
   "devDependencies": {
