@@ -180,7 +180,7 @@ app.listen(3001, (err) => {
 Then, verify your server compiles:
 
 ```bash
-npx tsc --noEmit server.ts
+npx tsc --noEmit
 ```
 
 No output means success. If you see errors, check for typos in `server.ts`.
