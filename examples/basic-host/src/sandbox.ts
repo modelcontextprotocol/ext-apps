@@ -20,6 +20,8 @@ if (!document.referrer.match(ALLOWED_REFERRER_PATTERN)) {
 // This is the origin we expect all parent messages to come from.
 const EXPECTED_HOST_ORIGIN = new URL(document.referrer).origin;
 
+const OWN_ORIGIN = new URL(window.location.href).origin;
+
 // Security self-test: verify iframe isolation is working correctly.
 // This MUST throw a SecurityError -- if `window.top` is accessible, the sandbox
 // configuration is dangerously broken and untrusted content could escape.
@@ -126,6 +128,15 @@ window.addEventListener("message", async (event) => {
       }
     }
   } else if (event.source === inner.contentWindow) {
+    if (event.origin !== OWN_ORIGIN) {
+      console.error(
+        "[Sandbox] Rejecting message from inner iframe with unexpected origin:",
+        event.origin,
+        "expected:",
+        OWN_ORIGIN
+      );
+      return;
+    }
     // Relay messages from inner frame to parent window.
     // Use specific origin instead of "*" to prevent message interception.
     window.parent.postMessage(event.data, EXPECTED_HOST_ORIGIN);
