@@ -350,7 +350,27 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 async function connectToAllServers(): Promise<ServerInfo[]> {
   const serverUrlsResponse = await fetch("/api/servers");
   const serverUrls = (await serverUrlsResponse.json()) as string[];
-  return Promise.all(serverUrls.map((url) => connectToServer(new URL(url))));
+
+  // Use allSettled to be resilient to individual server failures
+  const results = await Promise.allSettled(
+    serverUrls.map((url) => connectToServer(new URL(url)))
+  );
+
+  const servers: ServerInfo[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === "fulfilled") {
+      servers.push(result.value);
+    } else {
+      console.warn(`[HOST] Failed to connect to ${serverUrls[i]}:`, result.reason);
+    }
+  }
+
+  if (servers.length === 0 && serverUrls.length > 0) {
+    throw new Error(`Failed to connect to any servers (${serverUrls.length} attempted)`);
+  }
+
+  return servers;
 }
 
 createRoot(document.getElementById("root")!).render(
