@@ -194,25 +194,49 @@ test.describe("Host Resilience", () => {
 });
 
 test.describe("Origin Validation Infrastructure", () => {
-  test("sandbox logs indicate origin validation is active", async ({
+  test("PostMessageTransport rejects messages from wrong source", async ({
     page,
   }) => {
-    // Capture all sandbox logs to verify the security infrastructure is working
-    const allLogs: string[] = [];
+    // Capture rejection logs from the app's PostMessageTransport
+    const rejectionLogs: string[] = [];
     page.on("console", (msg) => {
-      allLogs.push(msg.text());
+      const text = msg.text();
+      if (text.includes("Ignoring message from unknown source")) {
+        rejectionLogs.push(text);
+      }
     });
 
     await loadServer(page, "Integration Test Server");
 
-    // App should load successfully (proves origin validation passed)
     const appFrame = getAppFrame(page);
     await expect(appFrame.locator("body")).toBeVisible();
 
-    // The sandbox should have logged CSP-related info
-    const cspLogs = allLogs.filter((log) => log.includes("CSP"));
-    // CSP logging is expected (either "Received CSP" or "No CSP provided")
-    expect(cspLogs.length).toBeGreaterThanOrEqual(0); // May or may not have CSP
+    // Inject a message from the page context (wrong source - not window.parent)
+    // The app's PostMessageTransport should reject it because event.source
+    // won't match the expected source (window.parent)
+    await page.evaluate(() => {
+      const outerIframe = document.querySelector("iframe");
+      if (!outerIframe?.contentWindow) return;
+
+      const innerIframe = outerIframe.contentDocument?.querySelector("iframe");
+      if (!innerIframe?.contentWindow) return;
+
+      // Send a fake JSON-RPC message from the page (not from parent)
+      innerIframe.contentWindow.postMessage(
+        {
+          jsonrpc: "2.0",
+          method: "test/injected",
+          id: 999,
+        },
+        "*",
+      );
+    });
+
+    // Wait for message to be processed
+    await page.waitForTimeout(500);
+
+    // The PostMessageTransport should have logged the rejection
+    expect(rejectionLogs.length).toBeGreaterThan(0);
   });
 
   test("app communication completes round-trip successfully", async ({
