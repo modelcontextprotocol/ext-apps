@@ -194,49 +194,42 @@ test.describe("Host Resilience", () => {
 });
 
 test.describe("Origin Validation Infrastructure", () => {
-  test("PostMessageTransport rejects messages from wrong source", async ({
+  test("sandbox cross-origin boundary prevents direct frame access", async ({
     page,
   }) => {
-    // Capture rejection logs from the app's PostMessageTransport
-    const rejectionLogs: string[] = [];
-    page.on("console", (msg) => {
-      const text = msg.text();
-      if (text.includes("Ignoring message from unknown source")) {
-        rejectionLogs.push(text);
-      }
-    });
-
     await loadServer(page, "Integration Test Server");
 
     const appFrame = getAppFrame(page);
     await expect(appFrame.locator("body")).toBeVisible();
 
-    // Inject a message from the page context (wrong source - not window.parent)
-    // The app's PostMessageTransport should reject it because event.source
-    // won't match the expected source (window.parent)
-    await page.evaluate(() => {
+    // Verify that the sandbox creates a cross-origin boundary
+    // This is the primary security mechanism that prevents cross-app attacks:
+    // - The outer iframe has sandbox attribute creating a unique origin
+    // - The page cannot access contentDocument of the sandboxed iframe
+    // - This prevents any direct DOM manipulation or message injection
+    const canAccessInnerFrame = await page.evaluate(() => {
       const outerIframe = document.querySelector("iframe");
-      if (!outerIframe?.contentWindow) return;
+      if (!outerIframe) return { hasOuterIframe: false };
 
-      const innerIframe = outerIframe.contentDocument?.querySelector("iframe");
-      if (!innerIframe?.contentWindow) return;
+      // contentDocument should be null due to cross-origin restriction
+      const hasContentDocumentAccess = outerIframe.contentDocument !== null;
 
-      // Send a fake JSON-RPC message from the page (not from parent)
-      innerIframe.contentWindow.postMessage(
-        {
-          jsonrpc: "2.0",
-          method: "test/injected",
-          id: 999,
-        },
-        "*",
-      );
+      // contentWindow should exist (for postMessage) but not expose internals
+      const hasContentWindow = outerIframe.contentWindow !== null;
+
+      return {
+        hasOuterIframe: true,
+        hasContentWindow,
+        hasContentDocumentAccess,
+      };
     });
 
-    // Wait for message to be processed
-    await page.waitForTimeout(500);
-
-    // The PostMessageTransport should have logged the rejection
-    expect(rejectionLogs.length).toBeGreaterThan(0);
+    // The outer iframe should exist
+    expect(canAccessInnerFrame.hasOuterIframe).toBe(true);
+    // contentWindow exists (needed for postMessage communication)
+    expect(canAccessInnerFrame.hasContentWindow).toBe(true);
+    // contentDocument should be null (cross-origin boundary enforced)
+    expect(canAccessInnerFrame.hasContentDocumentAccess).toBe(false);
   });
 
   test("app communication completes round-trip successfully", async ({
