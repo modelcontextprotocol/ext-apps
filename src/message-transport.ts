@@ -73,7 +73,7 @@ export class PostMessageTransport implements Transport {
    */
   constructor(
     private eventTarget: Window = window.parent,
-    private eventSource?: MessageEventSource,
+    private eventSource: MessageEventSource,
   ) {
     this.messageListener = (event) => {
       if (eventSource && event.source !== this.eventSource) {
