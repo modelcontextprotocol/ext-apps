@@ -549,12 +549,12 @@ export type McpUiToolVisibility = "model" | "app";
  */
 export interface McpUiToolMeta {
   /**
-   * URI of the UI resource to display for this tool.
+   * URI of the UI resource to display for this tool, if any.
    * This is converted to `_meta["ui/resourceUri"]`.
    *
    * @example "ui://weather/widget.html"
    */
-  resourceUri: string;
+  resourceUri?: string;
   /**
    * @description Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
