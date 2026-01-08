@@ -113,6 +113,19 @@ jobs:
           npm test
           npm run prettier
 
+  swift:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Swift SDK
+        working-directory: swift
+        run: swift build
+
+      - name: Test Swift SDK
+        working-directory: swift
+        run: swift test
+
   # Test that the package can be installed from git (triggers prepare script)
   test-git-install:
     strategy:

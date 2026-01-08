@@ -4,3 +4,13 @@ examples/basic-server-react/**/*.ts
 examples/basic-server-react/**/*.tsx
 examples/basic-server-vanillajs/**/*.ts
 examples/basic-server-vanillajs/**/*.tsx
+
+# Swift package manager build artifacts
+sdk/swift/.build/
+examples/basic-host-swift/.build/
+examples/basic-host-swift/build/
+
+# Swift build artifacts
+swift/.build/
+swift/.build
+examples/basic-host-swift/.build

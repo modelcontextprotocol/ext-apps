@@ -269,7 +269,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
       // Outside of Strict Mode, this `useEffect` runs only once per
       // `toolCallInfo`.
       if (firstTime) {
-        const appBridge = newAppBridge(toolCallInfo.serverInfo, iframe);
+        const appBridge = newAppBridge(toolCallInfo.serverInfo, toolCallInfo, iframe);
         appBridgeRef.current = appBridge;
         initializeApp(iframe, appBridge, toolCallInfo);
       }

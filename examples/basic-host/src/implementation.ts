@@ -207,12 +207,19 @@ function hookInitializedCallback(appBridge: AppBridge): Promise<void> {
 }
 
 
-export function newAppBridge(serverInfo: ServerInfo, iframe: HTMLIFrameElement): AppBridge {
+export function newAppBridge(serverInfo: ServerInfo, toolCallInfo: ToolCallInfo, iframe: HTMLIFrameElement): AppBridge {
   const serverCapabilities = serverInfo.client.getServerCapabilities();
   const appBridge = new AppBridge(serverInfo.client, IMPLEMENTATION, {
     openLinks: {},
     serverTools: serverCapabilities?.tools,
     serverResources: serverCapabilities?.resources,
+  }, {
+    hostContext: {
+      toolInfo: {
+        id: crypto.randomUUID(),  // We don't have the actual request ID, use a random one
+        tool: toolCallInfo.tool,
+      },
+    },
   });
 
   // Register all handlers before calling connect(). The Guest UI can start
