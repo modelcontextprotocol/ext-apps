@@ -1,0 +1,132 @@
+.main {
+  min-height: 100vh;
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+@media (prefers-color-scheme: dark) {
+  .main {
+    background: #0f172a;
+    color: #f1f5f9;
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.controls select,
+.controls button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.controls select {
+  border: 1px solid #cbd5e1;
+  background: white;
+  min-width: 180px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .controls select {
+    background: #334155;
+    border-color: #475569;
+    color: #f1f5f9;
+  }
+}
+
+.controls button {
+  border: none;
+  font-weight: 500;
+  transition: background-color 0.15s;
+}
+
+.controls button.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.controls button:not(.active) {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+@media (prefers-color-scheme: dark) {
+  .controls button:not(.active) {
+    background: #334155;
+    color: #94a3b8;
+  }
+}
+
+.controls button:hover {
+  opacity: 0.9;
+}
+
+.chart-container {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .chart-container {
+    background: #1e293b;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.chart-title {
+  margin: 0 0 1rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .chart-title {
+    color: #f1f5f9;
+  }
+}
+
+.chart-description {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+  color: #64748b;
+}
+
+.error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+  color: #ef4444;
+}
