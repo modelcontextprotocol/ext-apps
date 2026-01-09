@@ -278,18 +278,21 @@ export function createServer(): McpServer {
           ? calculateScenario(args.customInputs)
           : undefined;
 
+        const data = {
+          templates: SCENARIO_TEMPLATES,
+          defaultInputs: DEFAULT_INPUTS,
+          customProjections: customScenario?.projections,
+          customSummary: customScenario?.summary,
+        };
+
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                templates: SCENARIO_TEMPLATES,
-                defaultInputs: DEFAULT_INPUTS,
-                customProjections: customScenario?.projections,
-                customSummary: customScenario?.summary,
-              }),
+              text: JSON.stringify(data),
             },
           ],
+          structuredContent: data,
         };
       },
     );

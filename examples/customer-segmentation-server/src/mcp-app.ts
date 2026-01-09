@@ -369,41 +369,31 @@ function resetDetailPanel(): void {
 // Create app instance
 const app = new App({ name: "Customer Segmentation", version: "1.0.0" });
 
-// Fetch data from server
-async function fetchData(): Promise<void> {
-  try {
-    const result = await app.callServerTool({
-      name: "get-customer-data",
-      arguments: {},
-    });
+// Handle tool results via structuredContent
+app.ontoolresult = (result) => {
+  const data = result.structuredContent as {
+    customers: Customer[];
+    segments: SegmentSummary[];
+  };
 
-    const text = result
-      .content!.filter(
-        (c): c is { type: "text"; text: string } => c.type === "text",
-      )
-      .map((c) => c.text)
-      .join("");
-    const data = JSON.parse(text) as {
-      customers: Customer[];
-      segments: SegmentSummary[];
-    };
-
-    state.customers = data.customers;
-    state.segments = data.segments;
-
-    // Initialize or update chart
-    if (!state.chart) {
-      state.chart = initChart();
-    } else {
-      updateChart();
-    }
-
-    renderLegend();
-    log.info(`Loaded ${data.customers.length} customers`);
-  } catch (error) {
-    log.error("Failed to fetch data:", error);
+  if (!data?.customers || !data?.segments) {
+    log.error("Invalid data received:", result);
+    return;
   }
-}
+
+  state.customers = data.customers;
+  state.segments = data.segments;
+
+  // Initialize or update chart
+  if (!state.chart) {
+    state.chart = initChart();
+  } else {
+    updateChart();
+  }
+
+  renderLegend();
+  log.info(`Loaded ${data.customers.length} customers`);
+};
 
 // Event handlers
 xAxisSelect.addEventListener("change", () => {
@@ -482,6 +472,3 @@ app.connect().then(() => {
     handleHostContextChanged(ctx);
   }
 });
-
-// Fetch data after connection
-setTimeout(fetchData, 100);

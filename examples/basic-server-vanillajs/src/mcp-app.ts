@@ -15,8 +15,8 @@ const log = {
 
 
 function extractTime(result: CallToolResult): string {
-  const { text } = result.content?.find((c) => c.type === "text")!;
-  return text;
+  const data = result.structuredContent as { time: string };
+  return data.time;
 }
 
 

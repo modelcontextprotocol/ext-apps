@@ -279,6 +279,7 @@ export function createServer(): McpServer {
             text: JSON.stringify(response),
           },
         ],
+        structuredContent: response,
       };
     },
   );

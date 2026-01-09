@@ -607,13 +607,7 @@ const app = new App({ name: "Budget Allocator", version: "1.0.0" });
 
 app.ontoolresult = (result) => {
   log.info("Received tool result:", result);
-  const text = result
-    .content!.filter(
-      (c): c is { type: "text"; text: string } => c.type === "text",
-    )
-    .map((c) => c.text)
-    .join("");
-  const data = JSON.parse(text) as BudgetDataResponse;
+  const data = result.structuredContent as BudgetDataResponse;
   if (data?.config && data?.analytics) {
     initializeUI(data.config, data.analytics);
   }

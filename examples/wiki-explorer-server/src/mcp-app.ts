@@ -322,44 +322,36 @@ app.ontoolresult = (result) => {
 };
 
 function handleToolResultData(result: CallToolResult): void {
-  if (
-    result.isError ||
-    !result.content?.[0] ||
-    result.content[0].type !== "text"
-  ) {
+  if (result.isError) {
     console.error("Tool result error:", result);
     return;
   }
 
-  try {
-    const response: ToolResponse = JSON.parse(result.content[0].text);
-    const { page, links, error } = response;
+  const response = result.structuredContent as ToolResponse;
+  const { page, links, error } = response;
 
-    // Ensure the source node exists
-    addNode(page.url, page.title);
-    updateNodeTitle(page.url, page.title);
+  // Ensure the source node exists
+  addNode(page.url, page.title);
+  updateNodeTitle(page.url, page.title);
 
-    if (error) {
-      setNodeState(page.url, "error", error);
-    } else {
-      // Get source node position so new nodes appear nearby
-      const sourceNode = graphData.nodes.find((n) => n.url === page.url);
-      const sourcePos = sourceNode
-        ? { x: sourceNode.x ?? 0, y: sourceNode.y ?? 0 }
-        : undefined;
+  if (error) {
+    setNodeState(page.url, "error", error);
+  } else {
+    // Get source node position so new nodes appear nearby
+    const sourceNode = graphData.nodes.find((n) => n.url === page.url);
+    const sourcePos = sourceNode
+      ? { x: sourceNode.x ?? 0, y: sourceNode.y ?? 0 }
+      : undefined;
 
-      // Add all linked nodes and edges
-      for (const link of links) {
-        addNode(link.url, link.title, "default", sourcePos);
-        addEdge(page.url, link.url);
-      }
-      setNodeState(page.url, "expanded");
+    // Add all linked nodes and edges
+    for (const link of links) {
+      addNode(link.url, link.title, "default", sourcePos);
+      addEdge(page.url, link.url);
     }
-
-    updateGraph();
-  } catch (e) {
-    console.error("Failed to parse tool result:", e);
+    setNodeState(page.url, "expanded");
   }
+
+  updateGraph();
 }
 
 app.onerror = (err) => {

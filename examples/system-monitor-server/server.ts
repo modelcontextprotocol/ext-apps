@@ -151,6 +151,7 @@ export function createServer(): McpServer {
 
       return {
         content: [{ type: "text", text: JSON.stringify(stats) }],
+        structuredContent: stats,
       };
     },
   );
