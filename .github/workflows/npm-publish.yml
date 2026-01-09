@@ -98,7 +98,6 @@ jobs:
       fail-fast: false
       matrix:
         example:
-          - basic-host
           - basic-server-preact
           - basic-server-react
           - basic-server-solid
