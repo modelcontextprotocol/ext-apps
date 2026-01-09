@@ -11,7 +11,9 @@ import {
   McpUiToolMeta,
 } from "../app.js";
 import type {
+  BaseToolCallback,
   McpServer,
+  RegisteredTool,
   ResourceMetadata,
   ToolCallback,
   ReadResourceCallback,
@@ -33,6 +35,7 @@ export interface ToolConfig {
   title?: string;
   description?: string;
   inputSchema?: ZodRawShapeCompat | AnySchema;
+  outputSchema?: ZodRawShapeCompat | AnySchema;
   annotations?: ToolAnnotations;
   _meta?: Record<string, unknown>;
 }
@@ -100,15 +103,17 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  * ```
  */
 export function registerAppTool<
-  TInputSchema extends ZodRawShapeCompat | AnySchema | undefined = undefined,
+  OutputArgs extends ZodRawShapeCompat | AnySchema,
+  InputArgs extends undefined | ZodRawShapeCompat | AnySchema = undefined,
 >(
   server: Pick<McpServer, "registerTool">,
   name: string,
-  config: Omit<McpUiAppToolConfig, "inputSchema"> & {
-    inputSchema?: TInputSchema;
+  config: McpUiAppToolConfig & {
+    inputSchema?: InputArgs;
+    outputSchema?: OutputArgs;
   },
-  handler: ToolCallback<TInputSchema>,
-): void {
+  cb: ToolCallback<InputArgs>,
+): RegisteredTool {
   // Normalize metadata for backward compatibility:
   // - If _meta.ui.resourceUri is set, also set the legacy flat key
   // - If the legacy flat key is set, also set _meta.ui.resourceUri
@@ -125,7 +130,7 @@ export function registerAppTool<
     normalizedMeta = { ...meta, ui: { ...uiMeta, resourceUri: legacyUri } };
   }
 
-  server.registerTool(name, { ...config, _meta: normalizedMeta }, handler);
+  return server.registerTool(name, { ...config, _meta: normalizedMeta }, cb);
 }
 
 /**
