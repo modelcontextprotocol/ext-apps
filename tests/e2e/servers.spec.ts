@@ -21,7 +21,7 @@ const DYNAMIC_MASKS: Record<string, string[]> = {
     "#memory-bar-fill", // Memory bar fill level
     "#info-uptime", // System uptime
   ],
-  threejs: ["canvas"], // 3D render canvas (dynamic animation)
+  threejs: ["#threejs-canvas", ".threejs-container"], // 3D render canvas (dynamic animation)
   "wiki-explorer": ["#graph"], // Force-directed graph (dynamic layout)
 };
 

@@ -188,6 +188,7 @@ export default function ThreeJSApp({
       style={containerStyle}
     >
       <canvas
+        id="threejs-canvas"
         ref={canvasRef}
         style={{
           width: "100%",
