@@ -36,10 +36,9 @@ export function createServer(): McpServer {
     },
     async (): Promise<CallToolResult> => {
       const time = new Date().toISOString();
-      const data = { time };
       return {
-        content: [{ type: "text", text: JSON.stringify(data) }],
-        structuredContent: data,
+        content: [{ type: "text", text: time }],
+        structuredContent: { time },
       };
     },
   );

@@ -15,8 +15,8 @@ const log = {
 
 
 function extractTime(result: CallToolResult): string {
-  const data = result.structuredContent as { time: string };
-  return data.time;
+  const { time } = (result.structuredContent as { time?: string }) ?? {};
+  return time ?? "[ERROR]";
 }
 
 
