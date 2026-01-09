@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type {
   CallToolResult,
   ReadResourceResult,
@@ -14,7 +15,7 @@ import {
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
-import { startServer } from "./src/server-utils.js";
+import { startServer } from "./server-utils.js";
 
 // Schemas - types are derived from these using z.infer
 const CpuCoreSchema = z.object({
@@ -106,7 +107,7 @@ async function getMemoryStats(): Promise<MemoryStats> {
   };
 }
 
-function createServer(): McpServer {
+export function createServer(): McpServer {
   const server = new McpServer({
     name: "System Monitor Server",
     version: "1.0.0",
@@ -180,4 +181,16 @@ function createServer(): McpServer {
   return server;
 }
 
-startServer(createServer);
+async function main() {
+  if (process.argv.includes("--stdio")) {
+    await createServer().connect(new StdioServerTransport());
+  } else {
+    const port = parseInt(process.env.PORT ?? "3107", 10);
+    await startServer(createServer, { port, name: "System Monitor Server" });
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

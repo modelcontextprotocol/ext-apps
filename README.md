@@ -47,9 +47,13 @@ Or edit your `package.json` manually:
 
 Start with these foundational examples to learn the SDK:
 
-- [`examples/basic-server-vanillajs`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) — Example MCP server with tools that return UI Apps (vanilla JS)
-- [`examples/basic-server-react`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react) — Example MCP server with tools that return UI Apps (React)
-- [`examples/basic-host`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) — Bare-bones example of hosting MCP Apps
+- [`examples/basic-server-vanillajs`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) — MCP server + MCP App using vanilla JS
+- [`examples/basic-server-react`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react) — MCP server + MCP App using [React](https://github.com/facebook/react)
+- [`examples/basic-server-vue`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vue) — MCP server + MCP App using [Vue](https://github.com/vuejs/vue)
+- [`examples/basic-server-svelte`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-svelte) — MCP server + MCP App using [Svelte](https://github.com/sveltejs/svelte)
+- [`examples/basic-server-preact`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-preact) — MCP server + MCP App using [Preact](https://github.com/preactjs/preact)
+- [`examples/basic-server-solid`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-solid) — MCP server + MCP App using [Solid](https://github.com/solidjs/solid)
+- [`examples/basic-host`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) — MCP host application supporting MCP Apps
 
 The [`examples/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples) directory contains additional demo apps showcasing real-world use cases.
 

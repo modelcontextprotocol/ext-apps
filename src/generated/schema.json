@@ -30,7 +30,6 @@
     },
     "McpUiDisplayMode": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Display mode for UI presentation.",
       "anyOf": [
         {
           "type": "string",
@@ -44,7 +43,8 @@
           "type": "string",
           "const": "pip"
         }
-      ]
+      ],
+      "description": "Display mode for UI presentation."
     },
     "McpUiHostCapabilities": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -102,7 +102,6 @@
           "const": "ui/notifications/host-context-changed"
         },
         "params": {
-          "description": "Partial context update containing only changed fields.",
           "type": "object",
           "properties": {
             "toolInfo": {
@@ -123,7 +122,6 @@
                   ]
                 },
                 "tool": {
-                  "description": "Tool definition including name, inputSchema, etc.",
                   "type": "object",
                   "properties": {
                     "name": {
@@ -148,6 +146,10 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "theme": {
+                            "type": "string",
+                            "enum": ["light", "dark"]
                           }
                         },
                         "required": ["src"],
@@ -245,10 +247,11 @@
                     }
                   },
                   "required": ["name", "inputSchema"],
-                  "additionalProperties": false
+                  "additionalProperties": false,
+                  "description": "Tool definition including name, inputSchema, etc."
                 }
               },
-              "required": ["id", "tool"],
+              "required": ["tool"],
               "additionalProperties": false
             },
             "theme": {
@@ -272,7 +275,6 @@
                   "description": "CSS variables for theming the app.",
                   "type": "object",
                   "propertyNames": {
-                    "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -582,17 +584,96 @@
                         "type": "string",
                         "const": "--shadow-lg"
                       }
-                    ]
+                    ],
+                    "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
                   },
                   "additionalProperties": {
-                    "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
                     "anyOf": [
                       {
                         "type": "string"
                       },
                       {}
-                    ]
-                  }
+                    ],
+                    "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
+                  },
+                  "required": [
+                    "--color-background-primary",
+                    "--color-background-secondary",
+                    "--color-background-tertiary",
+                    "--color-background-inverse",
+                    "--color-background-ghost",
+                    "--color-background-info",
+                    "--color-background-danger",
+                    "--color-background-success",
+                    "--color-background-warning",
+                    "--color-background-disabled",
+                    "--color-text-primary",
+                    "--color-text-secondary",
+                    "--color-text-tertiary",
+                    "--color-text-inverse",
+                    "--color-text-ghost",
+                    "--color-text-info",
+                    "--color-text-danger",
+                    "--color-text-success",
+                    "--color-text-warning",
+                    "--color-text-disabled",
+                    "--color-border-primary",
+                    "--color-border-secondary",
+                    "--color-border-tertiary",
+                    "--color-border-inverse",
+                    "--color-border-ghost",
+                    "--color-border-info",
+                    "--color-border-danger",
+                    "--color-border-success",
+                    "--color-border-warning",
+                    "--color-border-disabled",
+                    "--color-ring-primary",
+                    "--color-ring-secondary",
+                    "--color-ring-inverse",
+                    "--color-ring-info",
+                    "--color-ring-danger",
+                    "--color-ring-success",
+                    "--color-ring-warning",
+                    "--font-sans",
+                    "--font-mono",
+                    "--font-weight-normal",
+                    "--font-weight-medium",
+                    "--font-weight-semibold",
+                    "--font-weight-bold",
+                    "--font-text-xs-size",
+                    "--font-text-sm-size",
+                    "--font-text-md-size",
+                    "--font-text-lg-size",
+                    "--font-heading-xs-size",
+                    "--font-heading-sm-size",
+                    "--font-heading-md-size",
+                    "--font-heading-lg-size",
+                    "--font-heading-xl-size",
+                    "--font-heading-2xl-size",
+                    "--font-heading-3xl-size",
+                    "--font-text-xs-line-height",
+                    "--font-text-sm-line-height",
+                    "--font-text-md-line-height",
+                    "--font-text-lg-line-height",
+                    "--font-heading-xs-line-height",
+                    "--font-heading-sm-line-height",
+                    "--font-heading-md-line-height",
+                    "--font-heading-lg-line-height",
+                    "--font-heading-xl-line-height",
+                    "--font-heading-2xl-line-height",
+                    "--font-heading-3xl-line-height",
+                    "--border-radius-xs",
+                    "--border-radius-sm",
+                    "--border-radius-md",
+                    "--border-radius-lg",
+                    "--border-radius-xl",
+                    "--border-radius-full",
+                    "--border-width-regular",
+                    "--shadow-hairline",
+                    "--shadow-sm",
+                    "--shadow-md",
+                    "--shadow-lg"
+                  ]
                 },
                 "css": {
                   "description": "CSS blocks that apps can inject.",
@@ -641,8 +722,8 @@
                       "type": "object",
                       "properties": {
                         "height": {
-                          "description": "Fixed container height in pixels.",
-                          "type": "number"
+                          "type": "number",
+                          "description": "Fixed container height in pixels."
                         }
                       },
                       "required": ["height"],
@@ -671,8 +752,8 @@
                       "type": "object",
                       "properties": {
                         "width": {
-                          "description": "Fixed container width in pixels.",
-                          "type": "number"
+                          "type": "number",
+                          "description": "Fixed container width in pixels."
                         }
                       },
                       "required": ["width"],
@@ -746,27 +827,28 @@
               "type": "object",
               "properties": {
                 "top": {
-                  "description": "Top safe area inset in pixels.",
-                  "type": "number"
+                  "type": "number",
+                  "description": "Top safe area inset in pixels."
                 },
                 "right": {
-                  "description": "Right safe area inset in pixels.",
-                  "type": "number"
+                  "type": "number",
+                  "description": "Right safe area inset in pixels."
                 },
                 "bottom": {
-                  "description": "Bottom safe area inset in pixels.",
-                  "type": "number"
+                  "type": "number",
+                  "description": "Bottom safe area inset in pixels."
                 },
                 "left": {
-                  "description": "Left safe area inset in pixels.",
-                  "type": "number"
+                  "type": "number",
+                  "description": "Left safe area inset in pixels."
                 }
               },
               "required": ["top", "right", "bottom", "left"],
               "additionalProperties": false
             }
           },
-          "additionalProperties": {}
+          "additionalProperties": {},
+          "description": "Partial context update containing only changed fields."
         }
       },
       "required": ["method", "params"],
@@ -794,7 +876,6 @@
               ]
             },
             "tool": {
-              "description": "Tool definition including name, inputSchema, etc.",
               "type": "object",
               "properties": {
                 "name": {
@@ -819,6 +900,10 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "theme": {
+                        "type": "string",
+                        "enum": ["light", "dark"]
                       }
                     },
                     "required": ["src"],
@@ -916,10 +1001,11 @@
                 }
               },
               "required": ["name", "inputSchema"],
-              "additionalProperties": false
+              "additionalProperties": false,
+              "description": "Tool definition including name, inputSchema, etc."
             }
           },
-          "required": ["id", "tool"],
+          "required": ["tool"],
           "additionalProperties": false
         },
         "theme": {
@@ -943,7 +1029,6 @@
               "description": "CSS variables for theming the app.",
               "type": "object",
               "propertyNames": {
-                "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
                 "anyOf": [
                   {
                     "type": "string",
@@ -1253,17 +1338,96 @@
                     "type": "string",
                     "const": "--shadow-lg"
                   }
-                ]
+                ],
+                "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
               },
               "additionalProperties": {
-                "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
                 "anyOf": [
                   {
                     "type": "string"
                   },
                   {}
-                ]
-              }
+                ],
+                "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
+              },
+              "required": [
+                "--color-background-primary",
+                "--color-background-secondary",
+                "--color-background-tertiary",
+                "--color-background-inverse",
+                "--color-background-ghost",
+                "--color-background-info",
+                "--color-background-danger",
+                "--color-background-success",
+                "--color-background-warning",
+                "--color-background-disabled",
+                "--color-text-primary",
+                "--color-text-secondary",
+                "--color-text-tertiary",
+                "--color-text-inverse",
+                "--color-text-ghost",
+                "--color-text-info",
+                "--color-text-danger",
+                "--color-text-success",
+                "--color-text-warning",
+                "--color-text-disabled",
+                "--color-border-primary",
+                "--color-border-secondary",
+                "--color-border-tertiary",
+                "--color-border-inverse",
+                "--color-border-ghost",
+                "--color-border-info",
+                "--color-border-danger",
+                "--color-border-success",
+                "--color-border-warning",
+                "--color-border-disabled",
+                "--color-ring-primary",
+                "--color-ring-secondary",
+                "--color-ring-inverse",
+                "--color-ring-info",
+                "--color-ring-danger",
+                "--color-ring-success",
+                "--color-ring-warning",
+                "--font-sans",
+                "--font-mono",
+                "--font-weight-normal",
+                "--font-weight-medium",
+                "--font-weight-semibold",
+                "--font-weight-bold",
+                "--font-text-xs-size",
+                "--font-text-sm-size",
+                "--font-text-md-size",
+                "--font-text-lg-size",
+                "--font-heading-xs-size",
+                "--font-heading-sm-size",
+                "--font-heading-md-size",
+                "--font-heading-lg-size",
+                "--font-heading-xl-size",
+                "--font-heading-2xl-size",
+                "--font-heading-3xl-size",
+                "--font-text-xs-line-height",
+                "--font-text-sm-line-height",
+                "--font-text-md-line-height",
+                "--font-text-lg-line-height",
+                "--font-heading-xs-line-height",
+                "--font-heading-sm-line-height",
+                "--font-heading-md-line-height",
+                "--font-heading-lg-line-height",
+                "--font-heading-xl-line-height",
+                "--font-heading-2xl-line-height",
+                "--font-heading-3xl-line-height",
+                "--border-radius-xs",
+                "--border-radius-sm",
+                "--border-radius-md",
+                "--border-radius-lg",
+                "--border-radius-xl",
+                "--border-radius-full",
+                "--border-width-regular",
+                "--shadow-hairline",
+                "--shadow-sm",
+                "--shadow-md",
+                "--shadow-lg"
+              ]
             },
             "css": {
               "description": "CSS blocks that apps can inject.",
@@ -1312,8 +1476,8 @@
                   "type": "object",
                   "properties": {
                     "height": {
-                      "description": "Fixed container height in pixels.",
-                      "type": "number"
+                      "type": "number",
+                      "description": "Fixed container height in pixels."
                     }
                   },
                   "required": ["height"],
@@ -1342,8 +1506,8 @@
                   "type": "object",
                   "properties": {
                     "width": {
-                      "description": "Fixed container width in pixels.",
-                      "type": "number"
+                      "type": "number",
+                      "description": "Fixed container width in pixels."
                     }
                   },
                   "required": ["width"],
@@ -1417,20 +1581,20 @@
           "type": "object",
           "properties": {
             "top": {
-              "description": "Top safe area inset in pixels.",
-              "type": "number"
+              "type": "number",
+              "description": "Top safe area inset in pixels."
             },
             "right": {
-              "description": "Right safe area inset in pixels.",
-              "type": "number"
+              "type": "number",
+              "description": "Right safe area inset in pixels."
             },
             "bottom": {
-              "description": "Bottom safe area inset in pixels.",
-              "type": "number"
+              "type": "number",
+              "description": "Bottom safe area inset in pixels."
             },
             "left": {
-              "description": "Left safe area inset in pixels.",
-              "type": "number"
+              "type": "number",
+              "description": "Left safe area inset in pixels."
             }
           },
           "required": ["top", "right", "bottom", "left"],
@@ -1458,7 +1622,6 @@
           "description": "CSS variables for theming the app.",
           "type": "object",
           "propertyNames": {
-            "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
             "anyOf": [
               {
                 "type": "string",
@@ -1768,17 +1931,96 @@
                 "type": "string",
                 "const": "--shadow-lg"
               }
-            ]
+            ],
+            "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
           },
           "additionalProperties": {
-            "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
             "anyOf": [
               {
                 "type": "string"
               },
               {}
-            ]
-          }
+            ],
+            "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
+          },
+          "required": [
+            "--color-background-primary",
+            "--color-background-secondary",
+            "--color-background-tertiary",
+            "--color-background-inverse",
+            "--color-background-ghost",
+            "--color-background-info",
+            "--color-background-danger",
+            "--color-background-success",
+            "--color-background-warning",
+            "--color-background-disabled",
+            "--color-text-primary",
+            "--color-text-secondary",
+            "--color-text-tertiary",
+            "--color-text-inverse",
+            "--color-text-ghost",
+            "--color-text-info",
+            "--color-text-danger",
+            "--color-text-success",
+            "--color-text-warning",
+            "--color-text-disabled",
+            "--color-border-primary",
+            "--color-border-secondary",
+            "--color-border-tertiary",
+            "--color-border-inverse",
+            "--color-border-ghost",
+            "--color-border-info",
+            "--color-border-danger",
+            "--color-border-success",
+            "--color-border-warning",
+            "--color-border-disabled",
+            "--color-ring-primary",
+            "--color-ring-secondary",
+            "--color-ring-inverse",
+            "--color-ring-info",
+            "--color-ring-danger",
+            "--color-ring-success",
+            "--color-ring-warning",
+            "--font-sans",
+            "--font-mono",
+            "--font-weight-normal",
+            "--font-weight-medium",
+            "--font-weight-semibold",
+            "--font-weight-bold",
+            "--font-text-xs-size",
+            "--font-text-sm-size",
+            "--font-text-md-size",
+            "--font-text-lg-size",
+            "--font-heading-xs-size",
+            "--font-heading-sm-size",
+            "--font-heading-md-size",
+            "--font-heading-lg-size",
+            "--font-heading-xl-size",
+            "--font-heading-2xl-size",
+            "--font-heading-3xl-size",
+            "--font-text-xs-line-height",
+            "--font-text-sm-line-height",
+            "--font-text-md-line-height",
+            "--font-text-lg-line-height",
+            "--font-heading-xs-line-height",
+            "--font-heading-sm-line-height",
+            "--font-heading-md-line-height",
+            "--font-heading-lg-line-height",
+            "--font-heading-xl-line-height",
+            "--font-heading-2xl-line-height",
+            "--font-heading-3xl-line-height",
+            "--border-radius-xs",
+            "--border-radius-sm",
+            "--border-radius-md",
+            "--border-radius-lg",
+            "--border-radius-xl",
+            "--border-radius-full",
+            "--border-width-regular",
+            "--shadow-hairline",
+            "--shadow-sm",
+            "--shadow-md",
+            "--shadow-lg"
+          ]
         },
         "css": {
           "description": "CSS blocks that apps can inject.",
@@ -1806,7 +2048,6 @@
           "type": "object",
           "properties": {
             "appInfo": {
-              "description": "App identification (name and version).",
               "type": "object",
               "properties": {
                 "name": {
@@ -1831,6 +2072,10 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "theme": {
+                        "type": "string",
+                        "enum": ["light", "dark"]
                       }
                     },
                     "required": ["src"],
@@ -1842,13 +2087,16 @@
                 },
                 "websiteUrl": {
                   "type": "string"
+                },
+                "description": {
+                  "type": "string"
                 }
               },
               "required": ["name", "version"],
-              "additionalProperties": false
+              "additionalProperties": false,
+              "description": "App identification (name and version)."
             },
             "appCapabilities": {
-              "description": "Features and capabilities this app provides.",
               "type": "object",
               "properties": {
                 "experimental": {
@@ -1869,11 +2117,12 @@
                   "additionalProperties": false
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": false,
+              "description": "Features and capabilities this app provides."
             },
             "protocolVersion": {
-              "description": "Protocol version this app supports.",
-              "type": "string"
+              "type": "string",
+              "description": "Protocol version this app supports."
             }
           },
           "required": ["appInfo", "appCapabilities", "protocolVersion"],
@@ -1888,11 +2137,10 @@
       "type": "object",
       "properties": {
         "protocolVersion": {
-          "description": "Negotiated protocol version string (e.g., \"2025-11-21\").",
-          "type": "string"
+          "type": "string",
+          "description": "Negotiated protocol version string (e.g., \"2025-11-21\")."
         },
         "hostInfo": {
-          "description": "Host application identification and version.",
           "type": "object",
           "properties": {
             "name": {
@@ -1917,6 +2165,10 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "theme": {
+                    "type": "string",
+                    "enum": ["light", "dark"]
                   }
                 },
                 "required": ["src"],
@@ -1928,13 +2180,16 @@
             },
             "websiteUrl": {
               "type": "string"
+            },
+            "description": {
+              "type": "string"
             }
           },
           "required": ["name", "version"],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Host application identification and version."
         },
         "hostCapabilities": {
-          "description": "Features and capabilities provided by the host.",
           "type": "object",
           "properties": {
             "experimental": {
@@ -1978,10 +2233,10 @@
               "additionalProperties": false
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Features and capabilities provided by the host."
         },
         "hostContext": {
-          "description": "Rich context about the host environment.",
           "type": "object",
           "properties": {
             "toolInfo": {
@@ -2002,7 +2257,6 @@
                   ]
                 },
                 "tool": {
-                  "description": "Tool definition including name, inputSchema, etc.",
                   "type": "object",
                   "properties": {
                     "name": {
@@ -2027,6 +2281,10 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "theme": {
+                            "type": "string",
+                            "enum": ["light", "dark"]
                           }
                         },
                         "required": ["src"],
@@ -2124,10 +2382,11 @@
                     }
                   },
                   "required": ["name", "inputSchema"],
-                  "additionalProperties": false
+                  "additionalProperties": false,
+                  "description": "Tool definition including name, inputSchema, etc."
                 }
               },
-              "required": ["id", "tool"],
+              "required": ["tool"],
               "additionalProperties": false
             },
             "theme": {
@@ -2151,7 +2410,6 @@
                   "description": "CSS variables for theming the app.",
                   "type": "object",
                   "propertyNames": {
-                    "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -2461,17 +2719,96 @@
                         "type": "string",
                         "const": "--shadow-lg"
                       }
-                    ]
+                    ],
+                    "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
                   },
                   "additionalProperties": {
-                    "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
                     "anyOf": [
                       {
                         "type": "string"
                       },
                       {}
-                    ]
-                  }
+                    ],
+                    "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
+                  },
+                  "required": [
+                    "--color-background-primary",
+                    "--color-background-secondary",
+                    "--color-background-tertiary",
+                    "--color-background-inverse",
+                    "--color-background-ghost",
+                    "--color-background-info",
+                    "--color-background-danger",
+                    "--color-background-success",
+                    "--color-background-warning",
+                    "--color-background-disabled",
+                    "--color-text-primary",
+                    "--color-text-secondary",
+                    "--color-text-tertiary",
+                    "--color-text-inverse",
+                    "--color-text-ghost",
+                    "--color-text-info",
+                    "--color-text-danger",
+                    "--color-text-success",
+                    "--color-text-warning",
+                    "--color-text-disabled",
+                    "--color-border-primary",
+                    "--color-border-secondary",
+                    "--color-border-tertiary",
+                    "--color-border-inverse",
+                    "--color-border-ghost",
+                    "--color-border-info",
+                    "--color-border-danger",
+                    "--color-border-success",
+                    "--color-border-warning",
+                    "--color-border-disabled",
+                    "--color-ring-primary",
+                    "--color-ring-secondary",
+                    "--color-ring-inverse",
+                    "--color-ring-info",
+                    "--color-ring-danger",
+                    "--color-ring-success",
+                    "--color-ring-warning",
+                    "--font-sans",
+                    "--font-mono",
+                    "--font-weight-normal",
+                    "--font-weight-medium",
+                    "--font-weight-semibold",
+                    "--font-weight-bold",
+                    "--font-text-xs-size",
+                    "--font-text-sm-size",
+                    "--font-text-md-size",
+                    "--font-text-lg-size",
+                    "--font-heading-xs-size",
+                    "--font-heading-sm-size",
+                    "--font-heading-md-size",
+                    "--font-heading-lg-size",
+                    "--font-heading-xl-size",
+                    "--font-heading-2xl-size",
+                    "--font-heading-3xl-size",
+                    "--font-text-xs-line-height",
+                    "--font-text-sm-line-height",
+                    "--font-text-md-line-height",
+                    "--font-text-lg-line-height",
+                    "--font-heading-xs-line-height",
+                    "--font-heading-sm-line-height",
+                    "--font-heading-md-line-height",
+                    "--font-heading-lg-line-height",
+                    "--font-heading-xl-line-height",
+                    "--font-heading-2xl-line-height",
+                    "--font-heading-3xl-line-height",
+                    "--border-radius-xs",
+                    "--border-radius-sm",
+                    "--border-radius-md",
+                    "--border-radius-lg",
+                    "--border-radius-xl",
+                    "--border-radius-full",
+                    "--border-width-regular",
+                    "--shadow-hairline",
+                    "--shadow-sm",
+                    "--shadow-md",
+                    "--shadow-lg"
+                  ]
                 },
                 "css": {
                   "description": "CSS blocks that apps can inject.",
@@ -2520,8 +2857,8 @@
                       "type": "object",
                       "properties": {
                         "height": {
-                          "description": "Fixed container height in pixels.",
-                          "type": "number"
+                          "type": "number",
+                          "description": "Fixed container height in pixels."
                         }
                       },
                       "required": ["height"],
@@ -2550,8 +2887,8 @@
                       "type": "object",
                       "properties": {
                         "width": {
-                          "description": "Fixed container width in pixels.",
-                          "type": "number"
+                          "type": "number",
+                          "description": "Fixed container width in pixels."
                         }
                       },
                       "required": ["width"],
@@ -2625,27 +2962,28 @@
               "type": "object",
               "properties": {
                 "top": {
-                  "description": "Top safe area inset in pixels.",
-                  "type": "number"
+                  "type": "number",
+                  "description": "Top safe area inset in pixels."
                 },
                 "right": {
-                  "description": "Right safe area inset in pixels.",
-                  "type": "number"
+                  "type": "number",
+                  "description": "Right safe area inset in pixels."
                 },
                 "bottom": {
-                  "description": "Bottom safe area inset in pixels.",
-                  "type": "number"
+                  "type": "number",
+                  "description": "Bottom safe area inset in pixels."
                 },
                 "left": {
-                  "description": "Left safe area inset in pixels.",
-                  "type": "number"
+                  "type": "number",
+                  "description": "Left safe area inset in pixels."
                 }
               },
               "required": ["top", "right", "bottom", "left"],
               "additionalProperties": false
             }
           },
-          "additionalProperties": {}
+          "additionalProperties": {},
+          "description": "Rich context about the host environment."
         }
       },
       "required": [
@@ -2685,12 +3023,11 @@
           "type": "object",
           "properties": {
             "role": {
-              "description": "Message role, currently only \"user\" is supported.",
               "type": "string",
-              "const": "user"
+              "const": "user",
+              "description": "Message role, currently only \"user\" is supported."
             },
             "content": {
-              "description": "Message content blocks (text, image, etc.).",
               "type": "array",
               "items": {
                 "anyOf": [
@@ -2857,6 +3194,10 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "theme": {
+                              "type": "string",
+                              "enum": ["light", "dark"]
                             }
                           },
                           "required": ["src"],
@@ -3000,7 +3341,8 @@
                     "additionalProperties": false
                   }
                 ]
-              }
+              },
+              "description": "Message content blocks (text, image, etc.)."
             }
           },
           "required": ["role", "content"],
@@ -3033,8 +3375,8 @@
           "type": "object",
           "properties": {
             "url": {
-              "description": "URL to open in the host's browser",
-              "type": "string"
+              "type": "string",
+              "description": "URL to open in the host's browser"
             }
           },
           "required": ["url"],
@@ -3067,7 +3409,6 @@
           "type": "object",
           "properties": {
             "mode": {
-              "description": "The display mode being requested.",
               "anyOf": [
                 {
                   "type": "string",
@@ -3081,7 +3422,8 @@
                   "type": "string",
                   "const": "pip"
                 }
-              ]
+              ],
+              "description": "The display mode being requested."
             }
           },
           "required": ["mode"],
@@ -3096,7 +3438,6 @@
       "type": "object",
       "properties": {
         "mode": {
-          "description": "The display mode that was actually set. May differ from requested if not supported.",
           "anyOf": [
             {
               "type": "string",
@@ -3110,7 +3451,8 @@
               "type": "string",
               "const": "pip"
             }
-          ]
+          ],
+          "description": "The display mode that was actually set. May differ from requested if not supported."
         }
       },
       "required": ["mode"],
@@ -3227,8 +3569,8 @@
           "type": "object",
           "properties": {
             "html": {
-              "description": "HTML content to load into the inner iframe.",
-              "type": "string"
+              "type": "string",
+              "description": "HTML content to load into the inner iframe."
             },
             "sandbox": {
               "description": "Optional override for the inner iframe's sandbox attribute.",
@@ -3291,7 +3633,6 @@
     },
     "McpUiStyleVariableKey": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "CSS variable keys available to MCP apps for theming.",
       "anyOf": [
         {
           "type": "string",
@@ -3601,14 +3942,13 @@
           "type": "string",
           "const": "--shadow-lg"
         }
-      ]
+      ],
+      "description": "CSS variable keys available to MCP apps for theming."
     },
     "McpUiStyles": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
       "type": "object",
       "propertyNames": {
-        "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
         "anyOf": [
           {
             "type": "string",
@@ -3918,21 +4258,100 @@
             "type": "string",
             "const": "--shadow-lg"
           }
-        ]
+        ],
+        "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
       },
       "additionalProperties": {
-        "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
         "anyOf": [
           {
             "type": "string"
           },
           {}
-        ]
-      }
+        ],
+        "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
+      },
+      "required": [
+        "--color-background-primary",
+        "--color-background-secondary",
+        "--color-background-tertiary",
+        "--color-background-inverse",
+        "--color-background-ghost",
+        "--color-background-info",
+        "--color-background-danger",
+        "--color-background-success",
+        "--color-background-warning",
+        "--color-background-disabled",
+        "--color-text-primary",
+        "--color-text-secondary",
+        "--color-text-tertiary",
+        "--color-text-inverse",
+        "--color-text-ghost",
+        "--color-text-info",
+        "--color-text-danger",
+        "--color-text-success",
+        "--color-text-warning",
+        "--color-text-disabled",
+        "--color-border-primary",
+        "--color-border-secondary",
+        "--color-border-tertiary",
+        "--color-border-inverse",
+        "--color-border-ghost",
+        "--color-border-info",
+        "--color-border-danger",
+        "--color-border-success",
+        "--color-border-warning",
+        "--color-border-disabled",
+        "--color-ring-primary",
+        "--color-ring-secondary",
+        "--color-ring-inverse",
+        "--color-ring-info",
+        "--color-ring-danger",
+        "--color-ring-success",
+        "--color-ring-warning",
+        "--font-sans",
+        "--font-mono",
+        "--font-weight-normal",
+        "--font-weight-medium",
+        "--font-weight-semibold",
+        "--font-weight-bold",
+        "--font-text-xs-size",
+        "--font-text-sm-size",
+        "--font-text-md-size",
+        "--font-text-lg-size",
+        "--font-heading-xs-size",
+        "--font-heading-sm-size",
+        "--font-heading-md-size",
+        "--font-heading-lg-size",
+        "--font-heading-xl-size",
+        "--font-heading-2xl-size",
+        "--font-heading-3xl-size",
+        "--font-text-xs-line-height",
+        "--font-text-sm-line-height",
+        "--font-text-md-line-height",
+        "--font-text-lg-line-height",
+        "--font-heading-xs-line-height",
+        "--font-heading-sm-line-height",
+        "--font-heading-md-line-height",
+        "--font-heading-lg-line-height",
+        "--font-heading-xl-line-height",
+        "--font-heading-2xl-line-height",
+        "--font-heading-3xl-line-height",
+        "--border-radius-xs",
+        "--border-radius-sm",
+        "--border-radius-md",
+        "--border-radius-lg",
+        "--border-radius-xl",
+        "--border-radius-full",
+        "--border-width-regular",
+        "--shadow-hairline",
+        "--shadow-sm",
+        "--shadow-md",
+        "--shadow-lg"
+      ],
+      "description": "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."
     },
     "McpUiTheme": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Color theme preference for the host environment.",
       "anyOf": [
         {
           "type": "string",
@@ -3942,7 +4361,8 @@
           "type": "string",
           "const": "dark"
         }
-      ]
+      ],
+      "description": "Color theme preference for the host environment."
     },
     "McpUiToolCancelledNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4033,7 +4453,6 @@
           "description": "Who can access this tool. Default: [\"model\", \"app\"]\n- \"model\": Tool visible to and callable by the agent\n- \"app\": Tool callable by the app from this server only",
           "type": "array",
           "items": {
-            "description": "Tool visibility scope - who can access the tool.",
             "anyOf": [
               {
                 "type": "string",
@@ -4043,11 +4462,11 @@
                 "type": "string",
                 "const": "app"
               }
-            ]
+            ],
+            "description": "Tool visibility scope - who can access the tool."
           }
         }
       },
-      "required": ["resourceUri"],
       "additionalProperties": false
     },
     "McpUiToolResultNotification": {
@@ -4059,12 +4478,23 @@
           "const": "ui/notifications/tool-result"
         },
         "params": {
-          "description": "Standard MCP tool execution result.",
           "type": "object",
           "properties": {
             "_meta": {
               "type": "object",
               "properties": {
+                "progressToken": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  ]
+                },
                 "io.modelcontextprotocol/related-task": {
                   "type": "object",
                   "properties": {
@@ -4073,7 +4503,7 @@
                     }
                   },
                   "required": ["taskId"],
-                  "additionalProperties": {}
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": {}
@@ -4246,6 +4676,10 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "theme": {
+                              "type": "string",
+                              "enum": ["light", "dark"]
                             }
                           },
                           "required": ["src"],
@@ -4403,7 +4837,8 @@
             }
           },
           "required": ["content"],
-          "additionalProperties": {}
+          "additionalProperties": {},
+          "description": "Standard MCP tool execution result."
         }
       },
       "required": ["method", "params"],
@@ -4411,7 +4846,6 @@
     },
     "McpUiToolVisibility": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Tool visibility scope - who can access the tool.",
       "anyOf": [
         {
           "type": "string",
@@ -4421,7 +4855,8 @@
           "type": "string",
           "const": "app"
         }
-      ]
+      ],
+      "description": "Tool visibility scope - who can access the tool."
     }
   }
 }

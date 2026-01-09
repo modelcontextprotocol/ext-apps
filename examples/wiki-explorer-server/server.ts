@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type {
   CallToolResult,
   ReadResourceResult,
@@ -13,7 +14,7 @@ import {
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
-import { startServer } from "./src/server-utils.js";
+import { startServer } from "./server-utils.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 
@@ -71,7 +72,7 @@ function extractWikiLinks(pageUrl: URL, html: string): PageInfo[] {
   }));
 }
 
-function createServer(): McpServer {
+export function createServer(): McpServer {
   const server = new McpServer({
     name: "Wiki Explorer",
     version: "1.0.0",
@@ -151,4 +152,16 @@ function createServer(): McpServer {
   return server;
 }
 
-startServer(createServer);
+async function main() {
+  if (process.argv.includes("--stdio")) {
+    await createServer().connect(new StdioServerTransport());
+  } else {
+    const port = parseInt(process.env.PORT ?? "3109", 10);
+    await startServer(createServer, { port, name: "Wiki Explorer" });
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

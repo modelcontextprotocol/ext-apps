@@ -1,7 +1,7 @@
 /**
  * @file App that demonstrates a few features using MCP Apps SDK + React.
  */
-import type { App } from "@modelcontextprotocol/ext-apps";
+import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { StrictMode, useCallback, useEffect, useState } from "react";
@@ -27,6 +27,7 @@ function extractTime(callToolResult: CallToolResult): string {
 
 function GetTimeApp() {
   const [toolResult, setToolResult] = useState<CallToolResult | null>(null);
+  const [hostContext, setHostContext] = useState<McpUiHostContext | undefined>();
   const { app, error } = useApp({
     appInfo: IMPLEMENTATION,
     capabilities: {},
@@ -45,21 +46,32 @@ function GetTimeApp() {
       };
 
       app.onerror = log.error;
+
+      app.onhostcontextchanged = (params) => {
+        setHostContext((prev) => ({ ...prev, ...params }));
+      };
     },
   });
+
+  useEffect(() => {
+    if (app) {
+      setHostContext(app.getHostContext());
+    }
+  }, [app]);
 
   if (error) return <div><strong>ERROR:</strong> {error.message}</div>;
   if (!app) return <div>Connecting...</div>;
 
-  return <GetTimeAppInner app={app} toolResult={toolResult} />;
+  return <GetTimeAppInner app={app} toolResult={toolResult} hostContext={hostContext} />;
 }
 
 
 interface GetTimeAppInnerProps {
   app: App;
   toolResult: CallToolResult | null;
+  hostContext?: McpUiHostContext;
 }
-function GetTimeAppInner({ app, toolResult }: GetTimeAppInnerProps) {
+function GetTimeAppInner({ app, toolResult, hostContext }: GetTimeAppInnerProps) {
   const [serverTime, setServerTime] = useState("Loading...");
   const [messageText, setMessageText] = useState("This is message text.");
   const [logText, setLogText] = useState("This is log text.");
@@ -109,7 +121,15 @@ function GetTimeAppInner({ app, toolResult }: GetTimeAppInnerProps) {
   }, [app, linkUrl]);
 
   return (
-    <main className={styles.main}>
+    <main
+      className={styles.main}
+      style={{
+        paddingTop: hostContext?.safeAreaInsets?.top,
+        paddingRight: hostContext?.safeAreaInsets?.right,
+        paddingBottom: hostContext?.safeAreaInsets?.bottom,
+        paddingLeft: hostContext?.safeAreaInsets?.left,
+      }}
+    >
       <p className={styles.notice}>Watch activity in the DevTools console!</p>
 
       <div className={styles.action}>

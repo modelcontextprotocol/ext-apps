@@ -36,6 +36,10 @@ jobs:
         shell: bash
         run: '! grep -E "\"resolved\": \"https?://" package-lock.json | grep -v registry.npmjs.org'
 
+      - name: Verify example dependency versions
+        shell: bash
+        run: node scripts/check-versions.mjs
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"

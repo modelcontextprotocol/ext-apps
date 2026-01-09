@@ -4,7 +4,7 @@
  * Interactive cohort retention analysis heatmap showing customer retention
  * over time by signup month. Hover for details, click to drill down.
  */
-import type { App } from "@modelcontextprotocol/ext-apps";
+import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -65,19 +65,39 @@ function formatNumber(n: number): string {
 
 // Main App Component
 function CohortHeatmapApp() {
+  const [hostContext, setHostContext] = useState<
+    McpUiHostContext | undefined
+  >();
   const { app, error } = useApp({
     appInfo: IMPLEMENTATION,
     capabilities: {},
+    onAppCreated: (app) => {
+      app.onhostcontextchanged = (params) => {
+        setHostContext((prev) => ({ ...prev, ...params }));
+      };
+    },
   });
+
+  useEffect(() => {
+    if (app) {
+      setHostContext(app.getHostContext());
+    }
+  }, [app]);
 
   if (error) return <div className={styles.error}>ERROR: {error.message}</div>;
   if (!app) return <div className={styles.loading}>Connecting...</div>;
 
-  return <CohortHeatmapInner app={app} />;
+  return <CohortHeatmapInner app={app} hostContext={hostContext} />;
 }
 
 // Inner App with state management
-function CohortHeatmapInner({ app }: { app: App }) {
+function CohortHeatmapInner({
+  app,
+  hostContext,
+}: {
+  app: App;
+  hostContext?: McpUiHostContext;
+}) {
   const [data, setData] = useState<CohortData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<MetricType>("retention");
@@ -143,7 +163,15 @@ function CohortHeatmapInner({ app }: { app: App }) {
   }, []);
 
   return (
-    <main className={styles.container}>
+    <main
+      className={styles.container}
+      style={{
+        paddingTop: hostContext?.safeAreaInsets?.top,
+        paddingRight: hostContext?.safeAreaInsets?.right,
+        paddingBottom: hostContext?.safeAreaInsets?.bottom,
+        paddingLeft: hostContext?.safeAreaInsets?.left,
+      }}
+    >
       <Header
         selectedMetric={selectedMetric}
         selectedPeriodType={selectedPeriodType}

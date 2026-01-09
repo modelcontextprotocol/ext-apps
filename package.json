@@ -5,7 +5,7 @@
     "url": "https://github.com/modelcontextprotocol/ext-apps"
   },
   "homepage": "https://github.com/modelcontextprotocol/ext-apps",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "license": "MIT",
   "description": "MCP Apps SDK — Enable MCP servers to display interactive user interfaces in conversational clients.",
   "type": "module",
@@ -15,9 +15,17 @@
       "types": "./dist/src/app.d.ts",
       "default": "./dist/src/app.js"
     },
+    "./app-with-deps": {
+      "types": "./dist/src/app.d.ts",
+      "default": "./dist/src/app-with-deps.js"
+    },
     "./react": {
       "types": "./dist/src/react/index.d.ts",
       "default": "./dist/src/react/index.js"
+    },
+    "./react-with-deps": {
+      "types": "./dist/src/react/index.d.ts",
+      "default": "./dist/src/react/react-with-deps.js"
     },
     "./app-bridge": {
       "types": "./dist/src/app-bridge.d.ts",
@@ -41,13 +49,14 @@
     "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
     "build": "npm run generate:schemas && node scripts/run-bun.mjs build.bun.ts",
     "prepack": "npm run build",
-    "build:all": "npm run build && npm run examples:build",
+    "build:all": "npm run examples:build",
     "test": "bun test src",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:docker": "docker run --rm -v $(pwd):/work -w /work -it mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'npm i -g bun && npm ci && npx playwright test'",
     "test:e2e:docker:update": "docker run --rm -v $(pwd):/work -w /work -it mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'npm i -g bun && npm ci && npx playwright test --update-snapshots'",
+    "preexamples:build": "npm run build",
     "examples:build": "bun examples/run-all.ts build",
     "examples:start": "NODE_ENV=development npm run build && bun examples/run-all.ts start",
     "examples:dev": "NODE_ENV=development bun examples/run-all.ts dev",
@@ -56,7 +65,8 @@
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
     "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
-    "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write"
+    "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write",
+    "check:versions": "node scripts/check-versions.mjs"
   },
   "author": "Olivier Chafik",
   "devDependencies": {
@@ -111,6 +121,7 @@
     "@rollup/rollup-darwin-x64": "^4.53.3",
     "@rollup/rollup-linux-arm64-gnu": "^4.53.3",
     "@rollup/rollup-linux-x64-gnu": "^4.53.3",
+    "@rollup/rollup-win32-arm64-msvc": "^4.53.3",
     "@rollup/rollup-win32-x64-msvc": "^4.53.3"
   }
 }

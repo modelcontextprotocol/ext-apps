@@ -21,7 +21,8 @@ import {
   RESOURCE_MIME_TYPE,
   RESOURCE_URI_META_KEY,
 } from "@modelcontextprotocol/ext-apps/server";
-import { startServer } from "./src/server-utils.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { startServer } from "./server-utils.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 const RESOURCE_URI = "ui://video-player/mcp-app.html";
@@ -123,6 +124,7 @@ ${Object.entries(VIDEO_LIBRARY)
       inputSchema: {
         videoId: z
           .enum(Object.keys(VIDEO_LIBRARY) as [string, ...string[]])
+          .default("bunny-1mb")
           .describe(
             `Video ID to play. Available: ${Object.keys(VIDEO_LIBRARY).join(", ")}`,
           ),
@@ -168,7 +170,12 @@ ${Object.entries(VIDEO_LIBRARY)
 }
 
 async function main() {
-  await startServer(createServer);
+  if (process.argv.includes("--stdio")) {
+    await createServer().connect(new StdioServerTransport());
+  } else {
+    const port = parseInt(process.env.PORT ?? "3001", 10);
+    await startServer(createServer, { port, name: "Video Resource Server" });
+  }
 }
 
 main().catch((e) => {

@@ -20,4 +20,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx pkg-pr-new publish
+      - run: npm run examples:build
+      - run: |
+          npx pkg-pr-new publish \
+            . \
+            ./examples/basic-server-react \
+            ./examples/basic-server-vanillajs \
+            ./examples/budget-allocator-server \
+            ./examples/cohort-heatmap-server \
+            ./examples/customer-segmentation-server \
+            ./examples/scenario-modeler-server \
+            ./examples/system-monitor-server \
+            ./examples/threejs-server \
+            ./examples/wiki-explorer-server
