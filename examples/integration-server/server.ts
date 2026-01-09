@@ -36,13 +36,15 @@ export function createServer(): McpServer {
       _meta: { [RESOURCE_URI_META_KEY]: RESOURCE_URI },
     },
     async (): Promise<CallToolResult> => {
+      const time = new Date().toISOString();
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ time: new Date().toISOString() }),
+            text: JSON.stringify({ time }),
           },
         ],
+        structuredContent: { time },
       };
     },
   );

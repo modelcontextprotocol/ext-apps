@@ -169,13 +169,10 @@ export function createServer(): McpServer {
       _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
     },
     async ({ code, height }) => {
+      const data = { code, height };
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ code, height }),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(data) }],
+        structuredContent: data,
       };
     },
   );

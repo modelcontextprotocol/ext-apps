@@ -28,18 +28,7 @@ const videoInfoEl = document.getElementById("video-info")!;
 function parseToolResult(
   result: CallToolResult,
 ): { videoUri: string; description: string } | null {
-  const text = result.content
-    ?.filter((c): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("");
-
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text) as { videoUri: string; description: string };
-  } catch {
-    return null;
-  }
+  return result.structuredContent as { videoUri: string; description: string } | null;
 }
 
 // Show states

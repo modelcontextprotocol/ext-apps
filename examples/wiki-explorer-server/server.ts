@@ -121,11 +121,17 @@ export function createServer(): McpServer {
         const links = extractWikiLinks(new URL(url), html);
 
         const result = { page: { url, title }, links, error: null };
-        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: result,
+        };
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
         const result = { page: { url, title }, links: [], error };
-        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: result,
+        };
       }
     },
   );

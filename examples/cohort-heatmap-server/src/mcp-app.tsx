@@ -123,13 +123,7 @@ function CohortHeatmapInner({
           maxPeriods: 12,
         },
       });
-      const text = result
-        .content!.filter(
-          (c): c is { type: "text"; text: string } => c.type === "text",
-        )
-        .map((c) => c.text)
-        .join("");
-      setData(JSON.parse(text) as CohortData);
+      setData(result.structuredContent as CohortData);
     } catch (e) {
       console.error("Failed to fetch cohort data:", e);
     } finally {

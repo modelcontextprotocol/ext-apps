@@ -1,6 +1,5 @@
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { StrictMode, useState, useMemo, useCallback, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { SliderRow } from "./components/SliderRow.tsx";
@@ -23,18 +22,6 @@ import "./mcp-app.css";
 interface CallToolResultData {
   templates?: ScenarioTemplate[];
   defaultInputs?: ScenarioInputs;
-}
-
-/** Extract templates and defaultInputs from tool result content */
-function extractResultData(result: CallToolResult): CallToolResultData {
-  const text = result
-    .content!.filter(
-      (c): c is { type: "text"; text: string } => c.type === "text",
-    )
-    .map((c) => c.text)
-    .join("");
-  const { templates, defaultInputs } = JSON.parse(text) as CallToolResultData;
-  return { templates, defaultInputs };
 }
 
 const APP_INFO = { name: "SaaS Scenario Modeler", version: "1.0.0" };
@@ -70,7 +57,8 @@ function ScenarioModeler() {
     capabilities: {},
     onAppCreated: (app) => {
       app.ontoolresult = async (result) => {
-        const { templates, defaultInputs } = extractResultData(result);
+        const { templates, defaultInputs } =
+          result.structuredContent as CallToolResultData;
         if (templates) setTemplates(templates);
         if (defaultInputs) setDefaultInputs(defaultInputs);
       };
