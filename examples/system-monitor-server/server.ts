@@ -124,6 +124,7 @@ export function createServer(): McpServer {
       description:
         "Returns current system statistics including per-core CPU usage, memory, and system info.",
       inputSchema: {},
+      outputSchema: SystemStatsSchema.shape,
       _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
     },
     async (): Promise<CallToolResult> => {

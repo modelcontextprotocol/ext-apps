@@ -123,7 +123,7 @@ function CohortHeatmapInner({
           maxPeriods: 12,
         },
       });
-      setData(result.structuredContent as CohortData);
+      setData(result.structuredContent as unknown as CohortData);
     } catch (e) {
       console.error("Failed to fetch cohort data:", e);
     } finally {

@@ -248,6 +248,7 @@ export function createServer(): McpServer {
       description:
         "Returns budget configuration with 24 months of historical allocations and industry benchmarks by company stage",
       inputSchema: {},
+      outputSchema: BudgetDataResponseSchema,
       _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
     },
     async (): Promise<CallToolResult> => {

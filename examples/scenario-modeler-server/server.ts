@@ -64,6 +64,13 @@ const GetScenarioDataInputSchema = z.object({
   ),
 });
 
+const GetScenarioDataOutputSchema = z.object({
+  templates: z.array(ScenarioTemplateSchema),
+  defaultInputs: ScenarioInputsSchema,
+  customProjections: z.array(MonthlyProjectionSchema).optional(),
+  customSummary: ScenarioSummarySchema.optional(),
+});
+
 // Types derived from schemas
 type ScenarioInputs = z.infer<typeof ScenarioInputsSchema>;
 type MonthlyProjection = z.infer<typeof MonthlyProjectionSchema>;
@@ -269,6 +276,7 @@ export function createServer(): McpServer {
         description:
           "Returns SaaS scenario templates and optionally computes custom projections for given inputs",
         inputSchema: GetScenarioDataInputSchema.shape,
+        outputSchema: GetScenarioDataOutputSchema.shape,
         _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
       },
       async (args: {

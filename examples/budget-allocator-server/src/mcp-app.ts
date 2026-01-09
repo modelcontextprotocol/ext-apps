@@ -607,7 +607,7 @@ const app = new App({ name: "Budget Allocator", version: "1.0.0" });
 
 app.ontoolresult = (result) => {
   log.info("Received tool result:", result);
-  const data = result.structuredContent as BudgetDataResponse;
+  const data = result.structuredContent as unknown as BudgetDataResponse;
   if (data?.config && data?.analytics) {
     initializeUI(data.config, data.analytics);
   }

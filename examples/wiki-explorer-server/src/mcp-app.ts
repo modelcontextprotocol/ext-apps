@@ -327,7 +327,7 @@ function handleToolResultData(result: CallToolResult): void {
     return;
   }
 
-  const response = result.structuredContent as ToolResponse;
+  const response = result.structuredContent as unknown as ToolResponse;
   const { page, links, error } = response;
 
   // Ensure the source node exists

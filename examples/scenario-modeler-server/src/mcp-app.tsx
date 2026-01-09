@@ -58,7 +58,7 @@ function ScenarioModeler() {
     onAppCreated: (app) => {
       app.ontoolresult = async (result) => {
         const { templates, defaultInputs } =
-          result.structuredContent as CallToolResultData;
+          result.structuredContent as unknown as CallToolResultData;
         if (templates) setTemplates(templates);
         if (defaultInputs) setDefaultInputs(defaultInputs);
       };
