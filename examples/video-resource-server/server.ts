@@ -129,6 +129,10 @@ ${Object.entries(VIDEO_LIBRARY)
             `Video ID to play. Available: ${Object.keys(VIDEO_LIBRARY).join(", ")}`,
           ),
       },
+      outputSchema: z.object({
+        videoUri: z.string(),
+        description: z.string(),
+      }),
       _meta: { [RESOURCE_URI_META_KEY]: RESOURCE_URI },
     },
     async ({ videoId }): Promise<CallToolResult> => {

@@ -166,6 +166,10 @@ export function createServer(): McpServer {
           .default(400)
           .describe("Height in pixels"),
       },
+      outputSchema: z.object({
+        code: z.string(),
+        height: z.number(),
+      }),
       _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
     },
     async ({ code, height }) => {

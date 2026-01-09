@@ -95,6 +95,19 @@ export function createServer(): McpServer {
           .default("https://en.wikipedia.org/wiki/Model_Context_Protocol")
           .describe("Wikipedia page URL"),
       }),
+      outputSchema: z.object({
+        page: z.object({
+          url: z.string(),
+          title: z.string(),
+        }),
+        links: z.array(
+          z.object({
+            url: z.string(),
+            title: z.string(),
+          }),
+        ),
+        error: z.string().nullable(),
+      }),
       _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
     },
     async ({ url }): Promise<CallToolResult> => {

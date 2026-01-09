@@ -265,7 +265,7 @@ async function fetchStats(): Promise<void> {
       arguments: {},
     });
 
-    const stats = result.structuredContent as SystemStats;
+    const stats = result.structuredContent as unknown as SystemStats;
 
     // Initialize chart on first data if needed
     if (!state.chart && stats.cpu.count > 0) {
