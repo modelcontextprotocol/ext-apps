@@ -1027,7 +1027,10 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @see {@link PostMessageTransport} for the typical transport implementation
    */
   override async connect(
-    transport: Transport = new PostMessageTransport(window.parent),
+    transport: Transport = new PostMessageTransport(
+      window.parent,
+      window.parent,
+    ),
     options?: RequestOptions,
   ): Promise<void> {
     await super.connect(transport);

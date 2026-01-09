@@ -1,8 +1,20 @@
 {
-  "name": "cohort-heatmap-server",
-  "version": "1.0.0",
-  "private": true,
+  "name": "@modelcontextprotocol/server-cohort-heatmap",
+  "version": "0.1.0",
   "type": "module",
+  "description": "Cohort heatmap MCP App Server for retention analysis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "directory": "examples/cohort-heatmap-server"
+  },
+  "license": "MIT",
+  "main": "server.ts",
+  "files": [
+    "server.ts",
+    "server-utils.ts",
+    "dist"
+  ],
   "scripts": {
     "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
@@ -11,10 +23,11 @@
     "start": "npm run start:http",
     "start:http": "cross-env NODE_ENV=development npm run build && npm run serve:http",
     "start:stdio": "cross-env NODE_ENV=development npm run build && npm run serve:stdio",
-    "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve:http'"
+    "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve:http'",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "../..",
+    "@modelcontextprotocol/ext-apps": "^0.2.2",
     "@modelcontextprotocol/sdk": "^1.24.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -29,6 +42,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.2.1",
     "cors": "^2.8.5",
+    "cross-env": "^10.1.0",
     "express": "^5.1.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",

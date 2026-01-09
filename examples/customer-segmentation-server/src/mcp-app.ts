@@ -6,6 +6,7 @@ import {
   applyHostStyleVariables,
   applyHostFonts,
   applyDocumentTheme,
+  type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
 import { Chart, registerables } from "chart.js";
 import "./global.css";
@@ -22,6 +23,7 @@ const log = {
 };
 
 // DOM element references
+const mainEl = document.querySelector(".main") as HTMLElement;
 const xAxisSelect = document.getElementById("x-axis") as HTMLSelectElement;
 const yAxisSelect = document.getElementById("y-axis") as HTMLSelectElement;
 const sizeMetricSelect = document.getElementById(
@@ -449,34 +451,35 @@ applyDocumentTheme(systemDark ? "dark" : "light");
 app.onerror = log.error;
 
 // Handle host context changes (theme, styles, and fonts from host)
-app.onhostcontextchanged = (params) => {
-  if (params.theme) {
-    applyDocumentTheme(params.theme);
+function handleHostContextChanged(ctx: McpUiHostContext) {
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
   }
-  if (params.styles?.variables) {
-    applyHostStyleVariables(params.styles.variables);
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-  if (params.styles?.css?.fonts) {
-    applyHostFonts(params.styles.css.fonts);
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+  if (ctx.safeAreaInsets) {
+    mainEl.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
+    mainEl.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
+    mainEl.style.paddingBottom = `${ctx.safeAreaInsets.bottom}px`;
+    mainEl.style.paddingLeft = `${ctx.safeAreaInsets.left}px`;
   }
   // Recreate chart to pick up new colors
-  if (state.chart && (params.theme || params.styles?.variables)) {
+  if (state.chart && (ctx.theme || ctx.styles?.variables)) {
     state.chart.destroy();
     state.chart = initChart();
   }
-};
+}
+
+app.onhostcontextchanged = handleHostContextChanged;
 
 app.connect().then(() => {
-  // Apply initial host context after connection
   const ctx = app.getHostContext();
-  if (ctx?.theme) {
-    applyDocumentTheme(ctx.theme);
-  }
-  if (ctx?.styles?.variables) {
-    applyHostStyleVariables(ctx.styles.variables);
-  }
-  if (ctx?.styles?.css?.fonts) {
-    applyHostFonts(ctx.styles.css.fonts);
+  if (ctx) {
+    handleHostContextChanged(ctx);
   }
 });
 

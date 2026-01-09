@@ -140,7 +140,7 @@ export default function ThreeJSApp({
   toolInputs,
   toolInputsPartial,
   toolResult: _toolResult,
-  hostContext: _hostContext,
+  hostContext,
   callServerTool: _callServerTool,
   sendMessage: _sendMessage,
   openLink: _openLink,
@@ -155,6 +155,14 @@ export default function ThreeJSApp({
   const partialCode = toolInputsPartial?.code;
   const isStreaming = !toolInputs && !!toolInputsPartial;
 
+  const safeAreaInsets = hostContext?.safeAreaInsets;
+  const containerStyle = {
+    paddingTop: safeAreaInsets?.top,
+    paddingRight: safeAreaInsets?.right,
+    paddingBottom: safeAreaInsets?.bottom,
+    paddingLeft: safeAreaInsets?.left,
+  };
+
   useEffect(() => {
     if (!code || !canvasRef.current || !containerRef.current) return;
 
@@ -166,12 +174,21 @@ export default function ThreeJSApp({
   }, [code, height]);
 
   if (isStreaming || !code) {
-    return <LoadingShimmer height={height} code={partialCode} />;
+    return (
+      <div style={containerStyle}>
+        <LoadingShimmer height={height} code={partialCode} />
+      </div>
+    );
   }
 
   return (
-    <div ref={containerRef} className="threejs-container">
+    <div
+      ref={containerRef}
+      className="threejs-container"
+      style={containerStyle}
+    >
       <canvas
+        id="threejs-canvas"
         ref={canvasRef}
         style={{
           width: "100%",

@@ -117,7 +117,10 @@ export function useApp({
 
     async function connect() {
       try {
-        const transport = new PostMessageTransport(window.parent);
+        const transport = new PostMessageTransport(
+          window.parent,
+          window.parent,
+        );
         const app = new App(appInfo, capabilities);
 
         // Register handlers BEFORE connecting

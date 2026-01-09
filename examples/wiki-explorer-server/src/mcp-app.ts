@@ -1,7 +1,7 @@
 /**
  * Wiki Explorer - Force-directed graph visualization of Wikipedia link networks
  */
-import { App } from "@modelcontextprotocol/ext-apps";
+import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
   forceCenter,
@@ -366,5 +366,21 @@ app.onerror = (err) => {
   console.error("[Wiki Explorer] App error:", err);
 };
 
+function handleHostContextChanged(ctx: McpUiHostContext) {
+  if (ctx.safeAreaInsets) {
+    document.body.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
+    document.body.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
+    document.body.style.paddingBottom = `${ctx.safeAreaInsets.bottom}px`;
+    document.body.style.paddingLeft = `${ctx.safeAreaInsets.left}px`;
+  }
+}
+
+app.onhostcontextchanged = handleHostContextChanged;
+
 // Connect to host
-app.connect();
+app.connect().then(() => {
+  const ctx = app.getHostContext();
+  if (ctx) {
+    handleHostContextChanged(ctx);
+  }
+});

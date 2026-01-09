@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type {
   CallToolResult,
   ReadResourceResult,
@@ -12,7 +13,7 @@ import {
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
-import { startServer } from "./src/server-utils.js";
+import { startServer } from "./server-utils.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 
@@ -248,8 +249,9 @@ const DEFAULT_INPUTS: ScenarioInputs = {
 
 /**
  * Creates a new MCP server instance with tools and resources registered.
+ * Each HTTP session needs its own server instance because McpServer only supports one transport.
  */
-function createServer(): McpServer {
+export function createServer(): McpServer {
   const server = new McpServer({
     name: "SaaS Scenario Modeler",
     version: "1.0.0",
@@ -318,4 +320,23 @@ function createServer(): McpServer {
   return server;
 }
 
-startServer(createServer);
+// ============================================================================
+// Server Startup
+// ============================================================================
+
+async function main() {
+  if (process.argv.includes("--stdio")) {
+    await createServer().connect(new StdioServerTransport());
+  } else {
+    const port = parseInt(process.env.PORT ?? "3106", 10);
+    await startServer(createServer, {
+      port,
+      name: "SaaS Scenario Modeler Server",
+    });
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

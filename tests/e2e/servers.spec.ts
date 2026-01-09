@@ -5,8 +5,12 @@ import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 // with partial matches (e.g., [class*="heatmapWrapper"]) for those components
 const DYNAMIC_MASKS: Record<string, string[]> = {
   integration: ["#server-time"], // Server time display
+  "basic-preact": ["#server-time"], // Server time display
   "basic-react": ["#server-time"], // Server time display
+  "basic-solid": ["#server-time"], // Server time display
+  "basic-svelte": ["#server-time"], // Server time display
   "basic-vanillajs": ["#server-time"], // Server time display
+  "basic-vue": ["#server-time"], // Server time display
   "cohort-heatmap": ['[class*="heatmapWrapper"]'], // Heatmap grid (random data)
   "customer-segmentation": [".chart-container"], // Scatter plot (random data)
   "system-monitor": [
@@ -17,15 +21,19 @@ const DYNAMIC_MASKS: Record<string, string[]> = {
     "#memory-bar-fill", // Memory bar fill level
     "#info-uptime", // System uptime
   ],
-  threejs: ["canvas"], // 3D render canvas (dynamic animation)
+  threejs: ["#threejs-canvas", ".threejs-container"], // 3D render canvas (dynamic animation)
   "wiki-explorer": ["#graph"], // Force-directed graph (dynamic layout)
 };
 
 // Server configurations (key is used for screenshot filenames, name is the MCP server name)
 const SERVERS = [
   { key: "integration", name: "Integration Test Server" },
+  { key: "basic-preact", name: "Basic MCP App Server (Preact)" },
   { key: "basic-react", name: "Basic MCP App Server (React)" },
+  { key: "basic-solid", name: "Basic MCP App Server (Solid)" },
+  { key: "basic-svelte", name: "Basic MCP App Server (Svelte)" },
   { key: "basic-vanillajs", name: "Basic MCP App Server (Vanilla JS)" },
+  { key: "basic-vue", name: "Basic MCP App Server (Vue)" },
   { key: "budget-allocator", name: "Budget Allocator Server" },
   { key: "cohort-heatmap", name: "Cohort Heatmap Server" },
   { key: "customer-segmentation", name: "Customer Segmentation Server" },

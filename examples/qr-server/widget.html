@@ -47,7 +47,22 @@
       }
     };
 
+    function handleHostContextChanged(ctx) {
+      if (ctx.safeAreaInsets) {
+        document.body.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
+        document.body.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
+        document.body.style.paddingBottom = `${ctx.safeAreaInsets.bottom}px`;
+        document.body.style.paddingLeft = `${ctx.safeAreaInsets.left}px`;
+      }
+    }
+
+    app.onhostcontextchanged = handleHostContextChanged;
+
     await app.connect();
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
   </script>
 </body>
 </html>

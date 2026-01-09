@@ -16,6 +16,12 @@ if (!document.referrer.match(ALLOWED_REFERRER_PATTERN)) {
   );
 }
 
+// Extract the expected host origin from the referrer for origin validation.
+// This is the origin we expect all parent messages to come from.
+const EXPECTED_HOST_ORIGIN = new URL(document.referrer).origin;
+
+const OWN_ORIGIN = new URL(window.location.href).origin;
+
 // Security self-test: verify iframe isolation is working correctly.
 // This MUST throw a SecurityError -- if `window.top` is accessible, the sandbox
 // configuration is dangerously broken and untrusted content could escape.
@@ -79,8 +85,18 @@ function buildCspMetaTag(csp?: { connectDomains?: string[]; resourceDomains?: st
 
 window.addEventListener("message", async (event) => {
   if (event.source === window.parent) {
-    // NOTE: In production you'll also want to validate `event.origin` against
-    // your Host domain.
+    // Validate that messages from parent come from the expected host origin.
+    // This prevents malicious pages from sending messages to this sandbox.
+    if (event.origin !== EXPECTED_HOST_ORIGIN) {
+      console.error(
+        "[Sandbox] Rejecting message from unexpected origin:",
+        event.origin,
+        "expected:",
+        EXPECTED_HOST_ORIGIN
+      );
+      return;
+    }
+
     if (event.data && event.data.method === RESOURCE_READY_NOTIFICATION) {
       const { html, sandbox, csp } = event.data.params;
       if (typeof sandbox === "string") {
@@ -112,14 +128,25 @@ window.addEventListener("message", async (event) => {
       }
     }
   } else if (event.source === inner.contentWindow) {
+    if (event.origin !== OWN_ORIGIN) {
+      console.error(
+        "[Sandbox] Rejecting message from inner iframe with unexpected origin:",
+        event.origin,
+        "expected:",
+        OWN_ORIGIN
+      );
+      return;
+    }
     // Relay messages from inner frame to parent window.
-    window.parent.postMessage(event.data, "*");
+    // Use specific origin instead of "*" to prevent message interception.
+    window.parent.postMessage(event.data, EXPECTED_HOST_ORIGIN);
   }
 });
 
 // Notify the Host that the Sandbox is ready to receive Guest UI HTML.
+// Use specific origin instead of "*" to ensure only the expected host receives this.
 window.parent.postMessage({
   jsonrpc: "2.0",
   method: PROXY_READY_NOTIFICATION,
   params: {},
-}, "*");
+}, EXPECTED_HOST_ORIGIN);

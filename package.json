@@ -111,6 +111,7 @@
     "@rollup/rollup-darwin-x64": "^4.53.3",
     "@rollup/rollup-linux-arm64-gnu": "^4.53.3",
     "@rollup/rollup-linux-x64-gnu": "^4.53.3",
+    "@rollup/rollup-win32-arm64-msvc": "^4.53.3",
     "@rollup/rollup-win32-x64-msvc": "^4.53.3"
   }
 }

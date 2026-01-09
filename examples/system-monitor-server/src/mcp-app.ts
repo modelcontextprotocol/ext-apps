@@ -1,7 +1,7 @@
 /**
  * @file System Monitor App - displays real-time OS metrics with Chart.js
  */
-import { App } from "@modelcontextprotocol/ext-apps";
+import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { Chart, registerables } from "chart.js";
 import "./global.css";
 import "./mcp-app.css";
@@ -40,6 +40,7 @@ interface SystemStats {
 }
 
 // DOM element references
+const mainEl = document.querySelector(".main") as HTMLElement;
 const pollToggleBtn = document.getElementById("poll-toggle-btn")!;
 const statusIndicator = document.getElementById("status-indicator")!;
 const statusText = document.getElementById("status-text")!;
@@ -360,7 +361,23 @@ window
 // Register handlers and connect
 app.onerror = log.error;
 
-app.connect();
+function handleHostContextChanged(ctx: McpUiHostContext) {
+  if (ctx.safeAreaInsets) {
+    mainEl.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
+    mainEl.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
+    mainEl.style.paddingBottom = `${ctx.safeAreaInsets.bottom}px`;
+    mainEl.style.paddingLeft = `${ctx.safeAreaInsets.left}px`;
+  }
+}
+
+app.onhostcontextchanged = handleHostContextChanged;
+
+app.connect().then(() => {
+  const ctx = app.getHostContext();
+  if (ctx) {
+    handleHostContextChanged(ctx);
+  }
+});
 
 // Auto-start polling after a short delay
 setTimeout(startPolling, 500);

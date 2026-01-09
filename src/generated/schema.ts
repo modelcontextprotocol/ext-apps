@@ -484,12 +484,12 @@ export const McpUiToolVisibilitySchema = z
  */
 export const McpUiToolMetaSchema = z.object({
   /**
-   * URI of the UI resource to display for this tool.
+   * URI of the UI resource to display for this tool, if any.
    * This is converted to `_meta["ui/resourceUri"]`.
    *
    * @example "ui://weather/widget.html"
    */
-  resourceUri: z.string(),
+  resourceUri: z.string().optional(),
   /**
    * @description Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
@@ -539,7 +539,9 @@ export const McpUiHostContextSchema = z
     toolInfo: z
       .object({
         /** @description JSON-RPC id of the tools/call request. */
-        id: RequestIdSchema.describe("JSON-RPC id of the tools/call request."),
+        id: RequestIdSchema.optional().describe(
+          "JSON-RPC id of the tools/call request.",
+        ),
         /** @description Tool definition including name, inputSchema, etc. */
         tool: ToolSchema.describe(
           "Tool definition including name, inputSchema, etc.",

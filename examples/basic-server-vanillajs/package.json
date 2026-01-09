@@ -1,17 +1,30 @@
 {
-  "name": "basic-server-vanillajs",
-  "version": "1.0.0",
-  "private": true,
+  "name": "@modelcontextprotocol/server-basic-vanillajs",
+  "version": "0.1.0",
   "type": "module",
+  "description": "Basic MCP App Server example using vanilla JavaScript",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "directory": "examples/basic-server-vanillajs"
+  },
+  "license": "MIT",
+  "main": "server.ts",
+  "files": [
+    "server.ts",
+    "server-utils.ts",
+    "dist"
+  ],
   "scripts": {
     "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
     "serve": "bun server.ts",
     "start": "cross-env NODE_ENV=development npm run build && npm run serve",
-    "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve'"
+    "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve'",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "../..",
+    "@modelcontextprotocol/ext-apps": "^0.2.2",
     "@modelcontextprotocol/sdk": "^1.24.0",
     "zod": "^4.1.13"
   },
@@ -21,6 +34,7 @@
     "@types/node": "^22.0.0",
     "concurrently": "^9.2.1",
     "cors": "^2.8.5",
+    "cross-env": "^10.1.0",
     "express": "^5.1.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
