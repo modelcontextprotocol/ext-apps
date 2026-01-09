@@ -137,7 +137,10 @@ ${Object.entries(VIDEO_LIBRARY)
     },
     async ({ videoId }): Promise<CallToolResult> => {
       const video = VIDEO_LIBRARY[videoId];
-      const data = { videoUri: `videos://${videoId}`, description: video.description };
+      const data = {
+        videoUri: `videos://${videoId}`,
+        description: video.description,
+      };
       return {
         content: [{ type: "text", text: JSON.stringify(data) }],
         structuredContent: data,
