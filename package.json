@@ -15,9 +15,17 @@
       "types": "./dist/src/app.d.ts",
       "default": "./dist/src/app.js"
     },
+    "./app-with-deps": {
+      "types": "./dist/src/app.d.ts",
+      "default": "./dist/src/app-with-deps.js"
+    },
     "./react": {
       "types": "./dist/src/react/index.d.ts",
       "default": "./dist/src/react/index.js"
+    },
+    "./react-with-deps": {
+      "types": "./dist/src/react/index.d.ts",
+      "default": "./dist/src/react/react-with-deps.js"
     },
     "./app-bridge": {
       "types": "./dist/src/app-bridge.d.ts",
