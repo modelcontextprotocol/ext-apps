@@ -98,14 +98,20 @@ jobs:
       fail-fast: false
       matrix:
         example:
+          - basic-server-preact
           - basic-server-react
+          - basic-server-solid
+          - basic-server-svelte
           - basic-server-vanillajs
+          - basic-server-vue
           - budget-allocator-server
           - cohort-heatmap-server
           - customer-segmentation-server
           - scenario-modeler-server
+          - sheet-music-server
           - system-monitor-server
           - threejs-server
+          - video-resource-server
           - wiki-explorer-server
 
     steps:
