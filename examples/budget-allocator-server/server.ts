@@ -225,6 +225,30 @@ function generateHistory(
 }
 
 // ---------------------------------------------------------------------------
+// Response Formatting
+// ---------------------------------------------------------------------------
+
+function formatBudgetSummary(data: BudgetDataResponse): string {
+  const lines: string[] = [
+    "Budget Allocator Configuration",
+    "==============================",
+    "",
+    `Default Budget: ${data.config.currencySymbol}${data.config.defaultBudget.toLocaleString()}`,
+    `Available Presets: ${data.config.presetBudgets.map((b) => `${data.config.currencySymbol}${b.toLocaleString()}`).join(", ")}`,
+    "",
+    "Categories:",
+    ...data.config.categories.map(
+      (c) => `  - ${c.name}: ${c.defaultPercent}% default`,
+    ),
+    "",
+    `Historical Data: ${data.analytics.history.length} months`,
+    `Benchmark Stages: ${data.analytics.stages.join(", ")}`,
+    `Default Stage: ${data.analytics.defaultStage}`,
+  ];
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // MCP Server Setup
 // ---------------------------------------------------------------------------
 
@@ -277,7 +301,7 @@ export function createServer(): McpServer {
         content: [
           {
             type: "text",
-            text: JSON.stringify(response),
+            text: formatBudgetSummary(response),
           },
         ],
         structuredContent: response,

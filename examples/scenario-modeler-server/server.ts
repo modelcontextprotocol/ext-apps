@@ -251,6 +251,37 @@ const DEFAULT_INPUTS: ScenarioInputs = {
 };
 
 // ============================================================================
+// Formatters for text output
+// ============================================================================
+
+function formatCurrency(value: number): string {
+  const absValue = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (absValue >= 1_000_000) {
+    return `${sign}$${(absValue / 1_000_000).toFixed(2)}M`;
+  }
+  if (absValue >= 1_000) {
+    return `${sign}$${(absValue / 1_000).toFixed(1)}K`;
+  }
+  return `${sign}$${Math.round(absValue)}`;
+}
+
+function formatScenarioSummary(
+  summary: ScenarioSummary,
+  label: string,
+): string {
+  return [
+    `${label}:`,
+    `  Ending MRR: ${formatCurrency(summary.endingMRR)}`,
+    `  ARR: ${formatCurrency(summary.arr)}`,
+    `  Total Revenue: ${formatCurrency(summary.totalRevenue)}`,
+    `  Total Profit: ${formatCurrency(summary.totalProfit)}`,
+    `  MRR Growth: ${summary.mrrGrowthPct.toFixed(1)}%`,
+    `  Break-even: ${summary.breakEvenMonth ? `Month ${summary.breakEvenMonth}` : "Not achieved"}`,
+  ].join("\n");
+}
+
+// ============================================================================
 // MCP Server
 // ============================================================================
 
@@ -286,21 +317,28 @@ export function createServer(): McpServer {
           ? calculateScenario(args.customInputs)
           : undefined;
 
-        const data = {
-          templates: SCENARIO_TEMPLATES,
-          defaultInputs: DEFAULT_INPUTS,
-          customProjections: customScenario?.projections,
-          customSummary: customScenario?.summary,
-        };
+        const text = [
+          "SaaS Scenario Modeler",
+          "=".repeat(40),
+          "",
+          "Available Templates:",
+          ...SCENARIO_TEMPLATES.map(
+            (t) => `  ${t.icon} ${t.name}: ${t.description}`,
+          ),
+          "",
+          customScenario
+            ? formatScenarioSummary(customScenario.summary, "Custom Scenario")
+            : "Use customInputs parameter to compute projections for a specific scenario.",
+        ].join("\n");
 
         return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(data),
-            },
-          ],
-          structuredContent: data,
+          content: [{ type: "text", text }],
+          structuredContent: {
+            templates: SCENARIO_TEMPLATES,
+            defaultInputs: DEFAULT_INPUTS,
+            customProjections: customScenario?.projections,
+            customSummary: customScenario?.summary,
+          },
         };
       },
     );
