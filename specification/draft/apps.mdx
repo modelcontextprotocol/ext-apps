@@ -1480,8 +1480,8 @@ const csp = resource._meta?.ui?.csp;
 
 const cspValue = `
   default-src 'none';
-  script-src 'self' 'unsafe-inline';
-  style-src 'self' 'unsafe-inline';
+  script-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
+  style-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
   connect-src 'self' ${csp?.connectDomains?.join(' ') || ''};
   img-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};
   font-src 'self' ${csp?.resourceDomains?.join(' ') || ''};
