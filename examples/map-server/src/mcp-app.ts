@@ -6,6 +6,7 @@
  * a navigate-to tool for the host to control navigation.
  */
 import { App } from "@modelcontextprotocol/ext-apps";
+import { z } from "zod";
 
 // TypeScript declaration for Cesium loaded from CDN
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,6 +102,7 @@ async function reverseGeocode(
       return null;
     }
     const data = await response.json();
+    log.info("Reverse geocode result:", JSON.stringify(data));
     return data.display_name ?? null;
   } catch (error) {
     log.warn("Reverse geocode error:", error);
@@ -122,6 +124,24 @@ function scheduleReverseGeocode(cesiumViewer: any): void {
       const name = await reverseGeocode(center.lat, center.lon);
       if (name) {
         log.info("Location:", name);
+
+        // Warning: This request method isn't standard yet
+        // See https://github.com/modelcontextprotocol/ext-apps/pull/125
+        app.request(
+          <any>{
+            method: "ui/update-model-context",
+            params: {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `Address at center: ${name} (Lat: ${center.lat.toFixed(4)}, Lon: ${center.lon.toFixed(4)})`,
+                },
+              ],
+            },
+          },
+          z.object({}),
+        );
       }
     }
   }, 1500);
