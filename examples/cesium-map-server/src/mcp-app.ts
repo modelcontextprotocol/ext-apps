@@ -39,7 +39,8 @@ async function loadCesium(): Promise<void> {
       (window as any).CESIUM_BASE_URL = CESIUM_BASE_URL;
       resolve();
     };
-    script.onerror = () => reject(new Error("Failed to load CesiumJS from CDN"));
+    script.onerror = () =>
+      reject(new Error("Failed to load CesiumJS from CDN"));
     document.head.appendChild(script);
   });
 }
@@ -76,7 +77,10 @@ async function initCesium(): Promise<any> {
 
   // Set default camera view rectangle (required when Ion is disabled)
   Cesium.Camera.DEFAULT_VIEW_RECTANGLE = Cesium.Rectangle.fromDegrees(
-    -130, 20, -60, 55 // USA bounding box
+    -130,
+    20,
+    -60,
+    55, // USA bounding box
   );
   log.info("Default view rectangle set");
 
@@ -139,19 +143,23 @@ async function initCesium(): Promise<any> {
 
     // Add the imagery layer to the viewer
     cesiumViewer.imageryLayers.addImageryProvider(osmProvider);
-    log.info("OSM imagery layer added, layer count:", cesiumViewer.imageryLayers.length);
+    log.info(
+      "OSM imagery layer added, layer count:",
+      cesiumViewer.imageryLayers.length,
+    );
 
     // Log tile load events for debugging
-    cesiumViewer.scene.globe.tileLoadProgressEvent.addEventListener((queueLength: number) => {
-      if (queueLength > 0) {
-        log.info("Tiles loading, queue length:", queueLength);
-      }
-    });
+    cesiumViewer.scene.globe.tileLoadProgressEvent.addEventListener(
+      (queueLength: number) => {
+        if (queueLength > 0) {
+          log.info("Tiles loading, queue length:", queueLength);
+        }
+      },
+    );
 
     // Force a render
     cesiumViewer.scene.requestRender();
     log.info("Render requested");
-
   } catch (error) {
     log.error("Failed to create OSM provider:", error);
   }
@@ -206,9 +214,19 @@ function flyToBoundingBox(
     const height = Math.max(100000, maxSpan * 111000 * 5);
 
     // Calculate destination - use a higher altitude to ensure globe is visible
-    const destination = Cesium.Cartesian3.fromDegrees(centerLon, centerLat, Math.max(height, 500000));
+    const destination = Cesium.Cartesian3.fromDegrees(
+      centerLon,
+      centerLat,
+      Math.max(height, 500000),
+    );
 
-    log.info("flyTo destination:", centerLon, centerLat, "height:", Math.max(height, 500000));
+    log.info(
+      "flyTo destination:",
+      centerLon,
+      centerLat,
+      "height:",
+      Math.max(height, 500000),
+    );
 
     // Always use flyTo with animation - setView doesn't work reliably
     // Use minimum 0.5s duration for reliability
@@ -217,7 +235,10 @@ function flyToBoundingBox(
       destination,
       duration: actualDuration,
       complete: () => {
-        log.info("flyTo complete, camera height:", cesiumViewer.camera.positionCartographic.height);
+        log.info(
+          "flyTo complete, camera height:",
+          cesiumViewer.camera.positionCartographic.height,
+        );
         resolve();
       },
     });
@@ -309,8 +330,14 @@ app.ontoolinput = (params) => {
         log.info("Executing flyToBoundingBox now...");
         flyToBoundingBox(viewer!, bbox).then(() => {
           log.info("flyToBoundingBox completed!");
-          log.info("Camera height:", viewer!.camera.positionCartographic.height);
-          log.info("Camera pitch:", Cesium.Math.toDegrees(viewer!.camera.pitch));
+          log.info(
+            "Camera height:",
+            viewer!.camera.positionCartographic.height,
+          );
+          log.info(
+            "Camera pitch:",
+            Cesium.Math.toDegrees(viewer!.camera.pitch),
+          );
         });
         setLabel(args?.label);
       }, 500);

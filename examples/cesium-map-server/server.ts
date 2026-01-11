@@ -7,7 +7,10 @@
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ReadResourceResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -65,13 +68,16 @@ async function geocodeWithNominatim(query: string): Promise<NominatimResult[]> {
     `https://nominatim.openstreetmap.org/search?${params}`,
     {
       headers: {
-        "User-Agent": "MCP-CesiumMap-Example/1.0 (https://github.com/modelcontextprotocol)",
+        "User-Agent":
+          "MCP-CesiumMap-Example/1.0 (https://github.com/modelcontextprotocol)",
       },
     },
   );
 
   if (!response.ok) {
-    throw new Error(`Nominatim API error: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Nominatim API error: ${response.status} ${response.statusText}`,
+    );
   }
 
   return response.json();
@@ -118,11 +124,19 @@ export function createServer(): McpServer {
     RESOURCE_URI,
     { mimeType: RESOURCE_MIME_TYPE },
     async (): Promise<ReadResourceResult> => {
-      const html = await fs.readFile(path.join(DIST_DIR, "mcp-app.html"), "utf-8");
+      const html = await fs.readFile(
+        path.join(DIST_DIR, "mcp-app.html"),
+        "utf-8",
+      );
       return {
         contents: [
           // _meta must be on the content item, not the resource metadata
-          { uri: RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: html, _meta: cspMeta },
+          {
+            uri: RESOURCE_URI,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: html,
+            _meta: cspMeta,
+          },
         ],
       };
     },
@@ -136,7 +150,11 @@ export function createServer(): McpServer {
       description:
         "Search for places using OpenStreetMap Nominatim. Returns coordinates and bounding boxes for up to 5 matches.",
       inputSchema: {
-        query: z.string().describe("Place name or address to search for (e.g., 'Paris', 'Golden Gate Bridge', '1600 Pennsylvania Ave')"),
+        query: z
+          .string()
+          .describe(
+            "Place name or address to search for (e.g., 'Paris', 'Golden Gate Bridge', '1600 Pennsylvania Ave')",
+          ),
       },
     },
     async ({ query }): Promise<CallToolResult> => {
@@ -145,7 +163,9 @@ export function createServer(): McpServer {
 
         if (results.length === 0) {
           return {
-            content: [{ type: "text", text: `No results found for "${query}"` }],
+            content: [
+              { type: "text", text: `No results found for "${query}"` },
+            ],
           };
         }
 
@@ -197,11 +217,30 @@ export function createServer(): McpServer {
       description:
         "Display an interactive 3D globe zoomed to a specific bounding box. The globe uses OpenStreetMap tiles and supports rotation, zoom, and 3D perspective. Defaults to London if no coordinates provided.",
       inputSchema: {
-        west: z.number().optional().default(-0.50).describe("Western longitude (-180 to 180)"),
-        south: z.number().optional().default(51.30).describe("Southern latitude (-90 to 90)"),
-        east: z.number().optional().default(0.30).describe("Eastern longitude (-180 to 180)"),
-        north: z.number().optional().default(51.70).describe("Northern latitude (-90 to 90)"),
-        label: z.string().optional().describe("Optional label to display on the map"),
+        west: z
+          .number()
+          .optional()
+          .default(-0.5)
+          .describe("Western longitude (-180 to 180)"),
+        south: z
+          .number()
+          .optional()
+          .default(51.3)
+          .describe("Southern latitude (-90 to 90)"),
+        east: z
+          .number()
+          .optional()
+          .default(0.3)
+          .describe("Eastern longitude (-180 to 180)"),
+        north: z
+          .number()
+          .optional()
+          .default(51.7)
+          .describe("Northern latitude (-90 to 90)"),
+        label: z
+          .string()
+          .optional()
+          .describe("Optional label to display on the map"),
       },
       _meta: { [RESOURCE_URI_META_KEY]: RESOURCE_URI },
     },
