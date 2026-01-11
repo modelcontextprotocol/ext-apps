@@ -1,12 +1,12 @@
 {
-  "name": "@modelcontextprotocol/server-cesium-map",
+  "name": "@modelcontextprotocol/server-map",
   "version": "0.1.0",
   "type": "module",
   "description": "MCP App Server example with CesiumJS 3D globe and geocoding",
   "repository": {
     "type": "git",
     "url": "https://github.com/modelcontextprotocol/ext-apps",
-    "directory": "examples/cesium-map-server"
+    "directory": "examples/map-server"
   },
   "license": "MIT",
   "main": "server.ts",
