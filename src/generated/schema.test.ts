@@ -43,8 +43,8 @@ export type McpUiSandboxProxyReadyNotificationSchemaInferredType = z.infer<
   typeof generated.McpUiSandboxProxyReadyNotificationSchema
 >;
 
-export type McpUiResourcePermissionsSchemaInferredType = z.infer<
-  typeof generated.McpUiResourcePermissionsSchema
+export type McpUiSandboxResourceReadyNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiSandboxResourceReadyNotificationSchema
 >;
 
 export type McpUiSizeChangedNotificationSchemaInferredType = z.infer<
@@ -119,10 +119,6 @@ export type McpUiMessageRequestSchemaInferredType = z.infer<
   typeof generated.McpUiMessageRequestSchema
 >;
 
-export type McpUiSandboxResourceReadyNotificationSchemaInferredType = z.infer<
-  typeof generated.McpUiSandboxResourceReadyNotificationSchema
->;
-
 export type McpUiToolResultNotificationSchemaInferredType = z.infer<
   typeof generated.McpUiToolResultNotificationSchema
 >;
@@ -175,11 +171,11 @@ expectType<spec.McpUiSandboxProxyReadyNotification>(
 expectType<McpUiSandboxProxyReadyNotificationSchemaInferredType>(
   {} as spec.McpUiSandboxProxyReadyNotification,
 );
-expectType<spec.McpUiResourcePermissions>(
-  {} as McpUiResourcePermissionsSchemaInferredType,
+expectType<spec.McpUiSandboxResourceReadyNotification>(
+  {} as McpUiSandboxResourceReadyNotificationSchemaInferredType,
 );
-expectType<McpUiResourcePermissionsSchemaInferredType>(
-  {} as spec.McpUiResourcePermissions,
+expectType<McpUiSandboxResourceReadyNotificationSchemaInferredType>(
+  {} as spec.McpUiSandboxResourceReadyNotification,
 );
 expectType<spec.McpUiSizeChangedNotification>(
   {} as McpUiSizeChangedNotificationSchemaInferredType,
@@ -268,12 +264,6 @@ expectType<spec.McpUiMessageRequest>(
 );
 expectType<McpUiMessageRequestSchemaInferredType>(
   {} as spec.McpUiMessageRequest,
-);
-expectType<spec.McpUiSandboxResourceReadyNotification>(
-  {} as McpUiSandboxResourceReadyNotificationSchemaInferredType,
-);
-expectType<McpUiSandboxResourceReadyNotificationSchemaInferredType>(
-  {} as spec.McpUiSandboxResourceReadyNotification,
 );
 expectType<spec.McpUiToolResultNotification>(
   {} as McpUiToolResultNotificationSchemaInferredType,
