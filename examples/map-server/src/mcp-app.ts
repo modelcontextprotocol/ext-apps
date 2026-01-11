@@ -127,48 +127,14 @@ function getScaleDimensions(extent: BoundingBox): {
 }
 
 /**
- * Calculate approximate Nominatim zoom level from visible extent
- * Nominatim zoom levels: 3=country, 5=state, 8=county, 10=city, 12=town, 14=neighbourhood, 18=building
- */
-function calculateNominatimZoom(extent: BoundingBox): number {
-  const { widthKm, heightKm } = getScaleDimensions(extent);
-  const maxDimensionKm = Math.max(widthKm, heightKm);
-
-  // Map dimension to zoom level (approximate)
-  // These thresholds are based on typical map scales
-  if (maxDimensionKm > 5000) return 3; // Continent/large country
-  if (maxDimensionKm > 2000) return 4; // Large country
-  if (maxDimensionKm > 1000) return 5; // Country/large state
-  if (maxDimensionKm > 500) return 6; // State
-  if (maxDimensionKm > 200) return 7; // State/region
-  if (maxDimensionKm > 100) return 8; // County
-  if (maxDimensionKm > 50) return 9; // County/city region
-  if (maxDimensionKm > 20) return 10; // City
-  if (maxDimensionKm > 10) return 11; // City/town
-  if (maxDimensionKm > 5) return 12; // Town
-  if (maxDimensionKm > 2) return 13; // Village/suburb
-  if (maxDimensionKm > 1) return 14; // Neighbourhood
-  if (maxDimensionKm > 0.5) return 15; // Settlement
-  if (maxDimensionKm > 0.2) return 16; // Major streets
-  if (maxDimensionKm > 0.1) return 17; // Streets
-  return 18; // Building level
-}
-
-/**
  * Reverse geocode a lat/lon using OpenStreetMap Nominatim
- * @param lat Latitude
- * @param lon Longitude
- * @param zoom Nominatim zoom level (0-18) to control detail level
  */
 async function reverseGeocode(
   lat: number,
   lon: number,
-  zoom: number = 18,
 ): Promise<string | null> {
   try {
-    // Clamp zoom to Nominatim's valid range
-    const clampedZoom = Math.max(0, Math.min(18, Math.round(zoom)));
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&zoom=${clampedZoom}&format=json`;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
     const response = await fetch(url, {
       headers: {
         "User-Agent": "CesiumJS-Globe-MCP-App/1.0",
@@ -179,7 +145,7 @@ async function reverseGeocode(
       return null;
     }
     const data = await response.json();
-    log.info("Reverse geocode result (zoom=" + clampedZoom + "):", JSON.stringify(data));
+    log.info("Reverse geocode result:", JSON.stringify(data));
     return data.display_name ?? null;
   } catch (error) {
     log.warn("Reverse geocode error:", error);
@@ -189,7 +155,7 @@ async function reverseGeocode(
 
 /**
  * Debounced reverse geocode of camera center position
- * Logs the visible extent and uses appropriate zoom level for geocoding
+ * Logs the visible extent (bounding box and dimensions)
  */
 function scheduleReverseGeocode(cesiumViewer: any): void {
   if (reverseGeocodeTimer) {
@@ -200,58 +166,36 @@ function scheduleReverseGeocode(cesiumViewer: any): void {
     const center = getCameraCenter(cesiumViewer);
     const extent = getVisibleExtent(cesiumViewer);
 
+    // Build extent info string for logging
+    let extentInfo = "";
     if (extent) {
       const { widthKm, heightKm } = getScaleDimensions(extent);
-      const zoom = calculateNominatimZoom(extent);
-      log.info(
-        `Visible extent: W=${extent.west.toFixed(4)}, S=${extent.south.toFixed(4)}, ` +
-          `E=${extent.east.toFixed(4)}, N=${extent.north.toFixed(4)} ` +
-          `(${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km, zoom=${zoom})`,
-      );
+      extentInfo =
+        `Extent: [${extent.west.toFixed(4)}, ${extent.south.toFixed(4)}, ` +
+        `${extent.east.toFixed(4)}, ${extent.north.toFixed(4)}] ` +
+        `(${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km)`;
+      log.info(extentInfo);
+    }
 
-      if (center) {
-        const name = await reverseGeocode(center.lat, center.lon, zoom);
-        if (name) {
-          log.info("Location:", name);
-
-          // Warning: This request method isn't standard yet
-          // See https://github.com/modelcontextprotocol/ext-apps/pull/125
-          app.request(
-            <any>{
-              method: "ui/update-model-context",
-              params: {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text:
-                      `Viewing: ${name}\n` +
-                      `Center: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}\n` +
-                      `Visible area: ${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km`,
-                  },
-                ],
-              },
-            },
-            z.object({}),
-          );
-        }
-      }
-    } else if (center) {
-      // Fallback: no visible extent (looking at sky), just use center with max zoom
+    if (center) {
       const name = await reverseGeocode(center.lat, center.lon);
       if (name) {
         log.info("Location:", name);
+
+        // Warning: This request method isn't standard yet
+        // See https://github.com/modelcontextprotocol/ext-apps/pull/125
+        const contextText = extentInfo
+          ? `Viewing: ${name}\nCenter: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}\n${extentInfo}`
+          : `Viewing: ${name}\nCenter: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}`;
+
+        log.info("Updating model context:", contextText);
+
         app.request(
           <any>{
             method: "ui/update-model-context",
             params: {
               role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `Address at center: ${name} (Lat: ${center.lat.toFixed(4)}, Lon: ${center.lon.toFixed(4)})`,
-                },
-              ],
+              content: [{ type: "text", text: contextText }],
             },
           },
           z.object({}),
@@ -412,56 +356,90 @@ async function initCesium(): Promise<any> {
 }
 
 /**
- * Position the camera to view a bounding box
+ * Calculate camera destination for a bounding box
  */
-function flyToBoundingBox(
-  cesiumViewer: any,
-  bbox: BoundingBox,
-  duration: number = 2,
-): Promise<void> {
+function calculateDestination(bbox: BoundingBox): {
+  destination: any;
+  centerLon: number;
+  centerLat: number;
+  height: number;
+} {
+  const centerLon = (bbox.west + bbox.east) / 2;
+  const centerLat = (bbox.south + bbox.north) / 2;
+
+  const lonSpan = Math.abs(bbox.east - bbox.west);
+  const latSpan = Math.abs(bbox.north - bbox.south);
+  const maxSpan = Math.max(lonSpan, latSpan);
+
+  // Height in meters - larger bbox = higher altitude
+  // Minimum 100km for small areas, scale up for larger areas
+  const height = Math.max(100000, maxSpan * 111000 * 5);
+  const actualHeight = Math.max(height, 500000);
+
+  const destination = Cesium.Cartesian3.fromDegrees(
+    centerLon,
+    centerLat,
+    actualHeight,
+  );
+
+  return { destination, centerLon, centerLat, height: actualHeight };
+}
+
+/**
+ * Position camera instantly to view a bounding box (no animation)
+ */
+function setViewToBoundingBox(cesiumViewer: any, bbox: BoundingBox): void {
+  const { destination, centerLon, centerLat, height } =
+    calculateDestination(bbox);
+
+  log.info("setView destination:", centerLon, centerLat, "height:", height);
+
+  cesiumViewer.camera.setView({
+    destination,
+    orientation: {
+      heading: 0,
+      pitch: Cesium.Math.toRadians(-90), // Look straight down
+      roll: 0,
+    },
+  });
+
+  log.info(
+    "setView complete, camera height:",
+    cesiumViewer.camera.positionCartographic.height,
+  );
+}
+
+/**
+ * Wait for globe tiles to finish loading
+ */
+function waitForTilesLoaded(cesiumViewer: any): Promise<void> {
   return new Promise((resolve) => {
-    // Calculate center of bounding box
-    const centerLon = (bbox.west + bbox.east) / 2;
-    const centerLat = (bbox.south + bbox.north) / 2;
+    // Check if already loaded
+    if (cesiumViewer.scene.globe.tilesLoaded) {
+      log.info("Tiles already loaded");
+      resolve();
+      return;
+    }
 
-    // Calculate appropriate height based on bounding box size
-    const lonSpan = Math.abs(bbox.east - bbox.west);
-    const latSpan = Math.abs(bbox.north - bbox.south);
-    const maxSpan = Math.max(lonSpan, latSpan);
+    log.info("Waiting for tiles to load...");
+    const removeListener =
+      cesiumViewer.scene.globe.tileLoadProgressEvent.addEventListener(
+        (queueLength: number) => {
+          log.info("Tile queue:", queueLength);
+          if (queueLength === 0 && cesiumViewer.scene.globe.tilesLoaded) {
+            log.info("All tiles loaded");
+            removeListener();
+            resolve();
+          }
+        },
+      );
 
-    // Height in meters - larger bbox = higher altitude
-    // Minimum 100km for small areas, scale up for larger areas
-    const height = Math.max(100000, maxSpan * 111000 * 5);
-
-    // Calculate destination - use a higher altitude to ensure globe is visible
-    const destination = Cesium.Cartesian3.fromDegrees(
-      centerLon,
-      centerLat,
-      Math.max(height, 500000),
-    );
-
-    log.info(
-      "flyTo destination:",
-      centerLon,
-      centerLat,
-      "height:",
-      Math.max(height, 500000),
-    );
-
-    // Always use flyTo with animation - setView doesn't work reliably
-    // Use minimum 0.5s duration for reliability
-    const actualDuration = Math.max(0.5, duration);
-    cesiumViewer.camera.flyTo({
-      destination,
-      duration: actualDuration,
-      complete: () => {
-        log.info(
-          "flyTo complete, camera height:",
-          cesiumViewer.camera.positionCartographic.height,
-        );
-        resolve();
-      },
-    });
+    // Timeout after 10 seconds to prevent infinite wait
+    setTimeout(() => {
+      log.warn("Tile loading timeout, proceeding anyway");
+      removeListener();
+      resolve();
+    }, 10000);
   });
 }
 
@@ -584,7 +562,7 @@ app.onhostcontextchanged = (params) => {
 };
 
 // Handle initial tool input (bounding box from show-map tool)
-app.ontoolinput = (params) => {
+app.ontoolinput = async (params) => {
   log.info("Received tool input:", params);
   const args = params.arguments as
     | {
@@ -618,22 +596,21 @@ app.ontoolinput = (params) => {
     }
 
     if (bbox) {
-      log.info("Will fly to bbox:", bbox);
-      // Small delay to ensure viewer is fully ready before first flyTo
-      setTimeout(() => {
-        log.info("Executing flyToBoundingBox now...");
-        flyToBoundingBox(viewer!, bbox).then(() => {
-          log.info("flyToBoundingBox completed!");
-          log.info(
-            "Camera height:",
-            viewer!.camera.positionCartographic.height,
-          );
-          log.info(
-            "Camera pitch:",
-            Cesium.Math.toDegrees(viewer!.camera.pitch),
-          );
-        });
-      }, 500);
+      log.info("Positioning camera to bbox:", bbox);
+
+      // Position camera instantly (no animation)
+      setViewToBoundingBox(viewer, bbox);
+
+      // Wait for tiles to load at this location
+      await waitForTilesLoaded(viewer);
+
+      // Now hide loading indicator
+      hideLoading();
+
+      log.info(
+        "Camera positioned, tiles loaded. Height:",
+        viewer.camera.positionCartographic.height,
+      );
     }
   }
 };
@@ -698,8 +675,20 @@ async function init() {
     log.info("CesiumJS loaded successfully");
 
     viewer = await initCesium();
-    hideLoading();
-    log.info("CesiumJS initialized");
+    // Don't hide loading here - we wait for tool input to position camera
+    // and for tiles to load before hiding the loading indicator
+    log.info("CesiumJS initialized, waiting for tool input...");
+
+    // Fallback: if no tool input received within 5 seconds, hide loading anyway
+    // (handles case where map is shown without a specific bbox)
+    setTimeout(async () => {
+      const loadingEl = document.getElementById("loading");
+      if (loadingEl && loadingEl.style.display !== "none") {
+        log.info("No tool input received, waiting for initial tiles...");
+        await waitForTilesLoaded(viewer!);
+        hideLoading();
+      }
+    }, 5000);
 
     // Connect to host (auto-creates PostMessageTransport)
     await app.connect();
