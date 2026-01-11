@@ -130,9 +130,7 @@ function getScaleDimensions(extent: BoundingBox): {
  * Search for places within a bounding box using Nominatim
  * Returns array of place names visible in the area
  */
-async function searchPlacesInBox(
-  extent: BoundingBox,
-): Promise<string[]> {
+async function searchPlacesInBox(extent: BoundingBox): Promise<string[]> {
   try {
     // Nominatim viewbox format: west,south,east,north (x1,y1,x2,y2)
     const viewbox = `${extent.west},${extent.south},${extent.east},${extent.north}`;
@@ -289,31 +287,48 @@ async function initCesium(): Promise<any> {
 
   log.info("Globe configured");
 
-  // Create and add OpenStreetMap imagery layer
-  log.info("Creating OSM imagery provider...");
+  // Create and add map imagery layer
+  // Use CARTO Voyager tiles with @2x for high-DPI displays (512x512 tiles)
+  // Standard OSM tiles are only 256x256 which looks pixelated on Retina displays
+  log.info("Creating CARTO Voyager @2x imagery provider...");
   try {
-    const osmProvider = new Cesium.UrlTemplateImageryProvider({
-      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    // Detect if we're on a high-DPI display
+    const isHighDPI = window.devicePixelRatio > 1;
+    const tileSize = isHighDPI ? 512 : 256;
+    const scale = isHighDPI ? "@2x" : "";
+
+    // CARTO Voyager provides clean OSM-based tiles with @2x retina support
+    // URL format: https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png
+    const cartoProvider = new Cesium.UrlTemplateImageryProvider({
+      url: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png`,
+      subdomains: ["a", "b", "c", "d"],
       minimumLevel: 0,
-      maximumLevel: 19,
-      credit: new Cesium.Credit("© OpenStreetMap contributors"),
+      maximumLevel: 20,
+      tileWidth: tileSize,
+      tileHeight: tileSize,
+      credit: new Cesium.Credit(
+        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>',
+        true,
+      ),
     });
-    log.info("OSM provider created");
+    log.info(
+      `CARTO provider created (${tileSize}x${tileSize} tiles, scale=${scale || "1x"})`,
+    );
 
     // Log any imagery provider errors
-    osmProvider.errorEvent.addEventListener((error: any) => {
-      log.error("OSM imagery provider error:", error);
+    cartoProvider.errorEvent.addEventListener((error: any) => {
+      log.error("CARTO imagery provider error:", error);
     });
 
     // Wait for provider to be ready
-    if (osmProvider.ready !== undefined && !osmProvider.ready) {
-      log.info("Waiting for OSM provider to be ready...");
-      await osmProvider.readyPromise;
-      log.info("OSM provider ready");
+    if (cartoProvider.ready !== undefined && !cartoProvider.ready) {
+      log.info("Waiting for CARTO provider to be ready...");
+      await cartoProvider.readyPromise;
+      log.info("CARTO provider ready");
     }
 
     // Add the imagery layer to the viewer
-    cesiumViewer.imageryLayers.addImageryProvider(osmProvider);
+    cesiumViewer.imageryLayers.addImageryProvider(cartoProvider);
     log.info(
       "OSM imagery layer added, layer count:",
       cesiumViewer.imageryLayers.length,
