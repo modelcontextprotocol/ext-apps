@@ -68,7 +68,9 @@ let reverseGeocodeTimer: ReturnType<typeof setTimeout> | null = null;
 /**
  * Get the center point of the current camera view
  */
-function getCameraCenter(cesiumViewer: any): { lat: number; lon: number } | null {
+function getCameraCenter(
+  cesiumViewer: any,
+): { lat: number; lon: number } | null {
   try {
     const cartographic = cesiumViewer.camera.positionCartographic;
     return {
@@ -181,6 +183,13 @@ async function initCesium(): Promise<any> {
   cesiumViewer.scene.globe.baseColor = Cesium.Color.DARKSLATEGRAY;
   // Disable request render mode - helps with initial rendering
   cesiumViewer.scene.requestRenderMode = false;
+
+  // Fix pixelated rendering on high-DPI displays
+  // CesiumJS sets image-rendering: pixelated by default which looks bad
+  cesiumViewer.canvas.style.imageRendering = "auto";
+  // Ensure resolutionScale matches device pixel ratio for crisp rendering
+  cesiumViewer.resolutionScale = window.devicePixelRatio;
+
   log.info("Globe configured");
 
   // Create and add OpenStreetMap imagery layer
