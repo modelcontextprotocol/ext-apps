@@ -84,14 +84,91 @@ function getCameraCenter(
 }
 
 /**
+ * Get the visible extent (bounding box) of the current camera view
+ * Returns null if the view doesn't intersect the ellipsoid (e.g., looking at sky)
+ */
+function getVisibleExtent(cesiumViewer: any): BoundingBox | null {
+  try {
+    const rect = cesiumViewer.camera.computeViewRectangle();
+    if (!rect) return null;
+    return {
+      west: Cesium.Math.toDegrees(rect.west),
+      south: Cesium.Math.toDegrees(rect.south),
+      east: Cesium.Math.toDegrees(rect.east),
+      north: Cesium.Math.toDegrees(rect.north),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Calculate approximate map scale dimensions in kilometers
+ */
+function getScaleDimensions(extent: BoundingBox): {
+  widthKm: number;
+  heightKm: number;
+} {
+  // Approximate conversion: 1 degree latitude ≈ 111 km
+  // Longitude varies by latitude, use midpoint latitude for approximation
+  const midLat = (extent.north + extent.south) / 2;
+  const latRad = (midLat * Math.PI) / 180;
+
+  const heightDeg = Math.abs(extent.north - extent.south);
+  const widthDeg = Math.abs(extent.east - extent.west);
+
+  // Handle wrap-around at 180/-180 longitude
+  const adjustedWidthDeg = widthDeg > 180 ? 360 - widthDeg : widthDeg;
+
+  const heightKm = heightDeg * 111;
+  const widthKm = adjustedWidthDeg * 111 * Math.cos(latRad);
+
+  return { widthKm, heightKm };
+}
+
+/**
+ * Calculate approximate Nominatim zoom level from visible extent
+ * Nominatim zoom levels: 3=country, 5=state, 8=county, 10=city, 12=town, 14=neighbourhood, 18=building
+ */
+function calculateNominatimZoom(extent: BoundingBox): number {
+  const { widthKm, heightKm } = getScaleDimensions(extent);
+  const maxDimensionKm = Math.max(widthKm, heightKm);
+
+  // Map dimension to zoom level (approximate)
+  // These thresholds are based on typical map scales
+  if (maxDimensionKm > 5000) return 3; // Continent/large country
+  if (maxDimensionKm > 2000) return 4; // Large country
+  if (maxDimensionKm > 1000) return 5; // Country/large state
+  if (maxDimensionKm > 500) return 6; // State
+  if (maxDimensionKm > 200) return 7; // State/region
+  if (maxDimensionKm > 100) return 8; // County
+  if (maxDimensionKm > 50) return 9; // County/city region
+  if (maxDimensionKm > 20) return 10; // City
+  if (maxDimensionKm > 10) return 11; // City/town
+  if (maxDimensionKm > 5) return 12; // Town
+  if (maxDimensionKm > 2) return 13; // Village/suburb
+  if (maxDimensionKm > 1) return 14; // Neighbourhood
+  if (maxDimensionKm > 0.5) return 15; // Settlement
+  if (maxDimensionKm > 0.2) return 16; // Major streets
+  if (maxDimensionKm > 0.1) return 17; // Streets
+  return 18; // Building level
+}
+
+/**
  * Reverse geocode a lat/lon using OpenStreetMap Nominatim
+ * @param lat Latitude
+ * @param lon Longitude
+ * @param zoom Nominatim zoom level (0-18) to control detail level
  */
 async function reverseGeocode(
   lat: number,
   lon: number,
+  zoom: number = 18,
 ): Promise<string | null> {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+    // Clamp zoom to Nominatim's valid range
+    const clampedZoom = Math.max(0, Math.min(18, Math.round(zoom)));
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&zoom=${clampedZoom}&format=json`;
     const response = await fetch(url, {
       headers: {
         "User-Agent": "CesiumJS-Globe-MCP-App/1.0",
@@ -102,7 +179,7 @@ async function reverseGeocode(
       return null;
     }
     const data = await response.json();
-    log.info("Reverse geocode result:", JSON.stringify(data));
+    log.info("Reverse geocode result (zoom=" + clampedZoom + "):", JSON.stringify(data));
     return data.display_name ?? null;
   } catch (error) {
     log.warn("Reverse geocode error:", error);
@@ -112,6 +189,7 @@ async function reverseGeocode(
 
 /**
  * Debounced reverse geocode of camera center position
+ * Logs the visible extent and uses appropriate zoom level for geocoding
  */
 function scheduleReverseGeocode(cesiumViewer: any): void {
   if (reverseGeocodeTimer) {
@@ -120,13 +198,49 @@ function scheduleReverseGeocode(cesiumViewer: any): void {
   // Debounce to 1.5 seconds (Nominatim rate limit is 1 req/sec)
   reverseGeocodeTimer = setTimeout(async () => {
     const center = getCameraCenter(cesiumViewer);
-    if (center) {
+    const extent = getVisibleExtent(cesiumViewer);
+
+    if (extent) {
+      const { widthKm, heightKm } = getScaleDimensions(extent);
+      const zoom = calculateNominatimZoom(extent);
+      log.info(
+        `Visible extent: W=${extent.west.toFixed(4)}, S=${extent.south.toFixed(4)}, ` +
+          `E=${extent.east.toFixed(4)}, N=${extent.north.toFixed(4)} ` +
+          `(${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km, zoom=${zoom})`,
+      );
+
+      if (center) {
+        const name = await reverseGeocode(center.lat, center.lon, zoom);
+        if (name) {
+          log.info("Location:", name);
+
+          // Warning: This request method isn't standard yet
+          // See https://github.com/modelcontextprotocol/ext-apps/pull/125
+          app.request(
+            <any>{
+              method: "ui/update-model-context",
+              params: {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text:
+                      `Viewing: ${name}\n` +
+                      `Center: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}\n` +
+                      `Visible area: ${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km`,
+                  },
+                ],
+              },
+            },
+            z.object({}),
+          );
+        }
+      }
+    } else if (center) {
+      // Fallback: no visible extent (looking at sky), just use center with max zoom
       const name = await reverseGeocode(center.lat, center.lon);
       if (name) {
         log.info("Location:", name);
-
-        // Warning: This request method isn't standard yet
-        // See https://github.com/modelcontextprotocol/ext-apps/pull/125
         app.request(
           <any>{
             method: "ui/update-model-context",
@@ -205,10 +319,16 @@ async function initCesium(): Promise<any> {
   cesiumViewer.scene.requestRenderMode = false;
 
   // Fix pixelated rendering on high-DPI displays
-  // CesiumJS sets image-rendering: pixelated by default which looks bad
+  // CesiumJS sets image-rendering: pixelated by default which looks bad on scaled displays
+  // Setting to "auto" allows the browser to apply smooth interpolation
   cesiumViewer.canvas.style.imageRendering = "auto";
-  // Ensure resolutionScale matches device pixel ratio for crisp rendering
-  cesiumViewer.resolutionScale = window.devicePixelRatio;
+  // Note: DO NOT set resolutionScale = devicePixelRatio here!
+  // When useBrowserRecommendedResolution: false, Cesium already uses devicePixelRatio.
+  // Setting resolutionScale = devicePixelRatio would double the scaling (e.g., 2x2=4x on Retina)
+  // which causes blurriness when scaled back down. Leave resolutionScale at default (1.0).
+
+  // Disable FXAA anti-aliasing which can cause blurriness on high-DPI displays
+  cesiumViewer.scene.postProcessStages.fxaa.enabled = false;
 
   log.info("Globe configured");
 
