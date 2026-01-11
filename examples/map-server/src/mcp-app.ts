@@ -91,11 +91,11 @@ async function initCesium(): Promise<any> {
     // Disable Ion-dependent features
     geocoder: false,
     baseLayerPicker: false,
-    // Simplify UI
+    // Simplify UI - hide all controls
     animation: false,
     timeline: false,
-    homeButton: true,
-    sceneModePicker: true,
+    homeButton: false,
+    sceneModePicker: false,
     navigationHelpButton: false,
     fullscreenButton: false,
     // Disable terrain (requires Ion)
@@ -107,6 +107,8 @@ async function initCesium(): Promise<any> {
         alpha: true,
       },
     },
+    // Use full device pixel ratio for sharp rendering on high-DPI displays
+    useBrowserRecommendedResolution: false,
   });
   log.info("Viewer created");
 
@@ -246,21 +248,6 @@ function flyToBoundingBox(
 }
 
 /**
- * Update the label display
- */
-function setLabel(text: string | undefined): void {
-  const labelEl = document.getElementById("label");
-  if (labelEl) {
-    if (text) {
-      labelEl.textContent = text;
-      labelEl.style.display = "block";
-    } else {
-      labelEl.style.display = "none";
-    }
-  }
-}
-
-/**
  * Hide the loading indicator
  */
 function hideLoading(): void {
@@ -270,12 +257,85 @@ function hideLoading(): void {
   }
 }
 
+// Preferred height for inline mode (px)
+const PREFERRED_INLINE_HEIGHT = 400;
+
+// Current display mode
+let currentDisplayMode: "inline" | "fullscreen" | "pip" = "inline";
+
 // Create App instance with tool capabilities
+// autoResize: false - we manually send size since map fills its container
 const app = new App(
   { name: "CesiumJS Globe", version: "1.0.0" },
   { tools: { listChanged: true } },
-  { autoResize: false }, // Cesium handles its own sizing
+  { autoResize: false },
 );
+
+/**
+ * Update fullscreen button visibility and icon based on current state
+ */
+function updateFullscreenButton(): void {
+  const btn = document.getElementById("fullscreen-btn");
+  const expandIcon = document.getElementById("expand-icon");
+  const compressIcon = document.getElementById("compress-icon");
+  if (!btn || !expandIcon || !compressIcon) return;
+
+  // Check if fullscreen is available from host
+  const context = app.getHostContext();
+  const availableModes = context?.availableDisplayModes ?? ["inline"];
+  const canFullscreen = availableModes.includes("fullscreen");
+
+  // Show button only if fullscreen is available
+  btn.style.display = canFullscreen ? "flex" : "none";
+
+  // Toggle icons based on current mode
+  const isFullscreen = currentDisplayMode === "fullscreen";
+  expandIcon.style.display = isFullscreen ? "none" : "block";
+  compressIcon.style.display = isFullscreen ? "block" : "none";
+  btn.title = isFullscreen ? "Exit fullscreen" : "Enter fullscreen";
+}
+
+/**
+ * Request display mode change from host
+ */
+async function toggleFullscreen(): Promise<void> {
+  const targetMode =
+    currentDisplayMode === "fullscreen" ? "inline" : "fullscreen";
+  log.info("Requesting display mode:", targetMode);
+
+  try {
+    const result = await app.requestDisplayMode({ mode: targetMode });
+    log.info("Display mode result:", result.mode);
+    // Note: actual mode change will come via onhostcontextchanged
+  } catch (error) {
+    log.error("Failed to change display mode:", error);
+  }
+}
+
+/**
+ * Handle display mode changes - resize Cesium and update UI
+ */
+function handleDisplayModeChange(
+  newMode: "inline" | "fullscreen" | "pip",
+): void {
+  if (newMode === currentDisplayMode) return;
+
+  log.info("Display mode changed:", currentDisplayMode, "->", newMode);
+  currentDisplayMode = newMode;
+
+  // Update button state
+  updateFullscreenButton();
+
+  // Tell Cesium to resize to new container dimensions
+  if (viewer) {
+    // Small delay to let the host finish resizing
+    setTimeout(() => {
+      viewer.resize();
+      viewer.scene.requestRender();
+      log.info("Cesium resized for", newMode, "mode");
+    }, 100);
+  }
+}
 
 // Register handlers BEFORE connecting
 app.onteardown = async () => {
@@ -288,6 +348,22 @@ app.onteardown = async () => {
 };
 
 app.onerror = log.error;
+
+// Listen for host context changes (display mode, theme, etc.)
+app.onhostcontextchanged = (params) => {
+  log.info("Host context changed:", params);
+
+  if (params.displayMode) {
+    handleDisplayModeChange(
+      params.displayMode as "inline" | "fullscreen" | "pip",
+    );
+  }
+
+  // Update button if available modes changed
+  if (params.availableDisplayModes) {
+    updateFullscreenButton();
+  }
+};
 
 // Handle initial tool input (bounding box from show-map tool)
 app.ontoolinput = (params) => {
@@ -339,7 +415,6 @@ app.ontoolinput = (params) => {
             Cesium.Math.toDegrees(viewer!.camera.pitch),
           );
         });
-        setLabel(args?.label);
       }, 500);
     }
   }
@@ -411,6 +486,29 @@ async function init() {
     // Connect to host (auto-creates PostMessageTransport)
     await app.connect();
     log.info("Connected to host");
+
+    // Get initial display mode from host context
+    const context = app.getHostContext();
+    if (context?.displayMode) {
+      currentDisplayMode = context.displayMode as
+        | "inline"
+        | "fullscreen"
+        | "pip";
+    }
+    log.info("Initial display mode:", currentDisplayMode);
+
+    // Tell host our preferred size for inline mode
+    if (currentDisplayMode === "inline") {
+      app.sendSizeChanged({ height: PREFERRED_INLINE_HEIGHT });
+      log.info("Sent initial size:", PREFERRED_INLINE_HEIGHT);
+    }
+
+    // Set up fullscreen button
+    updateFullscreenButton();
+    const fullscreenBtn = document.getElementById("fullscreen-btn");
+    if (fullscreenBtn) {
+      fullscreenBtn.addEventListener("click", toggleFullscreen);
+    }
   } catch (error) {
     log.error("Failed to initialize:", error);
     const loadingEl = document.getElementById("loading");
