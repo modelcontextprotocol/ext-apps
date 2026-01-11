@@ -127,37 +127,45 @@ function getScaleDimensions(extent: BoundingBox): {
 }
 
 /**
- * Reverse geocode a lat/lon using OpenStreetMap Nominatim
+ * Search for places within a bounding box using Nominatim
+ * Returns array of place names visible in the area
  */
-async function reverseGeocode(
-  lat: number,
-  lon: number,
-): Promise<string | null> {
+async function searchPlacesInBox(
+  extent: BoundingBox,
+): Promise<string[]> {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+    // Nominatim viewbox format: west,south,east,north (x1,y1,x2,y2)
+    const viewbox = `${extent.west},${extent.south},${extent.east},${extent.north}`;
+    // With bounded=1 and small viewbox, we can search without query to get places
+    // layer=address focuses on cities/towns/admin areas, limit=5 for top places
+    const url = `https://nominatim.openstreetmap.org/search?viewbox=${viewbox}&bounded=1&layer=address&featuretype=settlement&format=json&limit=5`;
     const response = await fetch(url, {
       headers: {
         "User-Agent": "CesiumJS-Globe-MCP-App/1.0",
       },
     });
     if (!response.ok) {
-      log.warn("Reverse geocode failed:", response.status);
-      return null;
+      log.warn("Place search failed:", response.status);
+      return [];
     }
     const data = await response.json();
-    log.info("Reverse geocode result:", JSON.stringify(data));
-    return data.display_name ?? null;
+    log.info("Places in view:", JSON.stringify(data));
+    // Extract display names, filter to unique short names
+    const places = (data as any[])
+      .map((p) => p.name || p.display_name?.split(",")[0])
+      .filter((name): name is string => !!name);
+    return [...new Set(places)]; // Remove duplicates
   } catch (error) {
-    log.warn("Reverse geocode error:", error);
-    return null;
+    log.warn("Place search error:", error);
+    return [];
   }
 }
 
 /**
- * Debounced reverse geocode of camera center position
- * Logs the visible extent (bounding box and dimensions)
+ * Debounced location update using viewbox search
+ * Finds places visible in the current view and logs extent
  */
-function scheduleReverseGeocode(cesiumViewer: any): void {
+function scheduleLocationUpdate(cesiumViewer: any): void {
   if (reverseGeocodeTimer) {
     clearTimeout(reverseGeocodeTimer);
   }
@@ -166,41 +174,46 @@ function scheduleReverseGeocode(cesiumViewer: any): void {
     const center = getCameraCenter(cesiumViewer);
     const extent = getVisibleExtent(cesiumViewer);
 
-    // Build extent info string for logging
-    let extentInfo = "";
-    if (extent) {
-      const { widthKm, heightKm } = getScaleDimensions(extent);
-      extentInfo =
-        `Extent: [${extent.west.toFixed(4)}, ${extent.south.toFixed(4)}, ` +
-        `${extent.east.toFixed(4)}, ${extent.north.toFixed(4)}] ` +
-        `(${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km)`;
-      log.info(extentInfo);
+    if (!extent) {
+      log.info("No visible extent (camera looking at sky?)");
+      return;
     }
 
-    if (center) {
-      const name = await reverseGeocode(center.lat, center.lon);
-      if (name) {
-        log.info("Location:", name);
+    const { widthKm, heightKm } = getScaleDimensions(extent);
+    const extentInfo =
+      `Extent: [${extent.west.toFixed(4)}, ${extent.south.toFixed(4)}, ` +
+      `${extent.east.toFixed(4)}, ${extent.north.toFixed(4)}] ` +
+      `(${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km)`;
+    log.info(extentInfo);
 
-        // Warning: This request method isn't standard yet
-        // See https://github.com/modelcontextprotocol/ext-apps/pull/125
-        const contextText = extentInfo
-          ? `Viewing: ${name}\nCenter: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}\n${extentInfo}`
-          : `Viewing: ${name}\nCenter: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}`;
+    // Search for places visible in the current view
+    const places = await searchPlacesInBox(extent);
+    const placesText =
+      places.length > 0 ? `Visible places: ${places.join(", ")}` : "";
 
-        log.info("Updating model context:", contextText);
+    if (places.length > 0 || center) {
+      const centerText = center
+        ? `Center: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}`
+        : "";
 
-        app.request(
-          <any>{
-            method: "ui/update-model-context",
-            params: {
-              role: "user",
-              content: [{ type: "text", text: contextText }],
-            },
+      const contextText = [placesText, centerText, extentInfo]
+        .filter(Boolean)
+        .join("\n");
+
+      log.info("Updating model context:", contextText);
+
+      // Warning: This request method isn't standard yet
+      // See https://github.com/modelcontextprotocol/ext-apps/pull/125
+      app.request(
+        <any>{
+          method: "ui/update-model-context",
+          params: {
+            role: "user",
+            content: [{ type: "text", text: contextText }],
           },
-          z.object({}),
-        );
-      }
+        },
+        z.object({}),
+      );
     }
   }, 1500);
 }
@@ -348,7 +361,7 @@ async function initCesium(): Promise<any> {
 
   // Set up camera move end listener for reverse geocoding
   cesiumViewer.camera.moveEnd.addEventListener(() => {
-    scheduleReverseGeocode(cesiumViewer);
+    scheduleLocationUpdate(cesiumViewer);
   });
   log.info("Camera move listener registered");
 
