@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CesiumJS Standalone Test</title>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.123/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        html, body, #cesiumContainer {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #status {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+            max-width: 400px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="cesiumContainer"></div>
+    <div id="status">Loading CesiumJS...</div>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.123/Build/Cesium/Cesium.js"></script>
+    <script>
+        const status = document.getElementById('status');
+        function log(msg) {
+            console.log(msg);
+            status.innerHTML += '<br>' + msg;
+            status.scrollTop = status.scrollHeight;
+        }
+
+        try {
+            log('CesiumJS version: ' + Cesium.VERSION);
+
+            // Disable Cesium Ion
+            Cesium.Ion.defaultAccessToken = undefined;
+            log('Ion disabled');
+
+            // Set default camera view rectangle (required when Ion is disabled)
+            Cesium.Camera.DEFAULT_VIEW_RECTANGLE = Cesium.Rectangle.fromDegrees(
+                -130, 20, -60, 55 // USA bounding box
+            );
+            log('Default view rectangle set');
+
+            // Create viewer with no base layer - expose globally for debugging
+            const viewer = new Cesium.Viewer('cesiumContainer', {
+                baseLayer: false,
+                geocoder: false,
+                baseLayerPicker: false,
+                animation: false,
+                timeline: false,
+                homeButton: true,
+                sceneModePicker: true,
+                navigationHelpButton: false,
+                fullscreenButton: false,
+                terrainProvider: undefined,
+            });
+            window.viewer = viewer; // Expose for debugging
+            log('Viewer created');
+
+            // Set globe properties
+            viewer.scene.globe.show = true;
+            viewer.scene.globe.enableLighting = false;
+            viewer.scene.globe.baseColor = Cesium.Color.DARKSLATEGRAY;
+            // Disable request render mode - force continuous rendering
+            viewer.scene.requestRenderMode = false;
+            log('Globe configured, continuous rendering enabled');
+
+            // Create OSM imagery provider
+            log('Creating OSM provider...');
+            const osmProvider = new Cesium.UrlTemplateImageryProvider({
+                url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                minimumLevel: 0,
+                maximumLevel: 19,
+                credit: new Cesium.Credit('OpenStreetMap'),
+            });
+
+            // Add error handler
+            osmProvider.errorEvent.addEventListener((error) => {
+                log('OSM ERROR: ' + JSON.stringify(error));
+            });
+
+            // Add the imagery layer
+            const layer = viewer.imageryLayers.addImageryProvider(osmProvider);
+            log('OSM layer added: ' + (layer ? 'success' : 'failed'));
+
+            // Track tile loading
+            viewer.scene.globe.tileLoadProgressEvent.addEventListener((queueLength) => {
+                if (queueLength > 0) {
+                    log('Tiles loading: ' + queueLength);
+                }
+            });
+
+            // Use flyTo with Rectangle - most reliable for initial view
+            log('Flying to USA rectangle...');
+            viewer.camera.flyTo({
+                destination: Cesium.Rectangle.fromDegrees(-130, 20, -60, 55),
+                duration: 0
+            });
+            // Force renders using setInterval (bypasses rAF throttling)
+            let renderCount = 0;
+            const intervalId = setInterval(() => {
+                viewer.render();
+                renderCount++;
+                if (renderCount <= 3) {
+                    log('Interval render #' + renderCount);
+                }
+                if (renderCount > 20) {
+                    clearInterval(intervalId);
+                    log('Stopped interval rendering');
+                }
+            }, 50);
+            log('FlyTo called, interval rendering started');
+
+            log('Initialization complete!');
+        } catch (e) {
+            log('ERROR: ' + e.message);
+            console.error(e);
+        }
+    </script>
+</body>
+</html>
