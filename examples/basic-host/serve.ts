@@ -54,11 +54,22 @@ hostApp.get("/", (_req, res) => {
 const sandboxApp = express();
 sandboxApp.use(cors());
 
+// Validate CSP domain entries to prevent injection attacks.
+// Rejects entries containing characters that could:
+// - `;` or newlines: break out to new CSP directive
+// - quotes: inject CSP keywords like 'unsafe-eval'
+// - space: inject multiple sources in one entry
+function sanitizeCspDomains(domains?: string[]): string[] {
+  if (!domains) return [];
+  return domains.filter((d) => typeof d === "string" && !/[;\r\n'" ]/.test(d));
+}
+
 function buildCspHeader(csp?: McpUiResourceCsp): string {
-  const resourceDomains = csp?.resourceDomains?.join(" ") ?? "";
-  const connectDomains = csp?.connectDomains?.join(" ") ?? "";
-  const frameDomains = csp?.frameDomains?.join(" ");
-  const baseUriDomains = csp?.baseUriDomains?.join(" ");
+  const resourceDomains = sanitizeCspDomains(csp?.resourceDomains).join(" ");
+  const connectDomains = sanitizeCspDomains(csp?.connectDomains).join(" ");
+  const frameDomains = sanitizeCspDomains(csp?.frameDomains).join(" ") || null;
+  const baseUriDomains =
+    sanitizeCspDomains(csp?.baseUriDomains).join(" ") || null;
 
   const directives = [
     // Default: allow same-origin + inline styles/scripts (needed for bundled apps)
