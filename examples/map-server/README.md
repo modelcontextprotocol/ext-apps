@@ -49,7 +49,7 @@ Display the 3D globe zoomed to a bounding box.
 {
   "west": 2.29,
   "south": 48.85,
-  "east": 2.30,
+  "east": 2.3,
   "north": 48.86,
   "label": "Eiffel Tower"
 }

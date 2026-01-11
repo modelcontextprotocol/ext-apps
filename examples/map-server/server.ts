@@ -99,17 +99,13 @@ export function createServer(): McpServer {
       csp: {
         // Allow fetching tiles from OSM and Cesium assets
         connectDomains: [
-          "https://tile.openstreetmap.org",
-          "https://*.tile.openstreetmap.org",
+          "https://*.openstreetmap.org",
           "https://cesium.com",
           "https://*.cesium.com",
-          "https://assets.cesium.com",
-          "https://api.cesium.com",
         ],
         // Allow loading tile images, scripts, and Cesium CDN resources
         resourceDomains: [
-          "https://tile.openstreetmap.org",
-          "https://*.tile.openstreetmap.org",
+          "https://*.openstreetmap.org",
           "https://cesium.com",
           "https://*.cesium.com",
         ],

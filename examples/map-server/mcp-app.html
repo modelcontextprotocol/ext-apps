@@ -4,24 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CesiumJS Globe</title>
-    <!-- MCP UI CSP metadata - parsed by host before loading -->
-    <script type="application/json" id="mcp-ui-csp">{
-        "connectDomains": [
-            "https://tile.openstreetmap.org",
-            "https://*.tile.openstreetmap.org",
-            "https://cesium.com",
-            "https://*.cesium.com",
-            "https://assets.cesium.com",
-            "https://api.cesium.com",
-            "https://nominatim.openstreetmap.org"
-        ],
-        "resourceDomains": [
-            "https://tile.openstreetmap.org",
-            "https://*.tile.openstreetmap.org",
-            "https://cesium.com",
-            "https://*.cesium.com"
-        ]
-    }</script>
     <!-- CesiumJS is loaded dynamically from CDN in mcp-app.ts because static
          <script src=""> tags don't work in srcdoc iframes -->
     <style>
@@ -36,7 +18,7 @@
         #cesiumContainer {
             width: 100%;
             height: 100%;
-            border-radius: 8px;
+            border-radius: .75rem;
             overflow: hidden;
         }
         #fullscreen-btn {
