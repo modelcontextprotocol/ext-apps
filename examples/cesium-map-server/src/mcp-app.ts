@@ -6,7 +6,6 @@
  * a navigate-to tool for the host to control navigation.
  */
 import { App } from "@modelcontextprotocol/ext-apps";
-import { z } from "zod";
 
 // TypeScript declaration for Cesium loaded from CDN
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -319,54 +318,57 @@ app.ontoolinput = (params) => {
   }
 };
 
-// Register navigate-to tool that host can call
-app.registerTool(
-  "navigate-to",
-  {
-    title: "Navigate To",
-    description: "Navigate the globe to a new bounding box location",
-    inputSchema: z.object({
-      west: z.number().describe("Western longitude (-180 to 180)"),
-      south: z.number().describe("Southern latitude (-90 to 90)"),
-      east: z.number().describe("Eastern longitude (-180 to 180)"),
-      north: z.number().describe("Northern latitude (-90 to 90)"),
-      duration: z
-        .number()
-        .optional()
-        .describe("Animation duration in seconds (default: 2)"),
-      label: z.string().optional().describe("Optional label to display"),
-    }),
-  },
-  async (args) => {
-    if (!viewer) {
-      return {
-        content: [
-          { type: "text" as const, text: "Error: Viewer not initialized" },
-        ],
-        isError: true,
-      };
-    }
+/*
+  Register tools for the model to interact w/ this component
+  Needs https://github.com/modelcontextprotocol/ext-apps/pull/72
+*/
+// app.registerTool(
+//   "navigate-to",
+//   {
+//     title: "Navigate To",
+//     description: "Navigate the globe to a new bounding box location",
+//     inputSchema: z.object({
+//       west: z.number().describe("Western longitude (-180 to 180)"),
+//       south: z.number().describe("Southern latitude (-90 to 90)"),
+//       east: z.number().describe("Eastern longitude (-180 to 180)"),
+//       north: z.number().describe("Northern latitude (-90 to 90)"),
+//       duration: z
+//         .number()
+//         .optional()
+//         .describe("Animation duration in seconds (default: 2)"),
+//       label: z.string().optional().describe("Optional label to display"),
+//     }),
+//   },
+//   async (args) => {
+//     if (!viewer) {
+//       return {
+//         content: [
+//           { type: "text" as const, text: "Error: Viewer not initialized" },
+//         ],
+//         isError: true,
+//       };
+//     }
 
-    const bbox: BoundingBox = {
-      west: args.west,
-      south: args.south,
-      east: args.east,
-      north: args.north,
-    };
+//     const bbox: BoundingBox = {
+//       west: args.west,
+//       south: args.south,
+//       east: args.east,
+//       north: args.north,
+//     };
 
-    await flyToBoundingBox(viewer, bbox, args.duration ?? 2);
-    setLabel(args.label);
+//     await flyToBoundingBox(viewer, bbox, args.duration ?? 2);
+//     setLabel(args.label);
 
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Navigated to: W:${bbox.west.toFixed(4)}, S:${bbox.south.toFixed(4)}, E:${bbox.east.toFixed(4)}, N:${bbox.north.toFixed(4)}${args.label ? ` (${args.label})` : ""}`,
-        },
-      ],
-    };
-  },
-);
+//     return {
+//       content: [
+//         {
+//           type: "text" as const,
+//           text: `Navigated to: W:${bbox.west.toFixed(4)}, S:${bbox.south.toFixed(4)}, E:${bbox.east.toFixed(4)}, N:${bbox.north.toFixed(4)}${args.label ? ` (${args.label})` : ""}`,
+//         },
+//       ],
+//     };
+//   },
+// );
 
 // Initialize Cesium and connect to host
 async function init() {
