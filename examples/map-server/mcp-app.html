@@ -12,7 +12,8 @@
             "https://cesium.com",
             "https://*.cesium.com",
             "https://assets.cesium.com",
-            "https://api.cesium.com"
+            "https://api.cesium.com",
+            "https://nominatim.openstreetmap.org"
         ],
         "resourceDomains": [
             "https://tile.openstreetmap.org",
@@ -24,13 +25,19 @@
     <!-- CesiumJS is loaded dynamically from CDN in mcp-app.ts because static
          <script src=""> tags don't work in srcdoc iframes -->
     <style>
-        html, body, #cesiumContainer {
+        html, body {
             width: 100%;
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #cesiumContainer {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            overflow: hidden;
         }
         #fullscreen-btn {
             position: absolute;

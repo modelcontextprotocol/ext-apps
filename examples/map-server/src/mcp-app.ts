@@ -62,6 +62,69 @@ interface BoundingBox {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let viewer: any = null;
 
+// Debounce timer for reverse geocoding
+let reverseGeocodeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Get the center point of the current camera view
+ */
+function getCameraCenter(cesiumViewer: any): { lat: number; lon: number } | null {
+  try {
+    const cartographic = cesiumViewer.camera.positionCartographic;
+    return {
+      lat: Cesium.Math.toDegrees(cartographic.latitude),
+      lon: Cesium.Math.toDegrees(cartographic.longitude),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reverse geocode a lat/lon using OpenStreetMap Nominatim
+ */
+async function reverseGeocode(
+  lat: number,
+  lon: number,
+): Promise<string | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "CesiumJS-Globe-MCP-App/1.0",
+      },
+    });
+    if (!response.ok) {
+      log.warn("Reverse geocode failed:", response.status);
+      return null;
+    }
+    const data = await response.json();
+    return data.display_name ?? null;
+  } catch (error) {
+    log.warn("Reverse geocode error:", error);
+    return null;
+  }
+}
+
+/**
+ * Debounced reverse geocode of camera center position
+ */
+function scheduleReverseGeocode(cesiumViewer: any): void {
+  if (reverseGeocodeTimer) {
+    clearTimeout(reverseGeocodeTimer);
+  }
+  // Debounce to 1.5 seconds (Nominatim rate limit is 1 req/sec)
+  reverseGeocodeTimer = setTimeout(async () => {
+    const center = getCameraCenter(cesiumViewer);
+    if (center) {
+      const name = await reverseGeocode(center.lat, center.lon);
+      if (name) {
+        log.info("Location:", name);
+      }
+    }
+  }, 1500);
+}
+
 /**
  * Initialize CesiumJS with OpenStreetMap imagery (no Ion token required)
  * Based on: https://gist.github.com/banesullivan/e3cc15a3e2e865d5ab8bae6719733752
@@ -189,6 +252,12 @@ async function initCesium(): Promise<any> {
   initialRenderLoop();
 
   log.info("Camera positioned, initial rendering started");
+
+  // Set up camera move end listener for reverse geocoding
+  cesiumViewer.camera.moveEnd.addEventListener(() => {
+    scheduleReverseGeocode(cesiumViewer);
+  });
+  log.info("Camera move listener registered");
 
   return cesiumViewer;
 }
