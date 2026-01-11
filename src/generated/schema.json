@@ -3475,6 +3475,20 @@
           "items": {
             "type": "string"
           }
+        },
+        "frameDomains": {
+          "description": "Origins for nested iframes (frame-src directive).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "baseUriDomains": {
+          "description": "Allowed base URIs for the document (base-uri directive).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -3500,6 +3514,39 @@
               "items": {
                 "type": "string"
               }
+            },
+            "frameDomains": {
+              "description": "Origins for nested iframes (frame-src directive).",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "baseUriDomains": {
+              "description": "Allowed base URIs for the document (base-uri directive).",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "permissions": {
+          "description": "Sandbox permissions requested by the UI.",
+          "type": "object",
+          "properties": {
+            "camera": {
+              "description": "Request camera access (Permission Policy `camera` feature).",
+              "type": "boolean"
+            },
+            "microphone": {
+              "description": "Request microphone access (Permission Policy `microphone` feature).",
+              "type": "boolean"
+            },
+            "geolocation": {
+              "description": "Request geolocation access (Permission Policy `geolocation` feature).",
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -3510,6 +3557,25 @@
         },
         "prefersBorder": {
           "description": "Visual boundary preference - true if UI prefers a visible border.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "McpUiResourcePermissions": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "camera": {
+          "description": "Request camera access (Permission Policy `camera` feature).",
+          "type": "boolean"
+        },
+        "microphone": {
+          "description": "Request microphone access (Permission Policy `microphone` feature).",
+          "type": "boolean"
+        },
+        "geolocation": {
+          "description": "Request geolocation access (Permission Policy `geolocation` feature).",
           "type": "boolean"
         }
       },
@@ -3593,6 +3659,39 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "frameDomains": {
+                  "description": "Origins for nested iframes (frame-src directive).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "baseUriDomains": {
+                  "description": "Allowed base URIs for the document (base-uri directive).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "permissions": {
+              "description": "Sandbox permissions from resource metadata.",
+              "type": "object",
+              "properties": {
+                "camera": {
+                  "description": "Request camera access (Permission Policy `camera` feature).",
+                  "type": "boolean"
+                },
+                "microphone": {
+                  "description": "Request microphone access (Permission Policy `microphone` feature).",
+                  "type": "boolean"
+                },
+                "geolocation": {
+                  "description": "Request geolocation access (Permission Policy `geolocation` feature).",
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false

@@ -224,7 +224,13 @@ export interface McpUiSandboxResourceReadyNotification {
       connectDomains?: string[];
       /** @description Origins for static resources (scripts, images, styles, fonts). */
       resourceDomains?: string[];
+      /** @description Origins for nested iframes (frame-src directive). */
+      frameDomains?: string[];
+      /** @description Allowed base URIs for the document (base-uri directive). */
+      baseUriDomains?: string[];
     };
+    /** @description Sandbox permissions from resource metadata. */
+    permissions?: McpUiResourcePermissions;
   };
 }
 
@@ -497,6 +503,24 @@ export interface McpUiResourceCsp {
   connectDomains?: string[];
   /** @description Origins for static resources (scripts, images, styles, fonts). */
   resourceDomains?: string[];
+  /** @description Origins for nested iframes (frame-src directive). */
+  frameDomains?: string[];
+  /** @description Allowed base URIs for the document (base-uri directive). */
+  baseUriDomains?: string[];
+}
+
+/**
+ * @description Sandbox permissions requested by the UI resource.
+ * Hosts MAY honor these by setting appropriate iframe `allow` attributes.
+ * Apps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.
+ */
+export interface McpUiResourcePermissions {
+  /** @description Request camera access (Permission Policy `camera` feature). */
+  camera?: boolean;
+  /** @description Request microphone access (Permission Policy `microphone` feature). */
+  microphone?: boolean;
+  /** @description Request geolocation access (Permission Policy `geolocation` feature). */
+  geolocation?: boolean;
 }
 
 /**
@@ -505,6 +529,8 @@ export interface McpUiResourceCsp {
 export interface McpUiResourceMeta {
   /** @description Content Security Policy configuration. */
   csp?: McpUiResourceCsp;
+  /** @description Sandbox permissions requested by the UI. */
+  permissions?: McpUiResourcePermissions;
   /** @description Dedicated origin for widget sandbox. */
   domain?: string;
   /** @description Visual boundary preference - true if UI prefers a visible border. */

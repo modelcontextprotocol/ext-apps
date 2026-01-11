@@ -4,7 +4,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 
 
-const SANDBOX_PROXY_URL = new URL("http://localhost:8081/sandbox.html");
+const SANDBOX_PROXY_BASE_URL = "http://localhost:8081/sandbox.html";
 const IMPLEMENTATION = { name: "MCP Apps Host", version: "1.0.0" };
 
 
@@ -45,6 +45,13 @@ interface UiResourceData {
   csp?: {
     connectDomains?: string[];
     resourceDomains?: string[];
+    frameDomains?: string[];
+    baseUriDomains?: string[];
+  };
+  permissions?: {
+    camera?: boolean;
+    microphone?: boolean;
+    geolocation?: boolean;
   };
 }
 
@@ -108,19 +115,23 @@ async function getUiResource(serverInfo: ServerInfo, uri: string): Promise<UiRes
 
   const html = "blob" in content ? atob(content.blob) : content.text;
 
-  // Extract CSP metadata from resource content._meta.ui.csp (or content.meta for Python SDK)
+  // Extract CSP and permissions metadata from resource content._meta.ui (or content.meta for Python SDK)
   log.info("Resource content keys:", Object.keys(content));
   log.info("Resource content._meta:", (content as any)._meta);
 
   // Try both _meta (spec) and meta (Python SDK quirk)
   const contentMeta = (content as any)._meta || (content as any).meta;
   const csp = contentMeta?.ui?.csp;
+  const permissions = contentMeta?.ui?.permissions;
 
-  return { html, csp };
+  return { html, csp, permissions };
 }
 
 
-export function loadSandboxProxy(iframe: HTMLIFrameElement): Promise<boolean> {
+export function loadSandboxProxy(
+  iframe: HTMLIFrameElement,
+  csp?: { connectDomains?: string[]; resourceDomains?: string[]; frameDomains?: string[]; baseUriDomains?: string[] },
+): Promise<boolean> {
   // Prevent reload
   if (iframe.src) return Promise.resolve(false);
 
@@ -140,8 +151,14 @@ export function loadSandboxProxy(iframe: HTMLIFrameElement): Promise<boolean> {
     window.addEventListener("message", listener);
   });
 
-  log.info("Loading sandbox proxy...");
-  iframe.src = SANDBOX_PROXY_URL.href;
+  // Build sandbox URL with CSP query param for HTTP header-based CSP
+  const sandboxUrl = new URL(SANDBOX_PROXY_BASE_URL);
+  if (csp) {
+    sandboxUrl.searchParams.set("csp", JSON.stringify(csp));
+  }
+
+  log.info("Loading sandbox proxy...", csp ? `(CSP: ${JSON.stringify(csp)})` : "");
+  iframe.src = sandboxUrl.href;
 
   return readyPromise;
 }
@@ -162,10 +179,10 @@ export async function initializeApp(
     new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!),
   );
 
-  // Load inner iframe HTML with CSP metadata
-  const { html, csp } = await appResourcePromise;
-  log.info("Sending UI resource HTML to MCP App", csp ? `(CSP: ${JSON.stringify(csp)})` : "");
-  await appBridge.sendSandboxResourceReady({ html, csp });
+  // Load inner iframe HTML with CSP and permissions metadata
+  const { html, csp, permissions } = await appResourcePromise;
+  log.info("Sending UI resource HTML to MCP App", csp ? `(CSP: ${JSON.stringify(csp)})` : "", permissions ? `(Permissions: ${JSON.stringify(permissions)})` : "");
+  await appBridge.sendSandboxResourceReady({ html, csp, permissions });
 
   // Wait for inner iframe to be ready
   log.info("Waiting for MCP App to initialize...");
