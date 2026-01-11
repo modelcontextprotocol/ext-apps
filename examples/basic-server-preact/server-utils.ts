@@ -54,7 +54,11 @@ export async function startServer(
     }
   });
 
-  const httpServer = app.listen(port, () => {
+  const httpServer = app.listen(port, (err) => {
+    if (err) {
+      console.error("Failed to start server:", err);
+      process.exit(1);
+    }
     console.log(`${name} listening on http://localhost:${port}/mcp`);
   });
 
