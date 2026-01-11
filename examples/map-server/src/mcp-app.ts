@@ -127,41 +127,47 @@ function getScaleDimensions(extent: BoundingBox): {
 }
 
 /**
- * Search for places within a bounding box using Nominatim
- * Returns array of place names visible in the area
+ * Reverse geocode a single point using Nominatim
+ * Returns the place name for that location
  */
-async function searchPlacesInBox(extent: BoundingBox): Promise<string[]> {
+async function reverseGeocode(
+  lat: number,
+  lon: number,
+): Promise<string | null> {
   try {
-    // Nominatim viewbox format: west,south,east,north (x1,y1,x2,y2)
-    const viewbox = `${extent.west},${extent.south},${extent.east},${extent.north}`;
-    // With bounded=1 and small viewbox, we can search without query to get places
-    // layer=address focuses on cities/towns/admin areas, limit=5 for top places
-    const url = `https://nominatim.openstreetmap.org/search?viewbox=${viewbox}&bounded=1&layer=address&featuretype=settlement&format=json&limit=5`;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`;
     const response = await fetch(url, {
       headers: {
         "User-Agent": "CesiumJS-Globe-MCP-App/1.0",
       },
     });
     if (!response.ok) {
-      log.warn("Place search failed:", response.status);
-      return [];
+      log.warn("Reverse geocode failed:", response.status);
+      return null;
     }
     const data = await response.json();
-    log.info("Places in view:", JSON.stringify(data));
-    // Extract display names, filter to unique short names
-    const places = (data as any[])
-      .map((p) => p.name || p.display_name?.split(",")[0])
-      .filter((name): name is string => !!name);
-    return [...new Set(places)]; // Remove duplicates
+    // Extract short place name from address
+    const addr = data.address;
+    if (!addr) return data.display_name?.split(",")[0] || null;
+    // Prefer city > town > village > county > state
+    return (
+      addr.city ||
+      addr.town ||
+      addr.village ||
+      addr.county ||
+      addr.state ||
+      data.display_name?.split(",")[0] ||
+      null
+    );
   } catch (error) {
-    log.warn("Place search error:", error);
-    return [];
+    log.warn("Reverse geocode error:", error);
+    return null;
   }
 }
 
 /**
- * Debounced location update using viewbox search
- * Finds places visible in the current view and logs extent
+ * Debounced location update using reverse geocoding
+ * Gets the place name for center point and logs extent
  */
 function scheduleLocationUpdate(cesiumViewer: any): void {
   if (reverseGeocodeTimer) {
@@ -184,17 +190,19 @@ function scheduleLocationUpdate(cesiumViewer: any): void {
       `(${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km)`;
     log.info(extentInfo);
 
-    // Search for places visible in the current view
-    const places = await searchPlacesInBox(extent);
-    const placesText =
-      places.length > 0 ? `Visible places: ${places.join(", ")}` : "";
+    // Reverse geocode the center point
+    let placeName: string | null = null;
+    if (center) {
+      placeName = await reverseGeocode(center.lat, center.lon);
+    }
+    const placeText = placeName ? `Location: ${placeName}` : "";
 
-    if (places.length > 0 || center) {
+    if (placeName || center) {
       const centerText = center
         ? `Center: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}`
         : "";
 
-      const contextText = [placesText, centerText, extentInfo]
+      const contextText = [placeText, centerText, extentInfo]
         .filter(Boolean)
         .join("\n");
 
@@ -288,47 +296,37 @@ async function initCesium(): Promise<any> {
   log.info("Globe configured");
 
   // Create and add map imagery layer
-  // Use CARTO Voyager tiles with @2x for high-DPI displays (512x512 tiles)
-  // Standard OSM tiles are only 256x256 which looks pixelated on Retina displays
-  log.info("Creating CARTO Voyager @2x imagery provider...");
+  // Use standard OSM tiles - they render sharply with Cesium's settings
+  log.info("Creating OpenStreetMap imagery provider...");
   try {
-    // Detect if we're on a high-DPI display
-    const isHighDPI = window.devicePixelRatio > 1;
-    const tileSize = isHighDPI ? 512 : 256;
-    const scale = isHighDPI ? "@2x" : "";
-
-    // CARTO Voyager provides clean OSM-based tiles with @2x retina support
-    // URL format: https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png
-    const cartoProvider = new Cesium.UrlTemplateImageryProvider({
-      url: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png`,
-      subdomains: ["a", "b", "c", "d"],
+    // Use standard OpenStreetMap tile server
+    // While these are 256x256 tiles, Cesium handles the rendering well
+    // with useBrowserRecommendedResolution: false
+    const osmProvider = new Cesium.UrlTemplateImageryProvider({
+      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       minimumLevel: 0,
-      maximumLevel: 20,
-      tileWidth: tileSize,
-      tileHeight: tileSize,
+      maximumLevel: 19,
       credit: new Cesium.Credit(
-        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>',
+        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         true,
       ),
     });
-    log.info(
-      `CARTO provider created (${tileSize}x${tileSize} tiles, scale=${scale || "1x"})`,
-    );
+    log.info("OSM provider created (256x256 tiles)");
 
     // Log any imagery provider errors
-    cartoProvider.errorEvent.addEventListener((error: any) => {
-      log.error("CARTO imagery provider error:", error);
+    osmProvider.errorEvent.addEventListener((error: any) => {
+      log.error("OSM imagery provider error:", error);
     });
 
     // Wait for provider to be ready
-    if (cartoProvider.ready !== undefined && !cartoProvider.ready) {
-      log.info("Waiting for CARTO provider to be ready...");
-      await cartoProvider.readyPromise;
-      log.info("CARTO provider ready");
+    if (osmProvider.ready !== undefined && !osmProvider.ready) {
+      log.info("Waiting for OSM provider to be ready...");
+      await osmProvider.readyPromise;
+      log.info("OSM provider ready");
     }
 
     // Add the imagery layer to the viewer
-    cesiumViewer.imageryLayers.addImageryProvider(cartoProvider);
+    cesiumViewer.imageryLayers.addImageryProvider(osmProvider);
     log.info(
       "OSM imagery layer added, layer count:",
       cesiumViewer.imageryLayers.length,
