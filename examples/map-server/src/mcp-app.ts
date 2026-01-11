@@ -244,7 +244,9 @@ async function getVisiblePlaces(extent: BoundingBox): Promise<string[]> {
     const place = await reverseGeocode(point.lat, point.lon);
     if (place) {
       places.add(place);
-      log.info(`Found place: ${place} at ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}`);
+      log.info(
+        `Found place: ${place} at ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}`,
+      );
     }
   }
 
