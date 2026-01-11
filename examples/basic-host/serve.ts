@@ -14,6 +14,7 @@ import express from "express";
 import cors from "cors";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import type { McpUiResourceCsp } from "@modelcontextprotocol/ext-apps";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -53,29 +54,7 @@ hostApp.get("/", (_req, res) => {
 const sandboxApp = express();
 sandboxApp.use(cors());
 
-/**
- * Build CSP header string from config.
- *
- * The CSP restricts what the sandboxed content can do:
- * - script-src: Allow scripts from specified domains + inline/eval (needed for bundled apps)
- * - style-src: Allow styles from specified domains + inline
- * - img-src: Allow images from specified domains + data/blob URIs
- * - font-src: Allow fonts from specified domains + data/blob URIs
- * - connect-src: Allow fetch/XHR to specified domains (e.g., tile servers, APIs)
- * - worker-src: Allow Web Workers from specified domains + blob URIs
- *   (Critical for WebGL apps like CesiumJS that use workers for tile decoding)
- * - frame-src: Disallow nested iframes (defense in depth)
- * - object-src: Disallow plugins (defense in depth)
- * - base-uri: Prevent base tag injection attacks
- */
-interface CspConfig {
-  connectDomains?: string[];
-  resourceDomains?: string[];
-  frameDomains?: string[];
-  baseUriDomains?: string[];
-}
-
-function buildCspHeader(csp?: CspConfig): string {
+function buildCspHeader(csp?: McpUiResourceCsp): string {
   const resourceDomains = csp?.resourceDomains?.join(" ") ?? "";
   const connectDomains = csp?.connectDomains?.join(" ") ?? "";
   const frameDomains = csp?.frameDomains?.join(" ");
@@ -114,7 +93,7 @@ function buildCspHeader(csp?: CspConfig): string {
 // Serve sandbox.html with CSP from query params
 sandboxApp.get(["/", "/sandbox.html"], (req, res) => {
   // Parse CSP config from query param: ?csp=<url-encoded-json>
-  let cspConfig: CspConfig | undefined;
+  let cspConfig: McpUiResourceCsp | undefined;
   if (typeof req.query.csp === "string") {
     try {
       cspConfig = JSON.parse(req.query.csp);

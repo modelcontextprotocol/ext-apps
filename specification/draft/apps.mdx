@@ -109,16 +109,9 @@ interface UIResource {
   }
 }
 
-interface UIResourceMeta {
-  /**
-   * Content Security Policy configuration
-   *
-   * Servers declare which external origins their UI needs to access.
-   * Hosts use this to enforce appropriate CSP headers.
-   */
-  csp?: {
+interface McpUiResourceCsp {
     /**
-     * Origins for network requests
+     * Origins for network requests (fetch/XHR/WebSocket)
      *
      * - Empty or omitted = no external connections (secure default)
      * - Maps to CSP `connect-src` directive
@@ -138,7 +131,24 @@ interface UIResourceMeta {
      * ["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]
      */
     resourceDomains?: string[],
-  },
+    /**
+     * Origins for nested iframes (frame-src directive).
+     */
+    frameDomains?: string[],
+    /**
+     * Allowed base URIs for the document (base-uri directive).
+     */
+    baseUriDomains?: string[],
+}
+
+interface UIResourceMeta {
+  /**
+   * Content Security Policy configuration
+   *
+   * Servers declare which external origins their UI needs to access.
+   * Hosts use this to enforce appropriate CSP headers.
+   */
+  csp?: McpUiResourceCsp,
   /**
    * Dedicated origin for widget
    *
@@ -178,8 +188,10 @@ The resource content is returned via `resources/read`:
     _meta?: {
       ui?: {
         csp?: {
-          connectDomains?: string[];  // Origins for fetch/XHR/WebSocket
-          resourceDomains?: string[]; // Origins for images, scripts, etc
+          connectDomains?: string[]; // Origins for network requests (fetch/XHR/WebSocket).
+          resourceDomains?: string[]; // Origins for static resources (scripts, images, styles, fonts).
+          frameDomains?: string[]; // Origins for nested iframes (frame-src directive).
+          baseUriDomains?: string[]; // Allowed base URIs for the document (base-uri directive).
         };
         domain?: string;
         prefersBorder?: boolean;

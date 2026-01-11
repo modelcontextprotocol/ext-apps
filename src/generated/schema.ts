@@ -186,49 +186,29 @@ export const McpUiSandboxProxyReadyNotificationSchema = z.object({
 });
 
 /**
- * @description Notification containing HTML resource for the sandbox proxy to load.
- * @internal
- * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
+ * @description Content Security Policy configuration for UI resources.
  */
-export const McpUiSandboxResourceReadyNotificationSchema = z.object({
-  method: z.literal("ui/notifications/sandbox-resource-ready"),
-  params: z.object({
-    /** @description HTML content to load into the inner iframe. */
-    html: z.string().describe("HTML content to load into the inner iframe."),
-    /** @description Optional override for the inner iframe's sandbox attribute. */
-    sandbox: z
-      .string()
-      .optional()
-      .describe("Optional override for the inner iframe's sandbox attribute."),
-    /** @description CSP configuration from resource metadata. */
-    csp: z
-      .object({
-        /** @description Origins for network requests (fetch/XHR/WebSocket). */
-        connectDomains: z
-          .array(z.string())
-          .optional()
-          .describe("Origins for network requests (fetch/XHR/WebSocket)."),
-        /** @description Origins for static resources (scripts, images, styles, fonts). */
-        resourceDomains: z
-          .array(z.string())
-          .optional()
-          .describe(
-            "Origins for static resources (scripts, images, styles, fonts).",
-          ),
-        /** @description Origins for nested iframes (frame-src directive). */
-        frameDomains: z
-          .array(z.string())
-          .optional()
-          .describe("Origins for nested iframes (frame-src directive)."),
-        /** @description Allowed base URIs for the document (base-uri directive). */
-        baseUriDomains: z
-          .array(z.string())
-          .optional()
-          .describe("Allowed base URIs for the document (base-uri directive)."),
-      })
-      .optional()
-      .describe("CSP configuration from resource metadata."),
-  }),
+export const McpUiResourceCspSchema = z.object({
+  /** @description Origins for network requests (fetch/XHR/WebSocket). */
+  connectDomains: z
+    .array(z.string())
+    .optional()
+    .describe("Origins for network requests (fetch/XHR/WebSocket)."),
+  /** @description Origins for static resources (scripts, images, styles, fonts). */
+  resourceDomains: z
+    .array(z.string())
+    .optional()
+    .describe("Origins for static resources (scripts, images, styles, fonts)."),
+  /** @description Origins for nested iframes (frame-src directive). */
+  frameDomains: z
+    .array(z.string())
+    .optional()
+    .describe("Origins for nested iframes (frame-src directive)."),
+  /** @description Allowed base URIs for the document (base-uri directive). */
+  baseUriDomains: z
+    .array(z.string())
+    .optional()
+    .describe("Allowed base URIs for the document (base-uri directive)."),
 });
 
 /**
@@ -418,32 +398,6 @@ export const McpUiInitializedNotificationSchema = z.object({
 });
 
 /**
- * @description Content Security Policy configuration for UI resources.
- */
-export const McpUiResourceCspSchema = z.object({
-  /** @description Origins for network requests (fetch/XHR/WebSocket). */
-  connectDomains: z
-    .array(z.string())
-    .optional()
-    .describe("Origins for network requests (fetch/XHR/WebSocket)."),
-  /** @description Origins for static resources (scripts, images, styles, fonts). */
-  resourceDomains: z
-    .array(z.string())
-    .optional()
-    .describe("Origins for static resources (scripts, images, styles, fonts)."),
-  /** @description Origins for nested iframes (frame-src directive). */
-  frameDomains: z
-    .array(z.string())
-    .optional()
-    .describe("Origins for nested iframes (frame-src directive)."),
-  /** @description Allowed base URIs for the document (base-uri directive). */
-  baseUriDomains: z
-    .array(z.string())
-    .optional()
-    .describe("Allowed base URIs for the document (base-uri directive)."),
-});
-
-/**
  * @description UI Resource metadata for security and rendering configuration.
  */
 export const McpUiResourceMetaSchema = z.object({
@@ -538,6 +492,28 @@ export const McpUiMessageRequestSchema = z.object({
     content: z
       .array(ContentBlockSchema)
       .describe("Message content blocks (text, image, etc.)."),
+  }),
+});
+
+/**
+ * @description Notification containing HTML resource for the sandbox proxy to load.
+ * @internal
+ * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
+ */
+export const McpUiSandboxResourceReadyNotificationSchema = z.object({
+  method: z.literal("ui/notifications/sandbox-resource-ready"),
+  params: z.object({
+    /** @description HTML content to load into the inner iframe. */
+    html: z.string().describe("HTML content to load into the inner iframe."),
+    /** @description Optional override for the inner iframe's sandbox attribute. */
+    sandbox: z
+      .string()
+      .optional()
+      .describe("Optional override for the inner iframe's sandbox attribute."),
+    /** @description CSP configuration from resource metadata. */
+    csp: McpUiResourceCspSchema.optional().describe(
+      "CSP configuration from resource metadata.",
+    ),
   }),
 });
 

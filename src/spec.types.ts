@@ -219,16 +219,7 @@ export interface McpUiSandboxResourceReadyNotification {
     /** @description Optional override for the inner iframe's sandbox attribute. */
     sandbox?: string;
     /** @description CSP configuration from resource metadata. */
-    csp?: {
-      /** @description Origins for network requests (fetch/XHR/WebSocket). */
-      connectDomains?: string[];
-      /** @description Origins for static resources (scripts, images, styles, fonts). */
-      resourceDomains?: string[];
-      /** @description Origins for nested iframes (frame-src directive). */
-      frameDomains?: string[];
-      /** @description Allowed base URIs for the document (base-uri directive). */
-      baseUriDomains?: string[];
-    };
+    csp?: McpUiResourceCsp;
   };
 }
 

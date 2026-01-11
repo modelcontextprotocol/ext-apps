@@ -1,4 +1,4 @@
-import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
@@ -42,12 +42,7 @@ export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
 
 interface UiResourceData {
   html: string;
-  csp?: {
-    connectDomains?: string[];
-    resourceDomains?: string[];
-    frameDomains?: string[];
-    baseUriDomains?: string[];
-  };
+  csp?: McpUiResourceCsp;
 }
 
 export interface ToolCallInfo {
@@ -124,7 +119,7 @@ async function getUiResource(serverInfo: ServerInfo, uri: string): Promise<UiRes
 
 export function loadSandboxProxy(
   iframe: HTMLIFrameElement,
-  csp?: { connectDomains?: string[]; resourceDomains?: string[]; frameDomains?: string[]; baseUriDomains?: string[] },
+  csp?: McpUiResourceCsp,
 ): Promise<boolean> {
   // Prevent reload
   if (iframe.src) return Promise.resolve(false);
