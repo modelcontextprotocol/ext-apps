@@ -138,13 +138,60 @@ export function createServer(): McpServer {
     },
   );
 
+  // show-map tool - displays the CesiumJS globe
+  // Default bounding box: London area
+  registerAppTool(
+    server,
+    "show-map",
+    {
+      title: "Show Map",
+      description:
+        "Display an interactive world map zoomed to a specific bounding box. Use the GeoCode tool to find the bounding box of a location.",
+      inputSchema: {
+        west: z
+          .number()
+          .optional()
+          .default(-0.5)
+          .describe("Western longitude (-180 to 180)"),
+        south: z
+          .number()
+          .optional()
+          .default(51.3)
+          .describe("Southern latitude (-90 to 90)"),
+        east: z
+          .number()
+          .optional()
+          .default(0.3)
+          .describe("Eastern longitude (-180 to 180)"),
+        north: z
+          .number()
+          .optional()
+          .default(51.7)
+          .describe("Northern latitude (-90 to 90)"),
+        label: z
+          .string()
+          .optional()
+          .describe("Optional label to display on the map"),
+      },
+      _meta: { [RESOURCE_URI_META_KEY]: RESOURCE_URI },
+    },
+    async ({ west, south, east, north, label }): Promise<CallToolResult> => ({
+      content: [
+        {
+          type: "text",
+          text: `Displaying globe at: W:${west.toFixed(4)}, S:${south.toFixed(4)}, E:${east.toFixed(4)}, N:${north.toFixed(4)}${label ? ` (${label})` : ""}`,
+        },
+      ],
+    }),
+  );
+
   // geocode tool - searches for places using Nominatim (no UI)
   server.registerTool(
     "geocode",
     {
       title: "Geocode",
       description:
-        "Search for places using OpenStreetMap Nominatim. Returns coordinates and bounding boxes for up to 5 matches.",
+        "Search for places using OpenStreetMap. Returns coordinates and bounding boxes for up to 5 matches.",
       inputSchema: {
         query: z
           .string()
@@ -201,53 +248,6 @@ export function createServer(): McpServer {
         };
       }
     },
-  );
-
-  // show-map tool - displays the CesiumJS globe
-  // Default bounding box: London area
-  registerAppTool(
-    server,
-    "show-map",
-    {
-      title: "Show Map",
-      description:
-        "Display an interactive 3D globe zoomed to a specific bounding box. The globe uses OpenStreetMap tiles and supports rotation, zoom, and 3D perspective. Defaults to London if no coordinates provided.",
-      inputSchema: {
-        west: z
-          .number()
-          .optional()
-          .default(-0.5)
-          .describe("Western longitude (-180 to 180)"),
-        south: z
-          .number()
-          .optional()
-          .default(51.3)
-          .describe("Southern latitude (-90 to 90)"),
-        east: z
-          .number()
-          .optional()
-          .default(0.3)
-          .describe("Eastern longitude (-180 to 180)"),
-        north: z
-          .number()
-          .optional()
-          .default(51.7)
-          .describe("Northern latitude (-90 to 90)"),
-        label: z
-          .string()
-          .optional()
-          .describe("Optional label to display on the map"),
-      },
-      _meta: { [RESOURCE_URI_META_KEY]: RESOURCE_URI },
-    },
-    async ({ west, south, east, north, label }): Promise<CallToolResult> => ({
-      content: [
-        {
-          type: "text",
-          text: `Displaying globe at: W:${west.toFixed(4)}, S:${south.toFixed(4)}, E:${east.toFixed(4)}, N:${north.toFixed(4)}${label ? ` (${label})` : ""}`,
-        },
-      ],
-    }),
   );
 
   return server;

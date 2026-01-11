@@ -126,6 +126,24 @@ function getScaleDimensions(extent: BoundingBox): {
   return { widthKm, heightKm };
 }
 
+// Rate limiting for Nominatim (1 request per second per their usage policy)
+let lastNominatimRequest = 0;
+const NOMINATIM_RATE_LIMIT_MS = 1100; // 1.1 seconds to be safe
+
+/**
+ * Wait for rate limit before making a Nominatim request
+ */
+async function waitForRateLimit(): Promise<void> {
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastNominatimRequest;
+  if (timeSinceLastRequest < NOMINATIM_RATE_LIMIT_MS) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, NOMINATIM_RATE_LIMIT_MS - timeSinceLastRequest),
+    );
+  }
+  lastNominatimRequest = Date.now();
+}
+
 /**
  * Reverse geocode a single point using Nominatim
  * Returns the place name for that location
@@ -135,6 +153,7 @@ async function reverseGeocode(
   lon: number,
 ): Promise<string | null> {
   try {
+    await waitForRateLimit();
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`;
     const response = await fetch(url, {
       headers: {
@@ -166,14 +185,81 @@ async function reverseGeocode(
 }
 
 /**
- * Debounced location update using reverse geocoding
- * Gets the place name for center point and logs extent
+ * Get sample points within an extent based on the visible area size.
+ * For small areas (city zoom), just sample center.
+ * For larger areas, sample center + corners to discover multiple places.
+ */
+function getSamplePoints(
+  extent: BoundingBox,
+  extentSizeKm: number,
+): Array<{ lat: number; lon: number }> {
+  const centerLat = (extent.north + extent.south) / 2;
+  const centerLon = (extent.east + extent.west) / 2;
+
+  // Always include center
+  const points: Array<{ lat: number; lon: number }> = [
+    { lat: centerLat, lon: centerLon },
+  ];
+
+  // For larger extents, add more sample points
+  if (extentSizeKm > 100) {
+    // > 100km: sample 4 quadrant centers
+    const latOffset = (extent.north - extent.south) / 4;
+    const lonOffset = (extent.east - extent.west) / 4;
+    points.push(
+      { lat: centerLat + latOffset, lon: centerLon - lonOffset }, // NW
+      { lat: centerLat + latOffset, lon: centerLon + lonOffset }, // NE
+      { lat: centerLat - latOffset, lon: centerLon - lonOffset }, // SW
+      { lat: centerLat - latOffset, lon: centerLon + lonOffset }, // SE
+    );
+  } else if (extentSizeKm > 30) {
+    // 30-100km: sample 2 opposite corners
+    const latOffset = (extent.north - extent.south) / 4;
+    const lonOffset = (extent.east - extent.west) / 4;
+    points.push(
+      { lat: centerLat + latOffset, lon: centerLon - lonOffset }, // NW
+      { lat: centerLat - latOffset, lon: centerLon + lonOffset }, // SE
+    );
+  }
+  // < 30km: just center (likely same city)
+
+  return points;
+}
+
+/**
+ * Get places visible in the extent by sampling multiple points
+ * Returns array of unique place names
+ */
+async function getVisiblePlaces(extent: BoundingBox): Promise<string[]> {
+  const { widthKm, heightKm } = getScaleDimensions(extent);
+  const extentSizeKm = Math.max(widthKm, heightKm);
+  const samplePoints = getSamplePoints(extent, extentSizeKm);
+
+  log.info(
+    `Sampling ${samplePoints.length} points for extent ${extentSizeKm.toFixed(0)}km`,
+  );
+
+  const places = new Set<string>();
+  for (const point of samplePoints) {
+    const place = await reverseGeocode(point.lat, point.lon);
+    if (place) {
+      places.add(place);
+      log.info(`Found place: ${place} at ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}`);
+    }
+  }
+
+  return [...places];
+}
+
+/**
+ * Debounced location update using multi-point reverse geocoding
+ * Samples multiple points in the visible extent to discover places
  */
 function scheduleLocationUpdate(cesiumViewer: any): void {
   if (reverseGeocodeTimer) {
     clearTimeout(reverseGeocodeTimer);
   }
-  // Debounce to 1.5 seconds (Nominatim rate limit is 1 req/sec)
+  // Debounce to 1.5 seconds before starting geocoding
   reverseGeocodeTimer = setTimeout(async () => {
     const center = getCameraCenter(cesiumViewer);
     const extent = getVisibleExtent(cesiumViewer);
@@ -190,19 +276,17 @@ function scheduleLocationUpdate(cesiumViewer: any): void {
       `(${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km)`;
     log.info(extentInfo);
 
-    // Reverse geocode the center point
-    let placeName: string | null = null;
-    if (center) {
-      placeName = await reverseGeocode(center.lat, center.lon);
-    }
-    const placeText = placeName ? `Location: ${placeName}` : "";
+    // Get places visible in the extent (samples multiple points for large areas)
+    const places = await getVisiblePlaces(extent);
+    const placesText =
+      places.length > 0 ? `Visible places: ${places.join(", ")}` : "";
 
-    if (placeName || center) {
+    if (places.length > 0 || center) {
       const centerText = center
         ? `Center: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}`
         : "";
 
-      const contextText = [placeText, centerText, extentInfo]
+      const contextText = [placesText, centerText, extentInfo]
         .filter(Boolean)
         .join("\n");
 
