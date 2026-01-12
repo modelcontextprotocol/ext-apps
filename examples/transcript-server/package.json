@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
+    "@types/dom-speech-recognition": "^0.0.7",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "concurrently": "^9.2.1",
