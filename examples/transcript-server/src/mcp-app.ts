@@ -350,8 +350,8 @@ function updateModelContext() {
       } as unknown as Parameters<typeof app.request>[0],
       z.object({}) as any,
     )
-    .catch(() => {
-      // Ignore errors - experimental feature may not be supported
+    .catch((e) => {
+      log.warn("Failed to update model context:", e);
     });
 }
 
