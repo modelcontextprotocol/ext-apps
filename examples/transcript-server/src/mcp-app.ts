@@ -4,7 +4,11 @@
  * Simple speech-to-text transcription using Web Speech API.
  * Transcribed text can be sent to the host via ui/message.
  */
-import { App, type McpUiHostContext, applyDocumentTheme } from "@modelcontextprotocol/ext-apps";
+import {
+  App,
+  type McpUiHostContext,
+  applyDocumentTheme,
+} from "@modelcontextprotocol/ext-apps";
 import { z } from "zod";
 import "./global.css";
 import "./mcp-app.css";
@@ -137,7 +141,8 @@ function stopAudioCapture() {
 // ============================================================================
 
 function startSpeechRecognition(): boolean {
-  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognitionCtor =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (!SpeechRecognitionCtor) {
     log.warn("Speech recognition not supported");
@@ -271,7 +276,9 @@ function addTranscriptEntry(text: string, isFinal: boolean) {
 function updateInterimTranscript(text: string) {
   clearTranscriptPlaceholder();
 
-  let interim = transcriptEl.querySelector(".transcript-entry.interim") as HTMLElement;
+  let interim = transcriptEl.querySelector(
+    ".transcript-entry.interim",
+  ) as HTMLElement;
   if (!interim) {
     interim = document.createElement("p");
     interim.className = "transcript-entry interim";
@@ -296,12 +303,16 @@ function getEntryText(entry: HTMLElement): string {
 }
 
 function getAllTranscriptText(): string {
-  const entries = Array.from(transcriptEl.querySelectorAll(".transcript-entry:not(.interim)")) as HTMLElement[];
+  const entries = Array.from(
+    transcriptEl.querySelectorAll(".transcript-entry:not(.interim)"),
+  ) as HTMLElement[];
   return entries.map(getEntryText).filter(Boolean).join(" ");
 }
 
 function getUnsentEntries(): HTMLElement[] {
-  const allEntries = Array.from(transcriptEl.querySelectorAll(".transcript-entry:not(.interim)")) as HTMLElement[];
+  const allEntries = Array.from(
+    transcriptEl.querySelectorAll(".transcript-entry:not(.interim)"),
+  ) as HTMLElement[];
   return allEntries.slice(lastSentIndex);
 }
 
@@ -319,18 +330,22 @@ function updateModelContext() {
 
   // EXPERIMENTAL: Updates model context with current transcript
   // See https://github.com/modelcontextprotocol/ext-apps/pull/125
-  app.request(
-    {
-      method: "ui/update-model-context",
-      params: {
-        role: "user",
-        content: text ? [{ type: "text", text: `[Live transcript]: ${text}` }] : [],
-      },
-    } as unknown as Parameters<typeof app.request>[0],
-    z.object({}) as any,
-  ).catch(() => {
-    // Ignore errors - experimental feature may not be supported
-  });
+  app
+    .request(
+      {
+        method: "ui/update-model-context",
+        params: {
+          role: "user",
+          content: text
+            ? [{ type: "text", text: `[Live transcript]: ${text}` }]
+            : [],
+        },
+      } as unknown as Parameters<typeof app.request>[0],
+      z.object({}) as any,
+    )
+    .catch(() => {
+      // Ignore errors - experimental feature may not be supported
+    });
 }
 
 // ============================================================================
@@ -403,7 +418,8 @@ copyBtn.addEventListener("click", async () => {
 });
 
 clearBtn.addEventListener("click", () => {
-  transcriptEl.innerHTML = '<p class="transcript-placeholder">Your speech will appear here...</p>';
+  transcriptEl.innerHTML =
+    '<p class="transcript-placeholder">Your speech will appear here...</p>';
   lastSentIndex = 0;
   updateSendButton();
   updateModelContext();
@@ -453,7 +469,9 @@ sendBtn.addEventListener("click", async () => {
       lastEntry.insertAdjacentElement("afterend", divider);
 
       // Update sent index
-      const allEntries = transcriptEl.querySelectorAll(".transcript-entry:not(.interim)");
+      const allEntries = transcriptEl.querySelectorAll(
+        ".transcript-entry:not(.interim)",
+      );
       lastSentIndex = allEntries.length;
 
       updateSendButton();
@@ -499,8 +517,12 @@ interface SpeechRecognition extends EventTarget {
   interimResults: boolean;
   lang: string;
   onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
-  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
+  onresult:
+    | ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void)
+    | null;
+  onerror:
+    | ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void)
+    | null;
   onend: ((this: SpeechRecognition, ev: Event) => void) | null;
   start(): void;
   stop(): void;

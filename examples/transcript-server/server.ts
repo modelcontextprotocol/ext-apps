@@ -1,6 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ReadResourceResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
@@ -29,7 +32,8 @@ export function createServer(): McpServer {
     "transcribe",
     {
       title: "Transcribe Speech",
-      description: "Opens a live speech transcription interface using the Web Speech API.",
+      description:
+        "Opens a live speech transcription interface using the Web Speech API.",
       inputSchema: {},
       _meta: { [RESOURCE_URI_META_KEY]: RESOURCE_URI },
     },
@@ -55,7 +59,10 @@ export function createServer(): McpServer {
     RESOURCE_URI,
     { mimeType: RESOURCE_MIME_TYPE, description: "Transcript UI" },
     async (): Promise<ReadResourceResult> => {
-      const html = await fs.readFile(path.join(DIST_DIR, "mcp-app.html"), "utf-8");
+      const html = await fs.readFile(
+        path.join(DIST_DIR, "mcp-app.html"),
+        "utf-8",
+      );
 
       return {
         contents: [

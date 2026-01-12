@@ -44,6 +44,7 @@ Opens a live speech transcription interface.
 **Parameters:** None
 
 **Example:**
+
 ```json
 {
   "name": "transcribe",
