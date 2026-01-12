@@ -45,7 +45,7 @@
   ],
   "scripts": {
     "postinstall": "node scripts/setup-bun.mjs || echo 'setup-bun.mjs failed or not available'",
-    "start": "npm run examples:start",
+    "start": "npm run examples:dev",
     "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
     "build": "npm run generate:schemas && node scripts/run-bun.mjs build.bun.ts",
     "prepack": "npm run build",
