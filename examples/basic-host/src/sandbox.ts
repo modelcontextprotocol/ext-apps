@@ -1,4 +1,5 @@
 import type { McpUiSandboxProxyReadyNotification, McpUiSandboxResourceReadyNotification } from "../../../dist/src/types";
+import { buildAllowAttribute } from "../../../dist/src/app-bridge";
 
 const ALLOWED_REFERRER_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/;
 
@@ -43,6 +44,8 @@ try {
 const inner = document.createElement("iframe");
 inner.style = "width:100%; height:100%; border:none;";
 inner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
+// Note: allow attribute is set later when receiving sandbox-resource-ready notification
+// based on the permissions requested by the app
 document.body.appendChild(inner);
 
 const RESOURCE_READY_NOTIFICATION: McpUiSandboxResourceReadyNotification["method"] =
@@ -65,24 +68,6 @@ const PROXY_READY_NOTIFICATION: McpUiSandboxProxyReadyNotification["method"] =
 //
 // Security: CSP is enforced via HTTP headers on sandbox.html (set by serve.ts
 // based on ?csp= query param). This is tamper-proof unlike meta tags.
-
-// Build iframe allow attribute from permissions
-function buildAllowAttribute(permissions?: {
-  camera?: boolean;
-  microphone?: boolean;
-  geolocation?: boolean;
-  clipboardWrite?: boolean;
-}): string {
-  if (!permissions) return "";
-
-  const allowList: string[] = [];
-  if (permissions.camera) allowList.push("camera");
-  if (permissions.microphone) allowList.push("microphone");
-  if (permissions.geolocation) allowList.push("geolocation");
-  if (permissions.clipboardWrite) allowList.push("clipboard-write");
-
-  return allowList.join("; ");
-}
 
 window.addEventListener("message", async (event) => {
   if (event.source === window.parent) {

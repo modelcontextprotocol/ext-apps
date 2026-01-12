@@ -126,6 +126,46 @@
   min-width: 0;
 }
 
+.appOutputPanel {
+  flex: 1;
+  min-width: 0;
+}
+
+.appHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  position: relative;
+
+  .toolName {
+    font-family: monospace;
+  }
+
+  .closeButton {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: #e0e0e0;
+    font-size: 1.25rem;
+    line-height: 1;
+    color: #666;
+    cursor: pointer;
+
+    &:hover {
+      background: #d0d0d0;
+      color: #333;
+    }
+  }
+}
+
 .jsonBlock {
   flex-grow: 1;
   min-height: 0;
@@ -146,6 +186,66 @@
     border: 3px dashed #888;
     border-radius: 4px;
   }
+}
+
+.collapsiblePanel {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #fafafa;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: #f0f0f0;
+  }
+}
+
+.collapsibleHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.collapsibleLabel {
+  font-weight: 600;
+  color: #555;
+}
+
+.collapsibleSize {
+  color: #888;
+  font-size: 0.75rem;
+}
+
+.collapsibleToggle {
+  margin-left: auto;
+  color: #888;
+  font-size: 0.75rem;
+}
+
+.collapsiblePreview {
+  margin-top: 0.25rem;
+  color: #666;
+  font-family: monospace;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collapsibleFull {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+  font-family: monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
 }
 
 .error {
