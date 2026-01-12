@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Transcript</title>
+</head>
+<body>
+  <main class="transcript-app">
+    <!-- Transcript Area -->
+    <section class="transcript-section">
+      <div class="transcript" id="transcript">
+        <p class="transcript-placeholder">Your speech will appear here...</p>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="controls">
+      <div class="controls-left">
+        <button class="btn btn-primary" id="start-btn">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Start
+        </button>
+        <div class="level-bar" id="level-bar">
+          <div class="level-fill" id="mic-level"></div>
+        </div>
+        <span class="timer" id="timer">0:00</span>
+      </div>
+      <div class="controls-right">
+        <button class="btn btn-secondary" id="copy-btn" title="Copy transcript">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+        <button class="btn btn-secondary" id="clear-btn">Clear</button>
+        <button class="btn btn-accent" id="send-btn" disabled>Send</button>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/src/mcp-app.ts"></script>
+</body>
+</html>

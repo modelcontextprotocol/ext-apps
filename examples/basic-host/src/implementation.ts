@@ -128,6 +128,8 @@ export function loadSandboxProxy(
   if (iframe.src) return Promise.resolve(false);
 
   iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
+  // Allow microphone and clipboard for apps that need audio input or copy functionality
+  iframe.setAttribute("allow", "microphone; clipboard-write");
 
   // Set Permission Policy allow attribute based on requested permissions
   const allowAttribute = buildAllowAttribute(permissions);
