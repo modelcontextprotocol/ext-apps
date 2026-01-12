@@ -5,7 +5,7 @@
  *   # Generate screenshots (starts server automatically via playwright.config):
  *   npm run generate:screenshots
  *
- * Output: examples/<server-dir>/grid-cell.png (300x300 centered fill)
+ * Output: examples/<server-dir>/grid-cell.png (300x300 centered, aspect-fit)
  *
  * For basic-server-* variants, only basic-server-react is included.
  */
@@ -100,7 +100,7 @@ async function loadServer(page: Page, serverName: string) {
 }
 
 /**
- * Capture the app iframe content and save as 300x300 centered-fill image.
+ * Capture the app iframe content and save as 300x300 centered, aspect-fit image.
  */
 async function captureAppScreenshot(page: Page, outputPath: string) {
   const outerFrame = page.frameLocator("iframe").nth(0);
@@ -111,8 +111,9 @@ async function captureAppScreenshot(page: Page, outputPath: string) {
 
   await sharp(screenshot)
     .resize(OUTPUT_SIZE, OUTPUT_SIZE, {
-      fit: "cover",
+      fit: "contain",
       position: "centre",
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
     })
     .png()
     .toFile(outputPath);
