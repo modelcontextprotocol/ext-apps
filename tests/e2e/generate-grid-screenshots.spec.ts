@@ -2,7 +2,6 @@
  * Generate 300x300 grid-cell.png screenshots for each example server.
  *
  * Usage:
- *   # Generate screenshots (starts server automatically via playwright.config):
  *   npm run generate:screenshots
  *
  * Output: examples/<server-dir>/grid-cell.png (300x300 centered, aspect-fit)
@@ -16,13 +15,8 @@ import * as fs from "fs";
 import sharp from "sharp";
 
 const OUTPUT_SIZE = 300;
-
-// Servers that need extra stabilization time
-const SLOW_SERVERS: Record<string, number> = {
-  "map-server": 5000,
-  threejs: 2000,
-  shadertoy: 1000,
-};
+const APP_WIDTH = 500;
+const LOAD_WAIT_MS = 5000;
 
 // Server configurations
 const SERVERS = [
@@ -58,7 +52,11 @@ const SERVERS = [
     dir: "scenario-modeler-server",
   },
   { key: "shadertoy", name: "ShaderToy Server", dir: "shadertoy-server" },
-  { key: "sheet-music", name: "Sheet Music Server", dir: "sheet-music-server" },
+  {
+    key: "sheet-music",
+    name: "Sheet Music Server",
+    dir: "sheet-music-server",
+  },
   {
     key: "system-monitor",
     name: "System Monitor Server",
@@ -100,15 +98,24 @@ async function loadServer(page: Page, serverName: string) {
 }
 
 /**
- * Capture the app iframe content and save as 300x300 centered, aspect-fit image.
+ * Capture the app iframe content and save both:
+ * - screenshot.png: full-size raw screenshot of the iframe
+ * - grid-cell.png: 300x300 centered, aspect-fit thumbnail
  */
-async function captureAppScreenshot(page: Page, outputPath: string) {
+async function captureAppScreenshot(page: Page, outputDir: string) {
+  // Get the inner app iframe element (not body, to avoid extra whitespace)
   const outerFrame = page.frameLocator("iframe").nth(0);
-  const innerFrame = outerFrame.frameLocator("iframe").nth(0);
-  const appBody = innerFrame.locator("body");
+  const innerIframe = outerFrame.locator("iframe").nth(0);
 
-  const screenshot = await appBody.screenshot();
+  // Screenshot just the inner iframe element
+  const screenshot = await innerIframe.screenshot();
 
+  // Save full-size screenshot
+  const screenshotPath = path.join(outputDir, "screenshot.png");
+  await sharp(screenshot).png().toFile(screenshotPath);
+
+  // Save 300x300 grid cell thumbnail
+  const gridCellPath = path.join(outputDir, "grid-cell.png");
   await sharp(screenshot)
     .resize(OUTPUT_SIZE, OUTPUT_SIZE, {
       fit: "contain",
@@ -116,15 +123,19 @@ async function captureAppScreenshot(page: Page, outputPath: string) {
       background: { r: 255, g: 255, b: 255, alpha: 1 },
     })
     .png()
-    .toFile(outputPath);
+    .toFile(gridCellPath);
+
+  return { screenshotPath, gridCellPath };
 }
+
+// Use a constrained viewport width for consistent app rendering
+test.use({ viewport: { width: APP_WIDTH, height: 600 } });
 
 // Generate screenshots for each server
 for (const server of SERVERS) {
   test(`Generate grid-cell.png for ${server.dir}`, async ({ page }) => {
     const examplesDir = path.join(process.cwd(), "examples");
     const outputDir = path.join(examplesDir, server.dir);
-    const outputPath = path.join(outputDir, "grid-cell.png");
 
     // Skip if directory doesn't exist
     if (!fs.existsSync(outputDir)) {
@@ -136,12 +147,14 @@ for (const server of SERVERS) {
     // Load the server
     await loadServer(page, server.name);
 
-    // Wait for stabilization
-    const stabilizationMs = SLOW_SERVERS[server.key] ?? 500;
-    await page.waitForTimeout(stabilizationMs);
+    // Wait 5 seconds for app to fully load (animations, data, tiles, etc.)
+    await page.waitForTimeout(LOAD_WAIT_MS);
 
-    // Capture and save
-    await captureAppScreenshot(page, outputPath);
-    console.log(`✅ Saved ${outputPath}`);
+    // Capture and save both screenshot.png and grid-cell.png
+    const { screenshotPath, gridCellPath } = await captureAppScreenshot(
+      page,
+      outputDir,
+    );
+    console.log(`✅ Saved ${screenshotPath} + ${gridCellPath}`);
   });
 }
