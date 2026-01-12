@@ -5,8 +5,9 @@ An MCP App Server for live speech transcription using the Web Speech API.
 ## Features
 
 - **Live Transcription**: Real-time speech-to-text using browser's Web Speech API
+- **Transitional Model Context**: Streams interim transcriptions to the model via `ui/update-model-context`, allowing the model to see what the user is saying as they speak
 - **Audio Level Indicator**: Visual feedback showing microphone input levels
-- **Send to Host**: Button to send transcribed text as a `ui/message` to the MCP host
+- **Send to Host**: Button to send completed transcriptions as a `ui/message` to the MCP host
 - **Start/Stop Control**: Toggle listening on and off
 - **Clear Transcript**: Reset the transcript area
 
@@ -56,8 +57,8 @@ Opens a live speech transcription interface.
 
 1. Click **Start** to begin listening
 2. Speak into your microphone
-3. Watch your speech appear as text in real-time
-4. Click **Send** to send the transcript as a `ui/message` to the host
+3. Watch your speech appear as text in real-time (interim text is streamed to model context via `ui/update-model-context`)
+4. Click **Send** to send the transcript as a `ui/message` to the host (clears the model context)
 5. Click **Clear** to reset the transcript
 
 ## Architecture
