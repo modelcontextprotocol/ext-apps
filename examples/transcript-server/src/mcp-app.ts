@@ -334,6 +334,7 @@ function updateSendButton() {
 
 function updateModelContext() {
   const text = getUnsentText();
+  log.info("Updating model context:", text || "(empty)");
 
   // EXPERIMENTAL: Updates model context with current transcript
   // See https://github.com/modelcontextprotocol/ext-apps/pull/125
