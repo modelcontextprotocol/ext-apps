@@ -26,7 +26,6 @@ const DYNAMIC_MASKS: Record<string, string[]> = {
     "#info-uptime", // System uptime
   ],
   threejs: ["#threejs-canvas", ".threejs-container"], // 3D render canvas (dynamic animation)
-  transcript: ["#timer"], // Timer display (dynamic when recording)
   "wiki-explorer": ["#graph"], // Force-directed graph (dynamic layout)
 };
 
