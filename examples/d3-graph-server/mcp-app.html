@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>D3 Graph Explorer</title>
+</head>
+<body>
+  <main id="main">
+    <div id="controls">
+      <select id="graph-select">
+        <option value="dependencies">Package Dependencies</option>
+        <option value="org-chart">Organization Chart</option>
+        <option value="knowledge">Knowledge Graph</option>
+      </select>
+      <button id="reset-btn">Reset View</button>
+    </div>
+    <div id="graph-container">
+      <svg id="graph"></svg>
+    </div>
+    <div id="tooltip"></div>
+  </main>
+  <script type="module" src="/src/mcp-app.ts"></script>
+</body>
+</html>

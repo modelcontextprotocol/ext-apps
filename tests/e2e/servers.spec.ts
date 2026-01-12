@@ -24,6 +24,8 @@ const DYNAMIC_MASKS: Record<string, string[]> = {
   ],
   threejs: ["#threejs-canvas", ".threejs-container"], // 3D render canvas (dynamic animation)
   "wiki-explorer": ["#graph"], // Force-directed graph (dynamic layout)
+  "d3-graph": ["#graph-container", "svg"], // Force simulation is dynamic
+  "recharts-chart": [".chart-container"], // Charts with dynamic rendering
 };
 
 // Servers that need extra stabilization time (e.g., for tile loading, WebGL init)
@@ -50,6 +52,8 @@ const SERVERS = [
   { key: "system-monitor", name: "System Monitor Server" },
   { key: "threejs", name: "Three.js Server" },
   { key: "wiki-explorer", name: "Wiki Explorer" },
+  { key: "d3-graph", name: "D3 Graph Server" },
+  { key: "recharts-chart", name: "Recharts Dashboard Server" },
 ];
 
 /**
