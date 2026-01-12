@@ -306,7 +306,7 @@ function getAllTranscriptText(): string {
   const entries = Array.from(
     transcriptEl.querySelectorAll(".transcript-entry:not(.interim)"),
   ) as HTMLElement[];
-  return entries.map(getEntryText).filter(Boolean).join(" ");
+  return entries.map(getEntryText).filter(Boolean).join("\n");
 }
 
 function getUnsentEntries(): HTMLElement[] {
