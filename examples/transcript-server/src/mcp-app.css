@@ -15,7 +15,7 @@
   flex-direction: column;
   width: 100%;
   max-width: 500px;
-  min-height: 100vh;
+  /* Auto-expand: no fixed height, let content determine size */
   margin: 0 auto;
   padding: 1rem;
   gap: 1rem;
@@ -33,7 +33,6 @@
 
 /* Transcript Section */
 .transcript-section {
-  flex: 1;
   display: flex;
   flex-direction: column;
   background: var(--color-surface);
@@ -41,14 +40,13 @@
   -webkit-backdrop-filter: blur(8px);
   border-radius: 12px;
   border: 1px solid var(--color-border);
-  overflow: hidden;
+  /* Auto-expand: no overflow hidden, let content grow */
 }
 
 .transcript {
-  flex: 1;
   padding: 1rem;
-  overflow-y: auto;
-  min-height: 200px;
+  /* Auto-expand: no overflow, no fixed height - content grows naturally */
+  min-height: 80px;
 }
 
 .transcript-placeholder {

@@ -270,7 +270,6 @@ function addTranscriptEntry(text: string, isFinal: boolean) {
   entry.className = `transcript-entry${isFinal ? "" : " interim"}`;
   entry.innerHTML = `<div class="timestamp">${timestamp}</div>${escapeHtml(text)}`;
   transcriptEl.appendChild(entry);
-  transcriptEl.scrollTop = transcriptEl.scrollHeight;
 }
 
 function updateInterimTranscript(text: string) {
@@ -287,7 +286,6 @@ function updateInterimTranscript(text: string) {
 
   const timestamp = new Date().toLocaleTimeString();
   interim.innerHTML = `<div class="timestamp">${timestamp}</div>${escapeHtml(text)}`;
-  transcriptEl.scrollTop = transcriptEl.scrollHeight;
 }
 
 function escapeHtml(text: string): string {
