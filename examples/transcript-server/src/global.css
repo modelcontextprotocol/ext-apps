@@ -1,0 +1,12 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 1rem;
+  margin: 0;
+  padding: 0;
+  /* No height: 100% - body must grow with content for ResizeObserver to detect changes */
+  background: transparent;
+}

@@ -1,0 +1,238 @@
+.transcript-app {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-secondary: #6b7280;
+  --color-secondary-hover: #4b5563;
+  --color-accent: #10b981;
+  --color-accent-hover: #059669;
+  --color-success: #16a34a;
+  --color-surface: rgba(255, 255, 255, 0.8);
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-text: #111827;
+  --color-text-secondary: #6b7280;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 500px;
+  /* Auto-expand: no fixed height, let content determine size */
+  margin: 0 auto;
+  padding: 1rem;
+  gap: 1rem;
+  background: transparent;
+  color: var(--color-text);
+}
+
+/* Dark theme via host context */
+[data-theme="dark"] .transcript-app {
+  --color-surface: rgba(31, 41, 55, 0.8);
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-text: #f9fafb;
+  --color-text-secondary: #9ca3af;
+}
+
+/* Transcript Section */
+.transcript-section {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.transcript {
+  padding: 1rem;
+  min-height: 80px;
+  /* No max-height - grows freely, host handles scrolling via autoResize */
+}
+
+.transcript-placeholder {
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin: 0;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.transcript-entry {
+  margin: 0 0 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-border);
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.transcript-entry.interim {
+  opacity: 0.6;
+  font-style: italic;
+  border-left: 3px solid var(--color-primary);
+}
+
+.transcript-entry.sent {
+  opacity: 0.5;
+}
+
+.transcript-entry .timestamp {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.125rem;
+}
+
+/* Sent divider */
+.sent-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
+.sent-divider::before,
+.sent-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.sent-divider span {
+  white-space: nowrap;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.controls-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Level bar inline */
+.level-bar {
+  flex: 1;
+  height: 8px;
+  max-width: 120px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.level-bar.active {
+  opacity: 1;
+}
+
+/* Timer */
+.timer {
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  opacity: 0;
+  transition: opacity 0.2s;
+  min-width: 3em;
+}
+
+.timer.active {
+  opacity: 1;
+}
+
+.level-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--color-success);
+  border-radius: 4px;
+  transition: width 0.1s ease-out;
+}
+
+/* Buttons */
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-primary.recording {
+  background: #dc2626;
+}
+
+.btn-primary.recording:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.btn-secondary.copied {
+  background: var(--color-success);
+  color: white;
+  border-color: var(--color-success);
+}
+
+.btn-accent {
+  background: var(--color-accent);
+  color: white;
+}
+
+.btn-accent:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}

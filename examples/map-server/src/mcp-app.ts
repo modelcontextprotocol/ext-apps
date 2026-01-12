@@ -6,7 +6,6 @@
  * a navigate-to tool for the host to control navigation.
  */
 import { App } from "@modelcontextprotocol/ext-apps";
-import { z } from "zod";
 
 // TypeScript declaration for Cesium loaded from CDN
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,6 +64,155 @@ let viewer: any = null;
 
 // Debounce timer for reverse geocoding
 let reverseGeocodeTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Debounce timer for persisting view state
+let persistViewTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Track whether tool input has been received (to know if we should restore persisted state)
+let hasReceivedToolInput = false;
+
+/**
+ * Persisted camera state for localStorage
+ */
+interface PersistedCameraState {
+  longitude: number; // degrees
+  latitude: number; // degrees
+  height: number; // meters
+  heading: number; // radians
+  pitch: number; // radians
+  roll: number; // radians
+}
+
+/**
+ * Get localStorage key for persisting view state
+ * Uses toolInfo.id (tool invocation ID) - localStorage is scoped per conversation per server,
+ * so each tool call remembers its own view state within the conversation.
+ */
+function getViewStorageKey(): string | null {
+  const context = app.getHostContext();
+  const toolId = context?.toolInfo?.id;
+  if (!toolId) return null;
+  return `cesium-view:${toolId}`;
+}
+
+/**
+ * Get current camera state for persistence
+ */
+function getCameraState(cesiumViewer: any): PersistedCameraState | null {
+  try {
+    const camera = cesiumViewer.camera;
+    const cartographic = camera.positionCartographic;
+    return {
+      longitude: Cesium.Math.toDegrees(cartographic.longitude),
+      latitude: Cesium.Math.toDegrees(cartographic.latitude),
+      height: cartographic.height,
+      heading: camera.heading,
+      pitch: camera.pitch,
+      roll: camera.roll,
+    };
+  } catch (e) {
+    log.warn("Failed to get camera state:", e);
+    return null;
+  }
+}
+
+/**
+ * Save current view state to localStorage (debounced)
+ */
+function schedulePersistViewState(cesiumViewer: any): void {
+  if (persistViewTimer) {
+    clearTimeout(persistViewTimer);
+  }
+  persistViewTimer = setTimeout(() => {
+    persistViewState(cesiumViewer);
+  }, 500); // 500ms debounce
+}
+
+/**
+ * Persist current view state to localStorage
+ */
+function persistViewState(cesiumViewer: any): void {
+  const key = getViewStorageKey();
+  if (!key) {
+    log.info("No storage key available, skipping view persistence");
+    return;
+  }
+
+  const state = getCameraState(cesiumViewer);
+  if (!state) return;
+
+  try {
+    localStorage.setItem(key, JSON.stringify(state));
+    log.info(
+      "Persisted view state:",
+      key,
+      state.latitude.toFixed(2),
+      state.longitude.toFixed(2),
+    );
+  } catch (e) {
+    log.warn("Failed to persist view state:", e);
+  }
+}
+
+/**
+ * Load persisted view state from localStorage
+ */
+function loadPersistedViewState(): PersistedCameraState | null {
+  const key = getViewStorageKey();
+  if (!key) return null;
+
+  try {
+    const stored = localStorage.getItem(key);
+    if (!stored) return null;
+
+    const state = JSON.parse(stored) as PersistedCameraState;
+    // Basic validation
+    if (
+      typeof state.longitude !== "number" ||
+      typeof state.latitude !== "number" ||
+      typeof state.height !== "number"
+    ) {
+      log.warn("Invalid persisted view state, ignoring");
+      return null;
+    }
+    return state;
+  } catch (e) {
+    log.warn("Failed to load persisted view state:", e);
+    return null;
+  }
+}
+
+/**
+ * Restore camera to persisted state
+ */
+function restorePersistedView(cesiumViewer: any): boolean {
+  const state = loadPersistedViewState();
+  if (!state) return false;
+
+  try {
+    log.info(
+      "Restoring persisted view:",
+      state.latitude.toFixed(2),
+      state.longitude.toFixed(2),
+    );
+    cesiumViewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(
+        state.longitude,
+        state.latitude,
+        state.height,
+      ),
+      orientation: {
+        heading: state.heading,
+        pitch: state.pitch,
+        roll: state.roll,
+      },
+    });
+    return true;
+  } catch (e) {
+    log.warn("Failed to restore persisted view:", e);
+    return false;
+  }
+}
 
 /**
  * Get the center point of the current camera view
@@ -294,20 +442,11 @@ function scheduleLocationUpdate(cesiumViewer: any): void {
 
       log.info("Updating model context:", contextText);
 
-      // EXPERIMENTAL: This request method isn't standard yet and may change.
-      // It updates the model's context with the current map location.
-      // See https://github.com/modelcontextprotocol/ext-apps/pull/125
+      // Update the model's context with the current map location.
       // If the host doesn't support this, the request will silently fail.
-      app.request(
-        <any>{
-          method: "ui/update-model-context",
-          params: {
-            role: "user",
-            content: [{ type: "text", text: contextText }],
-          },
-        },
-        z.object({}),
-      );
+      app.updateModelContext({
+        content: [{ type: "text", text: contextText }],
+      });
     }
   }, 1500);
 }
@@ -460,9 +599,10 @@ async function initCesium(): Promise<any> {
 
   log.info("Camera positioned, initial rendering started");
 
-  // Set up camera move end listener for reverse geocoding
+  // Set up camera move end listener for reverse geocoding and view persistence
   cesiumViewer.camera.moveEnd.addEventListener(() => {
     scheduleLocationUpdate(cesiumViewer);
+    schedulePersistViewState(cesiumViewer);
   });
   log.info("Camera move listener registered");
 
@@ -623,6 +763,30 @@ async function toggleFullscreen(): Promise<void> {
 }
 
 /**
+ * Handle keyboard shortcuts for fullscreen control
+ * - Escape: Exit fullscreen (when in fullscreen mode)
+ * - Ctrl/Cmd+Enter: Toggle fullscreen
+ */
+function handleFullscreenKeyboard(event: KeyboardEvent): void {
+  // Escape to exit fullscreen
+  if (event.key === "Escape" && currentDisplayMode === "fullscreen") {
+    event.preventDefault();
+    toggleFullscreen();
+    return;
+  }
+
+  // Ctrl+Enter (Windows/Linux) or Cmd+Enter (Mac) to toggle fullscreen
+  if (
+    event.key === "Enter" &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    toggleFullscreen();
+  }
+}
+
+/**
  * Handle display mode changes - resize Cesium and update UI
  */
 function handleDisplayModeChange(
@@ -710,6 +874,8 @@ app.ontoolinput = async (params) => {
     }
 
     if (bbox) {
+      // Mark that we received explicit tool input (overrides persisted state)
+      hasReceivedToolInput = true;
       log.info("Positioning camera to bbox:", bbox);
 
       // Position camera instantly (no animation)
@@ -793,16 +959,26 @@ async function init() {
     // and for tiles to load before hiding the loading indicator
     log.info("CesiumJS initialized, waiting for tool input...");
 
-    // Fallback: if no tool input received within 5 seconds, hide loading anyway
-    // (handles case where map is shown without a specific bbox)
+    // Fallback: if no tool input received within 2 seconds, try restoring
+    // persisted view or show default view
     setTimeout(async () => {
       const loadingEl = document.getElementById("loading");
-      if (loadingEl && loadingEl.style.display !== "none") {
-        log.info("No tool input received, waiting for initial tiles...");
+      if (
+        loadingEl &&
+        loadingEl.style.display !== "none" &&
+        !hasReceivedToolInput
+      ) {
+        // No explicit tool input - try to restore persisted view
+        const restored = restorePersistedView(viewer!);
+        if (restored) {
+          log.info("Restored persisted view, waiting for tiles...");
+        } else {
+          log.info("No persisted view, using default view...");
+        }
         await waitForTilesLoaded(viewer!);
         hideLoading();
       }
-    }, 5000);
+    }, 2000);
 
     // Connect to host (auto-creates PostMessageTransport)
     await app.connect();
@@ -830,6 +1006,9 @@ async function init() {
     if (fullscreenBtn) {
       fullscreenBtn.addEventListener("click", toggleFullscreen);
     }
+
+    // Set up keyboard shortcuts for fullscreen (Escape to exit, Ctrl/Cmd+Enter to toggle)
+    document.addEventListener("keydown", handleFullscreenKeyboard);
   } catch (error) {
     log.error("Failed to initialize:", error);
     const loadingEl = document.getElementById("loading");

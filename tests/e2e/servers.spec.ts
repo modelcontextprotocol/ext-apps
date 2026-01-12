@@ -53,6 +53,7 @@ const SERVERS = [
   { key: "sheet-music", name: "Sheet Music Server" },
   { key: "system-monitor", name: "System Monitor Server" },
   { key: "threejs", name: "Three.js Server" },
+  { key: "transcript", name: "Transcript Server" },
   { key: "wiki-explorer", name: "Wiki Explorer" },
 ];
 
