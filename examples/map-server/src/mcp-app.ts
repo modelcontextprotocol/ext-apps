@@ -6,7 +6,6 @@
  * a navigate-to tool for the host to control navigation.
  */
 import { App } from "@modelcontextprotocol/ext-apps";
-import { z } from "zod";
 
 // TypeScript declaration for Cesium loaded from CDN
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -443,20 +442,11 @@ function scheduleLocationUpdate(cesiumViewer: any): void {
 
       log.info("Updating model context:", contextText);
 
-      // EXPERIMENTAL: This request method isn't standard yet and may change.
-      // It updates the model's context with the current map location.
-      // See https://github.com/modelcontextprotocol/ext-apps/pull/125
+      // Update the model's context with the current map location.
       // If the host doesn't support this, the request will silently fail.
-      app.request(
-        <any>{
-          method: "ui/update-model-context",
-          params: {
-            role: "user",
-            content: [{ type: "text", text: contextText }],
-          },
-        },
-        z.object({}),
-      );
+      app.updateModelContext({
+        content: [{ type: "text", text: contextText }],
+      });
     }
   }, 1500);
 }
