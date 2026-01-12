@@ -95,21 +95,9 @@ window.addEventListener("message", async (event) => {
         inner.setAttribute("allow", allowAttribute);
       }
       if (typeof html === "string") {
-        // Use document.write instead of srcdoc for WebGL compatibility.
-        // srcdoc creates an opaque origin which prevents WebGL canvas updates
-        // from being displayed properly. document.write preserves the sandbox
-        // origin, allowing WebGL to work correctly.
-        // CSP is enforced via HTTP headers on this page (sandbox.html).
-        const doc = inner.contentDocument || inner.contentWindow?.document;
-        if (doc) {
-          doc.open();
-          doc.write(html);
-          doc.close();
-        } else {
-          // Fallback to srcdoc if document is not accessible
-          console.warn("[Sandbox] document.write not available, falling back to srcdoc");
-          inner.srcdoc = html;
-        }
+        inner.srcdoc = html;
+      } else {
+        console.error("[Sandbox] Missing or invalid HTML content in sandbox-resource-ready notification.");
       }
     } else {
       if (inner && inner.contentWindow) {
