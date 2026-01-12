@@ -1,3 +1,8 @@
+import {
+  RESOURCE_MIME_TYPE,
+  registerAppResource,
+  registerAppTool,
+} from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type {
@@ -9,12 +14,6 @@ import os from "node:os";
 import path from "node:path";
 import si from "systeminformation";
 import { z } from "zod";
-import {
-  RESOURCE_MIME_TYPE,
-  RESOURCE_URI_META_KEY,
-  registerAppResource,
-  registerAppTool,
-} from "@modelcontextprotocol/ext-apps/server";
 import { startServer } from "./server-utils.js";
 
 // Schemas - types are derived from these using z.infer
@@ -107,6 +106,30 @@ async function getMemoryStats(): Promise<MemoryStats> {
   };
 }
 
+async function getStats(): Promise<SystemStats> {
+  const cpuSnapshots = getCpuSnapshots();
+  const cpuInfo = os.cpus()[0];
+  const memory = await getMemoryStats();
+  const uptimeSeconds = os.uptime();
+
+  return {
+    cpu: {
+      cores: cpuSnapshots,
+      model: cpuInfo?.model ?? "Unknown",
+      count: os.cpus().length,
+    },
+    memory,
+    system: {
+      hostname: os.hostname(),
+      platform: `${os.platform()} ${os.arch()}`,
+      arch: os.arch(),
+      uptime: uptimeSeconds,
+      uptimeFormatted: formatUptime(uptimeSeconds),
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "System Monitor Server",
@@ -125,31 +148,30 @@ export function createServer(): McpServer {
         "Returns current system statistics including per-core CPU usage, memory, and system info.",
       inputSchema: {},
       outputSchema: SystemStatsSchema.shape,
-      _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+      _meta: { ui: { resourceUri } },
     },
     async (): Promise<CallToolResult> => {
-      const cpuSnapshots = getCpuSnapshots();
-      const cpuInfo = os.cpus()[0];
-      const memory = await getMemoryStats();
-      const uptimeSeconds = os.uptime();
-
-      const stats: SystemStats = {
-        cpu: {
-          cores: cpuSnapshots,
-          model: cpuInfo?.model ?? "Unknown",
-          count: os.cpus().length,
-        },
-        memory,
-        system: {
-          hostname: os.hostname(),
-          platform: `${os.platform()} ${os.arch()}`,
-          arch: os.arch(),
-          uptime: uptimeSeconds,
-          uptimeFormatted: formatUptime(uptimeSeconds),
-        },
-        timestamp: new Date().toISOString(),
+      const stats = await getStats();
+      return {
+        content: [{ type: "text", text: JSON.stringify(stats) }],
+        structuredContent: stats,
       };
+    },
+  );
 
+  // App-only tool for polling - used by the UI for periodic refresh
+  registerAppTool(
+    server,
+    "refresh-stats",
+    {
+      title: "Refresh Stats",
+      description: "Refresh system statistics (app-only, for polling)",
+      inputSchema: {},
+      outputSchema: SystemStatsSchema.shape,
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    async (): Promise<CallToolResult> => {
+      const stats = await getStats();
       return {
         content: [{ type: "text", text: JSON.stringify(stats) }],
         structuredContent: stats,

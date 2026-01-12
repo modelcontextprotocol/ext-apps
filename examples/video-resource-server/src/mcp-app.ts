@@ -4,7 +4,7 @@
  * Demonstrates fetching binary content (video) via MCP resources.
  * The video is served as a base64 blob and converted to a data URI for playback.
  */
-import { App } from "@modelcontextprotocol/ext-apps";
+import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import "./global.css";
@@ -16,6 +16,7 @@ const log = {
 };
 
 // Get element references
+const mainEl = document.querySelector(".main") as HTMLElement;
 const loadingEl = document.getElementById("loading")!;
 const loadingTextEl = document.getElementById("loading-text")!;
 const errorEl = document.getElementById("error")!;
@@ -83,15 +84,12 @@ app.ontoolresult = async (result) => {
       ReadResourceResultSchema,
     );
 
-    log.info(
-      "Resource received, blob size:",
-      resourceResult.contents[0]?.blob?.length,
-    );
-
     const content = resourceResult.contents[0];
-    if (!content?.blob) {
+    if (!content || !("blob" in content)) {
       throw new Error("Resource response did not contain blob data");
     }
+
+    log.info("Resource received, blob size:", content.blob.length);
 
     showLoading("Converting to data URI...");
 
@@ -112,5 +110,21 @@ app.onerror = (err) => {
   showError(err instanceof Error ? err.message : String(err));
 };
 
+function handleHostContextChanged(ctx: McpUiHostContext) {
+  if (ctx.safeAreaInsets) {
+    mainEl.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
+    mainEl.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
+    mainEl.style.paddingBottom = `${ctx.safeAreaInsets.bottom}px`;
+    mainEl.style.paddingLeft = `${ctx.safeAreaInsets.left}px`;
+  }
+}
+
+app.onhostcontextchanged = handleHostContextChanged;
+
 // Connect to host
-app.connect();
+app.connect().then(() => {
+  const ctx = app.getHostContext();
+  if (ctx) {
+    handleHostContextChanged(ctx);
+  }
+});

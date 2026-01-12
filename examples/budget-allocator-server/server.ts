@@ -15,7 +15,6 @@ import path from "node:path";
 import { z } from "zod";
 import {
   RESOURCE_MIME_TYPE,
-  RESOURCE_URI_META_KEY,
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
@@ -273,7 +272,7 @@ export function createServer(): McpServer {
         "Returns budget configuration with 24 months of historical allocations and industry benchmarks by company stage",
       inputSchema: {},
       outputSchema: BudgetDataResponseSchema,
-      _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+      _meta: { ui: { resourceUri } },
     },
     async (): Promise<CallToolResult> => {
       const response: BudgetDataResponse = {

@@ -6,6 +6,17 @@ This repo contains the SDK and [specification](https://github.com/modelcontextpr
 
 MCP Apps are a proposed standard inspired by [MCP-UI](https://mcpui.dev/) and [OpenAI's Apps SDK](https://developers.openai.com/apps-sdk/) to allow MCP Servers to display interactive UI elements in conversational MCP clients / chatbots.
 
+## How It Works
+
+MCP Apps extend the Model Context Protocol to let servers deliver **interactive UIs** to MCP hosts. Here's how it works:
+
+1. **Tool call** — The LLM calls a tool on your server
+2. **UI Resource** — The tool's definition links to a predeclared `ui://` resource containing its HTML interface
+3. **Host renders** — The host fetches the resource and displays it in a sandboxed iframe
+4. **Bidirectional communication** — The host passes tool data to the UI via notifications, and the UI can call other tools through the host
+
+This enables dashboards, forms, visualizations, and other rich experiences inside chat interfaces.
+
 ## Overview
 
 This SDK serves two audiences:

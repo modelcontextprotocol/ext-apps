@@ -1,12 +1,12 @@
 {
-  "name": "@modelcontextprotocol/server-video-resource",
+  "name": "@modelcontextprotocol/server-shadertoy",
   "version": "0.1.0",
   "type": "module",
-  "description": "MCP App Server demonstrating video resources served as base64 blobs",
+  "description": "MCP App Server example for rendering ShaderToy-compatible GLSL shaders",
   "repository": {
     "type": "git",
     "url": "https://github.com/modelcontextprotocol/ext-apps",
-    "directory": "examples/video-resource-server"
+    "directory": "examples/shadertoy-server"
   },
   "license": "MIT",
   "main": "server.ts",

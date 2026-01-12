@@ -9,7 +9,6 @@ import path from "node:path";
 import { z } from "zod";
 import {
   RESOURCE_MIME_TYPE,
-  RESOURCE_URI_META_KEY,
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
@@ -102,7 +101,7 @@ export function createServer(): McpServer {
           "Returns customer data with segment information for visualization. Optionally filter by segment.",
         inputSchema: GetCustomerDataInputSchema.shape,
         outputSchema: GetCustomerDataOutputSchema.shape,
-        _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+        _meta: { ui: { resourceUri } },
       },
       async ({ segment }): Promise<CallToolResult> => {
         const data = getCustomerData(segment);

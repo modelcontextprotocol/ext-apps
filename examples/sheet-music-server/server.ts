@@ -9,7 +9,6 @@ import { z } from "zod";
 import ABCJS from "abcjs";
 import {
   RESOURCE_MIME_TYPE,
-  RESOURCE_URI_META_KEY,
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
@@ -59,7 +58,7 @@ function createServer(): McpServer {
             "ABC notation string to render as sheet music with audio playback",
           ),
       }),
-      _meta: { [RESOURCE_URI_META_KEY]: resourceUri },
+      _meta: { ui: { resourceUri } },
     },
     async ({ abcNotation }): Promise<CallToolResult> => {
       // Validate ABC notation using abcjs parser

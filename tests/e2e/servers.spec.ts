@@ -1,8 +1,11 @@
 import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 
 // Dynamic element selectors to mask for screenshot comparison
+//
 // Note: CSS modules generate unique class names, so we use attribute selectors
 // with partial matches (e.g., [class*="heatmapWrapper"]) for those components
+//
+// Note: map-server uses SLOW_SERVERS timeout instead of masking to wait for tiles
 const DYNAMIC_MASKS: Record<string, string[]> = {
   integration: ["#server-time"], // Server time display
   "basic-preact": ["#server-time"], // Server time display
@@ -13,7 +16,7 @@ const DYNAMIC_MASKS: Record<string, string[]> = {
   "basic-vue": ["#server-time"], // Server time display
   "cohort-heatmap": ['[class*="heatmapWrapper"]'], // Heatmap grid (random data)
   "customer-segmentation": [".chart-container"], // Scatter plot (random data)
-  // Note: map-server uses SLOW_SERVERS timeout instead of masking to wait for tiles
+  shadertoy: ["#canvas"], // WebGL shader canvas (animated)
   "system-monitor": [
     ".chart-container", // CPU chart (highly dynamic)
     "#status-text", // Current timestamp
@@ -46,6 +49,7 @@ const SERVERS = [
   { key: "customer-segmentation", name: "Customer Segmentation Server" },
   { key: "map-server", name: "CesiumJS Map Server" },
   { key: "scenario-modeler", name: "SaaS Scenario Modeler" },
+  { key: "shadertoy", name: "ShaderToy Server" },
   { key: "sheet-music", name: "Sheet Music Server" },
   { key: "system-monitor", name: "System Monitor Server" },
   { key: "threejs", name: "Three.js Server" },

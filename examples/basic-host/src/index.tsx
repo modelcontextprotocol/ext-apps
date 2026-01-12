@@ -1,7 +1,7 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo } from "./implementation";
+import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
 import styles from "./index.module.css";
 
 
@@ -207,23 +207,41 @@ function ToolCallInfoPanel({ toolCallInfo, isDestroying, onRequestClose, onClose
       className={styles.toolCallInfoPanel}
       style={isDestroying ? { opacity: 0.5, pointerEvents: "none" } : undefined}
     >
-      <div className={styles.inputInfoPanel}>
-        <h2>
-          <span>{toolCallInfo.serverInfo.name}</span>
-          <span className={styles.toolName}>{toolCallInfo.tool.name}</span>
-          {onRequestClose && !isDestroying && (
-            <button
-              className={styles.closeButton}
-              onClick={onRequestClose}
-              title="Close"
-            >
-              ×
-            </button>
-          )}
-        </h2>
-        <JsonBlock value={toolCallInfo.input} />
-      </div>
-      <div className={styles.outputInfoPanel}>
+      {/* For non-app tools, show input/output side by side */}
+      {!isApp && (
+        <div className={styles.inputInfoPanel}>
+          <h2>
+            <span>{toolCallInfo.serverInfo.name}</span>
+            <span className={styles.toolName}>{toolCallInfo.tool.name}</span>
+            {onRequestClose && !isDestroying && (
+              <button
+                className={styles.closeButton}
+                onClick={onRequestClose}
+                title="Close"
+              >
+                ×
+              </button>
+            )}
+          </h2>
+          <JsonBlock value={toolCallInfo.input} />
+        </div>
+      )}
+      <div className={isApp ? styles.appOutputPanel : styles.outputInfoPanel}>
+        {/* For apps, show header above the app: ServerName:tool_name */}
+        {isApp && (
+          <div className={styles.appHeader}>
+            <span>{toolCallInfo.serverInfo.name}:<span className={styles.toolName}>{toolCallInfo.tool.name}</span></span>
+            {onRequestClose && !isDestroying && (
+              <button
+                className={styles.closeButton}
+                onClick={onRequestClose}
+                title="Close"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
         <ErrorBoundary>
           <Suspense fallback="Loading...">
             {
@@ -252,6 +270,43 @@ function JsonBlock({ value }: { value: object }) {
 }
 
 
+interface CollapsiblePanelProps {
+  icon: string;
+  label: string;
+  content: string;
+  badge?: string;
+  defaultExpanded?: boolean;
+}
+function CollapsiblePanel({ icon, label, content, badge, defaultExpanded = false }: CollapsiblePanelProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  return (
+    <div
+      className={styles.collapsiblePanel}
+      onClick={() => setExpanded(!expanded)}
+      title={expanded ? "Click to collapse" : "Click to expand"}
+    >
+      <div className={styles.collapsibleHeader}>
+        <span className={styles.collapsibleLabel}>{icon} {label}</span>
+        <span className={styles.collapsibleSize}>
+          {badge ?? `${content.length} chars`}
+        </span>
+        <span className={styles.collapsibleToggle}>
+          {expanded ? "▼" : "▶"}
+        </span>
+      </div>
+      {expanded ? (
+        <pre className={styles.collapsibleFull}>{content}</pre>
+      ) : (
+        <div className={styles.collapsiblePreview}>
+          {content.slice(0, 100)}{content.length > 100 ? "…" : ""}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 interface AppIFramePanelProps {
   toolCallInfo: Required<ToolCallInfo>;
   isDestroying?: boolean;
@@ -260,25 +315,34 @@ interface AppIFramePanelProps {
 function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppIFramePanelProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const appBridgeRef = useRef<ReturnType<typeof newAppBridge> | null>(null);
+  const [modelContext, setModelContext] = useState<ModelContext | null>(null);
+  const [toolResult, setToolResult] = useState<object | null>(null);
+  const [messages, setMessages] = useState<AppMessage[]>([]);
 
   useEffect(() => {
     const iframe = iframeRef.current!;
 
-    // First get CSP from resource, then load sandbox with CSP in query param
-    // This ensures CSP is set via HTTP headers (tamper-proof)
-    toolCallInfo.appResourcePromise.then(({ csp }) => {
-      loadSandboxProxy(iframe, csp).then((firstTime) => {
+    // First get CSP and permissions from resource, then load sandbox
+    // CSP is set via HTTP headers (tamper-proof), permissions via iframe allow attribute
+    toolCallInfo.appResourcePromise.then(({ csp, permissions }) => {
+      loadSandboxProxy(iframe, csp, permissions).then((firstTime) => {
         // The `firstTime` check guards against React Strict Mode's double
         // invocation (mount → unmount → remount simulation in development).
         // Outside of Strict Mode, this `useEffect` runs only once per
         // `toolCallInfo`.
         if (firstTime) {
-          const appBridge = newAppBridge(toolCallInfo.serverInfo, iframe);
+          const appBridge = newAppBridge(toolCallInfo.serverInfo, iframe, {
+            onContextUpdate: setModelContext,
+            onMessage: (msg) => setMessages((prev) => [...prev, msg]),
+          });
           appBridgeRef.current = appBridge;
           initializeApp(iframe, appBridge, toolCallInfo);
         }
       });
     });
+
+    // Track tool result for display
+    toolCallInfo.resultPromise.then(setToolResult).catch(() => {});
   }, [toolCallInfo]);
 
   // Graceful teardown: wait for guest to respond before unmounting
@@ -303,9 +367,57 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
       });
   }, [isDestroying, onTeardownComplete]);
 
+  // Format content blocks - handle text, images, resources, etc.
+  const formatContentBlock = (c: { type: string; [key: string]: unknown }) => {
+    switch (c.type) {
+      case "text":
+        return (c as { type: "text"; text: string }).text;
+      case "image":
+        return `<image: ${(c as { mimeType?: string }).mimeType ?? "unknown"}>`;
+      case "audio":
+        return `<audio: ${(c as { mimeType?: string }).mimeType ?? "unknown"}>`;
+      case "resource":
+        return `<resource: ${(c as { resource?: { uri?: string } }).resource?.uri ?? "unknown"}>`;
+      default:
+        return `<${c.type}>`;
+    }
+  };
+
+  // Format context for display
+  const contextText = modelContext?.content?.map(formatContentBlock).join("\n") ?? "";
+  const contextJson = modelContext?.structuredContent
+    ? JSON.stringify(modelContext.structuredContent, null, 2)
+    : "";
+  const fullContext = [contextText, contextJson].filter(Boolean).join("\n\n");
+
+  const inputJson = JSON.stringify(toolCallInfo.input, null, 2);
+  const resultJson = toolResult ? JSON.stringify(toolResult, null, 2) : null;
+
+  // Format messages
+  const formatMessage = (m: AppMessage) => {
+    const content = m.content.map(formatContentBlock).join("\n");
+    return `[${m.role}] ${content}`;
+  };
+  const messagesText = messages.map(formatMessage).join("\n\n");
+
   return (
     <div className={styles.appIframePanel}>
+      <CollapsiblePanel icon="📥" label="Tool Input" content={inputJson} />
       <iframe ref={iframeRef} />
+      {resultJson && (
+        <CollapsiblePanel icon="📤" label="Tool Result" content={resultJson} />
+      )}
+      {messages.length > 0 && (
+        <CollapsiblePanel
+          icon="💬"
+          label="Messages"
+          content={messagesText}
+          badge={`${messages.length} message${messages.length > 1 ? "s" : ""}`}
+        />
+      )}
+      {modelContext && (
+        <CollapsiblePanel icon="📋" label="Model Context" content={fullContext} />
+      )}
     </div>
   );
 }

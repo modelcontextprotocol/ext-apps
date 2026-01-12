@@ -76,6 +76,7 @@ import {
   McpUiRequestDisplayModeRequest,
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResult,
+  McpUiResourcePermissions,
 } from "./types";
 export * from "./types";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
@@ -124,6 +125,36 @@ export function getToolUiResourceUri(tool: {
     throw new Error(`Invalid UI resource URI: ${JSON.stringify(uri)}`);
   }
   return undefined;
+}
+
+/**
+ * Build iframe `allow` attribute string from permissions.
+ *
+ * Maps McpUiResourcePermissions to the Permission Policy allow attribute
+ * format used by iframes (e.g., "microphone; clipboard-write").
+ *
+ * @param permissions - Permissions requested by the UI resource
+ * @returns Space-separated permission directives, or empty string if none
+ *
+ * @example
+ * ```typescript
+ * const allow = buildAllowAttribute({ microphone: {}, clipboardWrite: {} });
+ * // Returns: "microphone; clipboard-write"
+ * iframe.setAttribute("allow", allow);
+ * ```
+ */
+export function buildAllowAttribute(
+  permissions: McpUiResourcePermissions | undefined,
+): string {
+  if (!permissions) return "";
+
+  const allowList: string[] = [];
+  if (permissions.camera) allowList.push("camera");
+  if (permissions.microphone) allowList.push("microphone");
+  if (permissions.geolocation) allowList.push("geolocation");
+  if (permissions.clipboardWrite) allowList.push("clipboard-write");
+
+  return allowList.join("; ");
 }
 
 /**

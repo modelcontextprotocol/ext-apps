@@ -15,8 +15,12 @@ A simple app that fetches the current server time and displays it in a clickable
 
 ## Prerequisites
 
-- Node.js 18+
+- Familiarity with MCP concepts, especially [Tools](https://modelcontextprotocol.io/docs/learn/server-concepts#tools) and [Resources](https://modelcontextprotocol.io/docs/learn/server-concepts#resources)
 - Familiarity with the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- Node.js 18+
+
+> [!TIP]
+> New to building MCP servers? Start with the [official MCP quickstart guide](https://modelcontextprotocol.io/docs/develop/build-server) to learn the core concepts first.
 
 ## 1. Project Setup
 
@@ -30,7 +34,7 @@ npm init -y
 Install dependencies:
 
 ```bash
-npm install github:modelcontextprotocol/ext-apps @modelcontextprotocol/sdk zod
+npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/sdk
 npm install -D typescript vite vite-plugin-singlefile express cors @types/express @types/cors tsx
 ```
 
@@ -98,45 +102,49 @@ Create `server.ts`:
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
+  registerAppTool,
+  registerAppResource,
   RESOURCE_MIME_TYPE,
-  type McpUiToolMeta,
-} from "@modelcontextprotocol/ext-apps";
+} from "@modelcontextprotocol/ext-apps/server";
 import cors from "cors";
 import express from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
-import * as z from "zod";
 
 const server = new McpServer({
   name: "My MCP App Server",
   version: "1.0.0",
 });
 
-// Two-part registration: tool + resource
+// Two-part registration: tool + resource, tied together by the resource URI.
 const resourceUri = "ui://get-time/mcp-app.html";
 
-server.registerTool(
+// Register a tool with UI metadata. When the host calls this tool, it reads
+// `_meta.ui.resourceUri` to know which resource to fetch and render as an
+// interactive UI.
+registerAppTool(
+  server,
   "get-time",
   {
     title: "Get Time",
     description: "Returns the current server time.",
     inputSchema: {},
-    outputSchema: { time: z.string() },
-    _meta: { ui: { resourceUri } as McpUiToolMeta }, // Links tool to UI
+    _meta: { ui: { resourceUri } },
   },
   async () => {
     const time = new Date().toISOString();
     return {
       content: [{ type: "text", text: time }],
-      structuredContent: { time },
     };
   },
 );
 
-server.registerResource(
+// Register the resource, which returns the bundled HTML/JavaScript for the UI.
+registerAppResource(
+  server,
   resourceUri,
   resourceUri,
-  { mimeType: "text/html;profile=mcp-app" },
+  { mimeType: RESOURCE_MIME_TYPE },
   async () => {
     const html = await fs.readFile(
       path.join(import.meta.dirname, "dist", "mcp-app.html"),
@@ -144,18 +152,18 @@ server.registerResource(
     );
     return {
       contents: [
-        { uri: resourceUri, mimeType: "text/html;profile=mcp-app", text: html },
+        { uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: html },
       ],
     };
   },
 );
 
-// Express server for MCP endpoint
-const app = express();
-app.use(cors());
-app.use(express.json());
+// Start an Express server that exposes the MCP endpoint.
+const expressApp = express();
+expressApp.use(cors());
+expressApp.use(express.json());
 
-app.post("/mcp", async (req, res) => {
+expressApp.post("/mcp", async (req, res) => {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -165,7 +173,7 @@ app.post("/mcp", async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 });
 
-app.listen(3001, (err) => {
+expressApp.listen(3001, (err) => {
   if (err) {
     console.error("Error starting server:", err);
     process.exit(1);
@@ -209,7 +217,7 @@ Create `mcp-app.html`:
 Create `src/mcp-app.ts`:
 
 ```typescript
-import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
+import { App } from "@modelcontextprotocol/ext-apps";
 
 // Get element references
 const serverTimeEl = document.getElementById("server-time")!;
@@ -220,29 +228,29 @@ const app = new App({ name: "Get Time App", version: "1.0.0" });
 
 // Register handlers BEFORE connecting
 app.ontoolresult = (result) => {
-  const { time } = (result.structuredContent as { time?: string }) ?? {};
+  const time = result.content?.find((c) => c.type === "text")?.text;
   serverTimeEl.textContent = time ?? "[ERROR]";
 };
 
 // Wire up button click
 getTimeBtn.addEventListener("click", async () => {
   const result = await app.callServerTool({ name: "get-time", arguments: {} });
-  const { time } = (result.structuredContent as { time?: string }) ?? {};
+  const time = result.content?.find((c) => c.type === "text")?.text;
   serverTimeEl.textContent = time ?? "[ERROR]";
 });
 
 // Connect to host
-app.connect(new PostMessageTransport(window.parent));
+app.connect();
 ```
+
+> [!NOTE]
+> **Full files:** [`mcp-app.html`](https://github.com/modelcontextprotocol/ext-apps/blob/main/examples/basic-server-vanillajs/mcp-app.html), [`src/mcp-app.ts`](https://github.com/modelcontextprotocol/ext-apps/blob/main/examples/basic-server-vanillajs/src/mcp-app.ts)
 
 Build the UI:
 
 ```bash
 npm run build
 ```
-
-> [!NOTE]
-> **Full files:** [`mcp-app.html`](https://github.com/modelcontextprotocol/ext-apps/blob/main/examples/basic-server-vanillajs/mcp-app.html), [`src/mcp-app.ts`](https://github.com/modelcontextprotocol/ext-apps/blob/main/examples/basic-server-vanillajs/src/mcp-app.ts)
 
 This produces `dist/mcp-app.html` which contains your bundled app:
 
