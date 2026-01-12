@@ -294,8 +294,10 @@ function scheduleLocationUpdate(cesiumViewer: any): void {
 
       log.info("Updating model context:", contextText);
 
-      // Warning: This request method isn't standard yet
+      // EXPERIMENTAL: This request method isn't standard yet and may change.
+      // It updates the model's context with the current map location.
       // See https://github.com/modelcontextprotocol/ext-apps/pull/125
+      // If the host doesn't support this, the request will silently fail.
       app.request(
         <any>{
           method: "ui/update-model-context",
