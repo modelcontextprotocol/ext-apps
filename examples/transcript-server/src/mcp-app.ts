@@ -9,7 +9,6 @@ import {
   type McpUiHostContext,
   applyDocumentTheme,
 } from "@modelcontextprotocol/ext-apps";
-import { z } from "zod";
 import "./global.css";
 import "./mcp-app.css";
 
@@ -331,25 +330,19 @@ function updateSendButton() {
 }
 
 function updateModelContext() {
+  const caps = app.getHostCapabilities();
+  if (!caps?.updateModelContext) return;
+
   const text = getUnsentText();
   log.info("Updating model context:", text || "(empty)");
 
-  // EXPERIMENTAL: Updates model context with current transcript
-  // See https://github.com/modelcontextprotocol/ext-apps/pull/125
   app
-    .request(
-      {
-        method: "ui/update-model-context",
-        params: {
-          role: "user",
-          content: text
-            ? [{ type: "text", text: `[Live transcript]: ${text}` }]
-            : [],
-        },
-      } as unknown as Parameters<typeof app.request>[0],
-      z.object({}) as any,
-    )
-    .catch((e) => {
+    .updateModelContext({
+      content: text
+        ? [{ type: "text", text: `[Live transcript]: ${text}` }]
+        : [],
+    })
+    .catch((e: unknown) => {
       log.warn("Failed to update model context:", e);
     });
 }
