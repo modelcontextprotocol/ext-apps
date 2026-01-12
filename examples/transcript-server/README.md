@@ -76,7 +76,7 @@ transcript-server/
 
 ## Notes
 
-- **Microphone Permission**: Requires `allow="microphone"` on the sandbox iframe (configured in `basic-host/src/sandbox.ts`)
+- **Microphone Permission**: Requires `allow="microphone"` on the sandbox iframe (configured via `permissions: { microphone: {} }` in the resource `_meta.ui`)
 - **Browser Support**: Web Speech API is well-supported in Chrome/Edge, with Safari support. Firefox has limited support.
 - **Continuous Mode**: Recognition automatically restarts when it ends, for seamless transcription
 

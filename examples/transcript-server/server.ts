@@ -70,6 +70,12 @@ export function createServer(): McpServer {
             uri: RESOURCE_URI,
             mimeType: RESOURCE_MIME_TYPE,
             text: html,
+            _meta: {
+              ui: {
+                // Request microphone for Web Speech API, clipboard for copy button
+                permissions: { microphone: {}, clipboardWrite: {} },
+              },
+            },
           },
         ],
       };

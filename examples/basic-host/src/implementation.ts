@@ -119,6 +119,19 @@ async function getUiResource(serverInfo: ServerInfo, uri: string): Promise<UiRes
 }
 
 
+// Build iframe allow attribute from permissions
+function buildAllowAttribute(permissions?: McpUiResourcePermissions): string {
+  if (!permissions) return "";
+
+  const allowList: string[] = [];
+  if (permissions.camera) allowList.push("camera");
+  if (permissions.microphone) allowList.push("microphone");
+  if (permissions.geolocation) allowList.push("geolocation");
+  if (permissions.clipboardWrite) allowList.push("clipboard-write");
+
+  return allowList.join("; ");
+}
+
 export function loadSandboxProxy(
   iframe: HTMLIFrameElement,
   csp?: McpUiResourceCsp,
@@ -128,8 +141,12 @@ export function loadSandboxProxy(
   if (iframe.src) return Promise.resolve(false);
 
   iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
-  // Allow microphone and clipboard for apps that need audio input or copy functionality
-  iframe.setAttribute("allow", "microphone; clipboard-write");
+
+  // Set Permission Policy allow attribute based on requested permissions
+  const allowAttribute = buildAllowAttribute(permissions);
+  if (allowAttribute) {
+    iframe.setAttribute("allow", allowAttribute);
+  }
 
   // Set Permission Policy allow attribute based on requested permissions
   const allowAttribute = buildAllowAttribute(permissions);
