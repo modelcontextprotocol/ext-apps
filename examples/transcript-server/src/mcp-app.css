@@ -40,13 +40,12 @@
   -webkit-backdrop-filter: blur(8px);
   border-radius: 12px;
   border: 1px solid var(--color-border);
-  /* Auto-expand: no overflow hidden, let content grow */
 }
 
 .transcript {
   padding: 1rem;
-  /* Auto-expand: no overflow, no fixed height - content grows naturally */
   min-height: 80px;
+  /* No max-height - grows freely, host handles scrolling via autoResize */
 }
 
 .transcript-placeholder {

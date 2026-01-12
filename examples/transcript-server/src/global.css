@@ -7,6 +7,6 @@ html, body {
   font-size: 1rem;
   margin: 0;
   padding: 0;
-  height: 100%;
+  /* No height: 100% - body must grow with content for ResizeObserver to detect changes */
   background: transparent;
 }
