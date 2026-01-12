@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
-    "serve:http": "bun server.ts",
+    "serve:http": "bun --watch server.ts",
     "serve:stdio": "bun server.ts --stdio",
     "start": "npm run start:http",
     "start:http": "cross-env NODE_ENV=development npm run build && npm run serve:http",
