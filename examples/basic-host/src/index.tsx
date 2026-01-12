@@ -367,11 +367,24 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
       });
   }, [isDestroying, onTeardownComplete]);
 
-  // Extract text from context for display
-  const contextText = modelContext?.content
-    ?.filter((c): c is { type: "text"; text: string } => c.type === "text" && !!c.text)
-    .map((c) => c.text)
-    .join("\n") ?? "";
+  // Format content blocks - handle text, images, resources, etc.
+  const formatContentBlock = (c: { type: string; [key: string]: unknown }) => {
+    switch (c.type) {
+      case "text":
+        return (c as { type: "text"; text: string }).text;
+      case "image":
+        return `<image: ${(c as { mimeType?: string }).mimeType ?? "unknown"}>`;
+      case "audio":
+        return `<audio: ${(c as { mimeType?: string }).mimeType ?? "unknown"}>`;
+      case "resource":
+        return `<resource: ${(c as { resource?: { uri?: string } }).resource?.uri ?? "unknown"}>`;
+      default:
+        return `<${c.type}>`;
+    }
+  };
+
+  // Format context for display
+  const contextText = modelContext?.content?.map(formatContentBlock).join("\n") ?? "";
   const contextJson = modelContext?.structuredContent
     ? JSON.stringify(modelContext.structuredContent, null, 2)
     : "";
@@ -380,13 +393,10 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
   const inputJson = JSON.stringify(toolCallInfo.input, null, 2);
   const resultJson = toolResult ? JSON.stringify(toolResult, null, 2) : null;
 
-  // Format messages - extract text from content blocks
+  // Format messages
   const formatMessage = (m: AppMessage) => {
-    const text = m.content
-      .filter((c): c is { type: "text"; text: string } => c.type === "text")
-      .map((c) => c.text)
-      .join("\n");
-    return `[${m.role}] ${text}`;
+    const content = m.content.map(formatContentBlock).join("\n");
+    return `[${m.role}] ${content}`;
   };
   const messagesText = messages.map(formatMessage).join("\n\n");
 
