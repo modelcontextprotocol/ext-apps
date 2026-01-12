@@ -296,28 +296,35 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
-function getEntryText(entry: HTMLElement): string {
+function formatEntry(entry: HTMLElement): string {
+  const timestamp = entry.querySelector(".timestamp")?.textContent?.trim();
   const clone = entry.cloneNode(true) as HTMLElement;
   clone.querySelector(".timestamp")?.remove();
-  return clone.textContent?.trim() || "";
+  const text = clone.textContent?.trim() || "";
+  if (!text) return "";
+  return timestamp ? `[${timestamp}] ${text}` : text;
 }
 
-function getAllTranscriptText(): string {
-  const entries = Array.from(
+function formatEntries(entries: HTMLElement[]): string {
+  return entries.map(formatEntry).filter(Boolean).join("\n");
+}
+
+function getAllEntries(): HTMLElement[] {
+  return Array.from(
     transcriptEl.querySelectorAll(".transcript-entry:not(.interim)"),
   ) as HTMLElement[];
-  return entries.map(getEntryText).filter(Boolean).join("\n");
 }
 
 function getUnsentEntries(): HTMLElement[] {
-  const allEntries = Array.from(
-    transcriptEl.querySelectorAll(".transcript-entry:not(.interim)"),
-  ) as HTMLElement[];
-  return allEntries.slice(lastSentIndex);
+  return getAllEntries().slice(lastSentIndex);
+}
+
+function getAllTranscriptText(): string {
+  return formatEntries(getAllEntries());
 }
 
 function getUnsentText(): string {
-  return getUnsentEntries().map(getEntryText).filter(Boolean).join(" ");
+  return formatEntries(getUnsentEntries());
 }
 
 function updateSendButton() {
@@ -429,17 +436,7 @@ sendBtn.addEventListener("click", async () => {
   const unsentEntries = getUnsentEntries();
   if (unsentEntries.length === 0) return;
 
-  // Collect text from unsent entries
-  const transcriptText = unsentEntries
-    .map((entry) => {
-      // Get text content excluding the timestamp
-      const clone = entry.cloneNode(true) as HTMLElement;
-      clone.querySelector(".timestamp")?.remove();
-      return clone.textContent?.trim() || "";
-    })
-    .filter(Boolean)
-    .join(" ");
-
+  const transcriptText = getUnsentText();
   if (!transcriptText) return;
 
   log.info("Sending transcript:", transcriptText);
