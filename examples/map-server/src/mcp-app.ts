@@ -623,6 +623,30 @@ async function toggleFullscreen(): Promise<void> {
 }
 
 /**
+ * Handle keyboard shortcuts for fullscreen control
+ * - Escape: Exit fullscreen (when in fullscreen mode)
+ * - Ctrl/Cmd+Enter: Toggle fullscreen
+ */
+function handleFullscreenKeyboard(event: KeyboardEvent): void {
+  // Escape to exit fullscreen
+  if (event.key === "Escape" && currentDisplayMode === "fullscreen") {
+    event.preventDefault();
+    toggleFullscreen();
+    return;
+  }
+
+  // Ctrl+Enter (Windows/Linux) or Cmd+Enter (Mac) to toggle fullscreen
+  if (
+    event.key === "Enter" &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    toggleFullscreen();
+  }
+}
+
+/**
  * Handle display mode changes - resize Cesium and update UI
  */
 function handleDisplayModeChange(
@@ -830,6 +854,9 @@ async function init() {
     if (fullscreenBtn) {
       fullscreenBtn.addEventListener("click", toggleFullscreen);
     }
+
+    // Set up keyboard shortcuts for fullscreen (Escape to exit, Ctrl/Cmd+Enter to toggle)
+    document.addEventListener("keydown", handleFullscreenKeyboard);
   } catch (error) {
     log.error("Failed to initialize:", error);
     const loadingEl = document.getElementById("loading");
