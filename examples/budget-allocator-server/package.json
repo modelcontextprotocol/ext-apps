@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-budget-allocator",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Budget allocator MCP App Server with interactive visualization",
   "repository": {
@@ -27,7 +27,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^0.3.1",
+    "@modelcontextprotocol/ext-apps": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
     "chart.js": "^4.4.0",
     "zod": "^4.1.13"

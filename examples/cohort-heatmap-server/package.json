@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-cohort-heatmap",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Cohort heatmap MCP App Server for retention analysis",
   "repository": {
@@ -27,7 +27,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^0.3.1",
+    "@modelcontextprotocol/ext-apps": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

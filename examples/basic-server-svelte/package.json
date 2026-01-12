@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-basic-svelte",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Basic MCP App Server example using Svelte",
   "repository": {
@@ -24,7 +24,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^0.3.1",
+    "@modelcontextprotocol/ext-apps": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
     "svelte": "^5.0.0",
     "zod": "^4.1.13"

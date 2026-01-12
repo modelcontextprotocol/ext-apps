@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-scenario-modeler",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Financial scenario modeling MCP App Server",
   "repository": {
@@ -27,7 +27,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^0.3.1",
+    "@modelcontextprotocol/ext-apps": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
     "chart.js": "^4.4.0",
     "react": "^19.2.0",
