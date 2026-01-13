@@ -51,7 +51,7 @@ const SERVERS = [
     name: "Customer Segmentation Server",
     dir: "customer-segmentation-server",
   },
-  { key: "map-server", name: "Map Server", dir: "map-server" },
+  { key: "map-server", name: "CesiumJS Map Server", dir: "map-server" },
   {
     key: "scenario-modeler",
     name: "SaaS Scenario Modeler",
