@@ -16,7 +16,7 @@ This guide helps you migrate from the OpenAI Apps SDK (`window.openai.*`) to the
 | -------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
 | `window.openai` (auto-available) | `const app = new App({name, version}, {})`         | MCP requires explicit instantiation                    |
 | (implicit)                       | `await app.connect()`                              | MCP requires async connection; auto-detects OpenAI env |
-| —                                | `await app.connect(new OpenAITransport())`         | Force OpenAI mode explicitly                           |
+| —                                | `await app.connect(new OpenAITransport())`         | Force OpenAI mode (not yet available, see [PR #172](https://github.com/modelcontextprotocol/ext-apps/pull/172)) |
 | —                                | `await app.connect(new PostMessageTransport(...))` | Force MCP mode explicitly                              |
 
 ## Host Context Properties
@@ -44,10 +44,9 @@ This guide helps you migrate from the OpenAI Apps SDK (`window.openai.*`) to the
 
 ## Calling Tools
 
-| OpenAI                                               | MCP Apps                                              | Notes                                   |
-| ---------------------------------------------------- | ----------------------------------------------------- | --------------------------------------- |
-| `await window.openai.callTool(name, args)`           | `await app.callServerTool({ name, arguments: args })` | Call another MCP server tool            |
-| Returns `{ structuredContent?, content?, isError? }` | Returns `{ content, structuredContent?, isError? }`   | Same shape, slightly different ordering |
+| OpenAI                                     | MCP Apps                                              | Notes                        |
+| ------------------------------------------ | ----------------------------------------------------- | ---------------------------- |
+| `await window.openai.callTool(name, args)` | `await app.callServerTool({ name, arguments: args })` | Call another MCP server tool |
 
 ## Sending Messages
 
