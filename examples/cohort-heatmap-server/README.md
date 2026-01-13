@@ -1,7 +1,5 @@
 # Example: Cohort Heatmap App
 
-![Screenshot](screenshot.png)
-
 A demo MCP App that displays cohort retention data as an interactive heatmap, showing customer retention over time by signup month.
 
 <table>

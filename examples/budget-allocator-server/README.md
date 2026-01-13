@@ -1,7 +1,5 @@
 # Example: Budget Allocator App
 
-![Screenshot](screenshot.png)
-
 An interactive budget allocation tool demonstrating real-time data visualization with MCP Apps.
 
 <table>

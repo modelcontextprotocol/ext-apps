@@ -1,7 +1,5 @@
 # Example: Sheet Music Server
 
-![Screenshot](screenshot.png)
-
 A demo MCP App that renders [ABC notation](https://en.wikipedia.org/wiki/ABC_notation) as sheet music with interactive audio playback using the [abcjs](https://www.abcjs.net/) library.
 
 <table>

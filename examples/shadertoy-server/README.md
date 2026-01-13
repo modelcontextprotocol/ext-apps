@@ -1,7 +1,5 @@
 # Example: ShaderToy Server
 
-![Screenshot](screenshot.png)
-
 A demo MCP App that renders [ShaderToy](https://www.shadertoy.com/)-compatible GLSL fragment shaders in real-time using WebGL 2.0 and [ShaderToyLite.js](https://github.com/nickoala/ShaderToyLite).
 
 <table>

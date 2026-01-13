@@ -1,7 +1,5 @@
 # Example: SaaS Scenario Modeler
 
-![Screenshot](screenshot.png)
-
 A React-based demo MCP App that lets users adjust SaaS business parameters and see real-time 12-month projections of revenue, costs, and profitability with comparison against pre-built scenario templates.
 
 <table>
