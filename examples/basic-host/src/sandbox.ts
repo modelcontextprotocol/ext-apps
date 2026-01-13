@@ -95,9 +95,17 @@ window.addEventListener("message", async (event) => {
         inner.setAttribute("allow", allowAttribute);
       }
       if (typeof html === "string") {
-        inner.srcdoc = html;
-      } else {
-        console.error("[Sandbox] Missing or invalid HTML content in sandbox-resource-ready notification.");
+        // Use document.write instead of srcdoc (which the CesiumJS Map won't work with)
+        const doc = inner.contentDocument || inner.contentWindow?.document;
+        if (doc) {
+          doc.open();
+          doc.write(html);
+          doc.close();
+        } else {
+          // Fallback to srcdoc if document is not accessible
+          console.warn("[Sandbox] document.write not available, falling back to srcdoc");
+          inner.srcdoc = html;
+        }
       }
     } else {
       if (inner && inner.contentWindow) {
