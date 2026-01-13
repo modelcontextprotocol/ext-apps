@@ -21,7 +21,7 @@ const DEFAULT_WAIT_MS = 5000;
 
 // Extra wait time for slow-loading servers (tiles, video, etc.)
 const EXTRA_WAIT_MS: Record<string, number> = {
-  "map-server": 30000, // CesiumJS needs time for map tiles
+  "map-server": 45000, // CesiumJS needs time for map tiles
   "video-resource": 30000, // Video needs time to load
 };
 
@@ -47,7 +47,7 @@ const SERVERS = [
     name: "Customer Segmentation Server",
     dir: "customer-segmentation-server",
   },
-  { key: "map-server", name: "CesiumJS Map Server", dir: "map-server" },
+  { key: "map-server", name: "Map Server", dir: "map-server" },
   {
     key: "scenario-modeler",
     name: "SaaS Scenario Modeler",
@@ -105,11 +105,11 @@ async function loadServer(page: Page, serverName: string) {
  * - grid-cell.png: 300x300 cropped thumbnail (top-aligned)
  */
 async function captureAppScreenshot(page: Page, outputDir: string) {
-  // Get the inner app iframe element (not body, to avoid extra whitespace)
+  // Get the inner app iframe element
   const outerFrame = page.frameLocator("iframe").nth(0);
   const innerIframe = outerFrame.locator("iframe").nth(0);
 
-  // Screenshot just the inner iframe element
+  // Screenshot the inner iframe element
   const screenshot = await innerIframe.screenshot();
 
   // Save full-size screenshot
