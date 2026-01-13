@@ -1,12 +1,8 @@
 # Example: Three.js App
 
-Interactive 3D scene renderer using Three.js. Demonstrates streaming code preview and full MCP App integration.
+![Screenshot](screenshot.png)
 
-<table>
-  <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/threejs-server/screenshot.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/threejs-server/screenshot.png" alt="Three.js scene" width="400"></a></td>
-  </tr>
-</table>
+Interactive 3D scene renderer using Three.js. Demonstrates streaming code preview and full MCP App integration.
 
 ## Features
 

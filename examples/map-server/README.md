@@ -1,5 +1,7 @@
 # Example: Interactive Map
 
+![Screenshot](screenshot.png)
+
 Interactive 3D globe viewer using CesiumJS with OpenStreetMap tiles. Demonstrates geocoding integration and full MCP App capabilities.
 
 ## Features

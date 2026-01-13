@@ -1,5 +1,7 @@
 # Example: Customer Segmentation Explorer
 
+![Screenshot](screenshot.png)
+
 A demo MCP App that displays customer data as an interactive scatter/bubble chart with segment-based clustering. Users can explore different metrics, filter by segment, and click to see detailed customer information.
 
 <table>

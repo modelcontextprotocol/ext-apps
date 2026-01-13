@@ -1,5 +1,7 @@
 # Example: Wiki Explorer
 
+![Screenshot](screenshot.png)
+
 Visualizes Wikipedia link graphs using a force-directed layout. Explore how Wikipedia pages are connected by expanding nodes to reveal first-degree links.
 
 <table>

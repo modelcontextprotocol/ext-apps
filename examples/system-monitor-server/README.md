@@ -1,5 +1,7 @@
 # Example: System Monitor App
 
+![Screenshot](screenshot.png)
+
 A demo MCP App that displays real-time OS metrics with a stacked area chart for per-core CPU usage and a bar gauge for memory.
 
 <table>
