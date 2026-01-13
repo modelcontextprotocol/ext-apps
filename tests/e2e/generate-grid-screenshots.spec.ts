@@ -19,11 +19,15 @@ const OUTPUT_SIZE = 300;
 const APP_WIDTH = 500;
 const DEFAULT_WAIT_MS = 5000;
 
-// Extra wait time for slow-loading servers (tiles, video, etc.)
+// Extra wait time for slow-loading servers (tiles, etc.)
 const EXTRA_WAIT_MS: Record<string, number> = {
   "map-server": 45000, // CesiumJS needs time for map tiles
-  "video-resource": 30000, // Video needs time to load
 };
+
+// Servers to skip (screenshots maintained manually)
+const SKIP_SERVERS = new Set([
+  "video-resource", // Uses custom screenshot from PR comment
+]);
 
 // Server configurations (excludes integration-server which is for E2E testing)
 const SERVERS = [
@@ -144,6 +148,13 @@ for (const server of SERVERS) {
     // Skip if directory doesn't exist
     if (!fs.existsSync(outputDir)) {
       console.log(`⚠️  Skipping ${server.dir}: directory not found`);
+      test.skip();
+      return;
+    }
+
+    // Skip servers with manually maintained screenshots
+    if (SKIP_SERVERS.has(server.key)) {
+      console.log(`⏭️  Skipping ${server.dir}: manually maintained screenshot`);
       test.skip();
       return;
     }
