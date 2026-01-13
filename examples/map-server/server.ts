@@ -89,7 +89,7 @@ async function geocodeWithNominatim(query: string): Promise<NominatimResult[]> {
  */
 export function createServer(): McpServer {
   const server = new McpServer({
-    name: "Map Server",
+    name: "CesiumJS Map Server",
     version: "1.0.0",
   });
 
