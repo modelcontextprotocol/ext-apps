@@ -1,0 +1,35 @@
+{
+  "name": "@modelcontextprotocol/server-inlined-app",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Minimal MCP App Server example with inlined HTML UI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "directory": "examples/inlined-app-server"
+  },
+  "license": "MIT",
+  "main": "server.ts",
+  "files": [
+    "server.ts",
+    "server-utils.ts"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit",
+    "serve": "bun server.ts",
+    "start": "npm run serve"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^0.3.1",
+    "@modelcontextprotocol/sdk": "^1.24.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "typescript": "^5.9.3"
+  }
+}

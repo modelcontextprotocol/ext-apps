@@ -108,6 +108,7 @@ jobs:
           - cohort-heatmap-server
           - customer-segmentation-server
           - map-server
+          - inlined-app-server
           - scenario-modeler-server
           - shadertoy-server
           - sheet-music-server

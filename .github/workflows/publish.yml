@@ -29,6 +29,7 @@ jobs:
             ./examples/budget-allocator-server \
             ./examples/cohort-heatmap-server \
             ./examples/customer-segmentation-server \
+            ./examples/inlined-app-server \
             ./examples/scenario-modeler-server \
             ./examples/system-monitor-server \
             ./examples/threejs-server \
