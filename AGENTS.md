@@ -85,3 +85,7 @@ Uses npm workspaces. Examples in `examples/` are separate packages:
 - `basic-server-*` - Starter templates (vanillajs, react, vue, svelte, preact, solid). Use these as the basis for new examples.
 - `basic-host` - Reference host implementation
 - Other examples showcase specific features (charts, 3D, video, etc.)
+
+## Migrating code from OpenAI Apps SDK to MCP Apps
+
+See [Migrating from OpenAI Apps SDK to MCP Apps SDK](./docs/migrate_from_openai_apps.md)
