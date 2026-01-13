@@ -69,8 +69,8 @@ Or edit your `package.json` manually:
 
 ### Starter Templates
 
-|                                                                                                       |                                                                                                                                                                                                                                                                                                                            |
-| :---------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| | |
+|:---:|:---|
 | [![Basic](examples/basic-server-react/grid-cell.png "Starter template")](examples/basic-server-react) | The same app built with different frameworks — pick your favorite!<br><br>[React](examples/basic-server-react) · [Vue](examples/basic-server-vue) · [Svelte](examples/basic-server-svelte) · [Preact](examples/basic-server-preact) · [Solid](examples/basic-server-solid) · [Vanilla JS](examples/basic-server-vanillajs) |
 
 The [`examples/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples) directory contains additional demo apps showcasing real-world use cases.
