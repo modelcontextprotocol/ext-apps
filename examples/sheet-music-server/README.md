@@ -38,7 +38,12 @@ When calling the `play-sheet-music` tool, provide ABC notation:
 
 ```json
 {
-  "abcNotation": "X:1\nT:C Major Scale\nM:4/4\nL:1/4\nK:C\nC D E F | G A B c |"
+  "abcNotation": "X:1
+T:C Major Scale
+M:4/4
+L:1/4
+K:C
+C D E F | G A B c |"
 }
 ```
 

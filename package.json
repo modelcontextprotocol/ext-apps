@@ -64,6 +64,7 @@
     "prepare": "node scripts/setup-bun.mjs && npm run build && husky",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
+    "generate:screenshots": "docker run --rm -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'npm i -g bun && npm ci && npx playwright test tests/e2e/generate-grid-screenshots.spec.ts'",
     "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
     "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write",
     "check:versions": "node scripts/check-versions.mjs"
@@ -85,6 +86,7 @@
     "prettier": "^3.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "sharp": "^0.34.5",
     "ts-to-zod": "^5.1.0",
     "tsx": "^4.21.0",
     "typedoc": "^0.28.14",

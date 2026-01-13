@@ -1,5 +1,7 @@
 # Transcript Server
 
+![Screenshot](screenshot.png)
+
 An MCP App Server for live speech transcription using the Web Speech API.
 
 ## Features

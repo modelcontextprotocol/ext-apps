@@ -1,5 +1,7 @@
 # Example: Basic Server (React)
 
+![Screenshot](screenshot.png)
+
 An MCP App example with a React UI.
 
 > [!TIP]

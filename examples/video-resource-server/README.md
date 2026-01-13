@@ -1,5 +1,7 @@
 # Video Resource Server
 
+![Screenshot](screenshot.png)
+
 Demonstrates serving binary content (video) via MCP resources using the base64 blob pattern.
 
 ## Quick Start

@@ -56,19 +56,28 @@ Or edit your `package.json` manually:
 
 ## Examples
 
-Start with these foundational examples to learn the SDK:
+<!-- prettier-ignore-start -->
+| | | |
+|:---:|:---:|:---:|
+| [![Map](examples/map-server/grid-cell.png "Interactive 3D globe viewer using CesiumJS")](examples/map-server) | [![Three.js](examples/threejs-server/grid-cell.png "Interactive 3D scene renderer")](examples/threejs-server) | [![ShaderToy](examples/shadertoy-server/grid-cell.png "Real-time GLSL shader renderer")](examples/shadertoy-server) |
+| [**Map**](examples/map-server) | [**Three.js**](examples/threejs-server) | [**ShaderToy**](examples/shadertoy-server) |
+| [![Sheet Music](examples/sheet-music-server/grid-cell.png "ABC notation to sheet music")](examples/sheet-music-server) | [![Wiki Explorer](examples/wiki-explorer-server/grid-cell.png "Wikipedia link graph visualization")](examples/wiki-explorer-server) | [![Cohort Heatmap](examples/cohort-heatmap-server/grid-cell.png "Customer retention heatmap")](examples/cohort-heatmap-server) |
+| [**Sheet Music**](examples/sheet-music-server) | [**Wiki Explorer**](examples/wiki-explorer-server) | [**Cohort Heatmap**](examples/cohort-heatmap-server) |
+| [![Scenario Modeler](examples/scenario-modeler-server/grid-cell.png "SaaS business projections")](examples/scenario-modeler-server) | [![Budget Allocator](examples/budget-allocator-server/grid-cell.png "Interactive budget allocation")](examples/budget-allocator-server) | [![Customer Segmentation](examples/customer-segmentation-server/grid-cell.png "Scatter chart with clustering")](examples/customer-segmentation-server) |
+| [**Scenario Modeler**](examples/scenario-modeler-server) | [**Budget Allocator**](examples/budget-allocator-server) | [**Customer Segmentation**](examples/customer-segmentation-server) |
+| [![System Monitor](examples/system-monitor-server/grid-cell.png "Real-time OS metrics")](examples/system-monitor-server) | [![Transcript](examples/transcript-server/grid-cell.png "Live speech transcription")](examples/transcript-server) | [![Video Resource](examples/video-resource-server/grid-cell.png "Binary video via MCP resources")](examples/video-resource-server) |
+| [**System Monitor**](examples/system-monitor-server) | [**Transcript**](examples/transcript-server) | [**Video Resource**](examples/video-resource-server) |
 
-- [`examples/basic-server-vanillajs`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) — MCP server + MCP App using vanilla JS
-- [`examples/basic-server-react`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react) — MCP server + MCP App using [React](https://github.com/facebook/react)
-- [`examples/basic-server-vue`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vue) — MCP server + MCP App using [Vue](https://github.com/vuejs/vue)
-- [`examples/basic-server-svelte`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-svelte) — MCP server + MCP App using [Svelte](https://github.com/sveltejs/svelte)
-- [`examples/basic-server-preact`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-preact) — MCP server + MCP App using [Preact](https://github.com/preactjs/preact)
-- [`examples/basic-server-solid`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-solid) — MCP server + MCP App using [Solid](https://github.com/solidjs/solid)
-- [`examples/basic-host`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) — MCP host application supporting MCP Apps
+### Starter Templates
+
+| | |
+|:---:|:---|
+| [![Basic](examples/basic-server-react/grid-cell.png "Starter template")](examples/basic-server-react) | The same app built with different frameworks — pick your favorite!<br><br>[React](examples/basic-server-react) · [Vue](examples/basic-server-vue) · [Svelte](examples/basic-server-svelte) · [Preact](examples/basic-server-preact) · [Solid](examples/basic-server-solid) · [Vanilla JS](examples/basic-server-vanillajs) |
+<!-- prettier-ignore-end -->
 
 The [`examples/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples) directory contains additional demo apps showcasing real-world use cases.
 
-To run all examples together:
+To run all examples:
 
 ```bash
 npm install
