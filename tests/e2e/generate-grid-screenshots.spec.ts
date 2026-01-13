@@ -4,7 +4,7 @@
  * Usage:
  *   npm run generate:screenshots
  *
- * Output: examples/<server-dir>/grid-cell.png (300x300 centered, aspect-fit)
+ * Output: examples/<server-dir>/grid-cell.png (300x300, cropped top-aligned)
  *
  * For basic-server-* variants, only basic-server-react is included.
  */
@@ -114,13 +114,12 @@ async function captureAppScreenshot(page: Page, outputDir: string) {
   const screenshotPath = path.join(outputDir, "screenshot.png");
   await sharp(screenshot).png().toFile(screenshotPath);
 
-  // Save 300x300 grid cell thumbnail
+  // Save 300x300 grid cell thumbnail (crop to fill, align top)
   const gridCellPath = path.join(outputDir, "grid-cell.png");
   await sharp(screenshot)
     .resize(OUTPUT_SIZE, OUTPUT_SIZE, {
-      fit: "contain",
-      position: "centre",
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
+      fit: "cover",
+      position: "top",
     })
     .png()
     .toFile(gridCellPath);
