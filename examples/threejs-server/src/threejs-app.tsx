@@ -28,10 +28,19 @@ const cube = new THREE.Mesh(
   new THREE.BoxGeometry(1, 1, 1),
   new THREE.MeshStandardMaterial({ color: 0x00ff88 })
 );
+// Start with an isometric-ish rotation to show 3 faces
+cube.rotation.x = 0.5;
+cube.rotation.y = 0.7;
 scene.add(cube);
 
-scene.add(new THREE.DirectionalLight(0xffffff, 1));
-scene.add(new THREE.AmbientLight(0x404040));
+// Better lighting: key light + fill light + ambient
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+keyLight.position.set(1, 1, 2);
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0x8888ff, 0.4);
+fillLight.position.set(-1, 0, -1);
+scene.add(fillLight);
+scene.add(new THREE.AmbientLight(0x404040, 0.5));
 
 camera.position.z = 3;
 

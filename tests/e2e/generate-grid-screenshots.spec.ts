@@ -7,6 +7,7 @@
  * Output: examples/<server-dir>/grid-cell.png (300x300, cropped top-aligned)
  *
  * For basic-server-* variants, only basic-server-react is included.
+ * integration-server is excluded (it's for E2E testing, same UI as basic-server-react).
  */
 
 import { test, type Page } from "@playwright/test";
@@ -16,9 +17,15 @@ import sharp from "sharp";
 
 const OUTPUT_SIZE = 300;
 const APP_WIDTH = 500;
-const LOAD_WAIT_MS = 5000;
+const DEFAULT_WAIT_MS = 5000;
 
-// Server configurations
+// Extra wait time for slow-loading servers (tiles, video, etc.)
+const EXTRA_WAIT_MS: Record<string, number> = {
+  "map-server": 30000, // CesiumJS needs time for map tiles
+  "video-resource": 30000, // Video needs time to load
+};
+
+// Server configurations (excludes integration-server which is for E2E testing)
 const SERVERS = [
   {
     key: "basic-react",
@@ -39,11 +46,6 @@ const SERVERS = [
     key: "customer-segmentation",
     name: "Customer Segmentation Server",
     dir: "customer-segmentation-server",
-  },
-  {
-    key: "integration",
-    name: "Integration Test Server",
-    dir: "integration-server",
   },
   { key: "map-server", name: "CesiumJS Map Server", dir: "map-server" },
   {
@@ -79,7 +81,7 @@ async function waitForAppLoad(page: Page) {
   const outerFrame = page.frameLocator("iframe").nth(0);
   await outerFrame
     .locator("iframe")
-    .waitFor({ state: "visible", timeout: 30000 });
+    .waitFor({ state: "visible", timeout: 60000 });
 }
 
 /**
@@ -100,7 +102,7 @@ async function loadServer(page: Page, serverName: string) {
 /**
  * Capture the app iframe content and save both:
  * - screenshot.png: full-size raw screenshot of the iframe
- * - grid-cell.png: 300x300 centered, aspect-fit thumbnail
+ * - grid-cell.png: 300x300 cropped thumbnail (top-aligned)
  */
 async function captureAppScreenshot(page: Page, outputDir: string) {
   // Get the inner app iframe element (not body, to avoid extra whitespace)
@@ -130,6 +132,9 @@ async function captureAppScreenshot(page: Page, outputDir: string) {
 // Use a constrained viewport width for consistent app rendering
 test.use({ viewport: { width: APP_WIDTH, height: 600 } });
 
+// Increase test timeout for slow servers
+test.setTimeout(120000);
+
 // Generate screenshots for each server
 for (const server of SERVERS) {
   test(`Generate grid-cell.png for ${server.dir}`, async ({ page }) => {
@@ -146,8 +151,10 @@ for (const server of SERVERS) {
     // Load the server
     await loadServer(page, server.name);
 
-    // Wait 5 seconds for app to fully load (animations, data, tiles, etc.)
-    await page.waitForTimeout(LOAD_WAIT_MS);
+    // Wait for app to fully load (extra time for slow servers)
+    const waitMs = EXTRA_WAIT_MS[server.key] ?? DEFAULT_WAIT_MS;
+    console.log(`⏳ Waiting ${waitMs / 1000}s for ${server.dir}...`);
+    await page.waitForTimeout(waitMs);
 
     // Capture and save both screenshot.png and grid-cell.png
     const { screenshotPath, gridCellPath } = await captureAppScreenshot(
