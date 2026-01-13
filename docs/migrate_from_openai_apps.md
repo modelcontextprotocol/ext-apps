@@ -80,7 +80,7 @@ This guide helps you migrate from the OpenAI Apps SDK (`window.openai.*`) to the
 | OpenAI                                | MCP Apps | Notes                                           |
 | ------------------------------------- | -------- | ----------------------------------------------- |
 | `window.openai.widgetState`           | —        | Not directly available in MCP                   |
-| `window.openai.setWidgetState(state)` | —        | Use framework state (React, localStorage, etc.) |
+| `window.openai.setWidgetState(state)` | —        | Use alternative mechanisms (`localStorage`, server-side state, etc.) |
 
 ## File Operations (Not Yet in MCP Apps)
 
