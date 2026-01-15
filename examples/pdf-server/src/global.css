@@ -9,4 +9,6 @@ html, body {
   padding: 0;
   height: 100%;
   width: 100%;
+  /* Match .main background to hide any gap at the bottom */
+  background: var(--bg100, #f5f5f5);
 }

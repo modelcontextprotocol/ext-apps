@@ -5,7 +5,7 @@ body {
 .main {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  min-height: 100%;
   width: 100%;
   background: var(--bg100, #f5f5f5);
   color: var(--text000, #1a1a1a);
