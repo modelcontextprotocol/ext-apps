@@ -17,7 +17,10 @@ import {
 } from "./src/data-generator.js";
 import { SEGMENTS, type Customer, type SegmentSummary } from "./src/types.js";
 
-const DIST_DIR = path.join(import.meta.dirname, "dist");
+// Works both from source (server.ts) and compiled (dist/server.js)
+const DIST_DIR = import.meta.filename.endsWith(".ts")
+  ? path.join(import.meta.dirname, "dist")
+  : import.meta.dirname;
 
 // Schemas - types are derived from these using z.infer
 const GetCustomerDataInputSchema = z.object({

@@ -37,7 +37,10 @@ import {
   type PdfIndex,
 } from "./src/types.js";
 
-const DIST_DIR = path.join(import.meta.dirname, "dist");
+// Works both from source (server.ts) and compiled (dist/server.js)
+const DIST_DIR = import.meta.filename.endsWith(".ts")
+  ? path.join(import.meta.dirname, "dist")
+  : import.meta.dirname;
 const RESOURCE_URI = "ui://pdf-viewer/mcp-app.html";
 const DEFAULT_PDF = "https://arxiv.org/pdf/1706.03762"; // Attention Is All You Need
 

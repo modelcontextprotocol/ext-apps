@@ -53,7 +53,10 @@ const SystemStatsSchema = z.object({
 type CpuCore = z.infer<typeof CpuCoreSchema>;
 type MemoryStats = z.infer<typeof MemoryStatsSchema>;
 type SystemStats = z.infer<typeof SystemStatsSchema>;
-const DIST_DIR = path.join(import.meta.dirname, "dist");
+// Works both from source (server.ts) and compiled (dist/server.js)
+const DIST_DIR = import.meta.filename.endsWith(".ts")
+  ? path.join(import.meta.dirname, "dist")
+  : import.meta.dirname;
 
 // Returns raw CPU timing data per core (client calculates usage from deltas)
 function getCpuSnapshots(): CpuCore[] {
