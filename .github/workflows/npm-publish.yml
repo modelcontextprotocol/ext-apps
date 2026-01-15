@@ -116,6 +116,7 @@ jobs:
           - threejs-server
           - transcript-server
           - video-resource-server
+          - virtual-desktop-server
           - wiki-explorer-server
 
     steps:

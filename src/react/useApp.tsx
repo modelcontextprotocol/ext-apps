@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
-import { Client } from "@modelcontextprotocol/sdk/client";
 import { App, McpUiAppCapabilities, PostMessageTransport } from "../app";
 export * from "../app";
 
@@ -117,6 +116,11 @@ export function useApp({
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  // Track the app instance in a ref so we can close it on cleanup.
+  // This is necessary because the app is created inside an async function
+  // and wouldn't otherwise be accessible from the cleanup function.
+  const appRef = useRef<App | null>(null);
+
   useEffect(() => {
     let mounted = true;
 
@@ -126,17 +130,23 @@ export function useApp({
           window.parent,
           window.parent,
         );
-        const app = new App(appInfo, capabilities);
+        const newApp = new App(appInfo, capabilities);
+
+        // Store in ref immediately so cleanup can access it
+        appRef.current = newApp;
 
         // Register handlers BEFORE connecting
-        onAppCreated?.(app);
+        onAppCreated?.(newApp);
 
-        await app.connect(transport);
+        await newApp.connect(transport);
 
         if (mounted) {
-          setApp(app);
+          setApp(newApp);
           setIsConnected(true);
           setError(null);
+        } else {
+          // Component unmounted during connection - close the app
+          void newApp.close();
         }
       } catch (error) {
         if (mounted) {
@@ -153,6 +163,13 @@ export function useApp({
 
     return () => {
       mounted = false;
+      // Close the app connection to stop the PostMessageTransport listener.
+      // This prevents duplicate listeners in React StrictMode where effects
+      // run twice, and ensures proper cleanup when the component unmounts.
+      if (appRef.current) {
+        void appRef.current.close();
+        appRef.current = null;
+      }
     };
   }, []); // Intentionally not including options to avoid reconnection
 

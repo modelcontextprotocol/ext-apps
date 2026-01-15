@@ -354,6 +354,13 @@ function ToolCallInfoPanel({ toolCallInfo, isDestroying, onRequestClose, onClose
   );
 }
 
+function JsonBlock({ value }: { value: object }) {
+  return (
+    <pre className={styles.jsonBlock}>
+      <code>{JSON.stringify(value, null, 2)}</code>
+    </pre>
+  );
+}
 
 interface CollapsiblePanelProps {
   icon: string;
@@ -513,8 +520,40 @@ interface ToolResultPanelProps {
 }
 function ToolResultPanel({ toolCallInfo }: ToolResultPanelProps) {
   const result = use(toolCallInfo.resultPromise);
-  const resultJson = JSON.stringify(result, null, 2);
-  return <CollapsiblePanel icon="📤" label="Tool Result" content={resultJson} />;
+
+  // Render content blocks nicely instead of raw JSON
+  if (result.content && Array.isArray(result.content)) {
+    return (
+      <div className={styles.toolResultPanel}>
+        {result.isError && <div className={styles.error}><strong>Error</strong></div>}
+        {result.content.map((block, i) => {
+          if (block.type === "text") {
+            return (
+              <pre key={i} className={styles.textBlock}>
+                {block.text}
+              </pre>
+            );
+          }
+          if (block.type === "image") {
+            const src = `data:${block.mimeType};base64,${block.data}`;
+            return (
+              <img
+                key={i}
+                src={src}
+                alt="Tool result"
+                className={styles.imageBlock}
+              />
+            );
+          }
+          // Fallback for unknown content types
+          return <JsonBlock key={i} value={block} />;
+        })}
+      </div>
+    );
+  }
+
+  // Fallback for non-standard results
+  return <JsonBlock value={result} />;
 }
 
 

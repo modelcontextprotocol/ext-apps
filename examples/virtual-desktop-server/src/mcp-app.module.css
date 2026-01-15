@@ -1,0 +1,330 @@
+/* Default (dark theme) */
+:root {
+  --vnc-bg: #1a1a1a;
+  --vnc-bg-secondary: #252525;
+  --vnc-border: #333;
+  --vnc-text: #fff;
+  --vnc-text-muted: #888;
+  --vnc-text-subtle: #666;
+  --vnc-button-bg: transparent;
+  --vnc-button-border: #444;
+  --vnc-button-hover-bg: #333;
+  --vnc-button-hover-border: #555;
+}
+
+/* Light theme */
+@media (prefers-color-scheme: light) {
+  :root {
+    --vnc-bg: #f5f5f5;
+    --vnc-bg-secondary: #e8e8e8;
+    --vnc-border: #ddd;
+    --vnc-text: #1a1a1a;
+    --vnc-text-muted: #666;
+    --vnc-text-subtle: #888;
+    --vnc-button-bg: transparent;
+    --vnc-button-border: #ccc;
+    --vnc-button-hover-bg: #ddd;
+    --vnc-button-hover-border: #bbb;
+  }
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  min-height: 500px;
+  background: transparent;
+  color: var(--vnc-text);
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.loading,
+.error,
+.waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 2rem;
+  text-align: center;
+  background: var(--vnc-bg);
+  border-radius: 8px;
+}
+
+.error {
+  color: #ff6b6b;
+}
+
+.waiting {
+  color: var(--vnc-text-muted);
+}
+
+.hint {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.hint code {
+  background: var(--vnc-bg-secondary);
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--vnc-bg-secondary);
+  border-bottom: 1px solid var(--vnc-border);
+  flex-shrink: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.desktopName {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.statusConnected {
+  background: #22c55e20;
+  color: #22c55e;
+}
+
+.statusConnecting {
+  background: #f59e0b20;
+  color: #f59e0b;
+}
+
+.toolbarActions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.toolbarButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--vnc-button-bg);
+  border: 1px solid var(--vnc-button-border);
+  border-radius: 4px;
+  color: var(--vnc-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbarButton:hover:not(:disabled) {
+  background: var(--vnc-button-hover-bg);
+  color: var(--vnc-text);
+  border-color: var(--vnc-button-hover-border);
+}
+
+.toolbarButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* VNC Container */
+.vncContainer {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--vnc-bg);
+  border-radius: 0 0 8px 8px;
+}
+
+.connectingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 10;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vncCanvas {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Let noVNC handle canvas sizing with scaleViewport.
+   Canvas is absolute positioned so it doesn't affect parent layout. */
+.vncCanvas canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Desktop Card (CSP blocked fallback) */
+.desktopCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  background: var(--vnc-bg);
+  border-radius: 8px;
+}
+
+.desktopIcon {
+  color: #3b82f6;
+  margin-bottom: 1rem;
+}
+
+.desktopTitle {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--vnc-text);
+}
+
+.desktopMeta {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.badge {
+  background: var(--vnc-bg-secondary);
+  color: var(--vnc-text-muted);
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.desktopUrl {
+  color: var(--vnc-text-subtle);
+  font-size: 0.875rem;
+  margin: 0 0 1.5rem;
+  font-family: ui-monospace, monospace;
+}
+
+.openButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.openButton:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.openButton:active {
+  transform: translateY(0);
+}
+
+/* Disconnected State */
+.disconnected {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  background: var(--vnc-bg);
+  border-radius: 8px;
+}
+
+.disconnected .icon {
+  color: var(--vnc-text-subtle);
+  margin-bottom: 1rem;
+}
+
+.disconnected h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--vnc-text);
+}
+
+.errorText {
+  color: var(--vnc-text-muted);
+  margin: 0 0 1.5rem;
+  font-size: 0.875rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  padding: 0.625rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.primaryButton {
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+}
+
+.primaryButton:hover {
+  background: #2563eb;
+}
+
+.secondaryButton {
+  background: transparent;
+  color: var(--vnc-text-muted);
+  border: 1px solid var(--vnc-button-border);
+}
+
+.secondaryButton:hover {
+  background: var(--vnc-button-hover-bg);
+  color: var(--vnc-text);
+  border-color: var(--vnc-button-hover-border);
+}

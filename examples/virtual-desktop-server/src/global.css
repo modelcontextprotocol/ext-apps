@@ -1,0 +1,25 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 1rem;
+  background: transparent;
+  color: #fff;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  background: transparent;
+}
+
+code {
+  font-size: 1em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
