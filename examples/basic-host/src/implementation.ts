@@ -228,12 +228,19 @@ export type AppMessage = McpUiMessageRequest["params"];
 export interface AppBridgeCallbacks {
   onContextUpdate?: (context: ModelContext | null) => void;
   onMessage?: (message: AppMessage) => void;
+  onDisplayModeChange?: (mode: "inline" | "fullscreen") => void;
+}
+
+export interface AppBridgeOptions {
+  containerDimensions?: { maxHeight?: number; width?: number } | { height: number; width?: number };
+  displayMode?: "inline" | "fullscreen";
 }
 
 export function newAppBridge(
   serverInfo: ServerInfo,
   iframe: HTMLIFrameElement,
   callbacks?: AppBridgeCallbacks,
+  options?: AppBridgeOptions,
 ): AppBridge {
   const serverCapabilities = serverInfo.client.getServerCapabilities();
   const appBridge = new AppBridge(serverInfo.client, IMPLEMENTATION, {
@@ -242,6 +249,12 @@ export function newAppBridge(
     serverResources: serverCapabilities?.resources,
     // Declare support for model context updates
     updateModelContext: { text: {} },
+  }, {
+    hostContext: {
+      containerDimensions: options?.containerDimensions ?? { maxHeight: 600 },
+      displayMode: options?.displayMode ?? "inline",
+      availableDisplayModes: ["inline", "fullscreen"],
+    },
   });
 
   // Register all handlers before calling connect(). The Guest UI can start
@@ -306,6 +319,19 @@ export function newAppBridge(
     }
 
     iframe.animate([from, to], { duration: 300, easing: "ease-out" });
+  };
+
+  // Handle display mode change requests from the app
+  appBridge.onrequestdisplaymode = async (params) => {
+    log.info("Display mode request from MCP App:", params);
+    const newMode = params.mode === "fullscreen" ? "fullscreen" : "inline";
+    // Update host context and notify the app
+    appBridge.sendHostContextChange({
+      displayMode: newMode,
+    });
+    // Notify the host UI (via callback)
+    callbacks?.onDisplayModeChange?.(newMode);
+    return { mode: newMode };
   };
 
   return appBridge;

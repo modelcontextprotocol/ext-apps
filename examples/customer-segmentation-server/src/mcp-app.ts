@@ -11,8 +11,8 @@ import {
 import { Chart, registerables } from "chart.js";
 import "./global.css";
 import "./mcp-app.css";
-import type { Customer, SegmentSummary, MetricName } from "./types.ts";
-import { SEGMENT_COLORS, METRIC_LABELS } from "./types.ts";
+import type { Customer, SegmentSummary, MetricName } from "./types.js";
+import { SEGMENT_COLORS, METRIC_LABELS } from "./types.js";
 
 // Register Chart.js components
 Chart.register(...registerables);

@@ -1,17 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
-import { startServer } from "./server-utils.js";
-
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 
 /**
  * Creates a new MCP server instance with tools and resources registered.
  */
-function createServer(): McpServer {
+export function createServer(): McpServer {
   const server = new McpServer({
     name: "Basic MCP App Server (Preact)",
     version: "1.0.0",
@@ -55,17 +52,3 @@ function createServer(): McpServer {
 
   return server;
 }
-
-async function main() {
-  if (process.argv.includes("--stdio")) {
-    await createServer().connect(new StdioServerTransport());
-  } else {
-    const port = parseInt(process.env.PORT ?? "3001", 10);
-    await startServer(createServer, { port, name: "Basic MCP App Server (Preact)" });
-  }
-}
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

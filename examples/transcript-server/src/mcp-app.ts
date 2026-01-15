@@ -329,18 +329,31 @@ function updateSendButton() {
   sendBtn.disabled = unsentEntries.length === 0;
 }
 
+/**
+ * Update model context with structured YAML frontmatter (like pdf-server, map-server).
+ */
 function updateModelContext() {
   const caps = app.getHostCapabilities();
   if (!caps?.updateModelContext) return;
 
   const text = getUnsentText();
+  const unsentCount = getUnsentEntries().length;
   log.info("Updating model context:", text || "(empty)");
+
+  // Build structured markdown with YAML frontmatter
+  const frontmatter = [
+    "---",
+    "tool: transcribe",
+    `status: ${isListening ? "listening" : "paused"}`,
+    `unsent-entries: ${unsentCount}`,
+    "---",
+  ].join("\n");
+
+  const markdown = text ? `${frontmatter}\n\n${text}` : frontmatter;
 
   app
     .updateModelContext({
-      content: text
-        ? [{ type: "text", text: `[Live transcript]: ${text}` }]
-        : [],
+      content: [{ type: "text", text: markdown }],
     })
     .catch((e: unknown) => {
       log.warn("Failed to update model context:", e);

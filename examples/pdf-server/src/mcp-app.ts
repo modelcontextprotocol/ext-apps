@@ -35,6 +35,7 @@ let totalPages = 0;
 let scale = 1.0;
 let pdfUrl = "";
 let pdfTitle: string | undefined;
+let widgetUUID: string | undefined;
 let currentRenderTask: { cancel: () => void } | null = null;
 
 // DOM Elements
@@ -402,20 +403,11 @@ async function renderPage() {
   }
 }
 
-// Page persistence
-function getStorageKey(): string | null {
-  if (!pdfUrl) return null;
-  const ctx = app.getHostContext();
-  const toolId = ctx?.toolInfo?.id ?? pdfUrl;
-  return `pdf:${pdfUrl}:${toolId}`;
-}
-
 function saveCurrentPage() {
-  const key = getStorageKey();
-  log.info("saveCurrentPage: key=", key, "page=", currentPage);
-  if (key) {
+  log.info("saveCurrentPage: key=", widgetUUID, "page=", currentPage);
+  if (widgetUUID) {
     try {
-      localStorage.setItem(key, String(currentPage));
+      localStorage.setItem(widgetUUID, String(currentPage));
       log.info("saveCurrentPage: saved successfully");
     } catch (err) {
       log.error("saveCurrentPage: error", err);
@@ -424,11 +416,10 @@ function saveCurrentPage() {
 }
 
 function loadSavedPage(): number | null {
-  const key = getStorageKey();
-  log.info("loadSavedPage: key=", key);
-  if (!key) return null;
+  log.info("loadSavedPage: key=", widgetUUID);
+  if (!widgetUUID) return null;
   try {
-    const saved = localStorage.getItem(key);
+    const saved = localStorage.getItem(widgetUUID);
     log.info("loadSavedPage: saved value=", saved);
     if (saved) {
       const page = parseInt(saved, 10);
@@ -715,6 +706,9 @@ app.ontoolresult = async (result) => {
   pdfUrl = parsed.url;
   pdfTitle = parsed.title;
   totalPages = parsed.pageCount;
+  widgetUUID = result._meta?.widgetUUID
+    ? String(result._meta.widgetUUID)
+    : undefined;
 
   // Restore saved page or use initial page
   const savedPage = loadSavedPage();

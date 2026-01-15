@@ -12,9 +12,6 @@ import {
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { startServer } from "./server-utils.js";
-
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 
 const DEFAULT_ABC_NOTATION_INPUT = `X:1
@@ -29,7 +26,7 @@ C C G G | A A G2 | F F E E | D D C2 |`;
 /**
  * Creates a new MCP server instance with the sheet music tool and resource.
  */
-function createServer(): McpServer {
+export function createServer(): McpServer {
   const server = new McpServer({
     name: "Sheet Music Server",
     version: "1.0.0",
@@ -115,17 +112,3 @@ function createServer(): McpServer {
 
   return server;
 }
-
-async function main() {
-  if (process.argv.includes("--stdio")) {
-    await createServer().connect(new StdioServerTransport());
-  } else {
-    const port = parseInt(process.env.PORT ?? "3001", 10);
-    await startServer(createServer, { port, name: "Sheet Music Server" });
-  }
-}
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

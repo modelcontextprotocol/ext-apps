@@ -47,7 +47,7 @@ const SERVERS = [
   { key: "budget-allocator", name: "Budget Allocator Server" },
   { key: "cohort-heatmap", name: "Cohort Heatmap Server" },
   { key: "customer-segmentation", name: "Customer Segmentation Server" },
-  { key: "map-server", name: "CesiumJS Map Server" },
+  { key: "map-server", name: "Map Server" },
   { key: "pdf-server", name: "PDF Server" },
   { key: "scenario-modeler", name: "SaaS Scenario Modeler" },
   { key: "shadertoy", name: "ShaderToy Server" },

@@ -4,7 +4,6 @@ import {
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type {
   CallToolResult,
   ReadResourceResult,
@@ -13,8 +12,6 @@ import * as cheerio from "cheerio";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { startServer } from "./server-utils.js";
-
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 
 type PageInfo = { url: string; title: string };
@@ -169,17 +166,3 @@ export function createServer(): McpServer {
 
   return server;
 }
-
-async function main() {
-  if (process.argv.includes("--stdio")) {
-    await createServer().connect(new StdioServerTransport());
-  } else {
-    const port = parseInt(process.env.PORT ?? "3109", 10);
-    await startServer(createServer, { port, name: "Wiki Explorer" });
-  }
-}
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

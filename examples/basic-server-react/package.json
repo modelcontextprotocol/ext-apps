@@ -9,16 +9,24 @@
     "directory": "examples/basic-server-react"
   },
   "license": "MIT",
-  "main": "server.ts",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "bin": {
+    "mcp-server-basic-react": "dist/index.js"
+  },
   "files": [
-    "server.ts",
-    "server-utils.ts",
     "dist"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
   "scripts": {
-    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build",
+    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --banner \"#!/usr/bin/env node\"",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
-    "serve": "bun --watch server.ts",
+    "serve": "bun --watch main.ts",
     "start": "cross-env NODE_ENV=development npm run build && npm run serve",
     "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve'",
     "prepublishOnly": "npm run build"
@@ -26,6 +34,8 @@
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zod": "^4.1.13"
@@ -38,9 +48,7 @@
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.2.1",
-    "cors": "^2.8.5",
     "cross-env": "^10.1.0",
-    "express": "^5.1.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
     "vite-plugin-singlefile": "^2.3.0"

@@ -1,12 +1,20 @@
 /**
+ * Entry point for running the MCP server.
+ * Run with: npx mcp-video-resource-server
+ * Or: node dist/index.js [--stdio]
+ */
+
+/**
  * Shared utilities for running MCP servers with Streamable HTTP transport.
  */
 
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import cors from "cors";
 import type { Request, Response } from "express";
+import { createServer } from "./server.js";
 
 export interface ServerOptions {
   port: number;
@@ -54,7 +62,11 @@ export async function startServer(
     }
   });
 
-  const httpServer = app.listen(port, () => {
+  const httpServer = app.listen(port, (err) => {
+    if (err) {
+      console.error("Failed to start server:", err);
+      process.exit(1);
+    }
     console.log(`${name} listening on http://localhost:${port}/mcp`);
   });
 
@@ -66,3 +78,17 @@ export async function startServer(
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 }
+
+async function main() {
+  if (process.argv.includes("--stdio")) {
+    await createServer().connect(new StdioServerTransport());
+  } else {
+    const port = parseInt(process.env.PORT ?? "3001", 10);
+    await startServer(createServer, { port, name: "Video Resource Server" });
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

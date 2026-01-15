@@ -1,12 +1,21 @@
 /**
+ * Entry point for running the MCP server.
+ * Run with: npx mcp-pdf-server
+ * Or: node dist/index.js [--stdio] [pdf-urls...]
+ */
+
+/**
  * Shared utilities for running MCP servers with Streamable HTTP transport.
  */
 
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import cors from "cors";
 import type { Request, Response } from "express";
+import { createServer, initializePdfIndex } from "./server.js";
+import { isArxivUrl, toFileUrl, normalizeArxivUrl } from "./src/pdf-indexer.js";
 
 export interface ServerOptions {
   port: number;
@@ -70,3 +79,52 @@ export async function startServer(
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 }
+
+const DEFAULT_PDF = "https://arxiv.org/pdf/1706.03762"; // Attention Is All You Need
+
+function parseArgs(): { urls: string[]; stdio: boolean } {
+  const args = process.argv.slice(2);
+  const urls: string[] = [];
+  let stdio = false;
+
+  for (const arg of args) {
+    if (arg === "--stdio") {
+      stdio = true;
+    } else if (!arg.startsWith("-")) {
+      // Convert local paths to file:// URLs, normalize arxiv URLs
+      let url = arg;
+      if (
+        !arg.startsWith("http://") &&
+        !arg.startsWith("https://") &&
+        !arg.startsWith("file://")
+      ) {
+        url = toFileUrl(arg);
+      } else if (isArxivUrl(arg)) {
+        url = normalizeArxivUrl(arg);
+      }
+      urls.push(url);
+    }
+  }
+
+  return { urls: urls.length > 0 ? urls : [DEFAULT_PDF], stdio };
+}
+
+async function main() {
+  const { urls, stdio } = parseArgs();
+
+  console.error(`[pdf-server] Initializing with ${urls.length} PDF(s)...`);
+  await initializePdfIndex(urls);
+  console.error(`[pdf-server] Ready`);
+
+  if (stdio) {
+    await createServer().connect(new StdioServerTransport());
+  } else {
+    const port = parseInt(process.env.PORT ?? "3120", 10);
+    await startServer(createServer, { port, name: "PDF Server" });
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

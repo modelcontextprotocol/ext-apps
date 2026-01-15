@@ -122,8 +122,7 @@ function schedulePersistViewState(cesiumViewer: any): void {
  * Persist current view state to localStorage
  */
 function persistViewState(cesiumViewer: any): void {
-  const key = widgetUUID;
-  if (!key) {
+  if (!widgetUUID) {
     log.info("No storage key available, skipping view persistence");
     return;
   }
@@ -133,12 +132,8 @@ function persistViewState(cesiumViewer: any): void {
 
   try {
     const value = JSON.stringify(state);
-    localStorage.setItem(key, value);
-    log.info(
-      "Persisted view state:",
-      key,
-      value,
-    );
+    localStorage.setItem(widgetUUID, value);
+    log.info("Persisted view state:", widgetUUID, value);
   } catch (e) {
     log.warn("Failed to persist view state:", e);
   }
@@ -148,11 +143,10 @@ function persistViewState(cesiumViewer: any): void {
  * Load persisted view state from localStorage
  */
 function loadPersistedViewState(): PersistedCameraState | null {
-  const key = widgetUUID;
-  if (!key) return null;
+  if (!widgetUUID) return null;
 
   try {
-    const stored = localStorage.getItem(key);
+    const stored = localStorage.getItem(widgetUUID);
     if (!stored) {
       console.info("No persisted view state found");
       return null;
@@ -396,8 +390,10 @@ async function getVisiblePlaces(extent: BoundingBox): Promise<string[]> {
 }
 
 /**
- * Debounced location update using multi-point reverse geocoding
- * Samples multiple points in the visible extent to discover places
+ * Debounced location update using multi-point reverse geocoding.
+ * Samples multiple points in the visible extent to discover places.
+ *
+ * Updates model context with structured YAML frontmatter (similar to pdf-server).
  */
 function scheduleLocationUpdate(cesiumViewer: any): void {
   if (reverseGeocodeTimer) {
@@ -414,34 +410,35 @@ function scheduleLocationUpdate(cesiumViewer: any): void {
     }
 
     const { widthKm, heightKm } = getScaleDimensions(extent);
-    const extentInfo =
-      `Extent: [${extent.west.toFixed(4)}, ${extent.south.toFixed(4)}, ` +
-      `${extent.east.toFixed(4)}, ${extent.north.toFixed(4)}] ` +
-      `(${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km)`;
-    log.info(extentInfo);
+
+    log.info(`Extent: ${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km`);
 
     // Get places visible in the extent (samples multiple points for large areas)
     const places = await getVisiblePlaces(extent);
-    const placesText =
-      places.length > 0 ? `Visible places: ${places.join(", ")}` : "";
 
-    if (places.length > 0 || center) {
-      const centerText = center
-        ? `Center: ${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}`
-        : "";
+    // Build structured markdown with YAML frontmatter (like pdf-server)
+    // Note: tool name isn't in the notification protocol, so we hardcode it
+    const frontmatter = [
+      "---",
+      `tool: show-map`,
+      center
+        ? `center: [${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}]`
+        : null,
+      `extent: [${extent.west.toFixed(4)}, ${extent.south.toFixed(4)}, ${extent.east.toFixed(4)}, ${extent.north.toFixed(4)}]`,
+      `extent-size: ${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km`,
+      places.length > 0 ? `visible-places: [${places.join(", ")}]` : null,
+      "---",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-      const contextText = [placesText, centerText, extentInfo]
-        .filter(Boolean)
-        .join("\n");
+    log.info("Updating model context:", frontmatter);
 
-      log.info("Updating model context:", contextText);
-
-      // Update the model's context with the current map location.
-      // If the host doesn't support this, the request will silently fail.
-      app.updateModelContext({
-        content: [{ type: "text", text: contextText }],
-      });
-    }
+    // Update the model's context with the current map location.
+    // If the host doesn't support this, the request will silently fail.
+    app.updateModelContext({
+      content: [{ type: "text", text: frontmatter }],
+    });
   }, 1500);
 }
 
@@ -941,40 +938,36 @@ app.ontoolinput = async (params) => {
 //   },
 // );
 
-// Initialize Cesium and connect to host
+// Handle tool result - extract widgetUUID and restore persisted view if available
 app.ontoolresult = async (result) => {
-  widgetUUID = result._meta?.widgetUUID ? String(result._meta.widgetUUID) : undefined;
-  
+  widgetUUID = result._meta?.widgetUUID
+    ? String(result._meta.widgetUUID)
+    : undefined;
+  log.info("Tool result received, widgetUUID:", widgetUUID);
+
+  // Now that we have widgetUUID, try to restore persisted view
+  // This overrides the tool input position if a saved state exists
+  if (viewer && widgetUUID) {
+    const restored = restorePersistedView(viewer);
+    if (restored) {
+      log.info("Restored persisted view from tool result handler");
+      await waitForTilesLoaded(viewer);
+      hideLoading();
+    }
+  }
+};
+
+// Initialize Cesium and connect to host
+async function initialize() {
   try {
     log.info("Loading CesiumJS from CDN...");
     await loadCesium();
     log.info("CesiumJS loaded successfully");
 
     viewer = await initCesium();
-    // Don't hide loading here - we wait for tool input to position camera
-    // and for tiles to load before hiding the loading indicator
-    log.info("CesiumJS initialized, waiting for tool input...");
+    log.info("CesiumJS initialized");
 
-    // Fallback: if no tool input received within 2 seconds, try restoring
-    // persisted view or show default view
-    const loadingEl = document.getElementById("loading");
-    if (
-      loadingEl &&
-      loadingEl.style.display !== "none" &&
-      !hasReceivedToolInput
-    ) {
-      // No explicit tool input - try to restore persisted view
-      const restored = restorePersistedView(viewer!);
-      if (restored) {
-        log.info("Restored persisted view, waiting for tiles...");
-      } else {
-        log.info("No persisted view, using default view...");
-      }
-      await waitForTilesLoaded(viewer!);
-      hideLoading();
-    }
-
-    // Connect to host (auto-creates PostMessageTransport)
+    // Connect to host (must happen before we can receive notifications)
     await app.connect();
     log.info("Connected to host");
 
@@ -1003,6 +996,26 @@ app.ontoolresult = async (result) => {
 
     // Set up keyboard shortcuts for fullscreen (Escape to exit, Ctrl/Cmd+Enter to toggle)
     document.addEventListener("keydown", handleFullscreenKeyboard);
+
+    // Wait a bit for tool input, then try restoring persisted view or show default
+    setTimeout(async () => {
+      const loadingEl = document.getElementById("loading");
+      if (
+        loadingEl &&
+        loadingEl.style.display !== "none" &&
+        !hasReceivedToolInput
+      ) {
+        // No explicit tool input - try to restore persisted view
+        const restored = restorePersistedView(viewer!);
+        if (restored) {
+          log.info("Restored persisted view, waiting for tiles...");
+        } else {
+          log.info("No persisted view, using default view...");
+        }
+        await waitForTilesLoaded(viewer!);
+        hideLoading();
+      }
+    }, 500);
   } catch (error) {
     log.error("Failed to initialize:", error);
     const loadingEl = document.getElementById("loading");
@@ -1013,3 +1026,5 @@ app.ontoolresult = async (result) => {
   }
 }
 
+// Start initialization
+initialize();

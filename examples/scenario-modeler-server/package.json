@@ -9,14 +9,12 @@
     "directory": "examples/scenario-modeler-server"
   },
   "license": "MIT",
-  "main": "server.ts",
+  "main": "dist/server.js",
   "files": [
-    "server.ts",
-    "server-utils.ts",
     "dist"
   ],
   "scripts": {
-    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build",
+    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --banner \"#!/usr/bin/env node\"",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
     "serve:http": "bun --watch server.ts",
     "serve:stdio": "bun server.ts --stdio",
@@ -24,7 +22,8 @@
     "start:http": "cross-env NODE_ENV=development npm run build && npm run serve:http",
     "start:stdio": "cross-env NODE_ENV=development npm run build && npm run serve:stdio",
     "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve:http'",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "serve": "bun --watch main.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^0.4.0",
@@ -32,7 +31,9 @@
     "chart.js": "^4.4.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -42,11 +43,19 @@
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.2.1",
-    "cors": "^2.8.5",
     "cross-env": "^10.1.0",
-    "express": "^5.1.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
     "vite-plugin-singlefile": "^2.3.0"
+  },
+  "types": "dist/server.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "bin": {
+    "mcp-scenario-modeler-server": "dist/index.js"
   }
 }

@@ -13,7 +13,6 @@ import {
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type {
   CallToolResult,
   ReadResourceResult,
@@ -21,6 +20,7 @@ import type {
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 import {
   buildPdfIndex,
@@ -28,7 +28,6 @@ import {
   createEntry,
   isArxivUrl,
   isFileUrl,
-  toFileUrl,
   normalizeArxivUrl,
 } from "./src/pdf-indexer.js";
 import { loadPdfBytesChunk, populatePdfMetadata } from "./src/pdf-loader.js";
@@ -37,7 +36,6 @@ import {
   PdfBytesChunkSchema,
   type PdfIndex,
 } from "./src/types.js";
-import { startServer } from "./server-utils.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 const RESOURCE_URI = "ui://pdf-viewer/mcp-app.html";
@@ -45,6 +43,18 @@ const DEFAULT_PDF = "https://arxiv.org/pdf/1706.03762"; // Attention Is All You 
 
 let pdfIndex: PdfIndex | null = null;
 
+/**
+ * Initialize the PDF index with the given URLs.
+ * Must be called before createServer().
+ */
+export async function initializePdfIndex(urls: string[]): Promise<void> {
+  pdfIndex = await buildPdfIndex(urls);
+}
+
+/**
+ * Creates a new MCP server instance with tools and resources registered.
+ * Each HTTP session needs its own server instance because McpServer only supports one transport.
+ */
 export function createServer(): McpServer {
   const server = new McpServer({ name: "PDF Server", version: "1.0.0" });
 
@@ -175,6 +185,9 @@ The viewer supports zoom, navigation, text selection, and fullscreen mode.`,
           },
         ],
         structuredContent: result,
+        _meta: {
+          widgetUUID: randomUUID(),
+        },
       };
     },
   );
@@ -200,51 +213,3 @@ The viewer supports zoom, navigation, text selection, and fullscreen mode.`,
 
   return server;
 }
-
-// CLI
-function parseArgs(): { urls: string[]; stdio: boolean } {
-  const args = process.argv.slice(2);
-  const urls: string[] = [];
-  let stdio = false;
-
-  for (const arg of args) {
-    if (arg === "--stdio") {
-      stdio = true;
-    } else if (!arg.startsWith("-")) {
-      // Convert local paths to file:// URLs, normalize arxiv URLs
-      let url = arg;
-      if (
-        !arg.startsWith("http://") &&
-        !arg.startsWith("https://") &&
-        !arg.startsWith("file://")
-      ) {
-        url = toFileUrl(arg);
-      } else if (isArxivUrl(arg)) {
-        url = normalizeArxivUrl(arg);
-      }
-      urls.push(url);
-    }
-  }
-
-  return { urls: urls.length > 0 ? urls : [DEFAULT_PDF], stdio };
-}
-
-async function main() {
-  const { urls, stdio } = parseArgs();
-
-  console.error(`[pdf-server] Initializing with ${urls.length} PDF(s)...`);
-  pdfIndex = await buildPdfIndex(urls);
-  console.error(`[pdf-server] Ready`);
-
-  if (stdio) {
-    await createServer().connect(new StdioServerTransport());
-  } else {
-    const port = parseInt(process.env.PORT ?? "3001", 10);
-    await startServer(createServer, { port, name: "PDF Server" });
-  }
-}
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

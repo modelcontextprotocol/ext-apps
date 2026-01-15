@@ -72,63 +72,13 @@
 
 .toolCallInfoPanel {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.5rem;
   animation: slideDown 0.3s ease-out;
 }
 
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-12px); }
-}
-
-.inputInfoPanel {
-  display: flex;
-  flex: 3;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 0;
-
-  h2 {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    font-size: 1.5rem;
-    position: relative;
-
-    .toolName {
-      font-family: monospace;
-    }
-
-    .closeButton {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 1.5rem;
-      height: 1.5rem;
-      padding: 0;
-      border: none;
-      border-radius: 4px;
-      background: #e0e0e0;
-      font-size: 1.25rem;
-      line-height: 1;
-      color: #666;
-      cursor: pointer;
-
-      &:hover {
-        background: #d0d0d0;
-        color: #333;
-      }
-    }
-  }
-}
-
-.outputInfoPanel {
-  flex: 4;
-  min-width: 0;
-}
-
-.appOutputPanel {
-  flex: 1;
-  min-width: 0;
 }
 
 .appHeader {
@@ -166,16 +116,6 @@
   }
 }
 
-.jsonBlock {
-  flex-grow: 1;
-  min-height: 0;
-  margin: 0;
-  padding: 1rem;
-  border-radius: 4px;
-  background-color: #f5f5f5;
-  overflow: auto;
-}
-
 .appIframePanel {
   min-height: 200px;
 
@@ -185,6 +125,62 @@
     box-sizing: border-box;
     border: 3px dashed #888;
     border-radius: 4px;
+  }
+
+  &.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    margin: 0;
+    padding: 1rem;
+    max-width: none;
+    background: white;
+    border: none;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+
+    /* Hide collapsible panels in fullscreen */
+    .collapsiblePanel {
+      display: none;
+    }
+
+    iframe {
+      flex: 1;
+      height: 100%;
+      border: none;
+      border-radius: 0;
+    }
+  }
+}
+
+.appToolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+
+  .collapsiblePanel {
+    flex: 1;
+    margin: 0;
+  }
+}
+
+.fullscreenButton {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f5f5f5;
+  font-size: 1.25rem;
+  cursor: pointer;
+
+  &:hover {
+    background: #e0e0e0;
   }
 }
 

@@ -1,5 +1,5 @@
-import type { Customer, SegmentSummary, SegmentName } from "./types.ts";
-import { SEGMENT_COLORS, SEGMENTS } from "./types.ts";
+import type { Customer, SegmentSummary, SegmentName } from "./types.js";
+import { SEGMENT_COLORS, SEGMENTS } from "./types.js";
 
 // Company name generation
 const PREFIXES = [
