@@ -463,7 +463,7 @@ If the Host is a web page, it MUST wrap the Guest UI and communicate with it thr
 
 1. The Host and the Sandbox MUST have different origins.
 2. The Sandbox MUST have the following permissions: `allow-scripts`, `allow-same-origin`.
-3. The Sandbox MUST send a `ui/notifications/sandbox-proxy-ready` notification to the host when it's ready to process an `ui/notifications/sandbox-resource-ready` notification.
+3. The Sandbox MUST send a `ui/notifications/sandbox-proxy-ready` notification to the host when it's ready to process a `ui/notifications/sandbox-resource-ready` notification.
 4. Once the Sandbox is ready, the Host MUST send the raw HTML resource to load in a `ui/notifications/sandbox-resource-ready` notification.
 5. The Sandbox MUST load the raw HTML of the Guest UI with CSP settings that:
    - Enforce the domains declared in `ui.csp` metadata
@@ -499,7 +499,7 @@ UI iframes can use the following subset of standard MCP protocol messages:
 
 ### Host Context in `McpUiInitializeResult`
 
-When the Guest UI sends an `ui/initialize` request to the Host, the Host SHOULD include UI-specific context in the `McpUiInitializeResult`'s `hostContext` field:
+When the Guest UI sends a `ui/initialize` request to the Host, the Host SHOULD include UI-specific context in the `McpUiInitializeResult`'s `hostContext` field:
 
 ```typescript
 interface HostContext {
@@ -1075,19 +1075,19 @@ Guest UI behavior (optional):
 
 Host MUST send this notification when tool execution completes (if UI is displayed during tool execution).
 
-`ui/notifications/tool-cancelled` - Tool execution was cancelled
+`ui/notifications/tool-canceled` - Tool execution was canceled
 
 ```typescript
 {
   jsonrpc: "2.0",
-  method: "ui/notifications/tool-cancelled",
+  method: "ui/notifications/tool-canceled",
   params: {
     reason: string
   }
 }
 ```
 
-Host MUST send this notification if the tool execution was cancelled, for any reason (which can optionally be specified), including user action, sampling error, classifier intervention, etc.
+Host MUST send this notification if the tool execution was canceled, for any reason (which can optionally be specified), including user action, sampling error, classifier intervention, etc.
 
 `ui/resource-teardown` - Host notifies UI before teardown
 
@@ -1238,8 +1238,8 @@ sequenceDiagram
   end
   alt Tool complete
     H -->> UI: ui/notifications/tool-result
-  else Tool cancelled
-    H -->> UI: ui/notifications/tool-cancelled
+  else Tool canceled
+    H -->> UI: ui/notifications/tool-canceled
   end
 ```
 
