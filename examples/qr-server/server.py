@@ -29,6 +29,86 @@ PORT = int(os.environ.get("PORT", "3108"))
 
 mcp = FastMCP("QR Code Server")
 
+# Embedded widget HTML for self-contained usage (uv run <url> or unbundled)
+EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
+<html>
+<head>
+  <meta name="color-scheme" content="light dark">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 340px;
+      width: 340px;
+    }
+    img {
+      width: 300px;
+      height: 300px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div id="qr"></div>
+  <script type="module">
+    import { App } from "https://unpkg.com/@modelcontextprotocol/ext-apps@0.4.0/app-with-deps";
+
+    const app = new App({ name: "QR Widget", version: "1.0.0" });
+
+    app.ontoolresult = ({ content }) => {
+      const img = content?.find(c => c.type === 'image');
+      if (img) {
+        const qrDiv = document.getElementById('qr');
+        qrDiv.innerHTML = '';
+
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/gif'];
+        const mimeType = allowedTypes.includes(img.mimeType) ? img.mimeType : 'image/png';
+
+        const image = document.createElement('img');
+        image.src = `data:${mimeType};base64,${img.data}`;
+        image.alt = "QR Code";
+        qrDiv.appendChild(image);
+      }
+    };
+
+    function handleHostContextChanged(ctx) {
+      if (ctx.safeAreaInsets) {
+        document.body.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
+        document.body.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
+        document.body.style.paddingBottom = `${ctx.safeAreaInsets.bottom}px`;
+        document.body.style.paddingLeft = `${ctx.safeAreaInsets.left}px`;
+      }
+    }
+
+    app.onhostcontextchanged = handleHostContextChanged;
+
+    await app.connect();
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  </script>
+</body>
+</html>"""
+
+
+def get_widget_html() -> str:
+    """Get the widget HTML, preferring built version from dist/."""
+    # Prefer built version from dist/ (local development with npm run build)
+    dist_path = Path(__file__).parent / "dist" / "mcp-app.html"
+    if dist_path.exists():
+        return dist_path.read_text()
+    # Fallback to embedded widget (for `uv run <url>` or unbundled usage)
+    return EMBEDDED_WIDGET_HTML
+
 
 @mcp.tool(meta={
     "ui":{"resourceUri": WIDGET_URI},
@@ -84,7 +164,7 @@ def generate_qr(
 )
 def widget() -> str:
     """Widget HTML resource with CSP metadata for external dependencies."""
-    return Path(__file__).parent.joinpath("widget.html").read_text()
+    return get_widget_html()
 
 if __name__ == "__main__":
     if "--stdio" in sys.argv:
