@@ -46,6 +46,41 @@
       ],
       "description": "Display mode for UI presentation."
     },
+    "McpUiGetFileUrlRequest": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/get-file-url"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "fileId": {
+              "type": "string",
+              "description": "The file ID from a previous upload"
+            }
+          },
+          "required": ["fileId"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiGetFileUrlResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Temporary download URL for the file"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": {}
+    },
     "McpUiHostCapabilities": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5349,6 +5384,70 @@
       ],
       "description": "Tool visibility scope - who can access the tool."
     },
+    "McpUiUpdateModelContextNotification": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/notifications/update-model-context"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "modelContent": {
+              "anyOf": [
+                {
+                  "description": "Text or JSON the model should see for follow-up reasoning.\nKeep focused and under 4k tokens.",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "privateContent": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "description": "UI-only state the model should NOT see.\nUse for ephemeral UI details like current view, filters, selections."
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "UI-only state the model should NOT see.\nUse for ephemeral UI details like current view, filters, selections."
+            },
+            "imageIds": {
+              "description": "File IDs for images the model should reason about.\nUse file IDs from uploadFile() or received as file params.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
     "McpUiUpdateModelContextRequest": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5688,6 +5787,78 @@
               }
             }
           },
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiUploadFileRequest": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/upload-file"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "File name with extension"
+            },
+            "mimeType": {
+              "type": "string",
+              "description": "MIME type of the file"
+            },
+            "data": {
+              "type": "string",
+              "description": "Base64-encoded file data"
+            }
+          },
+          "required": ["name", "mimeType", "data"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiUploadFileResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string",
+          "description": "The file ID to use in imageIds for model context"
+        }
+      },
+      "required": ["fileId"],
+      "additionalProperties": {}
+    },
+    "McpUiWidgetStateNotification": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/notifications/widget-state"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "description": "The persisted widget state from previous interaction."
+              },
+              "description": "The persisted widget state from previous interaction."
+            }
+          },
+          "required": ["state"],
           "additionalProperties": false
         }
       },

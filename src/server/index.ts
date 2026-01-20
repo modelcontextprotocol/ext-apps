@@ -5,6 +5,26 @@
  * your tool should render an {@link app!App} in the client. They handle UI metadata normalization
  * and provide sensible defaults for the MCP Apps MIME type ({@link RESOURCE_MIME_TYPE}).
  *
+ * These utilities register tools and resources that work with both
+ * MCP-compatible hosts and OpenAI's ChatGPT Apps SDK.
+ *
+ * ## Cross-Platform Support
+ *
+ * | Feature | MCP Apps | OpenAI Apps SDK |
+ * |---------|----------|-----------------|
+ * | Tool metadata | `_meta.ui.resourceUri` | `_meta["openai/outputTemplate"]` |
+ * | Resource MIME | `text/html;profile=mcp-app` | `text/html+skybridge` |
+ *
+ * These utilities register tools and resources that work with both
+ * MCP-compatible hosts and OpenAI's ChatGPT Apps SDK.
+ *
+ * ## Cross-Platform Support
+ *
+ * | Feature | MCP Apps | OpenAI Apps SDK |
+ * |---------|----------|-----------------|
+ * | Tool metadata | `_meta.ui.resourceUri` | `_meta["openai/outputTemplate"]` |
+ * | Resource MIME | `text/html;profile=mcp-app` | `text/html+skybridge` |
+ *
  * @module server-helpers
  *
  * @example
@@ -47,6 +67,17 @@ export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
 export type { ResourceMetadata, ToolCallback, ReadResourceCallback };
 
 /**
+ * OpenAI skybridge URI suffix.
+ * Appended to resource URIs for OpenAI-specific resource registration.
+ */
+export const OPENAI_RESOURCE_SUFFIX = "+skybridge";
+
+/**
+ * OpenAI skybridge MIME type.
+ */
+export const OPENAI_MIME_TYPE = "text/html+skybridge";
+
+/**
  * Base tool configuration matching the standard MCP server tool options.
  * Extended by {@link McpUiAppToolConfig} to add UI metadata requirements.
  */
@@ -79,7 +110,7 @@ export interface McpUiAppToolConfig extends ToolConfig {
     | {
         /**
          * URI of the UI resource to display for this tool.
-         * This is converted to `_meta["ui/resourceUri"]`.
+         * This is converted to `_meta.ui.resourceUri`.
          *
          * @example "ui://weather/widget.html"
          *
@@ -208,15 +239,31 @@ export function registerAppTool<
     normalizedMeta = { ...meta, ui: { ...uiMeta, resourceUri: legacyUri } };
   }
 
+  // Get the resource URI after normalization
+  const resourceUri = (normalizedMeta.ui as McpUiToolMeta | undefined)
+    ?.resourceUri;
+
+  // Add OpenAI outputTemplate metadata for cross-platform compatibility
+  if (resourceUri) {
+    normalizedMeta = {
+      ...normalizedMeta,
+      "openai/outputTemplate": resourceUri + OPENAI_RESOURCE_SUFFIX,
+    };
+  }
+
   return server.registerTool(name, { ...config, _meta: normalizedMeta }, cb);
 }
 
 /**
- * Register an app resource with the MCP server.
+ * Register an app resource with dual MCP/OpenAI support.
  *
  * This is a convenience wrapper around `server.registerResource` that:
  * - Defaults the MIME type to {@link RESOURCE_MIME_TYPE} (`"text/html;profile=mcp-app"`)
- * - Provides a cleaner API matching the SDK's callback signature
+ * - Registers both MCP and OpenAI variants for cross-platform compatibility
+ *
+ * Registers two resources:
+ * 1. MCP resource at the base URI with `text/html;profile=mcp-app` MIME type
+ * 2. OpenAI resource at URI+skybridge with `text/html+skybridge` MIME type
  *
  * @param server - The MCP server instance
  * @param name - Human-readable resource name
@@ -270,6 +317,9 @@ export function registerAppResource(
   config: McpUiAppResourceConfig,
   readCallback: ReadResourceCallback,
 ): void {
+  const openaiUri = uri + OPENAI_RESOURCE_SUFFIX;
+
+  // Register MCP resource (text/html;profile=mcp-app)
   server.registerResource(
     name,
     uri,
@@ -279,5 +329,31 @@ export function registerAppResource(
       ...config,
     },
     readCallback,
+  );
+
+  // Register OpenAI resource (text/html+skybridge)
+  // Re-uses the same callback but returns with OpenAI MIME type
+  server.registerResource(
+    name + " (OpenAI)",
+    openaiUri,
+    {
+      ...config,
+      // Force OpenAI MIME type
+      mimeType: OPENAI_MIME_TYPE,
+    },
+    async (resourceUri, extra) => {
+      const result = await readCallback(resourceUri, extra);
+      // Transform contents to use OpenAI MIME type
+      return {
+        contents: result.contents.map((content) => ({
+          ...content,
+          uri: content.uri + OPENAI_RESOURCE_SUFFIX,
+          mimeType:
+            content.mimeType === RESOURCE_MIME_TYPE
+              ? OPENAI_MIME_TYPE
+              : content.mimeType,
+        })),
+      };
+    },
   );
 }

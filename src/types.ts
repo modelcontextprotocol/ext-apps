@@ -61,6 +61,12 @@ export {
   type McpUiRequestDisplayModeResult,
   type McpUiToolVisibility,
   type McpUiToolMeta,
+  type McpUiWidgetStateNotification,
+  type McpUiUpdateModelContextNotification,
+  type McpUiUploadFileRequest,
+  type McpUiUploadFileResult,
+  type McpUiGetFileUrlRequest,
+  type McpUiGetFileUrlResult,
 } from "./spec.types.js";
 
 // Import types needed for protocol type unions (not re-exported, just used internally)
@@ -76,6 +82,8 @@ import type {
   McpUiToolInputPartialNotification,
   McpUiToolResultNotification,
   McpUiToolCancelledNotification,
+  McpUiWidgetStateNotification,
+  McpUiUpdateModelContextNotification,
   McpUiSandboxResourceReadyNotification,
   McpUiInitializedNotification,
   McpUiSizeChangedNotification,
@@ -85,6 +93,10 @@ import type {
   McpUiMessageResult,
   McpUiResourceTeardownResult,
   McpUiRequestDisplayModeResult,
+  McpUiUploadFileRequest,
+  McpUiUploadFileResult,
+  McpUiGetFileUrlRequest,
+  McpUiGetFileUrlResult,
 } from "./spec.types.js";
 
 // Re-export all schemas from generated/schema.ts (already PascalCase)
@@ -122,6 +134,12 @@ export {
   McpUiRequestDisplayModeResultSchema,
   McpUiToolVisibilitySchema,
   McpUiToolMetaSchema,
+  McpUiWidgetStateNotificationSchema,
+  McpUiUpdateModelContextNotificationSchema,
+  McpUiUploadFileRequestSchema,
+  McpUiUploadFileResultSchema,
+  McpUiGetFileUrlRequestSchema,
+  McpUiGetFileUrlResultSchema,
 } from "./generated/schema.js";
 
 // Re-export SDK types used in protocol type unions
@@ -162,6 +180,8 @@ export type AppRequest =
   | McpUiUpdateModelContextRequest
   | McpUiResourceTeardownRequest
   | McpUiRequestDisplayModeRequest
+  | McpUiUploadFileRequest
+  | McpUiGetFileUrlRequest
   | CallToolRequest
   | ListToolsRequest
   | ListResourcesRequest
@@ -190,6 +210,7 @@ export type AppNotification =
   | McpUiToolInputPartialNotification
   | McpUiToolResultNotification
   | McpUiToolCancelledNotification
+  | McpUiWidgetStateNotification
   | McpUiSandboxResourceReadyNotification
   | ToolListChangedNotification
   | ResourceListChangedNotification
@@ -198,6 +219,7 @@ export type AppNotification =
   | McpUiInitializedNotification
   | McpUiSizeChangedNotification
   | McpUiSandboxProxyReadyNotification
+  | McpUiUpdateModelContextNotification
   | LoggingMessageNotification;
 
 /**
@@ -209,6 +231,8 @@ export type AppResult =
   | McpUiMessageResult
   | McpUiResourceTeardownResult
   | McpUiRequestDisplayModeResult
+  | McpUiUploadFileResult
+  | McpUiGetFileUrlResult
   | CallToolResult
   | ListToolsResult
   | ListResourcesResult

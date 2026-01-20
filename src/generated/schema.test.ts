@@ -67,6 +67,14 @@ export type McpUiToolCancelledNotificationSchemaInferredType = z.infer<
   typeof generated.McpUiToolCancelledNotificationSchema
 >;
 
+export type McpUiWidgetStateNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiWidgetStateNotificationSchema
+>;
+
+export type McpUiUpdateModelContextNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiUpdateModelContextNotificationSchema
+>;
+
 export type McpUiHostCssSchemaInferredType = z.infer<
   typeof generated.McpUiHostCssSchema
 >;
@@ -117,6 +125,22 @@ export type McpUiToolVisibilitySchemaInferredType = z.infer<
 
 export type McpUiToolMetaSchemaInferredType = z.infer<
   typeof generated.McpUiToolMetaSchema
+>;
+
+export type McpUiUploadFileRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiUploadFileRequestSchema
+>;
+
+export type McpUiUploadFileResultSchemaInferredType = z.infer<
+  typeof generated.McpUiUploadFileResultSchema
+>;
+
+export type McpUiGetFileUrlRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiGetFileUrlRequestSchema
+>;
+
+export type McpUiGetFileUrlResultSchemaInferredType = z.infer<
+  typeof generated.McpUiGetFileUrlResultSchema
 >;
 
 export type McpUiMessageRequestSchemaInferredType = z.infer<
@@ -215,6 +239,18 @@ expectType<spec.McpUiToolCancelledNotification>(
 expectType<McpUiToolCancelledNotificationSchemaInferredType>(
   {} as spec.McpUiToolCancelledNotification,
 );
+expectType<spec.McpUiWidgetStateNotification>(
+  {} as McpUiWidgetStateNotificationSchemaInferredType,
+);
+expectType<McpUiWidgetStateNotificationSchemaInferredType>(
+  {} as spec.McpUiWidgetStateNotification,
+);
+expectType<spec.McpUiUpdateModelContextNotification>(
+  {} as McpUiUpdateModelContextNotificationSchemaInferredType,
+);
+expectType<McpUiUpdateModelContextNotificationSchemaInferredType>(
+  {} as spec.McpUiUpdateModelContextNotification,
+);
 expectType<spec.McpUiHostCss>({} as McpUiHostCssSchemaInferredType);
 expectType<McpUiHostCssSchemaInferredType>({} as spec.McpUiHostCss);
 expectType<spec.McpUiHostStyles>({} as McpUiHostStylesSchemaInferredType);
@@ -277,6 +313,30 @@ expectType<McpUiToolVisibilitySchemaInferredType>(
 );
 expectType<spec.McpUiToolMeta>({} as McpUiToolMetaSchemaInferredType);
 expectType<McpUiToolMetaSchemaInferredType>({} as spec.McpUiToolMeta);
+expectType<spec.McpUiUploadFileRequest>(
+  {} as McpUiUploadFileRequestSchemaInferredType,
+);
+expectType<McpUiUploadFileRequestSchemaInferredType>(
+  {} as spec.McpUiUploadFileRequest,
+);
+expectType<spec.McpUiUploadFileResult>(
+  {} as McpUiUploadFileResultSchemaInferredType,
+);
+expectType<McpUiUploadFileResultSchemaInferredType>(
+  {} as spec.McpUiUploadFileResult,
+);
+expectType<spec.McpUiGetFileUrlRequest>(
+  {} as McpUiGetFileUrlRequestSchemaInferredType,
+);
+expectType<McpUiGetFileUrlRequestSchemaInferredType>(
+  {} as spec.McpUiGetFileUrlRequest,
+);
+expectType<spec.McpUiGetFileUrlResult>(
+  {} as McpUiGetFileUrlResultSchemaInferredType,
+);
+expectType<McpUiGetFileUrlResultSchemaInferredType>(
+  {} as spec.McpUiGetFileUrlResult,
+);
 expectType<spec.McpUiMessageRequest>(
   {} as McpUiMessageRequestSchemaInferredType,
 );

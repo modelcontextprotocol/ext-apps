@@ -704,6 +704,41 @@ const PREFERRED_INLINE_HEIGHT = 400;
 // Current display mode
 let currentDisplayMode: "inline" | "fullscreen" | "pip" = "inline";
 
+// Default button offset from edge (matches CSS)
+const BUTTON_EDGE_OFFSET = 10;
+
+/**
+ * Safe area insets from host context.
+ * Used to offset fixed UI elements on mobile devices with notches/etc.
+ */
+interface SafeAreaInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+/**
+ * Update fixed UI element positions based on safe area insets.
+ * This keeps the map full-bleed while ensuring controls aren't obscured
+ * by device notches, status bars, or navigation bars.
+ */
+function applySafeAreaInsets(insets?: SafeAreaInsets): void {
+  const btn = document.getElementById("fullscreen-btn");
+  if (btn) {
+    // Offset button from top-right corner, accounting for safe area
+    btn.style.top = `${BUTTON_EDGE_OFFSET + (insets?.top ?? 0)}px`;
+    btn.style.right = `${BUTTON_EDGE_OFFSET + (insets?.right ?? 0)}px`;
+  }
+
+  // Also adjust loading indicator if visible
+  const loadingEl = document.getElementById("loading");
+  if (loadingEl && insets) {
+    // Center with safe area awareness (only affects vertical position)
+    loadingEl.style.top = `calc(50% + ${(insets.top - insets.bottom) / 2}px)`;
+  }
+}
+
 // Create App instance with tool capabilities
 // autoResize: false - we manually send size since map fills its container
 const app = new App(
@@ -814,7 +849,7 @@ app.onteardown = async () => {
 
 app.onerror = log.error;
 
-// Listen for host context changes (display mode, theme, etc.)
+// Listen for host context changes (display mode, theme, safe area, etc.)
 app.onhostcontextchanged = (params) => {
   log.info("Host context changed:", params);
 
@@ -827,6 +862,11 @@ app.onhostcontextchanged = (params) => {
   // Update button if available modes changed
   if (params.availableDisplayModes) {
     updateFullscreenButton();
+  }
+
+  // Update UI element positions if safe area insets changed
+  if (params.safeAreaInsets) {
+    applySafeAreaInsets(params.safeAreaInsets);
   }
 };
 
@@ -971,7 +1011,7 @@ async function initialize() {
     await app.connect();
     log.info("Connected to host");
 
-    // Get initial display mode from host context
+    // Get initial context from host
     const context = app.getHostContext();
     if (context?.displayMode) {
       currentDisplayMode = context.displayMode as
@@ -980,6 +1020,12 @@ async function initialize() {
         | "pip";
     }
     log.info("Initial display mode:", currentDisplayMode);
+
+    // Apply initial safe area insets for mobile devices
+    if (context?.safeAreaInsets) {
+      applySafeAreaInsets(context.safeAreaInsets);
+      log.info("Applied safe area insets:", context.safeAreaInsets);
+    }
 
     // Tell host our preferred size for inline mode
     if (currentDisplayMode === "inline") {

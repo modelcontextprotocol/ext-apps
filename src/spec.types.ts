@@ -284,6 +284,56 @@ export interface McpUiToolCancelledNotification {
 }
 
 /**
+ * @description Notification containing persisted widget state (Host -> Guest UI).
+ *
+ * This notification delivers previously persisted UI state on widget load.
+ * In OpenAI mode, this comes from window.openai.widgetState. Apps use this
+ * to hydrate their UI state from previous sessions.
+ *
+ * The state can be either a simple object or a StructuredWidgetState with
+ * separate modelContent/privateContent/imageIds fields.
+ */
+export interface McpUiWidgetStateNotification {
+  method: "ui/notifications/widget-state";
+  params: {
+    /** @description The persisted widget state from previous interaction. */
+    state: Record<string, unknown>;
+  };
+}
+
+/**
+ * @description Notification to update model context and persist widget state (Guest UI -> Host).
+ *
+ * This notification allows apps to update what the model sees for follow-up turns
+ * and persist UI state. In OpenAI mode, this calls window.openai.setWidgetState().
+ *
+ * Use the structured format with modelContent/privateContent/imageIds for fine-grained
+ * control over what the model sees vs. what stays private to the UI.
+ */
+export interface McpUiUpdateModelContextNotification {
+  method: "ui/notifications/update-model-context";
+  params: {
+    /**
+     * @description Text or JSON the model should see for follow-up reasoning.
+     * Keep focused and under 4k tokens.
+     */
+    modelContent?: string | Record<string, unknown> | null;
+
+    /**
+     * @description UI-only state the model should NOT see.
+     * Use for ephemeral UI details like current view, filters, selections.
+     */
+    privateContent?: Record<string, unknown> | null;
+
+    /**
+     * @description File IDs for images the model should reason about.
+     * Use file IDs from uploadFile() or received as file params.
+     */
+    imageIds?: string[];
+  };
+}
+
+/**
  * @description CSS blocks that can be injected by apps.
  */
 export interface McpUiHostCss {
@@ -628,6 +678,65 @@ export interface McpUiToolMeta {
    * - "app": Tool callable by the app from this server only
    */
   visibility?: McpUiToolVisibility[];
+}
+
+/**
+ * @description Request to upload a file for use in model context.
+ *
+ * This allows apps to upload images and other files that can be referenced
+ * in model context via imageIds in updateModelContext.
+ *
+ * @see {@link app.App.uploadFile} for the method that sends this request
+ */
+export interface McpUiUploadFileRequest {
+  method: "ui/upload-file";
+  params: {
+    /** @description File name with extension */
+    name: string;
+    /** @description MIME type of the file */
+    mimeType: string;
+    /** @description Base64-encoded file data */
+    data: string;
+  };
+}
+
+/**
+ * @description Result from uploading a file.
+ * @see {@link McpUiUploadFileRequest}
+ */
+export interface McpUiUploadFileResult {
+  /** @description The file ID to use in imageIds for model context */
+  fileId: string;
+  /**
+   * Index signature required for MCP SDK `Protocol` class compatibility.
+   */
+  [key: string]: unknown;
+}
+
+/**
+ * @description Request to get a download URL for a previously uploaded file.
+ *
+ * @see {@link app.App.getFileDownloadUrl} for the method that sends this request
+ */
+export interface McpUiGetFileUrlRequest {
+  method: "ui/get-file-url";
+  params: {
+    /** @description The file ID from a previous upload */
+    fileId: string;
+  };
+}
+
+/**
+ * @description Result from getting a file download URL.
+ * @see {@link McpUiGetFileUrlRequest}
+ */
+export interface McpUiGetFileUrlResult {
+  /** @description Temporary download URL for the file */
+  url: string;
+  /**
+   * Index signature required for MCP SDK `Protocol` class compatibility.
+   */
+  [key: string]: unknown;
 }
 
 /**

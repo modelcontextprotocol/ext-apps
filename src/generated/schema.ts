@@ -316,6 +316,85 @@ export const McpUiToolCancelledNotificationSchema = z.object({
 });
 
 /**
+ * @description Notification containing persisted widget state (Host -> Guest UI).
+ *
+ * This notification delivers previously persisted UI state on widget load.
+ * In OpenAI mode, this comes from window.openai.widgetState. Apps use this
+ * to hydrate their UI state from previous sessions.
+ *
+ * The state can be either a simple object or a StructuredWidgetState with
+ * separate modelContent/privateContent/imageIds fields.
+ */
+export const McpUiWidgetStateNotificationSchema = z.object({
+  method: z.literal("ui/notifications/widget-state"),
+  params: z.object({
+    /** @description The persisted widget state from previous interaction. */
+    state: z
+      .record(
+        z.string(),
+        z
+          .unknown()
+          .describe("The persisted widget state from previous interaction."),
+      )
+      .describe("The persisted widget state from previous interaction."),
+  }),
+});
+
+/**
+ * @description Notification to update model context and persist widget state (Guest UI -> Host).
+ *
+ * This notification allows apps to update what the model sees for follow-up turns
+ * and persist UI state. In OpenAI mode, this calls window.openai.setWidgetState().
+ *
+ * Use the structured format with modelContent/privateContent/imageIds for fine-grained
+ * control over what the model sees vs. what stays private to the UI.
+ */
+export const McpUiUpdateModelContextNotificationSchema = z.object({
+  method: z.literal("ui/notifications/update-model-context"),
+  params: z.object({
+    /**
+     * @description Text or JSON the model should see for follow-up reasoning.
+     * Keep focused and under 4k tokens.
+     */
+    modelContent: z
+      .union([z.string(), z.record(z.string(), z.unknown())])
+      .optional()
+      .describe(
+        "Text or JSON the model should see for follow-up reasoning.\nKeep focused and under 4k tokens.",
+      )
+      .nullable(),
+    /**
+     * @description UI-only state the model should NOT see.
+     * Use for ephemeral UI details like current view, filters, selections.
+     */
+    privateContent: z
+      .record(
+        z.string(),
+        z
+          .unknown()
+          .describe(
+            "UI-only state the model should NOT see.\nUse for ephemeral UI details like current view, filters, selections.",
+          ),
+      )
+      .optional()
+      .nullable()
+      .describe(
+        "UI-only state the model should NOT see.\nUse for ephemeral UI details like current view, filters, selections.",
+      ),
+    /**
+     * @description File IDs for images the model should reason about.
+     * Use file IDs from uploadFile() or received as file params.
+     */
+    imageIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "File IDs for images the model should reason about.\nUse file IDs from uploadFile() or received as file params.",
+      ),
+  }),
+});
+
+/**
  * @description CSS blocks that can be injected by apps.
  */
 export const McpUiHostCssSchema = z.object({
@@ -564,6 +643,63 @@ export const McpUiToolMetaSchema = z.object({
       'Who can access this tool. Default: ["model", "app"]\n- "model": Tool visible to and callable by the agent\n- "app": Tool callable by the app from this server only',
     ),
 });
+
+/**
+ * @description Request to upload a file for use in model context.
+ *
+ * This allows apps to upload images and other files that can be referenced
+ * in model context via imageIds in updateModelContext.
+ *
+ * @see {@link app.App.uploadFile} for the method that sends this request
+ */
+export const McpUiUploadFileRequestSchema = z.object({
+  method: z.literal("ui/upload-file"),
+  params: z.object({
+    /** @description File name with extension */
+    name: z.string().describe("File name with extension"),
+    /** @description MIME type of the file */
+    mimeType: z.string().describe("MIME type of the file"),
+    /** @description Base64-encoded file data */
+    data: z.string().describe("Base64-encoded file data"),
+  }),
+});
+
+/**
+ * @description Result from uploading a file.
+ * @see {@link McpUiUploadFileRequest}
+ */
+export const McpUiUploadFileResultSchema = z
+  .object({
+    /** @description The file ID to use in imageIds for model context */
+    fileId: z
+      .string()
+      .describe("The file ID to use in imageIds for model context"),
+  })
+  .passthrough();
+
+/**
+ * @description Request to get a download URL for a previously uploaded file.
+ *
+ * @see {@link app.App.getFileDownloadUrl} for the method that sends this request
+ */
+export const McpUiGetFileUrlRequestSchema = z.object({
+  method: z.literal("ui/get-file-url"),
+  params: z.object({
+    /** @description The file ID from a previous upload */
+    fileId: z.string().describe("The file ID from a previous upload"),
+  }),
+});
+
+/**
+ * @description Result from getting a file download URL.
+ * @see {@link McpUiGetFileUrlRequest}
+ */
+export const McpUiGetFileUrlResultSchema = z
+  .object({
+    /** @description Temporary download URL for the file */
+    url: z.string().describe("Temporary download URL for the file"),
+  })
+  .passthrough();
 
 /**
  * @description Request to send a message to the host's chat interface.

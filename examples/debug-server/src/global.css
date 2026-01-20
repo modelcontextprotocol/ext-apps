@@ -1,0 +1,33 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  margin: 0;
+  padding: 0;
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", Monaco, "Cascadia Code", Consolas, monospace;
+  font-size: 0.9em;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  code {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+button {
+  cursor: pointer;
+}
+
+input, select, button {
+  font-family: inherit;
+  font-size: inherit;
+}

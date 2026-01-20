@@ -4,6 +4,8 @@ import {
   registerAppResource,
   RESOURCE_URI_META_KEY,
   RESOURCE_MIME_TYPE,
+  OPENAI_RESOURCE_SUFFIX,
+  OPENAI_MIME_TYPE,
 } from "./index";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
@@ -51,6 +53,34 @@ describe("registerAppTool", () => {
       ],
     ).toBe("ui://test/widget.html");
     expect(capturedHandler).toBe(handler);
+  });
+
+  it("should add openai/outputTemplate metadata for cross-platform compatibility", () => {
+    let capturedConfig: Record<string, unknown> | undefined;
+
+    const mockServer = {
+      registerTool: mock(
+        (_name: string, config: Record<string, unknown>, _handler: unknown) => {
+          capturedConfig = config;
+        },
+      ),
+    };
+
+    registerAppTool(
+      mockServer as unknown as Pick<McpServer, "registerTool">,
+      "my-tool",
+      {
+        _meta: {
+          [RESOURCE_URI_META_KEY]: "ui://test/widget.html",
+        },
+      },
+      async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
+    );
+
+    const meta = capturedConfig?._meta as Record<string, unknown>;
+    expect(meta["openai/outputTemplate"]).toBe(
+      "ui://test/widget.html" + OPENAI_RESOURCE_SUFFIX,
+    );
   });
 
   describe("backward compatibility", () => {
@@ -196,18 +226,18 @@ describe("registerAppTool", () => {
 });
 
 describe("registerAppResource", () => {
-  it("should register a resource with default MIME type", () => {
-    let capturedName: string | undefined;
-    let capturedUri: string | undefined;
-    let capturedConfig: Record<string, unknown> | undefined;
+  it("should register both MCP and OpenAI resources", () => {
+    const registrations: Array<{
+      name: string;
+      uri: string;
+      config: Record<string, unknown>;
+    }> = [];
 
     const mockServer = {
       registerTool: mock(() => {}),
       registerResource: mock(
         (name: string, uri: string, config: Record<string, unknown>) => {
-          capturedName = name;
-          capturedUri = uri;
-          capturedConfig = config;
+          registrations.push({ name, uri, config });
         },
       ),
     };
@@ -233,21 +263,32 @@ describe("registerAppResource", () => {
       callback,
     );
 
-    expect(mockServer.registerResource).toHaveBeenCalledTimes(1);
-    expect(capturedName).toBe("My Resource");
-    expect(capturedUri).toBe("ui://test/widget.html");
-    expect(capturedConfig?.mimeType).toBe(RESOURCE_MIME_TYPE);
-    expect(capturedConfig?.description).toBe("A test resource");
+    // Should register TWO resources (MCP + OpenAI)
+    expect(mockServer.registerResource).toHaveBeenCalledTimes(2);
+
+    // First: MCP resource
+    expect(registrations[0].name).toBe("My Resource");
+    expect(registrations[0].uri).toBe("ui://test/widget.html");
+    expect(registrations[0].config.mimeType).toBe(RESOURCE_MIME_TYPE);
+    expect(registrations[0].config.description).toBe("A test resource");
+
+    // Second: OpenAI resource
+    expect(registrations[1].name).toBe("My Resource (OpenAI)");
+    expect(registrations[1].uri).toBe(
+      "ui://test/widget.html" + OPENAI_RESOURCE_SUFFIX,
+    );
+    expect(registrations[1].config.mimeType).toBe(OPENAI_MIME_TYPE);
+    expect(registrations[1].config.description).toBe("A test resource");
   });
 
-  it("should allow custom MIME type to override default", () => {
-    let capturedConfig: Record<string, unknown> | undefined;
+  it("should allow custom MIME type to override default for MCP resource", () => {
+    const registrations: Array<{ config: Record<string, unknown> }> = [];
 
     const mockServer = {
       registerTool: mock(() => {}),
       registerResource: mock(
         (_name: string, _uri: string, config: Record<string, unknown>) => {
-          capturedConfig = config;
+          registrations.push({ config });
         },
       ),
     };
@@ -271,12 +312,16 @@ describe("registerAppResource", () => {
       }),
     );
 
-    // Custom mimeType should override the default
-    expect(capturedConfig?.mimeType).toBe("text/html");
+    // MCP resource should use custom mimeType
+    expect(registrations[0].config.mimeType).toBe("text/html");
+    // OpenAI resource should always use skybridge MIME type
+    expect(registrations[1].config.mimeType).toBe(OPENAI_MIME_TYPE);
   });
 
-  it("should call the callback when handler is invoked", async () => {
-    let capturedHandler: (() => Promise<unknown>) | undefined;
+  it("should transform OpenAI resource callback to use skybridge MIME type", async () => {
+    let mcpHandler: (() => Promise<unknown>) | undefined;
+    let openaiHandler: (() => Promise<unknown>) | undefined;
+    let callCount = 0;
 
     const mockServer = {
       registerTool: mock(() => {}),
@@ -287,12 +332,17 @@ describe("registerAppResource", () => {
           _config: unknown,
           handler: () => Promise<unknown>,
         ) => {
-          capturedHandler = handler;
+          if (callCount === 0) {
+            mcpHandler = handler;
+          } else {
+            openaiHandler = handler;
+          }
+          callCount++;
         },
       ),
     };
 
-    const expectedResult = {
+    const callback = mock(async () => ({
       contents: [
         {
           uri: "ui://test/widget.html",
@@ -300,8 +350,7 @@ describe("registerAppResource", () => {
           text: "<html>content</html>",
         },
       ],
-    };
-    const callback = mock(async () => expectedResult);
+    }));
 
     registerAppResource(
       mockServer as unknown as Pick<McpServer, "registerResource">,
@@ -311,10 +360,70 @@ describe("registerAppResource", () => {
       callback,
     );
 
-    expect(capturedHandler).toBeDefined();
-    const result = await capturedHandler!();
+    // MCP handler should return original content
+    const mcpResult = (await mcpHandler!()) as {
+      contents: Array<{ uri: string; mimeType: string }>;
+    };
+    expect(mcpResult.contents[0].mimeType).toBe(RESOURCE_MIME_TYPE);
 
-    expect(callback).toHaveBeenCalledTimes(1);
-    expect(result).toEqual(expectedResult);
+    // OpenAI handler should return with skybridge MIME type
+    const openaiResult = (await openaiHandler!()) as {
+      contents: Array<{ uri: string; mimeType: string }>;
+    };
+    expect(openaiResult.contents[0].uri).toBe(
+      "ui://test/widget.html" + OPENAI_RESOURCE_SUFFIX,
+    );
+    expect(openaiResult.contents[0].mimeType).toBe(OPENAI_MIME_TYPE);
+  });
+
+  it("should preserve custom MIME types in OpenAI resource callback", async () => {
+    let openaiHandler: (() => Promise<unknown>) | undefined;
+    let callCount = 0;
+
+    const mockServer = {
+      registerTool: mock(() => {}),
+      registerResource: mock(
+        (
+          _name: string,
+          _uri: string,
+          _config: unknown,
+          handler: () => Promise<unknown>,
+        ) => {
+          if (callCount === 1) {
+            openaiHandler = handler;
+          }
+          callCount++;
+        },
+      ),
+    };
+
+    // Callback returns custom MIME type (not the default MCP App type)
+    const callback = mock(async () => ({
+      contents: [
+        {
+          uri: "ui://test/widget.html",
+          mimeType: "application/json",
+          text: "{}",
+        },
+      ],
+    }));
+
+    registerAppResource(
+      mockServer as unknown as Pick<McpServer, "registerResource">,
+      "My Resource",
+      "ui://test/widget.html",
+      { _meta: { ui: {} } },
+      callback,
+    );
+
+    // OpenAI handler should preserve the custom MIME type
+    const openaiResult = (await openaiHandler!()) as {
+      contents: Array<{ uri: string; mimeType: string }>;
+    };
+    expect(openaiResult.contents[0].uri).toBe(
+      "ui://test/widget.html" + OPENAI_RESOURCE_SUFFIX,
+    );
+    // Custom MIME type should be preserved, not converted to skybridge
+    expect(openaiResult.contents[0].mimeType).toBe("application/json");
   });
 });

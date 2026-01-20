@@ -1,15 +1,11 @@
 import { useEffect, useState } from "react";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
 import { Client } from "@modelcontextprotocol/sdk/client";
-import { App, McpUiAppCapabilities, PostMessageTransport } from "../app";
+import { App, McpUiAppCapabilities } from "../app";
 export * from "../app";
 
 /**
  * Options for configuring the {@link useApp} hook.
- *
- * Note: This interface does NOT expose {@link App} options like `autoResize`.
- * The hook creates the `App` with default options (`autoResize: true`). If you
- * need custom `App` options, create the `App` manually instead of using this hook.
  *
  * @see {@link useApp} for the hook that uses these options
  * @see {@link useAutoResize} for manual auto-resize control with custom `App` options
@@ -21,6 +17,18 @@ export interface UseAppOptions {
    * Declares what features this app supports.
    */
   capabilities: McpUiAppCapabilities;
+  /**
+   * Enable experimental OpenAI compatibility.
+   *
+   * When enabled (default), the App will auto-detect the environment:
+   * - If `window.openai` exists → use OpenAI Apps SDK
+   * - Otherwise → use MCP Apps protocol via PostMessageTransport
+   *
+   * Set to `false` to force MCP-only mode.
+   *
+   * @default true
+   */
+  experimentalOAICompatibility?: boolean;
   /**
    * Called after {@link App} is created but before connection.
    *
@@ -61,13 +69,13 @@ export interface AppState {
 /**
  * React hook to create and connect an MCP App.
  *
- * This hook manages {@link App} creation and connection. It automatically
- * creates a {@link PostMessageTransport} to window.parent and handles
- * initialization.
+ * This hook manages the complete lifecycle of an {@link App}: creation, connection,
+ * and cleanup. It automatically detects the platform (MCP or OpenAI) and uses the
+ * appropriate transport.
  *
- * This hook is part of the optional React integration. The core SDK (`App`,
- * `PostMessageTransport`) is framework-agnostic and can be used with any UI
- * framework or vanilla JavaScript.
+ * **Cross-Platform Support**: The hook supports both MCP-compatible hosts and
+ * OpenAI's ChatGPT environment. By default, it auto-detects the platform.
+ * Set `experimentalOAICompatibility: false` to force MCP-only mode.
  *
  * **Important**: The hook intentionally does NOT re-run when options change
  * to avoid reconnection loops. Options are only used during the initial mount.
@@ -75,27 +83,27 @@ export interface AppState {
  * issues during React Strict Mode's double-mount cycle. If you need to
  * explicitly close the `App`, call {@link App.close} manually.
  *
+ * **Note**: This is part of the optional React integration. The core SDK
+ * (App, PostMessageTransport, OpenAITransport) is framework-agnostic and can be
+ * used with any UI framework or vanilla JavaScript.
+ *
  * @param options - Configuration for the app
  * @returns Current connection state and app instance. If connection fails during
  *   initialization, the `error` field will contain the error (typically connection
  *   timeouts, initialization handshake failures, or transport errors).
  *
- * @example Basic usage
+ * @example Basic usage (auto-detects platform)
  * ```typescript
- * import { useApp, McpUiToolInputNotificationSchema } from '@modelcontextprotocol/ext-apps/react';
+ * import { useApp } from '@modelcontextprotocol/ext-apps/react';
  *
  * function MyApp() {
  *   const { app, isConnected, error } = useApp({
  *     appInfo: { name: "MyApp", version: "1.0.0" },
  *     capabilities: {},
  *     onAppCreated: (app) => {
- *       // Register handlers before connection
- *       app.setNotificationHandler(
- *         McpUiToolInputNotificationSchema,
- *         (notification) => {
- *           console.log("Tool input:", notification.params.arguments);
- *         }
- *       );
+ *       app.ontoolinput = (params) => {
+ *         console.log("Tool input:", params.arguments);
+ *       };
  *     },
  *   });
  *
@@ -105,12 +113,22 @@ export interface AppState {
  * }
  * ```
  *
+ * @example Force MCP-only mode
+ * ```typescript
+ * const { app } = useApp({
+ *   appInfo: { name: "MyApp", version: "1.0.0" },
+ *   capabilities: {},
+ *   experimentalOAICompatibility: false,  // Disable OpenAI auto-detection
+ * });
+ * ```
+ *
  * @see {@link App.connect} for the underlying connection method
  * @see {@link useAutoResize} for manual auto-resize control when using custom App options
  */
 export function useApp({
   appInfo,
   capabilities,
+  experimentalOAICompatibility = true,
   onAppCreated,
 }: UseAppOptions): AppState {
   const [app, setApp] = useState<App | null>(null);
@@ -122,16 +140,15 @@ export function useApp({
 
     async function connect() {
       try {
-        const transport = new PostMessageTransport(
-          window.parent,
-          window.parent,
-        );
-        const app = new App(appInfo, capabilities);
+        const app = new App(appInfo, capabilities, {
+          experimentalOAICompatibility,
+          autoResize: true,
+        });
 
         // Register handlers BEFORE connecting
         onAppCreated?.(app);
 
-        await app.connect(transport);
+        await app.connect();
 
         if (mounted) {
           setApp(app);

@@ -215,6 +215,21 @@ describe("App <-> AppBridge integration", () => {
       expect(receivedCancellations[0]).toEqual({});
     });
 
+    it("tool notifications work with default no-op handlers", async () => {
+      // Don't set any custom handlers - use defaults
+      await app.connect(appTransport);
+
+      // These should not throw (default handlers silently accept them)
+      // Just verify they complete without error
+      await bridge.sendToolInput({ arguments: {} });
+      await bridge.sendToolInputPartial({ arguments: {} });
+      await bridge.sendToolResult({ content: [{ type: "text", text: "ok" }] });
+      await bridge.sendToolCancelled({});
+
+      // If we got here without throwing, the test passes
+      expect(true).toBe(true);
+    });
+
     it("setHostContext triggers app.onhostcontextchanged", async () => {
       const receivedContexts: unknown[] = [];
       app.onhostcontextchanged = (params) => {
