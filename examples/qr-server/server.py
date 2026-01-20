@@ -27,7 +27,7 @@ WIDGET_URI = "ui://qr-server/widget.html"
 HOST = os.environ.get("HOST", "0.0.0.0")  # 0.0.0.0 for Docker compatibility
 PORT = int(os.environ.get("PORT", "3108"))
 
-mcp = FastMCP("QR Code Server", port=PORT, stateless_http=True)
+mcp = FastMCP("QR Code Server")
 
 
 @mcp.tool(meta={
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         mcp.run(transport="stdio")
     else:
         # HTTP mode for basic-host (default) - with CORS
-        app = mcp.streamable_http_app()
+        app = mcp.streamable_http_app(stateless_http=True)
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
