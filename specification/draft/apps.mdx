@@ -1460,24 +1460,25 @@ Future versions may add additional settings:
 Servers SHOULD check client (host would-be) capabilities before registering UI-enabled tools:
 
 ```typescript
+import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
+
 const hasUISupport =
   clientCapabilities?.extensions?.["io.modelcontextprotocol/ui"]?.mimeTypes?.includes("text/html;profile=mcp-app");
 
 if (hasUISupport) {
-  // Register tools with UI templates
-  server.registerTool("get_weather", {
+  // Register tools with UI templates using the helper
+  registerAppTool(server, "get_weather", {
     description: "Get weather with interactive dashboard",
     inputSchema: { /* ... */ },
     _meta: {
       ui: { resourceUri: "ui://weather-server/dashboard" }
     }
-  });
+  }, async (args) => { /* ... */ });
 } else {
-  // Register text-only version
+  // Register text-only version (no helper needed)
   server.registerTool("get_weather", {
     description: "Get weather as text",
     inputSchema: { /* ... */ }
-    // No UI metadata
   });
 }
 ```
