@@ -566,6 +566,27 @@ export const McpUiToolMetaSchema = z.object({
 });
 
 /**
+ * @description UI-related metadata for tool results.
+ * Used in CallToolResult._meta.ui to provide rendering hints to the host.
+ */
+export const McpUiToolResultMetaSchema = z.object({
+  /**
+   * @description Unique session identifier for widget consolidation.
+   * When multiple tool results share the same widgetSessionId,
+   * only the latest widget is displayed. Previous widgets are
+   * gracefully torn down via ui/resource-teardown and hidden.
+   *
+   * @example "shopping-cart-session-123"
+   */
+  widgetSessionId: z
+    .string()
+    .optional()
+    .describe(
+      "Unique session identifier for widget consolidation.\nWhen multiple tool results share the same widgetSessionId,\nonly the latest widget is displayed. Previous widgets are\ngracefully torn down via ui/resource-teardown and hidden.",
+    ),
+});
+
+/**
  * @description Request to send a message to the host's chat interface.
  * @see {@link app!App.sendMessage} for the method that sends this request
  */

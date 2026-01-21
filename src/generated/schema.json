@@ -4960,6 +4960,17 @@
       },
       "additionalProperties": false
     },
+    "McpUiToolResultMeta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "widgetSessionId": {
+          "description": "Unique session identifier for widget consolidation.\nWhen multiple tool results share the same widgetSessionId,\nonly the latest widget is displayed. Previous widgets are\ngracefully torn down via ui/resource-teardown and hidden.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "McpUiToolResultNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

@@ -631,6 +631,22 @@ export interface McpUiToolMeta {
 }
 
 /**
+ * @description UI-related metadata for tool results.
+ * Used in CallToolResult._meta.ui to provide rendering hints to the host.
+ */
+export interface McpUiToolResultMeta {
+  /**
+   * @description Unique session identifier for widget consolidation.
+   * When multiple tool results share the same widgetSessionId,
+   * only the latest widget is displayed. Previous widgets are
+   * gracefully torn down via ui/resource-teardown and hidden.
+   *
+   * @example "shopping-cart-session-123"
+   */
+  widgetSessionId?: string;
+}
+
+/**
  * Method string constants for MCP Apps protocol messages.
  *
  * These constants provide a type-safe way to check message methods without

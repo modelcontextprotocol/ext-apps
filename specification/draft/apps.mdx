@@ -1418,6 +1418,44 @@ This pattern enables interactive, self-updating widgets.
 
 Note: Tools with `visibility: ["app"]` are hidden from the agent but remain callable by apps via `tools/call`. This enables UI-only interactions (refresh buttons, form submissions) without exposing implementation details to the model. See the Visibility section under Resource Discovery for details.
 
+### Widget Session Consolidation
+
+When the same logical widget is updated multiple times during a conversation,
+hosts can consolidate these into a single visible widget using `widgetSessionId`:
+
+```typescript
+{
+  content: [{ type: "text", text: "Cart updated" }],
+  structuredContent: { items: [...] },
+  _meta: {
+    ui: {
+      widgetSessionId: "user-cart-abc123"
+    }
+  }
+}
+```
+
+**Host Behavior:**
+
+1. When a tool result with `_meta.ui.widgetSessionId` is rendered
+2. Find any earlier widgets in the conversation with the same `widgetSessionId`
+3. Call `ui/resource-teardown` on superseded widgets (allows graceful cleanup)
+4. Hide superseded widgets from the UI (model context unaffected)
+5. Only the latest widget remains visible
+
+**Use Cases:**
+
+- Shopping cart that updates as items are added/removed
+- Live data dashboards that refresh with new data
+- Multi-step forms that show only the current state
+
+**Implementation Notes:**
+
+- Scope is conversation-wide (widgets persist across turns)
+- Model context remains unaffected (all tool results still visible to model)
+- Teardown allows apps to save state before being hidden
+- Only applies to MCP App widgets (tools with `_meta.ui.resourceUri`)
+
 ### Client\<\>Server Capability Negotiation
 
 Clients and servers negotiate MCP Apps support through the standard MCP extensions capability mechanism (defined in SEP-1724).
