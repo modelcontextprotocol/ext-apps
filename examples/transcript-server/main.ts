@@ -13,8 +13,90 @@ import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import cors from "cors";
-import type { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { createServer } from "./server.js";
+
+/**
+ * Normalize Accept header for lenient MCP compatibility.
+ * The SDK requires 'application/json, text/event-stream' but some clients send '*\/*'.
+ * We must patch rawHeaders because @hono/node-server reads from there, not req.headers.
+ */
+function normalizeAcceptHeader(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  const accept = req.headers.accept;
+  if (!accept || accept === "*/*") {
+    const normalized = "application/json, text/event-stream";
+    req.headers.accept = normalized;
+
+    // Patch rawHeaders for @hono/node-server compatibility
+    const nodeReq = req as unknown as { rawHeaders: string[] };
+    const newRawHeaders: string[] = [];
+    let found = false;
+    for (let i = 0; i < nodeReq.rawHeaders.length; i += 2) {
+      if (nodeReq.rawHeaders[i].toLowerCase() === "accept") {
+        newRawHeaders.push(nodeReq.rawHeaders[i], normalized);
+        found = true;
+      } else {
+        newRawHeaders.push(nodeReq.rawHeaders[i], nodeReq.rawHeaders[i + 1]);
+      }
+    }
+    if (!found) {
+      newRawHeaders.push("Accept", normalized);
+    }
+    Object.defineProperty(nodeReq, "rawHeaders", { value: newRawHeaders });
+  }
+  next();
+}
+
+/**
+ * HTTP logging middleware - logs full request and response details.
+ */
+function httpLogger(req: Request, res: Response, next: NextFunction): void {
+  const startTime = Date.now();
+  const reqId = Math.random().toString(36).slice(2, 8);
+
+  // Log request
+  console.log(`\n[${reqId}] ← ${req.method} ${req.url}`);
+  console.log(`[${reqId}]   Headers:`, JSON.stringify(req.headers, null, 2));
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log(`[${reqId}]   Body:`, JSON.stringify(req.body, null, 2));
+  }
+
+  // Capture response
+  const originalWrite = res.write.bind(res);
+  const originalEnd = res.end.bind(res);
+  const chunks: Buffer[] = [];
+
+  res.write = function (chunk: any, ...args: any[]): boolean {
+    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    return originalWrite(chunk, ...args);
+  };
+
+  res.end = function (chunk?: any, ...args: any[]): Response {
+    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const duration = Date.now() - startTime;
+    const body = Buffer.concat(chunks).toString("utf8");
+
+    console.log(`[${reqId}] → ${res.statusCode} (${duration}ms)`);
+    console.log(
+      `[${reqId}]   Headers:`,
+      JSON.stringify(res.getHeaders(), null, 2),
+    );
+    if (body) {
+      console.log(
+        `[${reqId}]   Body:`,
+        body.length > 2000 ? body.slice(0, 2000) + "..." : body,
+      );
+    }
+
+    return originalEnd(chunk, ...args);
+  };
+
+  next();
+}
 
 export interface ServerOptions {
   port: number;
@@ -32,8 +114,10 @@ export async function startServer(
 
   const app = createMcpExpressApp({ host: "0.0.0.0" });
   app.use(cors());
+  app.use(normalizeAcceptHeader);
+  app.use(httpLogger);
 
-  app.all("/mcp", async (req: Request, res: Response) => {
+  app.post("/mcp", async (req: Request, res: Response) => {
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -57,6 +141,23 @@ export async function startServer(
         });
       }
     }
+  });
+
+  // GET and DELETE not supported in stateless mode
+  app.get("/mcp", (_req: Request, res: Response) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Method not allowed in stateless mode" },
+      id: null,
+    });
+  });
+
+  app.delete("/mcp", (_req: Request, res: Response) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Method not allowed in stateless mode" },
+      id: null,
+    });
   });
 
   const httpServer = app.listen(port, (err) => {

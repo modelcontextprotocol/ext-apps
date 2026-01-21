@@ -9,8 +9,43 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import cors from "cors";
-import type { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { createServer } from "./server.js";
+
+/**
+ * Normalize Accept header for lenient MCP compatibility.
+ * The SDK requires 'application/json, text/event-stream' but some clients send wildcard Accept headers.
+ * We must patch rawHeaders because @hono/node-server reads from there, not req.headers.
+ */
+function normalizeAcceptHeader(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  const accept = req.headers.accept;
+  if (!accept || accept === "*/*") {
+    const normalized = "application/json, text/event-stream";
+    req.headers.accept = normalized;
+
+    // Patch rawHeaders for @hono/node-server compatibility
+    const nodeReq = req as unknown as { rawHeaders: string[] };
+    const newRawHeaders: string[] = [];
+    let found = false;
+    for (let i = 0; i < nodeReq.rawHeaders.length; i += 2) {
+      if (nodeReq.rawHeaders[i].toLowerCase() === "accept") {
+        newRawHeaders.push(nodeReq.rawHeaders[i], normalized);
+        found = true;
+      } else {
+        newRawHeaders.push(nodeReq.rawHeaders[i], nodeReq.rawHeaders[i + 1]);
+      }
+    }
+    if (!found) {
+      newRawHeaders.push("Accept", normalized);
+    }
+    Object.defineProperty(nodeReq, "rawHeaders", { value: newRawHeaders });
+  }
+  next();
+}
 
 export interface ServerOptions {
   port: number;
@@ -31,8 +66,9 @@ export async function startServer(
 
   const app = createMcpExpressApp({ host: "0.0.0.0" });
   app.use(cors());
+  app.use(normalizeAcceptHeader);
 
-  app.all("/mcp", async (req: Request, res: Response) => {
+  app.post("/mcp", async (req: Request, res: Response) => {
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -56,6 +92,23 @@ export async function startServer(
         });
       }
     }
+  });
+
+  // GET and DELETE not supported in stateless mode
+  app.get("/mcp", (_req: Request, res: Response) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Method not allowed in stateless mode" },
+      id: null,
+    });
+  });
+
+  app.delete("/mcp", (_req: Request, res: Response) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Method not allowed in stateless mode" },
+      id: null,
+    });
   });
 
   const httpServer = app.listen(port, (err) => {
