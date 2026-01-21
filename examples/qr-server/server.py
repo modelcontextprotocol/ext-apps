@@ -15,7 +15,6 @@ import os
 import sys
 import io
 import base64
-from pathlib import Path
 
 import qrcode
 import uvicorn
@@ -100,16 +99,6 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
 </html>"""
 
 
-def get_widget_html() -> str:
-    """Get the widget HTML, preferring built version from dist/."""
-    # Prefer built version from dist/ (local development with npm run build)
-    dist_path = Path(__file__).parent / "dist" / "mcp-app.html"
-    if dist_path.exists():
-        return dist_path.read_text()
-    # Fallback to embedded widget (for `uv run <url>` or unbundled usage)
-    return EMBEDDED_WIDGET_HTML
-
-
 @mcp.tool(meta={
     "ui":{"resourceUri": WIDGET_URI},
     "ui/resourceUri": WIDGET_URI, # legacy support
@@ -164,7 +153,7 @@ def generate_qr(
 )
 def widget() -> str:
     """Widget HTML resource with CSP metadata for external dependencies."""
-    return get_widget_html()
+    return EMBEDDED_WIDGET_HTML
 
 if __name__ == "__main__":
     if "--stdio" in sys.argv:
