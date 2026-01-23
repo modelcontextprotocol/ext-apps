@@ -718,7 +718,7 @@ When using flexible dimensions (no fixed `height` or `width`), hosts MUST listen
 ```typescript
 // Host listens for size changes from the View
 bridge.onsizechange = ({ width, height }) => {
-  // Update iframe to match app's content size
+  // Update iframe to match View's content size
   if (width != null) {
     iframe.style.width = `${width}px`;
   }
