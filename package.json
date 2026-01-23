@@ -68,7 +68,9 @@
     "generate:screenshots": "npm run build:all && docker run --rm -e EXAMPLE -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'apt-get update -qq && apt-get install -qq -y python3-venv curl > /dev/null && curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.local/bin:$PATH\" && npm i -g bun && npm ci && npx playwright test tests/e2e/generate-grid-screenshots.spec.ts'",
     "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
     "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write",
-    "check:versions": "node scripts/check-versions.mjs"
+    "check:versions": "node scripts/check-versions.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "preflight:fix": "node scripts/preflight.mjs --fix"
   },
   "author": "Olivier Chafik",
   "devDependencies": {
