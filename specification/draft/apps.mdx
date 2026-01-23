@@ -511,7 +511,7 @@ When the View sends an `ui/initialize` request to the Host, the Host SHOULD incl
 
 ```typescript
 interface HostContext {
-  /** Metadata of the tool call that instantiated the App */
+  /** Metadata of the tool call that instantiated the View */
   toolInfo?: {
     /** JSON-RPC id of the tools/call request */
     id?: RequestId,
@@ -524,23 +524,23 @@ interface HostContext {
   styles?: {
     /** CSS variables for theming */
     variables?: Record<McpUiStyleVariableKey, string | undefined>;
-    /** CSS blocks that apps can inject */
+    /** CSS blocks that Views can inject */
     css?: {
       /** CSS for font loading (@font-face rules or @import statements) */
       fonts?: string;
     };
   };
-  /** How the UI is currently displayed */
+  /** How the View is currently displayed */
   displayMode?: "inline" | "fullscreen" | "pip";
   /** Display modes the host supports */
   availableDisplayModes?: string[];
   /** Container dimensions for the iframe. Specify either width or maxWidth, and either height or maxHeight. */
   containerDimensions?: (
     | { height: number }      // If specified, container is fixed at this height
-    | { maxHeight?: number }  // Otherwise, container height is determined by the UI height, up to this maximum height (if defined)
+    | { maxHeight?: number }  // Otherwise, container height is determined by the View's height, up to this maximum height (if defined)
   ) & (
     | { width: number }       // If specified, container is fixed at this width
-    | { maxWidth?: number }   // Otherwise, container width is determined by the UI width, up to this maximum width (if defined)
+    | { maxWidth?: number }   // Otherwise, container width is determined by the View's width, up to this maximum width (if defined)
   );
   /** User's language/region preference (BCP 47, e.g., "en-US") */
   locale?: string;
@@ -647,24 +647,24 @@ interface HostCapabilities {
 
 The `HostContext` provides sizing information via `containerDimensions`:
 
-- **`containerDimensions`**: The dimensions of the container that holds the app. This controls the actual space the app occupies within the host. Each dimension (height and width) operates independently and can be either **fixed** or **flexible**.
+- **`containerDimensions`**: The dimensions of the container that holds the View. This controls the actual space the View occupies within the host. Each dimension (height and width) operates independently and can be either **fixed** or **flexible**.
 
 #### Dimension Modes
 
 | Mode | Dimensions Field | Meaning |
 |------|-----------------|---------|
-| Fixed | `height` or `width` | Host controls the size. App should fill the available space. |
-| Flexible | `maxHeight` or `maxWidth` | App controls the size, up to the specified maximum. |
-| Unbounded | Field omitted | App controls the size with no limit. |
+| Fixed | `height` or `width` | Host controls the size. View should fill the available space. |
+| Flexible | `maxHeight` or `maxWidth` | View controls the size, up to the specified maximum. |
+| Unbounded | Field omitted | View controls the size with no limit. |
 
-These modes can be combined independently. For example, a host might specify a fixed width but flexible height, allowing the app to grow vertically based on content.
+These modes can be combined independently. For example, a host might specify a fixed width but flexible height, allowing the View to grow vertically based on content.
 
-#### App Behavior
+#### View Behavior
 
-Apps should check the containerDimensions configuration and apply appropriate CSS:
+Views should check the containerDimensions configuration and apply appropriate CSS:
 
 ```typescript
-// In the app's initialization
+// In the View's initialization
 const containerDimensions = hostContext.containerDimensions;
 
 if (containerDimensions) {
@@ -692,10 +692,10 @@ if (containerDimensions) {
 
 #### Host Behavior
 
-When using flexible dimensions (no fixed `height` or `width`), hosts MUST listen for `ui/notifications/size-changed` notifications from the app and update the iframe dimensions accordingly:
+When using flexible dimensions (no fixed `height` or `width`), hosts MUST listen for `ui/notifications/size-changed` notifications from the View and update the iframe dimensions accordingly:
 
 ```typescript
-// Host listens for size changes from the app
+// Host listens for size changes from the View
 bridge.onsizechange = ({ width, height }) => {
   // Update iframe to match app's content size
   if (width != null) {
@@ -707,7 +707,7 @@ bridge.onsizechange = ({ width, height }) => {
 };
 ```
 
-Apps using the SDK automatically send size-changed notifications via ResizeObserver when `autoResize` is enabled (the default). The notifications are debounced and only sent when dimensions actually change.
+Views using the SDK automatically send size-changed notifications via ResizeObserver when `autoResize` is enabled (the default). The notifications are debounced and only sent when dimensions actually change.
 
 ### Theming
 
@@ -716,7 +716,7 @@ Hosts can optionally pass CSS custom properties via `HostContext.styles.variable
 #### Current Standardized Variables
 
 ```typescript
-/** CSS variable keys available to MCP apps for theming. */
+/** CSS variable keys available to Views for theming. */
 type McpUiStyleVariableKey =
   // Background colors
   | "--color-background-primary"
@@ -812,12 +812,12 @@ type McpUiStyleVariableKey =
 #### Host Behavior
 
 - Hosts can provide any subset of standardized variables, or not pass `styles` at all
-  - However, unexpected clashes may occur if hosts pass some color variables but not others for example, since apps are instructed to fallback on their own default values for unspecified style variables
+  - However, unexpected clashes may occur if hosts pass some color variables but not others for example, since Views are instructed to fallback on their own default values for unspecified style variables
 - Hosts should use the CSS `light-dark()` function for theme-aware values (i.e. light mode and dark mode colors)
 
-#### App Behavior
+#### View Behavior
 
-- Apps should set default fallback values for the set of these variables that they use, to account for hosts who don't pass some or all style variables. This ensures graceful degradation when hosts omit `styles` or specific variables:
+- Views should set default fallback values for the set of these variables that they use, to account for hosts who don't pass some or all style variables. This ensures graceful degradation when hosts omit `styles` or specific variables:
 ```
 :root {
   --color-text-primary: light-dark(#171717, #000000);
@@ -825,8 +825,8 @@ type McpUiStyleVariableKey =
   ...
 }
 ```
-- Apps can use the `applyHostStyleVariables` utility (or `useHostStyleVariables` if they prefer a React hook) to easily populate the host-provided CSS variables into their style sheet
-- Apps can use the `applyDocumentTheme` utility (or `useDocumentTheme` if they prefer a React hook) to easily respond to Host Context `theme` changes in a way that is compatible with the host's light/dark color variables 
+- Views can use the `applyHostStyleVariables` utility (or `useHostStyleVariables` if they prefer a React hook) to easily populate the host-provided CSS variables into their style sheet
+- Views can use the `applyDocumentTheme` utility (or `useDocumentTheme` if they prefer a React hook) to easily respond to Host Context `theme` changes in a way that is compatible with the host's light/dark color variables 
 
 Example usage of standardized CSS variables:
 
@@ -869,7 +869,7 @@ hostContext.styles.css.fonts = `
 `;
 ```
 
-Apps can use the `applyHostFonts` utility to inject the font CSS into the document:
+Views can use the `applyHostFonts` utility to inject the font CSS into the document:
 
 ```typescript
 if (hostContext.styles?.css?.fonts) {
@@ -881,7 +881,7 @@ if (hostContext.styles?.css?.fonts) {
 
 MCP Apps introduces additional JSON-RPC methods for UI-specific functionality:
 
-#### Requests (UI → Host)
+#### Requests (View → Host)
 
 `ui/open-link` - Request host to open external URL
 
@@ -978,7 +978,7 @@ Host behavior:
 ```
 
 Host behavior:
-* App MUST check if the requested mode is in `availableDisplayModes` from host context.
+* View MUST check if the requested mode is in `availableDisplayModes` from host context.
 * It is up to the host whether it switches to the requested mode, but the host MUST return the resulting mode (whether updated or not) in the response.
 * If the requested mode is not available, Host SHOULD return the current display mode in the response.
 * Host MAY coerce modes on certain platforms (e.g., "pip" to "fullscreen" on mobile).
@@ -1030,7 +1030,7 @@ Host behavior:
 - If multiple updates are received before the next user message, Host SHOULD only send the last update to the model
 - MAY display context updates to the user
 
-#### Notifications (Host → UI)
+#### Notifications (Host → View)
 
 `ui/notifications/tool-input` - Host MUST send this notification with the complete tool arguments after the View's initialize request completes.
 
@@ -1081,7 +1081,7 @@ View behavior (optional):
 }
 ```
 
-Host MUST send this notification when tool execution completes (if UI is displayed during tool execution).
+Host MUST send this notification when tool execution completes (if the View is displayed during tool execution).
 
 `ui/notifications/tool-cancelled` - Tool execution was cancelled
 
@@ -1097,7 +1097,7 @@ Host MUST send this notification when tool execution completes (if UI is display
 
 Host MUST send this notification if the tool execution was cancelled, for any reason (which can optionally be specified), including user action, sampling error, classifier intervention, etc.
 
-`ui/resource-teardown` - Host notifies UI before teardown
+`ui/resource-teardown` - Host notifies View before teardown
 
 ```typescript
 {
@@ -1130,7 +1130,7 @@ Host MUST send this notification if the tool execution was cancelled, for any re
 Host MUST send this notification before tearing down the UI resource, for any reason, including user action, resource re-allocation, etc. The Host MAY specify the reason.
 Host SHOULD wait for a response before tearing down the resource (to prevent data loss).
 
-`ui/notifications/size-changed` - UI’s size changed
+`ui/notifications/size-changed` - View's size changed
 
 ```typescript
 {
@@ -1288,7 +1288,7 @@ sequenceDiagram
       S --> H: resources/read response
       H --> UI: resources/read response
     end
-    opt UI notifications
+    opt View notifications
       UI ->> H: notifications (e.g., ui/notifications/size-changed)
     end
     opt Host notifications
@@ -1309,7 +1309,7 @@ sequenceDiagram
   H -x H: Tear down iframe and listeners
 ```
 
-Note: Cleanup may be triggered at any point in the lifecycle following UI initialization.
+Note: Cleanup may be triggered at any point in the lifecycle following View initialization.
 
 #### Key Differences from Pre-SEP MCP-UI:
 
@@ -1319,7 +1319,7 @@ Note: Cleanup may be triggered at any point in the lifecycle following UI initia
 
 ### Data Passing
 
-Tool execution results are passed to the UI through two mechanisms:
+Tool execution results are passed to the View through two mechanisms:
 
 #### 1. Tool Input (via `ui/notifications/tool-input` notification)
 
@@ -1339,7 +1339,7 @@ The original tool call arguments:
   }
 }
 
-// UI receives (JSON-RPC notification from Host to UI):
+// View receives (JSON-RPC notification from Host to View):
 {
   jsonrpc: "2.0",
   method: "ui/notifications/tool-input",
@@ -1376,7 +1376,7 @@ The tool's execution result:
   }
 }
 
-// UI receives (JSON-RPC notification):
+// View receives (JSON-RPC notification):
 {
   jsonrpc: "2.0",
   method: "ui/notifications/tool-result",
@@ -1405,10 +1405,10 @@ The tool's execution result:
 
 #### 3. Interactive Updates
 
-UI can request fresh data by calling tools:
+Views can request fresh data by calling tools:
 
 ```typescript
-// UI requests updated data
+// View requests updated data
 await client.callTool("get_weather", { location: "New York" });
 
 // Result returned via standard tools/call response
@@ -1567,7 +1567,7 @@ This proposal synthesizes feedback from the UI CWG and MCP-UI community, host im
 **Rationale:**
 
 - CSS variables are universal, framework-agnostic, and require no runtime
-- Apps apply styles via `var(--name)` with fallbacks for graceful degradation
+- Views apply styles via `var(--name)` with fallbacks for graceful degradation
 - Limited variable set (colors, typography, borders) ensures hosts can realistically provide all values
 - Spacing intentionally excluded—layouts break when spacing varies from original design
 - No UI component library—no single library works across all host environments
@@ -1615,28 +1615,28 @@ Hosting interactive UI content from potentially untrusted MCP servers requires c
 Attackers may use the embedded UI in different scenarios. For example:
 
 - Malicious server delivers harmful HTML content
-- Compromised UI attempts to escape sandbox
-- UI attempts unauthorized tool execution
-- UI exfiltrates sensitive host data
-- UI performs phishing or social engineering
+- Compromised View attempts to escape sandbox
+- View attempts unauthorized tool execution
+- View exfiltrates sensitive host data
+- View performs phishing or social engineering
 
 ### Mitigations
 
 #### 1. Iframe Sandboxing
 
-All UI content MUST be rendered in sandboxed iframes with restricted permissions.
+All View content MUST be rendered in sandboxed iframes with restricted permissions.
 
-The sandbox limits the UI from accessing the host or manipulating it. All communication with the host is done via `postMessage`, where the host is in control.
+The sandbox limits the View from accessing the host or manipulating it. All communication with the host is done via `postMessage`, where the host is in control.
 
 #### 2. Auditable Communication
 
-All UI-to-host communication goes through auditable MCP JSON-RPC messages.
+All View-to-host communication goes through auditable MCP JSON-RPC messages.
 
 **Host behavior:**
 
 - Validate all incoming messages from UI iframes
 - Reject malformed message types
-- Log UI-initiated RPC calls for security review
+- Log View-initiated RPC calls for security review
 
 #### 3. Predeclared Resource Review
 
@@ -1689,7 +1689,7 @@ const allowAttribute = allowList.join(' ');
 ### Other risks
 
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
-- **Resource consumption:** Malicious UI can consume CPU/memory. Hosts should implement resource limits.
+- **Resource consumption:** Malicious View can consume CPU/memory. Hosts should implement resource limits.
 
 ## Reservations in MCP
 
