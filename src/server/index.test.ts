@@ -4,6 +4,8 @@ import {
   registerAppResource,
   RESOURCE_URI_META_KEY,
   RESOURCE_MIME_TYPE,
+  getUiCapability,
+  EXTENSION_ID,
 } from "./index";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
@@ -316,5 +318,41 @@ describe("registerAppResource", () => {
 
     expect(callback).toHaveBeenCalledTimes(1);
     expect(result).toEqual(expectedResult);
+  });
+});
+
+describe("getUiCapability", () => {
+  const MIME_TYPE = "text/html;profile=mcp-app";
+
+  it("should return undefined for null/undefined capabilities", () => {
+    expect(getUiCapability(null)).toBeUndefined();
+    expect(getUiCapability(undefined)).toBeUndefined();
+  });
+
+  it("should return undefined for empty capabilities", () => {
+    expect(getUiCapability({})).toBeUndefined();
+  });
+
+  it("should return capability from extensions field", () => {
+    const caps = {
+      extensions: {
+        [EXTENSION_ID]: {
+          mimeTypes: [MIME_TYPE],
+        },
+      },
+    };
+    const result = getUiCapability(caps);
+    expect(result).toEqual({ mimeTypes: [MIME_TYPE] });
+  });
+
+  it("should return undefined when extension ID is missing", () => {
+    const caps = {
+      extensions: {
+        "some-other-extension": {
+          mimeTypes: [MIME_TYPE],
+        },
+      },
+    };
+    expect(getUiCapability(caps)).toBeUndefined();
   });
 });

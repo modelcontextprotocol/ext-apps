@@ -19,6 +19,7 @@ import base64
 import qrcode
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp import types
 from starlette.middleware.cors import CORSMiddleware
 
@@ -161,7 +162,11 @@ if __name__ == "__main__":
         mcp.run(transport="stdio")
     else:
         # HTTP mode for basic-host (default) - with CORS
-        app = mcp.streamable_http_app(stateless_http=True)
+        # Allow Docker bridge IP for container-to-host communication
+        security = TransportSecuritySettings(
+            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*", "172.17.0.1:*"]
+        )
+        app = mcp.streamable_http_app(stateless_http=True, transport_security=security)
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],

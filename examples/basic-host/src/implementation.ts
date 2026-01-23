@@ -3,6 +3,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import { getTheme, onThemeChange } from "./theme";
+import { HOST_STYLE_VARIABLES } from "./host-styles";
 
 
 const SANDBOX_PROXY_BASE_URL = "http://localhost:8081/sandbox.html";
@@ -270,11 +272,23 @@ export function newAppBridge(
     // Declare support for model context updates
     updateModelContext: { text: {} },
   }, {
+    // Pass initial host context with theme, display mode, and style variables
     hostContext: {
-      containerDimensions: options?.containerDimensions ?? { maxHeight: 600 },
+      theme: getTheme(),
+      platform: "web",
+      styles: {
+        variables: HOST_STYLE_VARIABLES,
+      },
+      containerDimensions: options?.containerDimensions ?? { maxHeight: 6000 },
       displayMode: options?.displayMode ?? "inline",
       availableDisplayModes: ["inline", "fullscreen"],
     },
+  });
+
+  // Listen for theme changes (from toggle or system) and notify the app
+  onThemeChange((newTheme) => {
+    log.info("Theme changed:", newTheme);
+    appBridge.sendHostContextChange({ theme: newTheme });
   });
 
   // Register all handlers before calling connect(). The view can start

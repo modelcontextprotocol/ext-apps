@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Document body -->
+  <path d="M15 2a2 2 0 0 0-2 2v56a2 2 0 0 0 2 2h36a2 2 0 0 0 2-2V16L39 2H15z" fill="black"/>
+  <!-- Folded corner -->
+  <path d="M39 2v12a2 2 0 0 0 2 2h12" fill="none" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

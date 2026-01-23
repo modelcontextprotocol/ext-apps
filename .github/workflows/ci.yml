@@ -56,6 +56,12 @@ jobs:
           npm run generate:schemas
           git diff --exit-code src/generated/ || (echo "Generated schemas are out of date. Run 'npm run generate:schemas' and commit." && exit 1)
 
+      - name: Verify synced snippets are up-to-date
+        shell: bash
+        run: |
+          npm run sync:snippets
+          git diff --exit-code src/ docs/ || (echo "Synced snippets are out of date. Run 'npm run sync:snippets' and commit." && exit 1)
+
       - run: npm test
 
       - run: npm run prettier

@@ -80,9 +80,9 @@ View (App) <--PostMessageTransport--> Host (AppBridge) <--MCP Client--> MCP Serv
 
 ## Documentation
 
-JSDoc `@example` tags use `{@includeCode ./file.examples.ts#regionName}` to pull in type-checked code from companion `.examples.ts`/`.examples.tsx` files. Regions are marked with `//#region name` and `//#endregion name`, wrapped in functions (whose parameters provide types for external values). Region names follow `exportedName_variant` or `ClassName_methodName_variant` pattern (e.g., `useApp_basicUsage`, `App_hostCapabilities_checkAfterConnection`).
+JSDoc `@example` tags should pull type-checked code from companion `.examples.ts` files (e.g., `app.ts` → `app.examples.ts`). Use ` ```ts source="./file.examples.ts#regionName" ` fences referencing `//#region regionName` blocks, then run `npm run sync:snippets`. Region names follow `exportedName_variant` or `ClassName_methodName_variant` pattern (e.g., `useApp_basicUsage`, `App_hostCapabilities_checkAfterConnection`).
 
-Standalone docs in `docs/` (listed in `typedoc.config.mjs` `projectDocuments`) can also have type-checked companion `.ts`/`.tsx` files using the same `@includeCode` pattern.
+Standalone docs in `docs/` (listed in `typedoc.config.mjs` `projectDocuments`) can also have type-checked companion `.ts`/`.tsx` files using the same pattern.
 
 ## Full Examples
 

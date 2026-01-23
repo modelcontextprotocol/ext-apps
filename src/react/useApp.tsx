@@ -30,7 +30,17 @@ export interface UseAppOptions {
    * @param app - The newly created `App` instance
    *
    * @example Register an event handler
-   * {@includeCode ./useApp.examples.tsx#useApp_registerHandler}
+   * ```tsx source="./useApp.examples.tsx#useApp_registerHandler"
+   * useApp({
+   *   appInfo: { name: "MyApp", version: "1.0.0" },
+   *   capabilities: {},
+   *   onAppCreated: (app) => {
+   *     app.ontoolresult = (result) => {
+   *       console.log("Tool result:", result);
+   *     };
+   *   },
+   * });
+   * ```
    */
   onAppCreated?: (app: App) => void;
 }
@@ -70,7 +80,39 @@ export interface AppState {
  *   timeouts, initialization handshake failures, or transport errors).
  *
  * @example Basic usage of useApp hook with common event handlers
- * {@includeCode ./useApp.examples.tsx#useApp_basicUsage}
+ * ```tsx source="./useApp.examples.tsx#useApp_basicUsage"
+ * function MyApp() {
+ *   const [hostContext, setHostContext] = useState<
+ *     McpUiHostContext | undefined
+ *   >(undefined);
+ *
+ *   const { app, isConnected, error } = useApp({
+ *     appInfo: { name: "MyApp", version: "1.0.0" },
+ *     capabilities: {},
+ *     onAppCreated: (app) => {
+ *       app.ontoolinput = (input) => {
+ *         console.log("Tool input:", input);
+ *       };
+ *       app.ontoolresult = (result) => {
+ *         console.log("Tool result:", result);
+ *       };
+ *       app.ontoolcancelled = (params) => {
+ *         console.log("Tool cancelled:", params.reason);
+ *       };
+ *       app.onerror = (error) => {
+ *         console.log("Error:", error);
+ *       };
+ *       app.onhostcontextchanged = (params) => {
+ *         setHostContext((prev) => ({ ...prev, ...params }));
+ *       };
+ *     },
+ *   });
+ *
+ *   if (error) return <div>Error: {error.message}</div>;
+ *   if (!isConnected) return <div>Connecting...</div>;
+ *   return <div>Theme: {hostContext?.theme}</div>;
+ * }
+ * ```
  *
  * @see {@link App.connect `App.connect`} for the underlying connection method
  * @see {@link useAutoResize `useAutoResize`} for manual auto-resize control when using custom App options

@@ -1,27 +1,20 @@
 /**
  * Entry point for running the MCP server.
- * Run with: npx mcp-pdf-server
- * Or: node dist/index.js [--stdio] [pdf-urls...]
+ * Run with: npx mcp-server-debug
+ * Or: node dist/index.js [--stdio]
  */
 
-import fs from "node:fs";
+/**
+ * Shared utilities for running MCP servers with Streamable HTTP transport.
+ */
+
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import cors from "cors";
 import type { Request, Response } from "express";
-import {
-  createServer,
-  isArxivUrl,
-  isFileUrl,
-  normalizeArxivUrl,
-  pathToFileUrl,
-  fileUrlToPath,
-  allowedLocalFiles,
-  allowedRemoteOrigins,
-  DEFAULT_PDF,
-} from "./server.js";
+import { createServer } from "./server.js";
 
 export interface ServerOptions {
   port: number;
@@ -30,6 +23,9 @@ export interface ServerOptions {
 
 /**
  * Starts an MCP server with Streamable HTTP transport in stateless mode.
+ *
+ * @param createServer - Factory function that creates a new McpServer instance per request.
+ * @param options - Server configuration options.
  */
 export async function startServer(
   createServer: () => McpServer,
@@ -83,59 +79,12 @@ export async function startServer(
   process.on("SIGTERM", shutdown);
 }
 
-function parseArgs(): { urls: string[]; stdio: boolean } {
-  const args = process.argv.slice(2);
-  const urls: string[] = [];
-  let stdio = false;
-
-  for (const arg of args) {
-    if (arg === "--stdio") {
-      stdio = true;
-    } else if (!arg.startsWith("-")) {
-      // Convert local paths to file:// URLs, normalize arxiv URLs
-      let url = arg;
-      if (
-        !arg.startsWith("http://") &&
-        !arg.startsWith("https://") &&
-        !arg.startsWith("file://")
-      ) {
-        url = pathToFileUrl(arg);
-      } else if (isArxivUrl(arg)) {
-        url = normalizeArxivUrl(arg);
-      }
-      urls.push(url);
-    }
-  }
-
-  return { urls: urls.length > 0 ? urls : [DEFAULT_PDF], stdio };
-}
-
 async function main() {
-  const { urls, stdio } = parseArgs();
-
-  // Register local files in whitelist
-  for (const url of urls) {
-    if (isFileUrl(url)) {
-      const filePath = fileUrlToPath(url);
-      if (fs.existsSync(filePath)) {
-        allowedLocalFiles.add(filePath);
-        console.error(`[pdf-server] Registered local file: ${filePath}`);
-      } else {
-        console.error(`[pdf-server] Warning: File not found: ${filePath}`);
-      }
-    }
-  }
-
-  console.error(`[pdf-server] Ready (${urls.length} URL(s) configured)`);
-  console.error(
-    `[pdf-server] Allowed origins: ${[...allowedRemoteOrigins].join(", ")}`,
-  );
-
-  if (stdio) {
+  if (process.argv.includes("--stdio")) {
     await createServer().connect(new StdioServerTransport());
   } else {
-    const port = parseInt(process.env.PORT ?? "3120", 10);
-    await startServer(createServer, { port, name: "PDF Server" });
+    const port = parseInt(process.env.PORT ?? "3110", 10);
+    await startServer(createServer, { port, name: "Debug Server" });
   }
 }
 

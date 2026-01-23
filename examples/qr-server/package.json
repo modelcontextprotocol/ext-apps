@@ -6,5 +6,8 @@
     "start": "uv run server.py",
     "dev": "uv run server.py",
     "build": "echo 'No build step needed for Python server'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^0.4.1"
   }
 }

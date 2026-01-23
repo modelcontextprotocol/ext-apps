@@ -1,8 +1,34 @@
+/* Theme toggle button */
+.themeToggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background-color: var(--color-bg-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  z-index: 1000;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
+
+  &:hover {
+    background-color: var(--color-border);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
 .callToolPanel, .toolCallInfoPanel {
   margin: 0 auto;
   padding: 1rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
+  background-color: var(--color-bg-secondary);
 
   * + & {
     margin-top: 1rem;
@@ -28,9 +54,11 @@
   select,
   textarea {
     padding: 0.5rem;
-    border: 1px solid #ccc;
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     font-size: inherit;
+    background-color: var(--color-bg);
+    color: var(--color-text);
   }
 
   .toolSelect {
@@ -43,7 +71,7 @@
     resize: vertical;
 
     &[aria-invalid="true"] {
-      background-color: #fdd;
+      background-color: light-dark(#fee2e2, #7f1d1d);
     }
   }
 
@@ -53,14 +81,14 @@
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 4px;
-    background-color: #1e3a5f;
+    background-color: var(--color-primary);
     font-size: inherit;
     font-weight: 600;
     color: white;
     cursor: pointer;
 
     &:hover:not(:disabled) {
-      background-color: #2d4a7c;
+      background-color: var(--color-primary-hover);
     }
 
     &:disabled {
@@ -103,15 +131,15 @@
     padding: 0;
     border: none;
     border-radius: 4px;
-    background: #e0e0e0;
+    background: var(--color-border);
     font-size: 1.25rem;
     line-height: 1;
-    color: #666;
+    color: var(--color-text-secondary);
     cursor: pointer;
 
     &:hover {
-      background: #d0d0d0;
-      color: #333;
+      background: var(--color-bg-secondary);
+      color: var(--color-text);
     }
   }
 }
@@ -123,7 +151,7 @@
     width: 100%;
     height: 600px;
     box-sizing: border-box;
-    border: 3px dashed #888;
+    border: 3px dashed var(--color-border);
     border-radius: 4px;
   }
 
@@ -246,6 +274,6 @@
 
 .error {
   padding: 1.5rem;
-  background-color: #ddd;
-  color: #d00;
+  background-color: var(--color-bg-secondary);
+  color: light-dark(#dc2626, #f87171);
 }

@@ -505,6 +505,27 @@ UI iframes can use the following subset of standard MCP protocol messages:
 - `ui/initialize` → `ui/notifications/initialized` - MCP-like handshake (replaces custom iframe-ready pattern in MCP-UI)
 - `ping` - Connection health check
 
+### App Capabilities in `ui/initialize`
+
+When the View sends an `ui/initialize` request to the Host, it MUST include its capabilities in the `appCapabilities` field:
+
+```typescript
+interface McpUiAppCapabilities {
+  /** Experimental features (structure TBD). */
+  experimental?: {};
+  /** App exposes MCP-style tools that the host can call. */
+  tools?: {
+    /** App supports tools/list_changed notifications. */
+    listChanged?: boolean;
+  };
+  /**
+   * Display modes the app supports. See Display Modes section for details.
+   * @example ["inline", "fullscreen"]
+   */
+  availableDisplayModes?: Array<"inline" | "fullscreen" | "pip">;
+}
+```
+
 ### Host Context in `McpUiInitializeResult`
 
 When the View sends an `ui/initialize` request to the Host, the Host SHOULD include UI-specific context in the `McpUiInitializeResult`'s `hostContext` field:
@@ -708,6 +729,62 @@ bridge.onsizechange = ({ width, height }) => {
 ```
 
 Views using the SDK automatically send size-changed notifications via ResizeObserver when `autoResize` is enabled (the default). The notifications are debounced and only sent when dimensions actually change.
+
+### Display Modes
+
+Views can be displayed in different modes depending on the host's capabilities and the view's declared support.
+
+```typescript
+type McpUiDisplayMode = "inline" | "fullscreen" | "pip";
+```
+
+- **inline**: Default mode, embedded within the host's content flow
+- **fullscreen**: View takes over the full screen/window
+- **pip**: Picture-in-picture, floating overlay
+
+#### Declaring Support
+
+**View (`appCapabilities.availableDisplayModes`):**
+
+Views declare which display modes they support in the `ui/initialize` request via `appCapabilities.availableDisplayModes`. This allows hosts to only offer display mode options that the view can handle.
+
+```typescript
+// Example: View declares support for inline and fullscreen
+{
+  method: "ui/initialize",
+  params: {
+    appCapabilities: {
+      availableDisplayModes: ["inline", "fullscreen"]
+    },
+    // ...
+  }
+}
+```
+
+**Host (`HostContext.availableDisplayModes`):**
+
+Hosts declare which display modes they support in `HostContext.availableDisplayModes`. Views should check this before requesting a mode change.
+
+#### Requesting Changes
+
+Views request display mode changes via `ui/request-display-mode`. See the Requests section for message format.
+
+#### Notifying Changes
+
+Hosts notify views of display mode changes via `ui/notifications/host-context-changed` with the `displayMode` field.
+
+#### Requirements
+
+**View behavior:**
+- View MUST declare all display modes it supports in `appCapabilities.availableDisplayModes` during initialization.
+- View MUST check if the requested mode is in `availableDisplayModes` from host context before requesting a mode change.
+- View MUST handle the response mode differing from the requested mode.
+
+**Host behavior:**
+- Host MUST NOT switch the View to a display mode that does not appear in its `appCapabilities.availableDisplayModes`, if set.
+- Host MUST return the resulting mode (whether updated or not) in the response to `ui/request-display-mode`.
+- If the requested mode is not available, Host SHOULD return the current display mode in the response.
+- Host MAY decline display mode requests from Views that did not declare said modes in their capabilities.
 
 ### Theming
 
@@ -977,15 +1054,7 @@ Host behavior:
 }
 ```
 
-Host behavior:
-* View MUST check if the requested mode is in `availableDisplayModes` from host context.
-* It is up to the host whether it switches to the requested mode, but the host MUST return the resulting mode (whether updated or not) in the response.
-* If the requested mode is not available, Host SHOULD return the current display mode in the response.
-* Host MAY coerce modes on certain platforms (e.g., "pip" to "fullscreen" on mobile).
-
-View behavior:
-* View SHOULD check `availableDisplayModes` in host context before requesting a mode change.
-* View MUST handle the response mode differing from the requested mode.
+See the Display Modes section for detailed behavior requirements.
 
 `ui/update-model-context` - Update the model context
 
@@ -1457,13 +1526,13 @@ Future versions may add additional settings:
 
 #### Server Behavior
 
-Servers SHOULD check client (host would-be) capabilities before registering UI-enabled tools:
+Servers SHOULD check client capabilities before registering UI-enabled tools. The SDK provides the `getUiCapability` helper for this:
 
 ```typescript
-const hasUISupport =
-  clientCapabilities?.extensions?.["io.modelcontextprotocol/ui"]?.mimeTypes?.includes("text/html;profile=mcp-app");
+import { getUiCapability, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 
-if (hasUISupport) {
+const uiCap = getUiCapability(clientCapabilities);
+if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
   // Register tools with UI templates
   server.registerTool("get_weather", {
     description: "Get weather with interactive dashboard",
@@ -1540,7 +1609,7 @@ This proposal synthesizes feedback from the UI CWG and MCP-UI community, host im
 
 **Alternatives considered:**
 
-- **Custom message protocol:** Current MCP-UI approach with message types like tool, intent, prompt, etc. These message types can be translated to a subset of the proposed JSON-RPC messages.
+- **Custom message protocol:** Current MCP-UI approach with message types like tool, prompt, etc. These message types can be translated to a subset of the proposed JSON-RPC messages.
 - **Global API object:** Rejected because it requires host-specific injection and doesn't work with external iframe sources. Syntactic sugar may still be added on the server/UI side.
 
 #### 3. Support Raw HTML Content Type

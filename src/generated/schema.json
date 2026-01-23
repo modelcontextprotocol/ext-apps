@@ -24,6 +24,41 @@
             }
           },
           "additionalProperties": false
+        },
+        "availableDisplayModes": {
+          "description": "Display modes the app supports.",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "inline"
+              },
+              {
+                "type": "string",
+                "const": "fullscreen"
+              },
+              {
+                "type": "string",
+                "const": "pip"
+              }
+            ],
+            "description": "Display mode for UI presentation."
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "McpUiClientCapabilities": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mimeTypes": {
+          "description": "Array of supported MIME types for UI resources.\nMust include `\"text/html;profile=mcp-app\"` for MCP Apps support.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -868,7 +903,21 @@
               "description": "Display modes the host supports.",
               "type": "array",
               "items": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "inline"
+                  },
+                  {
+                    "type": "string",
+                    "const": "fullscreen"
+                  },
+                  {
+                    "type": "string",
+                    "const": "pip"
+                  }
+                ],
+                "description": "Display mode for UI presentation."
               }
             },
             "containerDimensions": {
@@ -1621,7 +1670,21 @@
           "description": "Display modes the host supports.",
           "type": "array",
           "items": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "inline"
+              },
+              {
+                "type": "string",
+                "const": "fullscreen"
+              },
+              {
+                "type": "string",
+                "const": "pip"
+              }
+            ],
+            "description": "Display mode for UI presentation."
           }
         },
         "containerDimensions": {
@@ -2270,6 +2333,27 @@
                     }
                   },
                   "additionalProperties": false
+                },
+                "availableDisplayModes": {
+                  "description": "Display modes the app supports.",
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "inline"
+                      },
+                      {
+                        "type": "string",
+                        "const": "fullscreen"
+                      },
+                      {
+                        "type": "string",
+                        "const": "pip"
+                      }
+                    ],
+                    "description": "Display mode for UI presentation."
+                  }
                 }
               },
               "additionalProperties": false,
@@ -3158,7 +3242,21 @@
               "description": "Display modes the host supports.",
               "type": "array",
               "items": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "inline"
+                  },
+                  {
+                    "type": "string",
+                    "const": "fullscreen"
+                  },
+                  {
+                    "type": "string",
+                    "const": "pip"
+                  }
+                ],
+                "description": "Display mode for UI presentation."
               }
             },
             "containerDimensions": {

@@ -470,6 +470,11 @@ export const McpUiAppCapabilitiesSchema = z.object({
     })
     .optional()
     .describe("App exposes MCP-style tools that the host can call."),
+  /** @description Display modes the app supports. */
+  availableDisplayModes: z
+    .array(McpUiDisplayModeSchema)
+    .optional()
+    .describe("Display modes the app supports."),
 });
 
 /**
@@ -563,6 +568,26 @@ export const McpUiToolMetaSchema = z.object({
 });
 
 /**
+ * @description MCP Apps capability settings advertised by clients to servers.
+ *
+ * Clients advertise these capabilities via the `extensions` field in their
+ * capabilities during MCP initialization. Servers can check for MCP Apps
+ * support using {@link server-helpers!getUiCapability}.
+ */
+export const McpUiClientCapabilitiesSchema = z.object({
+  /**
+   * @description Array of supported MIME types for UI resources.
+   * Must include `"text/html;profile=mcp-app"` for MCP Apps support.
+   */
+  mimeTypes: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Array of supported MIME types for UI resources.\nMust include `"text/html;profile=mcp-app"` for MCP Apps support.',
+    ),
+});
+
+/**
  * @description Request to send a message to the host's chat interface.
  * @see {@link app!App.sendMessage `App.sendMessage`} for the method that sends this request
  */
@@ -648,7 +673,7 @@ export const McpUiHostContextSchema = z
     ),
     /** @description Display modes the host supports. */
     availableDisplayModes: z
-      .array(z.string())
+      .array(McpUiDisplayModeSchema)
       .optional()
       .describe("Display modes the host supports."),
     /**

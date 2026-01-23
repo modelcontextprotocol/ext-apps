@@ -672,6 +672,7 @@ EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>Say View</title>
   <script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
   <script type="importmap">
@@ -679,6 +680,7 @@ EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
     "imports": {
       "react": "https://esm.sh/react@19.2.0",
       "react-dom/client": "https://esm.sh/react-dom@19.2.0/client",
+      "@modelcontextprotocol/ext-apps": "https://esm.sh/@modelcontextprotocol/ext-apps@0.4.1?deps=zod@3.25.1&external=react,react-dom",
       "@modelcontextprotocol/ext-apps/react": "https://esm.sh/@modelcontextprotocol/ext-apps@0.4.1/react?deps=zod@3.25.1&external=react,react-dom"
     }
   }
@@ -769,8 +771,14 @@ EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
     .infoPopup a:hover { text-decoration: underline; }
     .infoPopup ul { margin: 0; padding-left: 16px; }
     .infoPopup li { margin: 4px 0; }
+    /* Dark mode: host-provided theme via data-theme attribute */
+    [data-theme="dark"] {
+      --color-text-primary: #eee;
+      --color-text-secondary: #666;
+    }
+    /* Fallback: system preference when running standalone without host */
     @media (prefers-color-scheme: dark) {
-      :root {
+      :root:not([data-theme]) {
         --color-text-primary: #eee;
         --color-text-secondary: #666;
       }
@@ -783,6 +791,7 @@ EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
     import React, { useState, useCallback, useEffect, useRef, StrictMode } from 'react';
     import { createRoot } from 'react-dom/client';
     import { useApp } from '@modelcontextprotocol/ext-apps/react';
+    import { applyDocumentTheme, applyHostStyleVariables, applyHostFonts } from '@modelcontextprotocol/ext-apps';
 
     function SayView() {
       const [hostContext, setHostContext] = useState(undefined);
@@ -1251,6 +1260,16 @@ EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
             if (params.displayMode) {
               setDisplayMode(params.displayMode);
             }
+            // Apply host theme and styles
+            if (params.theme) {
+              applyDocumentTheme(params.theme);
+            }
+            if (params.styles?.variables) {
+              applyHostStyleVariables(params.styles.variables);
+            }
+            if (params.styles?.css?.fonts) {
+              applyHostFonts(params.styles.css.fonts);
+            }
           };
         },
       });
@@ -1264,6 +1283,16 @@ EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
         }
         if (ctx?.displayMode) {
           setDisplayMode(ctx.displayMode);
+        }
+        // Apply initial host theme and styles
+        if (ctx?.theme) {
+          applyDocumentTheme(ctx.theme);
+        }
+        if (ctx?.styles?.variables) {
+          applyHostStyleVariables(ctx.styles.variables);
+        }
+        if (ctx?.styles?.css?.fonts) {
+          applyHostFonts(ctx.styles.css.fonts);
         }
       }, [app]);
 
@@ -1429,7 +1458,8 @@ def load_tts_model():
 def create_app():
     """Create the ASGI app (for uvicorn reload mode)."""
     load_tts_model()
-    app = mcp.streamable_http_app(stateless_http=True)
+    # Pass host=HOST to disable DNS rebinding protection for non-localhost deployments
+    app = mcp.streamable_http_app(stateless_http=True, host=HOST)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

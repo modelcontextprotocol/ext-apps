@@ -1,17 +1,37 @@
+:root {
+  color-scheme: light dark;
+
+  /* Background colors */
+  --bg000: light-dark(#ffffff, #1a1a1a);
+  --bg100: light-dark(#f5f5f5, #252525);
+  --bg200: light-dark(#e0e0e0, #333333);
+  --bg300: light-dark(#cccccc, #444444);
+
+  /* Text colors */
+  --text000: light-dark(#1a1a1a, #f0f0f0);
+  --text100: light-dark(#666666, #aaaaaa);
+  --text200: light-dark(#999999, #888888);
+
+  /* Shadows */
+  --shadow-page: light-dark(0 2px 8px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.4));
+  --selection-bg: light-dark(rgba(0, 0, 255, 0.3), rgba(100, 150, 255, 0.4));
+}
+
 body {
   overscroll-behavior-x: none;
+  display: flex;
 }
 
 .main {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  flex: 1;
   width: 100%;
-  background: var(--bg100, #f5f5f5);
-  color: var(--text000, #1a1a1a);
+  background: var(--bg100);
+  color: var(--text000);
   overflow: hidden; /* Prevent scrollbars in inline mode - we request exact size */
   border-radius: 0.75rem;
-  border: 1px solid var(--bg200, rgba(0, 0, 0, 0.08));
+  border: 1px solid var(--bg200);
 }
 
 /* Loading State */
@@ -28,8 +48,8 @@ body {
 .spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid var(--bg200, #e0e0e0);
-  border-top-color: var(--text100, #888);
+  border: 2px solid var(--bg200);
+  border-top-color: var(--text100);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -42,7 +62,7 @@ body {
 
 #loading-text {
   font-size: 0.8rem;
-  color: var(--text100, #888);
+  color: var(--text100);
 }
 
 /* Progress Bar */
@@ -50,21 +70,21 @@ body {
   width: 100%;
   max-width: 200px;
   height: 3px;
-  background: var(--bg200, #e0e0e0);
+  background: var(--bg200);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .progress-bar {
   height: 100%;
-  background: var(--text100, #888);
+  background: var(--text100);
   width: 0%;
   transition: width 0.15s ease-out;
 }
 
 .progress-text {
   font-size: 0.7rem;
-  color: var(--text200, #aaa);
+  color: var(--text200);
 }
 
 /* Error State */
@@ -84,7 +104,7 @@ body {
 }
 
 #error-message {
-  color: var(--text200, #999);
+  color: var(--text200);
   max-width: 400px;
 }
 
@@ -102,8 +122,8 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 1rem;
-  background: var(--bg000, #ffffff);
-  border-bottom: 1px solid var(--bg200, #e0e0e0);
+  background: var(--bg000);
+  border-bottom: 1px solid var(--bg200);
   flex-shrink: 0;
   gap: 0.5rem;
   height: 48px;
@@ -150,17 +170,17 @@ body {
 .page-input {
   width: 50px;
   padding: 0.25rem 0.5rem;
-  border: 1px solid var(--bg200, #e0e0e0);
+  border: 1px solid var(--bg200);
   border-radius: 4px;
   font-size: 0.85rem;
   text-align: center;
-  background: var(--bg000, #ffffff);
-  color: var(--text000, #1a1a1a);
+  background: var(--bg000);
+  color: var(--text000);
 }
 
 .page-input:focus {
   outline: none;
-  border-color: var(--text100, #666);
+  border-color: var(--text100);
 }
 
 .page-input::-webkit-outer-spin-button,
@@ -174,7 +194,7 @@ body {
 
 .total-pages {
   font-size: 0.85rem;
-  color: var(--text100, #666);
+  color: var(--text100);
   white-space: nowrap;
 }
 
@@ -186,10 +206,10 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--bg200, #e0e0e0);
+  border: 1px solid var(--bg200);
   border-radius: 4px;
-  background: var(--bg000, #ffffff);
-  color: var(--text000, #1a1a1a);
+  background: var(--bg000);
+  color: var(--text000);
   cursor: pointer;
   font-size: 1rem;
   transition: all 0.15s ease;
@@ -198,8 +218,8 @@ body {
 .nav-btn:hover:not(:disabled),
 .zoom-btn:hover:not(:disabled),
 .fullscreen-btn:hover {
-  background: var(--bg100, #f5f5f5);
-  border-color: var(--bg300, #ccc);
+  background: var(--bg100);
+  border-color: var(--bg300);
 }
 
 .nav-btn:disabled,
@@ -210,7 +230,7 @@ body {
 
 .zoom-level {
   font-size: 0.8rem;
-  color: var(--text100, #666);
+  color: var(--text100);
   min-width: 50px;
   text-align: center;
 }
@@ -223,12 +243,12 @@ body {
   justify-content: center;
   align-items: flex-start;
   padding: 1rem;
-  background: var(--bg200, #e0e0e0);
+  background: var(--bg200);
 }
 
 .page-wrapper {
   position: relative;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-page);
   background: white;
 }
 
@@ -262,7 +282,7 @@ body {
 }
 
 .text-layer ::selection {
-  background: rgba(0, 0, 255, 0.3);
+  background: var(--selection-bg);
 }
 
 .text-layer > span {

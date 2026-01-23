@@ -6,15 +6,20 @@
  * - Text selection via PDF.js TextLayer
  * - Page navigation, zoom
  */
-import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import {
+  App,
+  type McpUiHostContext,
+  applyDocumentTheme,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import * as pdfjsLib from "pdfjs-dist";
 import { TextLayer } from "pdfjs-dist";
 import "./global.css";
 import "./mcp-app.css";
 
-// const MAX_MODEL_CONTEXT_LENGTH = 5000;
-const MAX_MODEL_CONTEXT_LENGTH = 1500;
+const MAX_MODEL_CONTEXT_LENGTH = 15000;
+const CHUNK_SIZE = 500 * 1024; // 500KB chunks
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -247,7 +252,7 @@ function findSelectionInText(
   return undefined;
 }
 
-// Extract text from current page and update model context as markdown
+// Extract text from current page and update model context
 async function updatePageContext() {
   if (!pdfDocument) return;
 
@@ -276,22 +281,24 @@ async function updatePageContext() {
       );
     }
 
-    // Format content with selection and truncation
+    // Format content with selection markers and truncation
     const content = formatPageContent(
       pageText,
       MAX_MODEL_CONTEXT_LENGTH,
       selection,
     );
 
-    const markdown = `---
-title: ${pdfTitle || ""}
-url: ${pdfUrl}
-current-page: ${currentPage}/${totalPages}
----
+    // Build context with tool ID for multi-tool disambiguation
+    const toolId = app.getHostContext()?.toolInfo?.id;
+    const header = [
+      `PDF viewer${toolId ? ` (${toolId})` : ""}`,
+      pdfTitle ? `"${pdfTitle}"` : pdfUrl,
+      `Current Page: ${currentPage}/${totalPages}`,
+    ].join(" | ");
 
-${content}`;
+    const contextText = `${header}\n\nPage content:\n${content}`;
 
-    app.updateModelContext({ content: [{ type: "text", text: markdown }] });
+    app.updateModelContext({ content: [{ type: "text", text: contextText }] });
   } catch (err) {
     log.error("Error updating context:", err);
   }
@@ -635,7 +642,6 @@ function updateProgress(loaded: number, total: number) {
 
 // Load PDF in chunks with progress
 async function loadPdfInChunks(urlToLoad: string): Promise<Uint8Array> {
-  const CHUNK_SIZE = 500 * 1024; // 500KB chunks
   const chunks: Uint8Array[] = [];
   let offset = 0;
   let totalBytes = 0;
@@ -749,6 +755,16 @@ app.onerror = (err) => {
 
 function handleHostContextChanged(ctx: McpUiHostContext) {
   log.info("Host context changed:", ctx);
+
+  // Apply theme from host
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+  }
+
+  // Apply host CSS variables
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
 
   // Apply safe area insets
   if (ctx.safeAreaInsets) {
