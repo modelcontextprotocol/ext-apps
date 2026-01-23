@@ -505,6 +505,63 @@ UI iframes can use the following subset of standard MCP protocol messages:
 - `ui/initialize` → `ui/notifications/initialized` - MCP-like handshake (replaces custom iframe-ready pattern in MCP-UI)
 - `ping` - Connection health check
 
+### UI Initialization
+
+The Guest UI initiates the session by sending an `ui/initialize` request to the Host. The Host responds with the negotiated protocol version, host information, capabilities, and context. The Guest UI then sends an `ui/notifications/initialized` notification to signal it is ready to receive notifications.
+
+`ui/initialize` - Initialize the UI session
+
+```typescript
+// Request (UI → Host)
+{
+  jsonrpc: "2.0",
+  id: 1,
+  method: "ui/initialize",
+  params: {
+    protocolVersion: string,  // Protocol version the app supports
+    appInfo: Implementation,  // App identification (name and version)
+    appCapabilities: {        // Features this app provides
+      experimental?: {},
+      tools?: {
+        listChanged?: boolean
+      }
+    }
+  }
+}
+
+// Response (Host → UI)
+{
+  jsonrpc: "2.0",
+  id: 1,
+  result: {
+    protocolVersion: string,           // Negotiated protocol version
+    hostInfo: Implementation,          // Host identification
+    hostCapabilities: HostCapabilities,
+    hostContext: HostContext
+  }
+}
+```
+
+Host behavior:
+* Host MUST respond with the negotiated protocol version.
+* Host MUST include `hostInfo`, `hostCapabilities`, and `hostContext` in the response.
+* Host MUST NOT send any notifications to the Guest UI before receiving the `ui/notifications/initialized` notification.
+
+`ui/notifications/initialized` - Notify host that initialization is complete
+
+```typescript
+// Notification (UI → Host)
+{
+  jsonrpc: "2.0",
+  method: "ui/notifications/initialized",
+  params: {}
+}
+```
+
+Guest UI behavior:
+* Guest UI MUST send this notification after processing the `ui/initialize` response.
+* Guest UI SHOULD be ready to receive notifications after sending this.
+
 ### Host Context in `McpUiInitializeResult`
 
 When the View sends an `ui/initialize` request to the Host, the Host SHOULD include UI-specific context in the `McpUiInitializeResult`'s `hostContext` field:
