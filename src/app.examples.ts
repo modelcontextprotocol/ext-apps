@@ -1,5 +1,5 @@
 /**
- * Type-checked examples for {@link App} and constants in {@link ./app.ts}.
+ * Type-checked examples for {@link App `App`} and constants in {@link ./app.ts `app.ts`}.
  *
  * These examples are included in the API documentation via `@includeCode` tags.
  * Each function's region markers define the code snippet that appears in the docs.
@@ -82,18 +82,6 @@ async function App_basicUsage() {
 }
 
 /**
- * Example: Sending a message to the host's chat.
- */
-async function App_sendMessage(app: App) {
-  //#region App_sendMessage
-  await app.sendMessage({
-    role: "user",
-    content: [{ type: "text", text: "Weather updated!" }],
-  });
-  //#endregion App_sendMessage
-}
-
-/**
  * Example: Check host capabilities after connection.
  */
 async function App_getHostCapabilities_checkAfterConnection(app: App) {
@@ -157,12 +145,33 @@ async function App_ontoolinput_setter(app: App) {
  */
 function App_ontoolinputpartial_progressiveRendering(app: App) {
   //#region App_ontoolinputpartial_progressiveRendering
+  let toolInputs: Record<string, unknown> | null = null;
+  let toolInputsPartial: Record<string, unknown> | null = null;
+
   app.ontoolinputpartial = (params) => {
-    console.log("Partial args:", params.arguments);
-    // Update your UI progressively as arguments stream in
+    toolInputsPartial = params.arguments as Record<string, unknown>;
+    render();
   };
+
+  app.ontoolinput = (params) => {
+    toolInputs = params.arguments as Record<string, unknown>;
+    toolInputsPartial = null;
+    render();
+  };
+
+  function render() {
+    if (toolInputs) {
+      renderFinalUI(toolInputs);
+    } else {
+      renderLoadingUI(toolInputsPartial); // e.g., shimmer with partial preview
+    }
+  }
   //#endregion App_ontoolinputpartial_progressiveRendering
 }
+
+// Stubs for App_ontoolinputpartial_progressiveRendering example
+declare function renderLoadingUI(data: Record<string, unknown> | null): void;
+declare function renderFinalUI(data: Record<string, unknown>): void;
 
 /**
  * Example: Display tool execution results using ontoolresult.
@@ -204,6 +213,20 @@ function App_onhostcontextchanged_respondToTheme(app: App) {
     }
   };
   //#endregion App_onhostcontextchanged_respondToTheme
+}
+
+/**
+ * Example: Respond to display mode changes using onhostcontextchanged.
+ */
+function App_onhostcontextchanged_respondToDisplayMode(app: App) {
+  //#region App_onhostcontextchanged_respondToDisplayMode
+  app.onhostcontextchanged = (params) => {
+    if (params.displayMode) {
+      const isFullscreen = params.displayMode === "fullscreen";
+      document.body.classList.toggle("fullscreen", isFullscreen);
+    }
+  };
+  //#endregion App_onhostcontextchanged_respondToDisplayMode
 }
 
 /**
@@ -295,6 +318,33 @@ async function App_sendMessage_textFromInteraction(app: App) {
 }
 
 /**
+ * Example: Send follow-up message after offloading large data to model context.
+ */
+async function App_sendMessage_withLargeContext(
+  app: App,
+  fullTranscript: string,
+  speakerNames: string[],
+) {
+  //#region App_sendMessage_withLargeContext
+  const markdown = `---
+word-count: ${fullTranscript.split(/\s+/).length}
+speaker-names: ${speakerNames.join(", ")}
+---
+
+${fullTranscript}`;
+
+  // Offload long transcript to model context
+  await app.updateModelContext({ content: [{ type: "text", text: markdown }] });
+
+  // Send brief trigger message
+  await app.sendMessage({
+    role: "user",
+    content: [{ type: "text", text: "Summarize the key points" }],
+  });
+  //#endregion App_sendMessage_withLargeContext
+}
+
+/**
  * Example: Log app state for debugging.
  */
 function App_sendLog_debugState(app: App) {
@@ -310,23 +360,49 @@ function App_sendLog_debugState(app: App) {
 /**
  * Example: Update model context with current app state.
  */
-async function App_updateModelContext_appState(app: App) {
+async function App_updateModelContext_appState(
+  app: App,
+  itemList: string[],
+  totalCost: string,
+  currency: string,
+) {
   //#region App_updateModelContext_appState
+  const markdown = `---
+item-count: ${itemList.length}
+total-cost: ${totalCost}
+currency: ${currency}
+---
+
+User is viewing their shopping cart with ${itemList.length} items selected:
+
+${itemList.map((item) => `- ${item}`).join("\n")}`;
+
   await app.updateModelContext({
-    content: [{ type: "text", text: "User selected 3 items totaling $150.00" }],
+    content: [{ type: "text", text: markdown }],
   });
   //#endregion App_updateModelContext_appState
 }
 
 /**
- * Example: Update with structured content.
+ * Example: Report runtime error to model.
  */
-async function App_updateModelContext_structuredContent(app: App) {
-  //#region App_updateModelContext_structuredContent
-  await app.updateModelContext({
-    structuredContent: { selectedItems: 3, total: 150.0, currency: "USD" },
-  });
-  //#endregion App_updateModelContext_structuredContent
+async function App_updateModelContext_reportError(app: App) {
+  //#region App_updateModelContext_reportError
+  try {
+    const _stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // ... use _stream for transcription
+  } catch (err) {
+    // Inform the model that the app is in a degraded state
+    await app.updateModelContext({
+      content: [
+        {
+          type: "text",
+          text: "Error: transcription unavailable",
+        },
+      ],
+    });
+  }
+  //#endregion App_updateModelContext_reportError
 }
 
 /**
@@ -344,16 +420,17 @@ async function App_openLink_documentation(app: App) {
 }
 
 /**
- * Example: Request fullscreen mode.
+ * Example: Toggle between inline and fullscreen display modes.
  */
-async function App_requestDisplayMode_fullscreen(app: App) {
-  //#region App_requestDisplayMode_fullscreen
-  const context = app.getHostContext();
-  if (context?.availableDisplayModes?.includes("fullscreen")) {
-    const result = await app.requestDisplayMode({ mode: "fullscreen" });
-    console.log("Display mode set to:", result.mode);
+async function App_requestDisplayMode_toggle(app: App) {
+  //#region App_requestDisplayMode_toggle
+  const ctx = app.getHostContext();
+  if (ctx?.availableDisplayModes?.includes("fullscreen")) {
+    const target = ctx.displayMode === "fullscreen" ? "inline" : "fullscreen";
+    const result = await app.requestDisplayMode({ mode: target });
+    console.log("Now in:", result.mode);
   }
-  //#endregion App_requestDisplayMode_fullscreen
+  //#endregion App_requestDisplayMode_toggle
 }
 
 /**

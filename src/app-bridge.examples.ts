@@ -1,5 +1,5 @@
 /**
- * Type-checked examples for {@link AppBridge}.
+ * Type-checked examples for {@link AppBridge `AppBridge`}.
  *
  * These examples are included in the API documentation via `@includeCode` tags.
  * Each function's region markers define the code snippet that appears in the docs.
@@ -31,7 +31,7 @@ async function AppBridge_basicUsage(serverTransport: Transport) {
   });
   await client.connect(serverTransport);
 
-  // Create bridge for the Guest UI
+  // Create bridge for the View
   const bridge = new AppBridge(
     client,
     { name: "MyHost", version: "1.0.0" },
@@ -46,7 +46,7 @@ async function AppBridge_basicUsage(serverTransport: Transport) {
   );
 
   bridge.oninitialized = () => {
-    console.log("Guest UI initialized");
+    console.log("View initialized");
     // Now safe to send tool input
     bridge.sendToolInput({ arguments: { location: "NYC" } });
   };
@@ -86,35 +86,35 @@ function AppBridge_constructor_withoutMcpClient() {
 }
 
 /**
- * Example: Check Guest UI capabilities after initialization.
+ * Example: Check View capabilities after initialization.
  */
 function AppBridge_getAppCapabilities_checkAfterInit(bridge: AppBridge) {
   //#region AppBridge_getAppCapabilities_checkAfterInit
   bridge.oninitialized = () => {
     const caps = bridge.getAppCapabilities();
     if (caps?.tools) {
-      console.log("Guest UI provides tools");
+      console.log("View provides tools");
     }
   };
   //#endregion AppBridge_getAppCapabilities_checkAfterInit
 }
 
 /**
- * Example: Log Guest UI information after initialization.
+ * Example: Log View information after initialization.
  */
 function AppBridge_getAppVersion_logAfterInit(bridge: AppBridge) {
   //#region AppBridge_getAppVersion_logAfterInit
   bridge.oninitialized = () => {
     const appInfo = bridge.getAppVersion();
     if (appInfo) {
-      console.log(`Guest UI: ${appInfo.name} v${appInfo.version}`);
+      console.log(`View: ${appInfo.name} v${appInfo.version}`);
     }
   };
   //#endregion AppBridge_getAppVersion_logAfterInit
 }
 
 /**
- * Example: Handle Guest UI initialization and send tool input.
+ * Example: Handle View initialization and send tool input.
  */
 function AppBridge_oninitialized_sendToolInput(
   bridge: AppBridge,
@@ -122,14 +122,14 @@ function AppBridge_oninitialized_sendToolInput(
 ) {
   //#region AppBridge_oninitialized_sendToolInput
   bridge.oninitialized = () => {
-    console.log("Guest UI ready");
+    console.log("View ready");
     bridge.sendToolInput({ arguments: toolArgs });
   };
   //#endregion AppBridge_oninitialized_sendToolInput
 }
 
 /**
- * Example: Handle message requests from the Guest UI.
+ * Example: Handle message requests from the View.
  */
 function AppBridge_onmessage_logMessage(bridge: AppBridge) {
   //#region AppBridge_onmessage_logMessage
@@ -169,7 +169,7 @@ declare const modelContextManager: {
 };
 
 /**
- * Example: Handle external link requests from the Guest UI.
+ * Example: Handle external link requests from the View.
  */
 function AppBridge_onopenlink_handleRequest(bridge: AppBridge) {
   //#region AppBridge_onopenlink_handleRequest
@@ -195,7 +195,7 @@ function AppBridge_onopenlink_handleRequest(bridge: AppBridge) {
 }
 
 /**
- * Example: Store model context updates from the Guest UI.
+ * Example: Store model context updates from the View.
  */
 function AppBridge_onupdatemodelcontext_storeContext(bridge: AppBridge) {
   //#region AppBridge_onupdatemodelcontext_storeContext
@@ -283,18 +283,18 @@ function AppBridge_onlistprompts_returnPrompts(
 }
 
 /**
- * Example: Handle ping requests from the Guest UI.
+ * Example: Handle ping requests from the View.
  */
 function AppBridge_onping_handleRequest(bridge: AppBridge) {
   //#region AppBridge_onping_handleRequest
   bridge.onping = (params, extra) => {
-    console.log("Received ping from Guest UI");
+    console.log("Received ping from view");
   };
   //#endregion AppBridge_onping_handleRequest
 }
 
 /**
- * Example: Handle size change notifications from the Guest UI.
+ * Example: Handle size change notifications from the View.
  */
 function AppBridge_onsizechange_handleResize(
   bridge: AppBridge,
@@ -313,7 +313,7 @@ function AppBridge_onsizechange_handleResize(
 }
 
 /**
- * Example: Handle display mode requests from the Guest UI.
+ * Example: Handle display mode requests from the View.
  */
 function AppBridge_onrequestdisplaymode_handleRequest(
   bridge: AppBridge,
@@ -331,13 +331,13 @@ function AppBridge_onrequestdisplaymode_handleRequest(
 }
 
 /**
- * Example: Handle logging messages from the Guest UI.
+ * Example: Handle logging messages from the View.
  */
 function AppBridge_onloggingmessage_handleLog(bridge: AppBridge) {
   //#region AppBridge_onloggingmessage_handleLog
   bridge.onloggingmessage = ({ level, logger, data }) => {
     console[level === "error" ? "error" : "log"](
-      `[${logger ?? "Guest UI"}] ${level.toUpperCase()}:`,
+      `[${logger ?? "View"}] ${level.toUpperCase()}:`,
       data,
     );
   };
@@ -345,7 +345,7 @@ function AppBridge_onloggingmessage_handleLog(bridge: AppBridge) {
 }
 
 /**
- * Example: Gracefully tear down the Guest UI before unmounting.
+ * Example: Gracefully tear down the View before unmounting.
  */
 async function AppBridge_teardownResource_gracefulShutdown(
   bridge: AppBridge,
@@ -354,7 +354,7 @@ async function AppBridge_teardownResource_gracefulShutdown(
   //#region AppBridge_teardownResource_gracefulShutdown
   try {
     await bridge.teardownResource({});
-    // Guest UI is ready, safe to unmount iframe
+    // View is ready, safe to unmount iframe
     iframe.remove();
   } catch (error) {
     console.error("Teardown failed:", error);
@@ -471,7 +471,7 @@ async function AppBridge_connect_withMcpClient(
   );
 
   bridge.oninitialized = () => {
-    console.log("Guest UI ready");
+    console.log("View ready");
     bridge.sendToolInput({ arguments: toolArgs });
   };
 

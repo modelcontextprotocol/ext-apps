@@ -65,21 +65,14 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
 
   // Show fullscreen button if available (only update if field is present)
   if (ctx.availableDisplayModes !== undefined) {
-    if (ctx.availableDisplayModes.includes("fullscreen")) {
-      fullscreenBtn.classList.add("available");
-    } else {
-      fullscreenBtn.classList.remove("available");
-    }
+    const canFullscreen = ctx.availableDisplayModes.includes("fullscreen");
+    fullscreenBtn.classList.toggle("available", canFullscreen);
   }
 
   // Update display mode state and UI
   if (ctx.displayMode) {
     currentDisplayMode = ctx.displayMode as "inline" | "fullscreen";
-    if (currentDisplayMode === "fullscreen") {
-      mainEl.classList.add("fullscreen");
-    } else {
-      mainEl.classList.remove("fullscreen");
-    }
+    mainEl.classList.toggle("fullscreen", currentDisplayMode === "fullscreen");
   }
 }
 
@@ -96,11 +89,7 @@ async function toggleFullscreen() {
   try {
     const result = await app.requestDisplayMode({ mode: newMode });
     currentDisplayMode = result.mode as "inline" | "fullscreen";
-    if (currentDisplayMode === "fullscreen") {
-      mainEl.classList.add("fullscreen");
-    } else {
-      mainEl.classList.remove("fullscreen");
-    }
+    mainEl.classList.toggle("fullscreen", currentDisplayMode === "fullscreen");
   } catch (err) {
     log.error("Failed to change display mode:", err);
   }

@@ -1,6 +1,6 @@
 # QR Code MCP Server
 
-A minimal Python MCP server that generates customizable QR codes with an interactive widget UI.
+A minimal Python MCP server that generates customizable QR codes with an interactive view UI.
 
 ![Screenshot](https://modelcontextprotocol.github.io/ext-apps/screenshots/qr-server/screenshot.png)
 
@@ -33,7 +33,7 @@ Then add to your MCP client configuration (stdio transport), replacing the path 
 
 - Generate QR codes from any text or URL
 - Customizable colors, size, and error correction
-- Interactive widget that displays in MCP-UI enabled clients
+- Interactive view that displays in MCP-UI enabled clients
 - Supports both HTTP (for web clients) and stdio (for MCP clients)
 
 ## Prerequisites
@@ -151,19 +151,19 @@ Generate a QR code with optional customization.
 ```
 qr-server/
 ├── server.py      # MCP server (FastMCP + uvicorn, deps inline via PEP 723)
-├── widget.html    # Interactive UI widget
+├── view.html    # Interactive UI view
 └── README.md
 ```
 
 ### Protocol
 
-The widget uses MCP Apps SDK protocol:
+The view uses MCP Apps SDK protocol:
 
-1. Widget sends `ui/initialize` request
+1. The view sends `ui/initialize` request
 2. Host responds with capabilities
-3. Widget sends `ui/notifications/initialized`
+3. The view sends `ui/notifications/initialized`
 4. Host sends `ui/notifications/tool-result` with QR image
-5. Widget renders image and sends `ui/notifications/size-changed`
+5. The view renders image and sends `ui/notifications/size-changed`
 
 ## Dependencies
 

@@ -277,7 +277,7 @@ export function newAppBridge(
     },
   });
 
-  // Register all handlers before calling connect(). The Guest UI can start
+  // Register all handlers before calling connect(). The view can start
   // sending requests immediately after the initialization handshake, so any
   // handlers registered after connect() might miss early requests.
 

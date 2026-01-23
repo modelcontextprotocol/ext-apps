@@ -15,7 +15,6 @@ import os
 import sys
 import io
 import base64
-from pathlib import Path
 
 import qrcode
 import uvicorn
@@ -23,16 +22,86 @@ from mcp.server.fastmcp import FastMCP
 from mcp import types
 from starlette.middleware.cors import CORSMiddleware
 
-WIDGET_URI = "ui://qr-server/widget.html"
+VIEW_URI = "ui://qr-server/view.html"
 HOST = os.environ.get("HOST", "0.0.0.0")  # 0.0.0.0 for Docker compatibility
 PORT = int(os.environ.get("PORT", "3108"))
 
 mcp = FastMCP("QR Code Server")
 
+# Embedded View HTML for self-contained usage (uv run <url> or unbundled)
+EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
+<html>
+<head>
+  <meta name="color-scheme" content="light dark">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 340px;
+      width: 340px;
+    }
+    img {
+      width: 300px;
+      height: 300px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div id="qr"></div>
+  <script type="module">
+    import { App } from "https://unpkg.com/@modelcontextprotocol/ext-apps@0.4.0/app-with-deps";
+
+    const app = new App({ name: "QR View", version: "1.0.0" });
+
+    app.ontoolresult = ({ content }) => {
+      const img = content?.find(c => c.type === 'image');
+      if (img) {
+        const qrDiv = document.getElementById('qr');
+        qrDiv.innerHTML = '';
+
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/gif'];
+        const mimeType = allowedTypes.includes(img.mimeType) ? img.mimeType : 'image/png';
+
+        const image = document.createElement('img');
+        image.src = `data:${mimeType};base64,${img.data}`;
+        image.alt = "QR Code";
+        qrDiv.appendChild(image);
+      }
+    };
+
+    function handleHostContextChanged(ctx) {
+      if (ctx.safeAreaInsets) {
+        document.body.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
+        document.body.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
+        document.body.style.paddingBottom = `${ctx.safeAreaInsets.bottom}px`;
+        document.body.style.paddingLeft = `${ctx.safeAreaInsets.left}px`;
+      }
+    }
+
+    app.onhostcontextchanged = handleHostContextChanged;
+
+    await app.connect();
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  </script>
+</body>
+</html>"""
+
 
 @mcp.tool(meta={
-    "ui":{"resourceUri": WIDGET_URI},
-    "ui/resourceUri": WIDGET_URI, # legacy support
+    "ui":{"resourceUri": VIEW_URI},
+    "ui/resourceUri": VIEW_URI, # legacy support
 })
 def generate_qr(
     text: str = "https://modelcontextprotocol.io",
@@ -78,13 +147,13 @@ def generate_qr(
 # IMPORTANT: all the external domains used by app must be listed
 # in the meta.ui.csp.resourceDomains - otherwise they will be blocked by CSP policy
 @mcp.resource(
-    WIDGET_URI,
+    VIEW_URI,
     mime_type="text/html;profile=mcp-app",
     meta={"ui": {"csp": {"resourceDomains": ["https://unpkg.com"]}}},
 )
-def widget() -> str:
-    """Widget HTML resource with CSP metadata for external dependencies."""
-    return Path(__file__).parent.joinpath("widget.html").read_text()
+def view() -> str:
+    """View HTML resource with CSP metadata for external dependencies."""
+    return EMBEDDED_VIEW_HTML
 
 if __name__ == "__main__":
     if "--stdio" in sys.argv:

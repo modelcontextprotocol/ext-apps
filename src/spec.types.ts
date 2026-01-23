@@ -144,7 +144,7 @@ export type McpUiStyles = Record<McpUiStyleVariableKey, string | undefined>;
 
 /**
  * @description Request to open an external URL in the host's default browser.
- * @see {@link app!App.openLink} for the method that sends this request
+ * @see {@link app!App.openLink `App.openLink`} for the method that sends this request
  */
 export interface McpUiOpenLinkRequest {
   method: "ui/open-link";
@@ -156,7 +156,7 @@ export interface McpUiOpenLinkRequest {
 
 /**
  * @description Result from opening a URL.
- * @see {@link McpUiOpenLinkRequest}
+ * @see {@link McpUiOpenLinkRequest `McpUiOpenLinkRequest`}
  */
 export interface McpUiOpenLinkResult {
   /** @description True if the host failed to open the URL (e.g., due to security policy). */
@@ -170,7 +170,7 @@ export interface McpUiOpenLinkResult {
 
 /**
  * @description Request to send a message to the host's chat interface.
- * @see {@link app!App.sendMessage} for the method that sends this request
+ * @see {@link app!App.sendMessage `App.sendMessage`} for the method that sends this request
  */
 export interface McpUiMessageRequest {
   method: "ui/message";
@@ -184,7 +184,7 @@ export interface McpUiMessageRequest {
 
 /**
  * @description Result from sending a message.
- * @see {@link McpUiMessageRequest}
+ * @see {@link McpUiMessageRequest `McpUiMessageRequest`}
  */
 export interface McpUiMessageResult {
   /** @description True if the host rejected or failed to deliver the message. */
@@ -226,8 +226,8 @@ export interface McpUiSandboxResourceReadyNotification {
 }
 
 /**
- * @description Notification of UI size changes (Guest UI -> Host).
- * @see {@link app!App.sendSizeChanged} for the method to send this from Guest UI
+ * @description Notification of UI size changes (View -> Host).
+ * @see {@link app!App.sendSizeChanged `App.sendSizeChanged`} for the method to send this from View
  */
 export interface McpUiSizeChangedNotification {
   method: "ui/notifications/size-changed";
@@ -240,7 +240,7 @@ export interface McpUiSizeChangedNotification {
 }
 
 /**
- * @description Notification containing complete tool arguments (Host -> Guest UI).
+ * @description Notification containing complete tool arguments (Host -> View).
  */
 export interface McpUiToolInputNotification {
   method: "ui/notifications/tool-input";
@@ -251,7 +251,7 @@ export interface McpUiToolInputNotification {
 }
 
 /**
- * @description Notification containing partial/streaming tool arguments (Host -> Guest UI).
+ * @description Notification containing partial/streaming tool arguments (Host -> View).
  */
 export interface McpUiToolInputPartialNotification {
   method: "ui/notifications/tool-input-partial";
@@ -262,7 +262,7 @@ export interface McpUiToolInputPartialNotification {
 }
 
 /**
- * @description Notification containing tool execution result (Host -> Guest UI).
+ * @description Notification containing tool execution result (Host -> View).
  */
 export interface McpUiToolResultNotification {
   method: "ui/notifications/tool-result";
@@ -271,7 +271,7 @@ export interface McpUiToolResultNotification {
 }
 
 /**
- * @description Notification that tool execution was cancelled (Host -> Guest UI).
+ * @description Notification that tool execution was cancelled (Host -> View).
  * Host MUST send this if tool execution was cancelled for any reason (user action,
  * sampling error, classifier intervention, etc.).
  */
@@ -287,7 +287,7 @@ export interface McpUiToolCancelledNotification {
  * @description CSS blocks that can be injected by apps.
  */
 export interface McpUiHostCss {
-  /** @description CSS for font loading (`@font-face` rules or `@import` statements). Apps must apply using {@link applyHostFonts}. */
+  /** @description CSS for font loading (`@font-face` rules or `@import` statements). Apps must apply using {@link applyHostFonts `applyHostFonts`}. */
   fonts?: string;
 }
 
@@ -302,7 +302,7 @@ export interface McpUiHostStyles {
 }
 
 /**
- * @description Rich context about the host environment provided to Guest UIs.
+ * @description Rich context about the host environment provided to views.
  */
 export interface McpUiHostContext {
   /** @description Allow additional properties for forward compatibility. */
@@ -375,8 +375,8 @@ export interface McpUiHostContext {
 }
 
 /**
- * @description Notification that host context has changed (Host -> Guest UI).
- * @see {@link McpUiHostContext} for the full context structure
+ * @description Notification that host context has changed (Host -> View).
+ * @see {@link McpUiHostContext `McpUiHostContext`} for the full context structure
  */
 export interface McpUiHostContextChangedNotification {
   method: "ui/notifications/host-context-changed";
@@ -385,16 +385,16 @@ export interface McpUiHostContextChangedNotification {
 }
 
 /**
- * @description Request to update the agent's context without requiring a follow-up action (Guest UI -> Host).
+ * @description Request to update the agent's context without requiring a follow-up action (View -> Host).
  *
  * Unlike `notifications/message` which is for debugging/logging, this request is intended
- * to update the Host's model context. Each request overwrites the previous context sent by the Guest UI.
+ * to update the Host's model context. Each request overwrites the previous context sent by the View.
  * Unlike messages, context updates do not trigger follow-ups.
  *
  * The host will typically defer sending the context to the model until the next user message
  * (including `ui/message`), and will only send the last update received.
  *
- * @see {@link app.App.updateModelContext} for the method that sends this request
+ * @see {@link app.App.updateModelContext `App.updateModelContext`} for the method that sends this request
  */
 export interface McpUiUpdateModelContextRequest {
   method: "ui/update-model-context";
@@ -407,8 +407,8 @@ export interface McpUiUpdateModelContextRequest {
 }
 
 /**
- * @description Request for graceful shutdown of the Guest UI (Host -> Guest UI).
- * @see {@link app-bridge!AppBridge.teardownResource} for the host method that sends this
+ * @description Request for graceful shutdown of the View (Host -> View).
+ * @see {@link app-bridge!AppBridge.teardownResource `AppBridge.teardownResource`} for the host method that sends this
  */
 export interface McpUiResourceTeardownRequest {
   method: "ui/resource-teardown";
@@ -417,7 +417,7 @@ export interface McpUiResourceTeardownRequest {
 
 /**
  * @description Result from graceful shutdown request.
- * @see {@link McpUiResourceTeardownRequest}
+ * @see {@link McpUiResourceTeardownRequest `McpUiResourceTeardownRequest`}
  */
 export interface McpUiResourceTeardownResult {
   /**
@@ -443,7 +443,7 @@ export interface McpUiSupportedContentBlockModalities {
 
 /**
  * @description Capabilities supported by the host application.
- * @see {@link McpUiInitializeResult} for the initialization result that includes these capabilities
+ * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
 export interface McpUiHostCapabilities {
   /** @description Experimental features (structure TBD). */
@@ -471,13 +471,13 @@ export interface McpUiHostCapabilities {
   };
   /** @description Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns. */
   updateModelContext?: McpUiSupportedContentBlockModalities;
-  /** @description Host supports receiving content messages (ui/message) from the Guest UI. */
+  /** @description Host supports receiving content messages (ui/message) from the view. */
   message?: McpUiSupportedContentBlockModalities;
 }
 
 /**
- * @description Capabilities provided by the Guest UI ({@link app!App}).
- * @see {@link McpUiInitializeRequest} for the initialization request that includes these capabilities
+ * @description Capabilities provided by the View ({@link app!App `App`}).
+ * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`} for the initialization request that includes these capabilities
  */
 export interface McpUiAppCapabilities {
   /** @description Experimental features (structure TBD). */
@@ -490,8 +490,8 @@ export interface McpUiAppCapabilities {
 }
 
 /**
- * @description Initialization request sent from Guest UI to Host.
- * @see {@link app!App.connect} for the method that sends this request
+ * @description Initialization request sent from View to Host.
+ * @see {@link app!App.connect `App.connect`} for the method that sends this request
  */
 export interface McpUiInitializeRequest {
   method: "ui/initialize";
@@ -506,8 +506,8 @@ export interface McpUiInitializeRequest {
 }
 
 /**
- * @description Initialization result returned from Host to Guest UI.
- * @see {@link McpUiInitializeRequest}
+ * @description Initialization result returned from Host to View.
+ * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`}
  */
 export interface McpUiInitializeResult {
   /** @description Negotiated protocol version string (e.g., "2025-11-21"). */
@@ -526,8 +526,8 @@ export interface McpUiInitializeResult {
 }
 
 /**
- * @description Notification that Guest UI has completed initialization (Guest UI -> Host).
- * @see {@link app!App.connect} for the method that sends this notification
+ * @description Notification that View has completed initialization (View -> Host).
+ * @see {@link app!App.connect `App.connect`} for the method that sends this notification
  */
 export interface McpUiInitializedNotification {
   method: "ui/notifications/initialized";
@@ -572,7 +572,7 @@ export interface McpUiResourceMeta {
   csp?: McpUiResourceCsp;
   /** @description Sandbox permissions requested by the UI. */
   permissions?: McpUiResourcePermissions;
-  /** @description Dedicated origin for widget sandbox. */
+  /** @description Dedicated origin for view sandbox. */
   domain?: string;
   /** @description Visual boundary preference - true if UI prefers a visible border. */
   prefersBorder?: boolean;
@@ -582,7 +582,7 @@ export interface McpUiResourceMeta {
  * @description Request to change the display mode of the UI.
  * The host will respond with the actual display mode that was set,
  * which may differ from the requested mode if not supported.
- * @see {@link app!App.requestDisplayMode} for the method that sends this request
+ * @see {@link app!App.requestDisplayMode `App.requestDisplayMode`} for the method that sends this request
  */
 export interface McpUiRequestDisplayModeRequest {
   method: "ui/request-display-mode";
@@ -594,7 +594,7 @@ export interface McpUiRequestDisplayModeRequest {
 
 /**
  * @description Result from requesting a display mode change.
- * @see {@link McpUiRequestDisplayModeRequest}
+ * @see {@link McpUiRequestDisplayModeRequest `McpUiRequestDisplayModeRequest`}
  */
 export interface McpUiRequestDisplayModeResult {
   /** @description The display mode that was actually set. May differ from requested if not supported. */
@@ -619,7 +619,7 @@ export interface McpUiToolMeta {
    * URI of the UI resource to display for this tool, if any.
    * This is converted to `_meta["ui/resourceUri"]`.
    *
-   * @example "ui://weather/widget.html"
+   * @example "ui://weather/view.html"
    */
   resourceUri?: string;
   /**

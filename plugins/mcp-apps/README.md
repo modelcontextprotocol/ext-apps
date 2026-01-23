@@ -19,7 +19,7 @@ Invoke skills by asking Claude Code to:
 
 - "Create an MCP App"
 - "Add a UI to an MCP tool"
-- "Build an interactive MCP widget"
+- "Build an interactive MCP View"
 - "Scaffold an MCP App"
 
 ### Migrate from OpenAI

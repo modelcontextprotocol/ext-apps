@@ -90,6 +90,7 @@
     "ts-to-zod": "^5.1.0",
     "tsx": "^4.21.0",
     "typedoc": "^0.28.14",
+    "typedoc-github-theme": "^0.3.1",
     "typescript": "^5.9.3",
     "zod": "^4.1.13"
   },

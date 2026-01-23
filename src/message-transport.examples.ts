@@ -1,5 +1,5 @@
 /**
- * Type-checked examples for {@link PostMessageTransport}.
+ * Type-checked examples for {@link PostMessageTransport `PostMessageTransport`}.
  *
  * These examples are included in the API documentation via `@includeCode` tags.
  * Each function's region markers define the code snippet that appears in the docs.
@@ -12,13 +12,13 @@ import type { App } from "./app.js";
 import type { AppBridge } from "./app-bridge.js";
 
 /**
- * Example: Guest UI connecting to parent window.
+ * Example: View connecting to parent window.
  */
-async function PostMessageTransport_guestUI(app: App) {
-  //#region PostMessageTransport_guestUI
+async function PostMessageTransport_view(app: App) {
+  //#region PostMessageTransport_view
   const transport = new PostMessageTransport(window.parent, window.parent);
   await app.connect(transport);
-  //#endregion PostMessageTransport_guestUI
+  //#endregion PostMessageTransport_view
 }
 
 /**
@@ -36,12 +36,12 @@ async function PostMessageTransport_host(bridge: AppBridge) {
 }
 
 /**
- * Example: Creating transport for guest UI (constructor only).
+ * Example: Creating transport for view (constructor only).
  */
-function PostMessageTransport_constructor_guestUI() {
-  //#region PostMessageTransport_constructor_guestUI
+function PostMessageTransport_constructor_view() {
+  //#region PostMessageTransport_constructor_view
   const transport = new PostMessageTransport(window.parent, window.parent);
-  //#endregion PostMessageTransport_constructor_guestUI
+  //#endregion PostMessageTransport_constructor_view
 }
 
 /**

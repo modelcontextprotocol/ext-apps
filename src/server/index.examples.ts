@@ -1,5 +1,5 @@
 /**
- * Type-checked examples for {@link registerAppTool} and {@link registerAppResource}.
+ * Type-checked examples for {@link registerAppTool `registerAppTool`} and {@link registerAppResource `registerAppResource`}.
  *
  * These examples are included in the API documentation via `@includeCode` tags.
  * Each function's region markers define the code snippet that appears in the docs.
@@ -39,13 +39,13 @@ function index_overview(
   readCallback: ReadResourceCallback,
 ) {
   //#region index_overview
-  // Register a tool that displays a widget
+  // Register a tool that displays a view
   registerAppTool(
     server,
     "weather",
     {
       description: "Get weather forecast",
-      _meta: { ui: { resourceUri: "ui://weather/widget.html" } },
+      _meta: { ui: { resourceUri: "ui://weather/view.html" } },
     },
     toolCallback,
   );
@@ -53,8 +53,8 @@ function index_overview(
   // Register the HTML resource the tool references
   registerAppResource(
     server,
-    "Weather Widget",
-    "ui://weather/widget.html",
+    "Weather View",
+    "ui://weather/view.html",
     {},
     readCallback,
   );
@@ -74,7 +74,7 @@ function registerAppTool_basicUsage(server: McpServer) {
       description: "Get current weather for a location",
       inputSchema: { location: z.string() },
       _meta: {
-        ui: { resourceUri: "ui://weather/widget.html" },
+        ui: { resourceUri: "ui://weather/view.html" },
       },
     },
     async (args) => {
@@ -86,11 +86,10 @@ function registerAppTool_basicUsage(server: McpServer) {
 }
 
 /**
- * Example: Tool visibility - create app-only tools for UI actions.
+ * Example: Model-only visibility - tools visible to model but not callable by UI.
  */
-function registerAppTool_toolVisibility(server: McpServer) {
-  //#region registerAppTool_toolVisibility
-  // Main tool - visible to both model and app (default)
+function registerAppTool_modelOnlyVisibility(server: McpServer) {
+  //#region registerAppTool_modelOnlyVisibility
   registerAppTool(
     server,
     "show-cart",
@@ -99,7 +98,7 @@ function registerAppTool_toolVisibility(server: McpServer) {
       _meta: {
         ui: {
           resourceUri: "ui://shop/cart.html",
-          visibility: ["model", "app"],
+          visibility: ["model"],
         },
       },
     },
@@ -108,8 +107,14 @@ function registerAppTool_toolVisibility(server: McpServer) {
       return { content: [{ type: "text", text: JSON.stringify(cart) }] };
     },
   );
+  //#endregion registerAppTool_modelOnlyVisibility
+}
 
-  // App-only tool - hidden from the model, only callable by the UI
+/**
+ * Example: App-only visibility - tools hidden from model, only callable by UI.
+ */
+function registerAppTool_appOnlyVisibility(server: McpServer) {
+  //#region registerAppTool_appOnlyVisibility
   registerAppTool(
     server,
     "update-quantity",
@@ -128,7 +133,7 @@ function registerAppTool_toolVisibility(server: McpServer) {
       return { content: [{ type: "text", text: JSON.stringify(cart) }] };
     },
   );
-  //#endregion registerAppTool_toolVisibility
+  //#endregion registerAppTool_appOnlyVisibility
 }
 
 /**
@@ -138,17 +143,17 @@ function registerAppResource_basicUsage(server: McpServer) {
   //#region registerAppResource_basicUsage
   registerAppResource(
     server,
-    "Weather Widget",
-    "ui://weather/widget.html",
+    "Weather View",
+    "ui://weather/view.html",
     {
       description: "Interactive weather display",
     },
     async () => ({
       contents: [
         {
-          uri: "ui://weather/widget.html",
+          uri: "ui://weather/view.html",
           mimeType: RESOURCE_MIME_TYPE,
-          text: await fs.readFile("dist/widget.html", "utf-8"),
+          text: await fs.readFile("dist/view.html", "utf-8"),
         },
       ],
     }),

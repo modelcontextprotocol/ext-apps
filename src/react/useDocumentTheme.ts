@@ -20,8 +20,8 @@ import { McpUiTheme } from "../types";
  * @example Use with theme-aware styling
  * {@includeCode ./useDocumentTheme.examples.tsx#useDocumentTheme_themedButton}
  *
- * @see {@link getDocumentTheme} for the underlying function
- * @see {@link applyDocumentTheme} to set the theme
+ * @see {@link getDocumentTheme `getDocumentTheme`} for the underlying function
+ * @see {@link applyDocumentTheme `applyDocumentTheme`} to set the theme
  */
 export function useDocumentTheme(): McpUiTheme {
   const [theme, setTheme] = useState<McpUiTheme>(getDocumentTheme);

@@ -56,7 +56,7 @@ const PROXY_READY_NOTIFICATION: McpUiSandboxProxyReadyNotification["method"] =
 // Message relay: This Sandbox (outer iframe) acts as a bidirectional bridge,
 // forwarding messages between:
 //
-//   Host (parent window) ↔ Sandbox (outer frame) ↔ Guest UI (inner iframe)
+//   Host (parent window) ↔ Sandbox (outer frame) ↔ View (inner iframe)
 //
 // Reason: the parent window and inner iframe have different origins and can't
 // communicate directly, so the outer iframe forwards messages in both
@@ -64,7 +64,7 @@ const PROXY_READY_NOTIFICATION: McpUiSandboxProxyReadyNotification["method"] =
 //
 // Special case: The "ui/notifications/sandbox-proxy-ready" message is
 // intercepted here (not relayed) because the Sandbox uses it to configure and
-// load the inner iframe with the Guest UI HTML content.
+// load the inner iframe with the view HTML content.
 //
 // Security: CSP is enforced via HTTP headers on sandbox.html (set by serve.ts
 // based on ?csp= query param). This is tamper-proof unlike meta tags.
@@ -128,7 +128,7 @@ window.addEventListener("message", async (event) => {
   }
 });
 
-// Notify the Host that the Sandbox is ready to receive Guest UI HTML.
+// Notify the Host that the Sandbox is ready to receive view HTML.
 // Use specific origin instead of "*" to ensure only the expected host receives this.
 window.parent.postMessage({
   jsonrpc: "2.0",

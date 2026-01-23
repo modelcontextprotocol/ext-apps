@@ -10,7 +10,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import type { WidgetProps } from "./mcp-app-wrapper.tsx";
+import type { ViewProps } from "./mcp-app-wrapper.tsx";
 
 // =============================================================================
 // Types
@@ -21,7 +21,7 @@ interface ThreeJSToolInput {
   height?: number;
 }
 
-type ThreeJSAppProps = WidgetProps<ThreeJSToolInput>;
+type ThreeJSAppProps = ViewProps<ThreeJSToolInput>;
 
 // =============================================================================
 // Constants

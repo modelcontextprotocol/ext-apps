@@ -1,5 +1,5 @@
 /**
- * Type-checked examples for style utilities in {@link ./styles.ts}.
+ * Type-checked examples for style utilities in {@link ./styles.ts `styles.ts`}.
  *
  * These examples are included in the API documentation via `@includeCode` tags.
  * Each function's region markers define the code snippet that appears in the docs.
@@ -21,7 +21,7 @@ import {
 function getDocumentTheme_checkCurrent() {
   //#region getDocumentTheme_checkCurrent
   const theme = getDocumentTheme();
-  const isDark = theme === "dark";
+  document.body.classList.toggle("dark", theme === "dark");
   //#endregion getDocumentTheme_checkCurrent
 }
 
@@ -30,11 +30,20 @@ function getDocumentTheme_checkCurrent() {
  */
 function applyDocumentTheme_fromHostContext(app: App) {
   //#region applyDocumentTheme_fromHostContext
+  // Apply when host context changes
   app.onhostcontextchanged = (params) => {
     if (params.theme) {
       applyDocumentTheme(params.theme);
     }
   };
+
+  // Apply initial theme after connecting
+  app.connect().then(() => {
+    const ctx = app.getHostContext();
+    if (ctx?.theme) {
+      applyDocumentTheme(ctx.theme);
+    }
+  });
   //#endregion applyDocumentTheme_fromHostContext
 }
 
@@ -43,11 +52,23 @@ function applyDocumentTheme_fromHostContext(app: App) {
  */
 function applyHostStyleVariables_fromHostContext(app: App) {
   //#region applyHostStyleVariables_fromHostContext
+  // Use CSS variables in your styles
+  document.body.style.background = "var(--color-background-primary)";
+
+  // Apply when host context changes
   app.onhostcontextchanged = (params) => {
     if (params.styles?.variables) {
       applyHostStyleVariables(params.styles.variables);
     }
   };
+
+  // Apply initial styles after connecting
+  app.connect().then(() => {
+    const ctx = app.getHostContext();
+    if (ctx?.styles?.variables) {
+      applyHostStyleVariables(ctx.styles.variables);
+    }
+  });
   //#endregion applyHostStyleVariables_fromHostContext
 }
 
@@ -70,11 +91,20 @@ function applyHostStyleVariables_toElement(app: App) {
  */
 function applyHostFonts_fromHostContext(app: App) {
   //#region applyHostFonts_fromHostContext
+  // Apply when host context changes
   app.onhostcontextchanged = (params) => {
     if (params.styles?.css?.fonts) {
       applyHostFonts(params.styles.css.fonts);
     }
   };
+
+  // Apply initial fonts after connecting
+  app.connect().then(() => {
+    const ctx = app.getHostContext();
+    if (ctx?.styles?.css?.fonts) {
+      applyHostFonts(ctx.styles.css.fonts);
+    }
+  });
   //#endregion applyHostFonts_fromHostContext
 }
 

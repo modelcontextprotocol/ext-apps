@@ -38,7 +38,7 @@ const SLOW_SERVERS: Record<string, number> = {
 
 // Servers to skip in CI (require special resources like GPU, large ML models)
 const SKIP_SERVERS = new Set<string>([
-  // None currently - say-server widget works without TTS model for screenshots
+  // None currently - say-server view works without TTS model for screenshots
 ]);
 
 // Optional: filter to a single example via EXAMPLE env var (folder name)

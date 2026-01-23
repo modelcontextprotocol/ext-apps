@@ -185,7 +185,7 @@ export function createServer(): McpServer {
         },
       ],
       _meta: {
-        widgetUUID: randomUUID(),
+        viewUUID: randomUUID(),
       },
     }),
   );

@@ -30,13 +30,13 @@ Add to your MCP client configuration (stdio transport):
 This example showcases several MCP App capabilities:
 
 - **Single-file executable**: Python server with embedded React UI - no build step required
-- **Partial tool inputs** (`ontoolinputpartial`): Widget receives streaming text as it's being generated
+- **Partial tool inputs** (`ontoolinputpartial`): The view receives streaming text as it's being generated
 - **Queue-based streaming**: Demonstrates how to stream text out and audio in via a polling tool (adds text to an input queue, retrieves audio chunks from an output queue)
-- **Model context updates**: Widget updates the LLM with playback progress ("Playing: ...snippet...")
+- **Model context updates**: The view updates the LLM with playback progress ("Playing: ...snippet...")
 - **Native theming**: Uses CSS variables for automatic dark/light mode adaptation
 - **Fullscreen mode**: Toggle fullscreen via `requestDisplayMode()` API, press Escape to exit
-- **Multi-widget speak lock**: Coordinates multiple TTS widgets via localStorage so only one plays at a time
-- **Hidden tools** (`visibility: ["app"]`): Private tools only accessible to the widget, not the model
+- **Multi-view speak lock**: Coordinates multiple TTS views via localStorage so only one plays at a time
+- **Hidden tools** (`visibility: ["app"]`): Private tools only accessible to the view, not the model
 - **External links** (`openLink`): Attribution popup uses `app.openLink()` to open external URLs
 - **CSP metadata**: Resource declares required domains (`esm.sh`) for in-browser transpilation
 
@@ -132,29 +132,29 @@ See the [kyutai/tts-voices](https://huggingface.co/kyutai/tts-voices) repository
 
 The entire server is contained in a single `server.py` file:
 
-1. **`say` tool**: Public tool that triggers the widget with text to speak
-2. **Private tools** (`create_tts_queue`, `add_tts_text`, `poll_tts_audio`, etc.): Hidden from the model, only callable by the widget
-3. **Embedded React widget**: Uses [Babel standalone](https://babeljs.io/docs/babel-standalone) for in-browser JSX transpilation - no build step needed
+1. **`say` tool**: Public tool that triggers the view with text to speak
+2. **Private tools** (`create_tts_queue`, `add_tts_text`, `poll_tts_audio`, etc.): Hidden from the model, only callable by the view
+3. **Embedded React view**: Uses [Babel standalone](https://babeljs.io/docs/babel-standalone) for in-browser JSX transpilation - no build step needed
 4. **TTS backend**: Manages per-request audio queues using Pocket TTS
 
-The widget communicates with the server via MCP tool calls:
+The view communicates with the server via MCP tool calls:
 
 - Receives streaming text via `ontoolinputpartial` callback
 - Incrementally sends new text to the server as it arrives (via `add_tts_text`)
 - Polls for generated audio chunks while TTS runs in parallel
 - Plays audio via Web Audio API with synchronized text highlighting
 
-## Multi-Widget Speak Lock
+## Multi-view Speak Lock
 
-When multiple TTS widgets exist in the same browser (e.g., multiple chat messages each with their own say widget), they coordinate via localStorage to ensure only one plays at a time:
+When multiple TTS views exist in the same browser (e.g., multiple chat messages each with their own say view), they coordinate via localStorage to ensure only one plays at a time:
 
-1. **Unique Widget IDs**: Each widget receives a UUID via `toolResult._meta.widgetUUID`
-2. **Announce on Play**: When starting, a widget writes `{uuid, timestamp}` to `localStorage["mcp-tts-playing"]`
-3. **Poll for Conflicts**: Every 200ms, playing widgets check if another widget took the lock
-4. **Yield Gracefully**: If another widget started playing, pause and yield
+1. **Unique view IDs**: Each view receives a UUID via `toolResult._meta.viewUUID`
+2. **Announce on Play**: When starting, a view writes `{uuid, timestamp}` to `localStorage["mcp-tts-playing"]`
+3. **Poll for Conflicts**: Every 200ms, playing views check if another view took the lock
+4. **Yield Gracefully**: If another view started playing, pause and yield
 5. **Clean Up**: On pause/finish, clear the lock (only if owned)
 
-This "last writer wins" protocol ensures a seamless experience: clicking play on any widget immediately pauses others, without requiring cross-iframe postMessage coordination.
+This "last writer wins" protocol ensures a seamless experience: clicking play on any view immediately pauses others, without requiring cross-iframe postMessage coordination.
 
 ## TODO
 

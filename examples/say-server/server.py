@@ -12,17 +12,17 @@
 Say Demo - MCP App for streaming text-to-speech.
 
 This MCP server provides a "say" tool that speaks text using TTS.
-The widget receives streaming partial input and starts speaking immediately.
+The view receives streaming partial input and starts speaking immediately.
 
 Architecture:
-- The `say` tool itself is a no-op - it just triggers the widget
-- The widget uses `ontoolinputpartial` to receive text as it streams
-- Widget calls private tools to create TTS queue, add text, and poll audio
-- Audio plays in the widget using Web Audio API
+- The `say` tool itself is a no-op - it just triggers the view
+- The view uses `ontoolinputpartial` to receive text as it streams
+- view calls private tools to create TTS queue, add text, and poll audio
+- Audio plays in the view using Web Audio API
 - Model context updates show playback progress to the LLM
 - Native theming adapts to dark/light mode automatically
 - Fullscreen mode with Escape key to exit
-- Multi-widget speak lock coordinates playback across instances
+- Multi-View speak lock coordinates playback across instances
 
 Usage:
   # Start the MCP server
@@ -56,7 +56,7 @@ from pocket_tts.default_parameters import DEFAULT_AUDIO_PROMPT
 
 logger = logging.getLogger(__name__)
 
-WIDGET_URI = "ui://say-demo/widget.html"
+VIEW_URI = "ui://say-demo/view.html"
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "3109"))
 
@@ -167,8 +167,8 @@ def list_voices() -> list[types.TextContent]:
 
 
 @mcp.tool(meta={
-    "ui":{"resourceUri": WIDGET_URI},
-    "ui/resourceUri": WIDGET_URI, # legacy support
+    "ui":{"resourceUri": VIEW_URI},
+    "ui/resourceUri": VIEW_URI, # legacy support
 })
 def say(
     text: Annotated[str, Field(description="The English text to speak aloud")] = DEFAULT_TEXT,
@@ -192,19 +192,19 @@ def say(
 
     Note: English only. Non-English text may produce poor or garbled results.
     """
-    # Generate a unique ID for this widget instance (used for speak lock coordination)
-    widget_uuid = uuid.uuid4().hex[:12]
+    # Generate a unique ID for this view instance (used for speak lock coordination)
+    view_uuid = uuid.uuid4().hex[:12]
 
-    # This is a no-op - the widget handles everything via ontoolinputpartial
+    # This is a no-op - the view handles everything via ontoolinputpartial
     # The tool exists to:
-    # 1. Trigger the widget to load
+    # 1. Trigger the view to load
     # 2. Provide the resourceUri metadata
     # 3. Show the final text in the tool result
-    # 4. Provide widget UUID for multi-player coordination
+    # 4. Provide view UUID for multi-player coordination
     return [types.TextContent(
         type="text",
-        text=f"Displayed a TTS widget with voice '{voice}'. Click to play/pause, use toolbar to restart or fullscreen.",
-        _meta={"widgetUUID": widget_uuid},
+        text=f"Displayed a TTS view with voice '{voice}'. Click to play/pause, use toolbar to restart or fullscreen.",
+        _meta={"viewUUID": view_uuid},
     )]
 
 
@@ -348,7 +348,7 @@ def poll_tts_audio(queue_id: str) -> list[types.TextContent]:
     new_chunks = state.audio_chunks[state.chunks_delivered:]
     state.chunks_delivered = len(state.audio_chunks)
 
-    # Consider queues with errors as "done" so widget stops polling
+    # Consider queues with errors as "done" so view stops polling
     done = (state.status == "complete" or state.status == "error") and state.chunks_delivered >= len(state.audio_chunks)
 
     response = {
@@ -661,18 +661,18 @@ async def _process_tts_chunk(
 
 
 # ------------------------------------------------------
-# Widget Resource
+# View Resource
 # ------------------------------------------------------
 
-# Embedded widget HTML for standalone execution via `uv run <url>`
+# Embedded View HTML for standalone execution via `uv run <url>`
 # Uses Babel standalone for in-browser JSX transpilation
-# This is a copy of widget.html - keep them in sync!
-EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
+# This is a copy of view.html - keep them in sync!
+EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Say Widget</title>
+  <title>Say View</title>
   <script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
   <script type="importmap">
   {
@@ -784,7 +784,7 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
     import { createRoot } from 'react-dom/client';
     import { useApp } from '@modelcontextprotocol/ext-apps/react';
 
-    function SayWidget() {
+    function SayView() {
       const [hostContext, setHostContext] = useState(undefined);
       const [displayText, setDisplayText] = useState("");
       const [charPosition, setCharPosition] = useState(0);
@@ -796,7 +796,7 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
       const [showInfo, setShowInfo] = useState(false);
 
       const voiceRef = useRef("cosette"); // Current voice, updated from tool input
-      const widgetUuidRef = useRef(null); // Widget UUID for speak lock coordination
+      const viewUuidRef = useRef(null); // View UUID for speak lock coordination
       const speakLockIntervalRef = useRef(null); // Polling interval for speak lock
       const queueIdRef = useRef(null);
       const audioContextRef = useRef(null);
@@ -816,22 +816,22 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
       const initQueuePromiseRef = useRef(null);
       const pendingModelContextUpdateRef = useRef(null);
 
-      // Speak lock: coordinates multiple TTS widgets so only one plays at a time
+      // Speak lock: coordinates multiple TTS views so only one plays at a time
       const SPEAK_LOCK_KEY = "mcp-tts-playing";
 
       const announcePlayback = useCallback(() => {
-        if (!widgetUuidRef.current) return;
+        if (!viewUuidRef.current) return;
         localStorage.setItem(SPEAK_LOCK_KEY, JSON.stringify({
-          uuid: widgetUuidRef.current,
+          uuid: viewUuidRef.current,
           timestamp: Date.now()
         }));
       }, []);
 
       const clearSpeakLock = useCallback(() => {
-        if (!widgetUuidRef.current) return;
+        if (!viewUuidRef.current) return;
         try {
           const current = JSON.parse(localStorage.getItem(SPEAK_LOCK_KEY) || "null");
-          if (current?.uuid === widgetUuidRef.current) {
+          if (current?.uuid === viewUuidRef.current) {
             localStorage.removeItem(SPEAK_LOCK_KEY);
           }
         } catch {}
@@ -842,9 +842,9 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
         speakLockIntervalRef.current = setInterval(() => {
           try {
             const current = JSON.parse(localStorage.getItem(SPEAK_LOCK_KEY) || "null");
-            if (current && current.uuid !== widgetUuidRef.current) {
+            if (current && current.uuid !== viewUuidRef.current) {
               // Someone else started playing - yield
-              console.log('[TTS] Another widget started playing, pausing');
+              console.log('[TTS] Another view started playing, pausing');
               onStolenCallback();
             }
           } catch {}
@@ -1161,7 +1161,7 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
       }, [displayMode]);
 
       const { app, error } = useApp({
-        appInfo: { name: "Say Widget", version: "1.0.0" },
+        appInfo: { name: "Say View", version: "1.0.0" },
         capabilities: {},
         onHostContextChanged: (ctx) => {
           if (ctx.availableDisplayModes?.includes("fullscreen")) {
@@ -1219,11 +1219,11 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
           app.ontoolresult = async (params) => {
             console.log('[TTS] ontoolresult called, queueId:', queueIdRef.current);
             fullTextRef.current = lastTextRef.current;
-            // Read widget UUID from tool result _meta for speak lock coordination
-            const resultUuid = params.content?.[0]?._meta?.widgetUUID;
+            // Read View UUID from tool result _meta for speak lock coordination
+            const resultUuid = params.content?.[0]?._meta?.viewUUID;
             if (resultUuid) {
-              widgetUuidRef.current = resultUuid;
-              console.log('[TTS] Widget UUID:', resultUuid);
+              viewUuidRef.current = resultUuid;
+              console.log('[TTS] View UUID:', resultUuid);
             }
             if (queueIdRef.current) {
               console.log('[TTS] Calling end_tts_queue for:', queueIdRef.current);
@@ -1267,14 +1267,14 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
         }
       }, [app]);
 
-      // Speak lock: coordinate with other TTS widgets
+      // Speak lock: coordinate with other TTS Views
       useEffect(() => {
         if (status === "playing") {
           // Announce that we're playing
           announcePlayback();
-          // Poll to detect if another widget starts
+          // Poll to detect if another View starts
           startSpeakLockPolling(() => {
-            // Another widget took over - pause
+            // Another View took over - pause
             const ctx = audioContextRef.current;
             if (ctx && ctx.state === "running") {
               ctx.suspend();
@@ -1386,32 +1386,32 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
       );
     }
 
-    createRoot(document.getElementById('root')).render(<StrictMode><SayWidget /></StrictMode>);
+    createRoot(document.getElementById('root')).render(<StrictMode><SayView /></StrictMode>);
   </script>
 </body>
 </html>"""
 
 
-def get_widget_html() -> str:
-    """Get the widget HTML, preferring built version from dist/."""
+def get_view_html() -> str:
+    """Get the View HTML, preferring built version from dist/."""
     # Prefer built version from dist/ (local development with npm run build)
     dist_path = Path(__file__).parent / "dist" / "mcp-app.html"
     if dist_path.exists():
         return dist_path.read_text()
-    # Fallback to embedded widget (for `uv run <url>` or unbundled usage)
-    return EMBEDDED_WIDGET_HTML
+    # Fallback to embedded View (for `uv run <url>` or unbundled usage)
+    return EMBEDDED_VIEW_HTML
 
 
 # IMPORTANT: all the external domains used by app must be listed
 # in the meta.ui.csp.resourceDomains - otherwise they will be blocked by CSP policy
 @mcp.resource(
-    WIDGET_URI,
+    VIEW_URI,
     mime_type="text/html;profile=mcp-app",
     meta={"ui": {"csp": {"resourceDomains": ["https://esm.sh", "https://unpkg.com"]}}},
 )
-def widget() -> str:
-    """Widget HTML resource with CSP metadata for external dependencies."""
-    return get_widget_html()
+def view() -> str:
+    """View HTML resource with CSP metadata for external dependencies."""
+    return get_view_html()
 
 
 # ------------------------------------------------------

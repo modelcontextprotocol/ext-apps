@@ -65,10 +65,10 @@ export {
  * MCP servers include this key in tool definition metadata (via `tools/list`)
  * to indicate which UI resource should be displayed when the tool is called.
  * When hosts see a tool with this metadata, they fetch and render the
- * corresponding {@link App}.
+ * corresponding {@link App `App`}.
  *
  * **Note**: This constant is provided for reference. App developers typically
- * don't need to use it directly. Prefer using {@link server-helpers!registerAppTool}
+ * don't need to use it directly. Prefer using {@link server-helpers!registerAppTool `registerAppTool`}
  * with the `_meta.ui.resourceUri` format instead.
  *
  * @example How MCP servers use this key (server-side, not in Apps)
@@ -84,12 +84,12 @@ export const RESOURCE_URI_META_KEY = "ui/resourceUri";
  *
  * Identifies HTML content as an MCP App UI resource.
  *
- * Used by {@link server-helpers!registerAppResource} as the default MIME type for app resources.
+ * Used by {@link server-helpers!registerAppResource `registerAppResource`} as the default MIME type for app resources.
  */
 export const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 
 /**
- * Options for configuring {@link App} behavior.
+ * Options for configuring {@link App `App`} behavior.
  *
  * Extends `ProtocolOptions` from the MCP SDK with `App`-specific configuration.
  *
@@ -99,7 +99,7 @@ type AppOptions = ProtocolOptions & {
   /**
    * Automatically report size changes to the host using `ResizeObserver`.
    *
-   * When enabled, the {@link App} monitors `document.body` and `document.documentElement`
+   * When enabled, the {@link App `App`} monitors `document.body` and `document.documentElement`
    * for size changes and automatically sends `ui/notifications/size-changed`
    * notifications to the host.
    *
@@ -122,7 +122,7 @@ type RequestHandlerExtra = Parameters<
  *
  * ## Architecture
  *
- * Guest UIs (Apps) act as MCP clients connecting to the host via {@link PostMessageTransport}.
+ * Views (Apps) act as MCP clients connecting to the host via {@link PostMessageTransport `PostMessageTransport`}.
  * The host proxies requests to the actual MCP server and forwards
  * responses back to the App.
  *
@@ -156,9 +156,6 @@ type RequestHandlerExtra = Parameters<
  *
  * @example Basic usage with PostMessageTransport
  * {@includeCode ./app.examples.ts#App_basicUsage}
- *
- * @example Sending a message to the host's chat
- * {@includeCode ./app.examples.ts#App_sendMessage}
  */
 export class App extends Protocol<AppRequest, AppNotification, AppResult> {
   private _hostCapabilities?: McpUiHostCapabilities;
@@ -196,7 +193,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * Get the host's capabilities discovered during initialization.
    *
    * Returns the capabilities that the host advertised during the
-   * {@link connect} handshake. Returns `undefined` if called before
+   * {@link connect `connect`} handshake. Returns `undefined` if called before
    * connection is established.
    *
    * @returns Host capabilities, or `undefined` if not yet connected
@@ -204,8 +201,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Check host capabilities after connection
    * {@includeCode ./app.examples.ts#App_getHostCapabilities_checkAfterConnection}
    *
-   * @see {@link connect} for the initialization handshake
-   * @see {@link McpUiHostCapabilities} for the capabilities structure
+   * @see {@link connect `connect`} for the initialization handshake
+   * @see {@link McpUiHostCapabilities `McpUiHostCapabilities`} for the capabilities structure
    */
   getHostCapabilities(): McpUiHostCapabilities | undefined {
     return this._hostCapabilities;
@@ -215,7 +212,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * Get the host's implementation info discovered during initialization.
    *
    * Returns the host's name and version as advertised during the
-   * {@link connect} handshake. Returns `undefined` if called before
+   * {@link connect `connect`} handshake. Returns `undefined` if called before
    * connection is established.
    *
    * @returns Host implementation info, or `undefined` if not yet connected
@@ -223,7 +220,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Log host information after connection
    * {@includeCode ./app.examples.ts#App_getHostVersion_logAfterConnection}
    *
-   * @see {@link connect} for the initialization handshake
+   * @see {@link connect `connect`} for the initialization handshake
    */
   getHostVersion(): Implementation | undefined {
     return this._hostInfo;
@@ -244,9 +241,9 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Access host context after connection
    * {@includeCode ./app.examples.ts#App_getHostContext_accessAfterConnection}
    *
-   * @see {@link connect} for the initialization handshake
-   * @see {@link onhostcontextchanged} for context change notifications
-   * @see {@link McpUiHostContext} for the context structure
+   * @see {@link connect `connect`} for the initialization handshake
+   * @see {@link onhostcontextchanged `onhostcontextchanged`} for context change notifications
+   * @see {@link McpUiHostContext `McpUiHostContext`} for the context structure
    */
   getHostContext(): McpUiHostContext | undefined {
     return this._hostContext;
@@ -262,15 +259,15 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * This setter is a convenience wrapper around `setNotificationHandler()` that
    * automatically handles the notification schema and extracts the params for you.
    *
-   * Register handlers before calling {@link connect} to avoid missing notifications.
+   * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
-   * @param callback - Function called with the tool input params ({@link McpUiToolInputNotification.params})
+   * @param callback - Function called with the tool input params ({@link McpUiToolInputNotification.params `McpUiToolInputNotification.params`})
    *
    * @example
    * {@includeCode ./app.examples.ts#App_ontoolinput_setter}
    *
-   * @see {@link setNotificationHandler} for the underlying method
-   * @see {@link McpUiToolInputNotification} for the notification structure
+   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link McpUiToolInputNotification `McpUiToolInputNotification`} for the notification structure
    */
   set ontoolinput(
     callback: (params: McpUiToolInputNotification["params"]) => void,
@@ -287,19 +284,24 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * streams partial tool arguments during tool call initialization. This enables
    * progressive rendering of tool arguments before they're complete.
    *
+   * **Important:** Partial arguments are "healed" JSON — the host closes unclosed
+   * brackets/braces to produce valid JSON. This means objects may be incomplete
+   * (e.g., the last item in an array may be truncated). Use partial data only
+   * for preview UI, not for critical operations.
+   *
    * This setter is a convenience wrapper around `setNotificationHandler()` that
    * automatically handles the notification schema and extracts the params for you.
    *
-   * Register handlers before calling {@link connect} to avoid missing notifications.
+   * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
-   * @param callback - Function called with each partial tool input update ({@link McpUiToolInputPartialNotification.params})
+   * @param callback - Function called with each partial tool input update ({@link McpUiToolInputPartialNotification.params `McpUiToolInputPartialNotification.params`})
    *
    * @example Progressive rendering of tool arguments
    * {@includeCode ./app.examples.ts#App_ontoolinputpartial_progressiveRendering}
    *
-   * @see {@link setNotificationHandler} for the underlying method
-   * @see {@link McpUiToolInputPartialNotification} for the notification structure
-   * @see {@link ontoolinput} for the complete tool input handler
+   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link McpUiToolInputPartialNotification `McpUiToolInputPartialNotification`} for the notification structure
+   * @see {@link ontoolinput `ontoolinput`} for the complete tool input handler
    */
   set ontoolinputpartial(
     callback: (params: McpUiToolInputPartialNotification["params"]) => void,
@@ -319,16 +321,16 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * This setter is a convenience wrapper around `setNotificationHandler()` that
    * automatically handles the notification schema and extracts the params for you.
    *
-   * Register handlers before calling {@link connect} to avoid missing notifications.
+   * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
-   * @param callback - Function called with the tool result ({@link McpUiToolResultNotification.params})
+   * @param callback - Function called with the tool result ({@link McpUiToolResultNotification.params `McpUiToolResultNotification.params`})
    *
    * @example Display tool execution results
    * {@includeCode ./app.examples.ts#App_ontoolresult_displayResults}
    *
-   * @see {@link setNotificationHandler} for the underlying method
-   * @see {@link McpUiToolResultNotification} for the notification structure
-   * @see {@link ontoolinput} for the initial tool input handler
+   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link McpUiToolResultNotification `McpUiToolResultNotification`} for the notification structure
+   * @see {@link ontoolinput `ontoolinput`} for the initial tool input handler
    */
   set ontoolresult(
     callback: (params: McpUiToolResultNotification["params"]) => void,
@@ -349,16 +351,16 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * This setter is a convenience wrapper around `setNotificationHandler()` that
    * automatically handles the notification schema and extracts the params for you.
    *
-   * Register handlers before calling {@link connect} to avoid missing notifications.
+   * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
-   * @param callback - Function called when tool execution is cancelled. Receives optional cancellation reason — see {@link McpUiToolCancelledNotification.params}.
+   * @param callback - Function called when tool execution is cancelled. Receives optional cancellation reason — see {@link McpUiToolCancelledNotification.params `McpUiToolCancelledNotification.params`}.
    *
    * @example Handle tool cancellation
    * {@includeCode ./app.examples.ts#App_ontoolcancelled_handleCancellation}
    *
-   * @see {@link setNotificationHandler} for the underlying method
-   * @see {@link McpUiToolCancelledNotification} for the notification structure
-   * @see {@link ontoolresult} for successful tool completion
+   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link McpUiToolCancelledNotification `McpUiToolCancelledNotification`} for the notification structure
+   * @see {@link ontoolresult `ontoolresult`} for successful tool completion
    */
   set ontoolcancelled(
     callback: (params: McpUiToolCancelledNotification["params"]) => void,
@@ -380,19 +382,19 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * automatically handles the notification schema and extracts the params for you.
    *
    * Notification params are automatically merged into the internal host context
-   * before the callback is invoked. This means {@link getHostContext} will
+   * before the callback is invoked. This means {@link getHostContext `getHostContext`} will
    * return the updated values even before your callback runs.
    *
-   * Register handlers before calling {@link connect} to avoid missing notifications.
+   * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
    * @param callback - Function called with the updated host context
    *
    * @example Respond to theme changes
    * {@includeCode ./app.examples.ts#App_onhostcontextchanged_respondToTheme}
    *
-   * @see {@link setNotificationHandler} for the underlying method
-   * @see {@link McpUiHostContextChangedNotification} for the notification structure
-   * @see {@link McpUiHostContext} for the full context structure
+   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link McpUiHostContextChangedNotification `McpUiHostContextChangedNotification`} for the notification structure
+   * @see {@link McpUiHostContext `McpUiHostContext`} for the full context structure
    */
   set onhostcontextchanged(
     callback: (params: McpUiHostContextChangedNotification["params"]) => void,
@@ -420,7 +422,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * This setter is a convenience wrapper around `setRequestHandler()` that
    * automatically handles the request schema.
    *
-   * Register handlers before calling {@link connect} to avoid missing requests.
+   * Register handlers before calling {@link connect `connect`} to avoid missing requests.
    *
    * @param callback - Function called when teardown is requested.
    *   Must return `McpUiResourceTeardownResult` (can be an empty object `{}`) or a Promise resolving to it.
@@ -428,8 +430,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Perform cleanup before teardown
    * {@includeCode ./app.examples.ts#App_onteardown_performCleanup}
    *
-   * @see {@link setRequestHandler} for the underlying method
-   * @see {@link McpUiResourceTeardownRequest} for the request structure
+   * @see {@link setRequestHandler `setRequestHandler`} for the underlying method
+   * @see {@link McpUiResourceTeardownRequest `McpUiResourceTeardownRequest`} for the request structure
    */
   set onteardown(
     callback: (
@@ -455,7 +457,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * This setter is a convenience wrapper around `setRequestHandler()` that
    * automatically handles the request schema and extracts the params for you.
    *
-   * Register handlers before calling {@link connect} to avoid missing requests.
+   * Register handlers before calling {@link connect `connect`} to avoid missing requests.
    *
    * @param callback - Async function that executes the tool and returns the result.
    *   The callback will only be invoked if the app declared tool capabilities
@@ -464,7 +466,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Handle tool calls from the host
    * {@includeCode ./app.examples.ts#App_oncalltool_handleFromHost}
    *
-   * @see {@link setRequestHandler} for the underlying method
+   * @see {@link setRequestHandler `setRequestHandler`} for the underlying method
    */
   set oncalltool(
     callback: (
@@ -489,7 +491,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * This setter is a convenience wrapper around `setRequestHandler()` that
    * automatically handles the request schema and extracts the params for you.
    *
-   * Register handlers before calling {@link connect} to avoid missing requests.
+   * Register handlers before calling {@link connect `connect`} to avoid missing requests.
    *
    * @param callback - Async function that returns tool names as strings (simplified
    *   from full `ListToolsResult` with `Tool` objects). Registration is always
@@ -498,8 +500,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Return available tools
    * {@includeCode ./app.examples.ts#App_onlisttools_returnTools}
    *
-   * @see {@link setRequestHandler} for the underlying method
-   * @see {@link oncalltool} for handling tool execution
+   * @see {@link setRequestHandler `setRequestHandler`} for the underlying method
+   * @see {@link oncalltool `oncalltool`} for handling tool execution
    */
   set onlisttools(
     callback: (
@@ -613,7 +615,10 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Send a text message from user interaction
    * {@includeCode ./app.examples.ts#App_sendMessage_textFromInteraction}
    *
-   * @see {@link McpUiMessageRequest} for request structure
+   * @example Send follow-up message after offloading large data to model context
+   * {@includeCode ./app.examples.ts#App_sendMessage_withLargeContext}
+   *
+   * @see {@link McpUiMessageRequest `McpUiMessageRequest`} for request structure
    */
   sendMessage(params: McpUiMessageRequest["params"], options?: RequestOptions) {
     return this.request(
@@ -649,13 +654,12 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
   /**
    * Update the host's model context with app state.
    *
-   * Unlike `sendLog`, which is for debugging/telemetry, context updates
-   * are intended to be available to the model in future reasoning,
-   * without requiring a follow-up action (like `sendMessage`).
+   * Context updates are intended to be available to the model in future
+   * turns, without triggering an immediate model response (unlike {@link sendMessage `sendMessage`}).
    *
    * The host will typically defer sending the context to the model until the
-   * next user message (including `ui/message`), and will only send the last
-   * update received. Each call overwrites any previous context update.
+   * next user message — either from the actual user or via `sendMessage`. Only
+   * the last update is sent; each call overwrites any previous context.
    *
    * @param params - Context content and/or structured content
    * @param options - Request options (timeout, etc.)
@@ -666,8 +670,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Update model context with current app state
    * {@includeCode ./app.examples.ts#App_updateModelContext_appState}
    *
-   * @example Update with structured content
-   * {@includeCode ./app.examples.ts#App_updateModelContext_structuredContent}
+   * @example Report runtime error to model
+   * {@includeCode ./app.examples.ts#App_updateModelContext_reportError}
    *
    * @returns Promise that resolves when the context update is acknowledged
    */
@@ -700,8 +704,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Open documentation link
    * {@includeCode ./app.examples.ts#App_openLink_documentation}
    *
-   * @see {@link McpUiOpenLinkRequest} for request structure
-   * @see {@link McpUiOpenLinkResult} for result structure
+   * @see {@link McpUiOpenLinkRequest `McpUiOpenLinkRequest`} for request structure
+   * @see {@link McpUiOpenLinkResult `McpUiOpenLinkResult`} for result structure
    */
   openLink(params: McpUiOpenLinkRequest["params"], options?: RequestOptions) {
     return this.request(
@@ -714,7 +718,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     );
   }
 
-  /** @deprecated Use {@link openLink} instead */
+  /** @deprecated Use {@link openLink `openLink`} instead */
   sendOpenLink: App["openLink"] = this.openLink;
 
   /**
@@ -729,11 +733,11 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @param options - Request options (timeout, etc.)
    * @returns Result containing the actual display mode that was set
    *
-   * @example Request fullscreen mode
-   * {@includeCode ./app.examples.ts#App_requestDisplayMode_fullscreen}
+   * @example Toggle display mode
+   * {@includeCode ./app.examples.ts#App_requestDisplayMode_toggle}
    *
-   * @see {@link McpUiRequestDisplayModeRequest} for request structure
-   * @see {@link McpUiHostContext} for checking availableDisplayModes
+   * @see {@link McpUiRequestDisplayModeRequest `McpUiRequestDisplayModeRequest`} for request structure
+   * @see {@link McpUiHostContext `McpUiHostContext`} for checking availableDisplayModes
    */
   requestDisplayMode(
     params: McpUiRequestDisplayModeRequest["params"],
@@ -762,7 +766,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * @returns Promise that resolves when the notification is sent
    *
-   * @see {@link McpUiSizeChangedNotification} for notification structure
+   * @see {@link McpUiSizeChangedNotification `McpUiSizeChangedNotification`} for notification structure
    */
   sendSizeChanged(params: McpUiSizeChangedNotification["params"]) {
     return this.notification(<McpUiSizeChangedNotification>{
@@ -846,12 +850,12 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * 2. Sends `ui/initialize` request with app info and capabilities
    * 3. Receives host capabilities and context in response
    * 4. Sends `ui/notifications/initialized` notification
-   * 5. Sets up auto-resize using {@link setupSizeChangedNotifications} if enabled (default)
+   * 5. Sets up auto-resize using {@link setupSizeChangedNotifications `setupSizeChangedNotifications`} if enabled (default)
    *
    * If initialization fails, the connection is automatically closed and an error
    * is thrown.
    *
-   * @param transport - Transport layer (typically {@link PostMessageTransport})
+   * @param transport - Transport layer (typically {@link PostMessageTransport `PostMessageTransport`})
    * @param options - Request options for the initialize request
    *
    * @throws {Error} If initialization fails or connection is lost
@@ -859,9 +863,9 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Connect with PostMessageTransport
    * {@includeCode ./app.examples.ts#App_connect_withPostMessageTransport}
    *
-   * @see {@link McpUiInitializeRequest} for the initialization request structure
-   * @see {@link McpUiInitializedNotification} for the initialized notification
-   * @see {@link PostMessageTransport} for the typical transport implementation
+   * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`} for the initialization request structure
+   * @see {@link McpUiInitializedNotification `McpUiInitializedNotification`} for the initialized notification
+   * @see {@link PostMessageTransport `PostMessageTransport`} for the typical transport implementation
    */
   override async connect(
     transport: Transport = new PostMessageTransport(

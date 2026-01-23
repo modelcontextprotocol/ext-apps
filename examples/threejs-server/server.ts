@@ -19,7 +19,7 @@ const DIST_DIR = import.meta.filename.endsWith(".ts")
   ? path.join(import.meta.dirname, "dist")
   : import.meta.dirname;
 
-// Default code example for the Three.js widget
+// Default code example for the Three.js view
 const DEFAULT_THREEJS_CODE = `const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -45,7 +45,7 @@ function animate() {
 }
 animate();`;
 
-const THREEJS_DOCUMENTATION = `# Three.js Widget Documentation
+const THREEJS_DOCUMENTATION = `# Three.js view Documentation
 
 ## Available Globals
 - \`THREE\` - Three.js library (r181)
@@ -191,8 +191,7 @@ export function createServer(): McpServer {
     "learn_threejs",
     {
       title: "Learn Three.js",
-      description:
-        "Get documentation and examples for using the Three.js widget",
+      description: "Get documentation and examples for using the Three.js View",
       inputSchema: {},
     },
     async () => {
@@ -207,7 +206,7 @@ export function createServer(): McpServer {
     server,
     resourceUri,
     resourceUri,
-    { mimeType: RESOURCE_MIME_TYPE, description: "Three.js Widget UI" },
+    { mimeType: RESOURCE_MIME_TYPE, description: "Three.js View UI" },
     async (): Promise<ReadResourceResult> => {
       const html = await fs.readFile(
         path.join(DIST_DIR, "mcp-app.html"),

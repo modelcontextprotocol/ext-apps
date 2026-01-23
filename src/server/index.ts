@@ -2,8 +2,8 @@
  * Utilities for MCP servers to register tools and resources that display interactive UIs.
  *
  * Use these helpers instead of the base SDK's `registerTool` and `registerResource` when
- * your tool should render an {@link app!App} in the client. They handle UI metadata normalization
- * and provide sensible defaults for the MCP Apps MIME type ({@link RESOURCE_MIME_TYPE}).
+ * your tool should render an {@link app!App `App`} in the client. They handle UI metadata normalization
+ * and provide sensible defaults for the MCP Apps MIME type ({@link RESOURCE_MIME_TYPE `RESOURCE_MIME_TYPE`}).
  *
  * @module server-helpers
  *
@@ -37,7 +37,7 @@ export type { ResourceMetadata, ToolCallback, ReadResourceCallback };
 
 /**
  * Base tool configuration matching the standard MCP server tool options.
- * Extended by {@link McpUiAppToolConfig} to add UI metadata requirements.
+ * Extended by {@link McpUiAppToolConfig `McpUiAppToolConfig`} to add UI metadata requirements.
  */
 export interface ToolConfig {
   title?: string;
@@ -51,12 +51,12 @@ export interface ToolConfig {
 /**
  * Configuration for tools that render an interactive UI.
  *
- * Extends {@link ToolConfig} with a required `_meta` field that specifies UI metadata.
+ * Extends {@link ToolConfig `ToolConfig`} with a required `_meta` field that specifies UI metadata.
  * The UI resource can be specified in two ways:
  * - `_meta.ui.resourceUri` (preferred)
  * - `_meta["ui/resourceUri"]` (deprecated, for backward compatibility)
  *
- * @see {@link registerAppTool} for the recommended way to register app tools
+ * @see {@link registerAppTool `registerAppTool`} for the recommended way to register app tools
  */
 export interface McpUiAppToolConfig extends ToolConfig {
   _meta: {
@@ -70,7 +70,7 @@ export interface McpUiAppToolConfig extends ToolConfig {
          * URI of the UI resource to display for this tool.
          * This is converted to `_meta["ui/resourceUri"]`.
          *
-         * @example "ui://weather/widget.html"
+         * @example "ui://weather/view.html"
          *
          * @deprecated Use `_meta.ui.resourceUri` instead.
          */
@@ -80,12 +80,12 @@ export interface McpUiAppToolConfig extends ToolConfig {
 }
 
 /**
- * MCP App Resource configuration for {@link registerAppResource}.
+ * MCP App Resource configuration for {@link registerAppResource `registerAppResource`}.
  *
  * Extends the base MCP SDK `ResourceMetadata` with optional UI metadata
  * for configuring security policies and rendering preferences.
  *
- * @see {@link registerAppResource} for usage
+ * @see {@link registerAppResource `registerAppResource`} for usage
  */
 export interface McpUiAppResourceConfig extends ResourceMetadata {
   /**
@@ -117,10 +117,13 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  * @example Basic usage
  * {@includeCode ./index.examples.ts#registerAppTool_basicUsage}
  *
- * @example Tool visibility - create app-only tools for UI actions
- * {@includeCode ./index.examples.ts#registerAppTool_toolVisibility}
+ * @example Tool visible to model but not callable by UI
+ * {@includeCode ./index.examples.ts#registerAppTool_modelOnlyVisibility}
  *
- * @see {@link registerAppResource} to register the HTML resource referenced by the tool
+ * @example Tool hidden from model, only callable by UI
+ * {@includeCode ./index.examples.ts#registerAppTool_appOnlyVisibility}
+ *
+ * @see {@link registerAppResource `registerAppResource`} to register the HTML resource referenced by the tool
  */
 export function registerAppTool<
   OutputArgs extends ZodRawShapeCompat | AnySchema,
@@ -157,7 +160,7 @@ export function registerAppTool<
  * Register an app resource with the MCP server.
  *
  * This is a convenience wrapper around `server.registerResource` that:
- * - Defaults the MIME type to {@link RESOURCE_MIME_TYPE} (`"text/html;profile=mcp-app"`)
+ * - Defaults the MIME type to {@link RESOURCE_MIME_TYPE `RESOURCE_MIME_TYPE`} (`"text/html;profile=mcp-app"`)
  * - Provides a cleaner API matching the SDK's callback signature
  *
  * @param server - The MCP server instance
@@ -172,7 +175,7 @@ export function registerAppTool<
  * @example With CSP configuration for external domains
  * {@includeCode ./index.examples.ts#registerAppResource_withCsp}
  *
- * @see {@link registerAppTool} to register tools that reference this resource
+ * @see {@link registerAppTool `registerAppTool`} to register tools that reference this resource
  */
 export function registerAppResource(
   server: Pick<McpServer, "registerResource">,

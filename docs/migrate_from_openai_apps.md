@@ -1,3 +1,7 @@
+---
+title: Migrate OpenAI App
+---
+
 # Migrating from OpenAI Apps SDK to MCP Apps SDK
 
 This guide helps you migrate from the OpenAI Apps SDK to the MCP Apps SDK (`@modelcontextprotocol/ext-apps`).
@@ -50,7 +54,7 @@ This guide helps you migrate from the OpenAI Apps SDK to the MCP Apps SDK (`@mod
 
 ### Server-Side Migration Example
 
-### Before (OpenAI)
+#### Before (OpenAI)
 
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -68,7 +72,7 @@ function createServer() {
       inputSchema: { userId: z.string() },
       annotations: { readOnlyHint: true },
       _meta: {
-        "openai/outputTemplate": "ui://widget/cart.html",
+        "openai/outputTemplate": "ui://view/cart.html",
         "openai/toolInvocation/invoking": "Loading cart...",
         "openai/toolInvocation/invoked": "Cart ready",
         "openai/widgetAccessible": true,
@@ -85,13 +89,13 @@ function createServer() {
 
   // Register UI resource
   server.registerResource(
-    "Cart Widget",
-    "ui://widget/cart.html",
+    "Cart View",
+    "ui://view/cart.html",
     { mimeType: "text/html+skybridge" },
     async () => ({
       contents: [
         {
-          uri: "ui://widget/cart.html",
+          uri: "ui://view/cart.html",
           mimeType: "text/html+skybridge",
           text: getCartHtml(),
           _meta: {
@@ -110,7 +114,7 @@ function createServer() {
 }
 ```
 
-### After (MCP Apps)
+#### After (MCP Apps)
 
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -133,7 +137,7 @@ function createServer() {
       description: "Display the user's shopping cart",
       inputSchema: { userId: z.string() },
       annotations: { readOnlyHint: true },
-      _meta: { ui: { resourceUri: "ui://widget/cart.html" } },
+      _meta: { ui: { resourceUri: "ui://view/cart.html" } },
     },
     async (args) => {
       const cart = await getCart(args.userId);
@@ -147,13 +151,13 @@ function createServer() {
   // Register UI resource
   registerAppResource(
     server,
-    "Cart Widget",
-    "ui://widget/cart.html",
+    "Cart View",
+    "ui://view/cart.html",
     { description: "Shopping cart UI" },
     async () => ({
       contents: [
         {
-          uri: "ui://widget/cart.html",
+          uri: "ui://view/cart.html",
           mimeType: RESOURCE_MIME_TYPE,
           text: getCartHtml(),
           _meta: {
@@ -184,7 +188,7 @@ function createServer() {
 6. **Helper Functions**: MCP provides `registerAppTool()` and `registerAppResource()` helpers
 7. **Not Yet Implemented**: `_meta["openai/toolInvocation/invoking"]`, `_meta["openai/toolInvocation/invoked"]`, and `_meta["openai/widgetDescription"]` don't have MCP equivalents yet
 
-## Client-side
+## Client-Side
 
 ### Quick Start Comparison
 
@@ -302,7 +306,7 @@ function createServer() {
 | —      | `app.getHostVersion()`      | Returns `{ name, version }` of host               |
 | —      | `app.getHostCapabilities()` | Check `serverTools`, `openLinks`, `logging`, etc. |
 
-### Full Migration Example
+### Client-Side Migration Example
 
 #### Before (OpenAI)
 

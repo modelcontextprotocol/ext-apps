@@ -35,7 +35,7 @@ describe("registerAppTool", () => {
         title: "My Tool",
         description: "A test tool",
         _meta: {
-          [RESOURCE_URI_META_KEY]: "ui://test/widget.html",
+          [RESOURCE_URI_META_KEY]: "ui://test/view.html",
         },
       },
       handler,
@@ -49,7 +49,7 @@ describe("registerAppTool", () => {
       (capturedConfig?._meta as Record<string, unknown>)?.[
         RESOURCE_URI_META_KEY
       ],
-    ).toBe("ui://test/widget.html");
+    ).toBe("ui://test/view.html");
     expect(capturedHandler).toBe(handler);
   });
 
@@ -74,7 +74,7 @@ describe("registerAppTool", () => {
         "my-tool",
         {
           _meta: {
-            ui: { resourceUri: "ui://test/widget.html" },
+            ui: { resourceUri: "ui://test/view.html" },
           },
         },
         async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
@@ -83,10 +83,10 @@ describe("registerAppTool", () => {
       const meta = capturedConfig?._meta as Record<string, unknown>;
       // New format should be preserved
       expect((meta.ui as { resourceUri: string }).resourceUri).toBe(
-        "ui://test/widget.html",
+        "ui://test/view.html",
       );
       // Legacy key should also be set
-      expect(meta[RESOURCE_URI_META_KEY]).toBe("ui://test/widget.html");
+      expect(meta[RESOURCE_URI_META_KEY]).toBe("ui://test/view.html");
     });
 
     it("should set _meta.ui.resourceUri when legacy key is provided", () => {
@@ -109,7 +109,7 @@ describe("registerAppTool", () => {
         "my-tool",
         {
           _meta: {
-            [RESOURCE_URI_META_KEY]: "ui://test/widget.html",
+            [RESOURCE_URI_META_KEY]: "ui://test/view.html",
           },
         },
         async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
@@ -117,10 +117,10 @@ describe("registerAppTool", () => {
 
       const meta = capturedConfig?._meta as Record<string, unknown>;
       // Legacy key should be preserved
-      expect(meta[RESOURCE_URI_META_KEY]).toBe("ui://test/widget.html");
+      expect(meta[RESOURCE_URI_META_KEY]).toBe("ui://test/view.html");
       // New format should also be set
       expect((meta.ui as { resourceUri: string }).resourceUri).toBe(
-        "ui://test/widget.html",
+        "ui://test/view.html",
       );
     });
 
@@ -145,7 +145,7 @@ describe("registerAppTool", () => {
         {
           _meta: {
             ui: { visibility: ["app"] },
-            [RESOURCE_URI_META_KEY]: "ui://test/widget.html",
+            [RESOURCE_URI_META_KEY]: "ui://test/view.html",
           },
         } as any,
         async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
@@ -154,7 +154,7 @@ describe("registerAppTool", () => {
       const meta = capturedConfig?._meta as Record<string, unknown>;
       const ui = meta.ui as { resourceUri: string; visibility: string[] };
       // Should have merged resourceUri into existing ui object
-      expect(ui.resourceUri).toBe("ui://test/widget.html");
+      expect(ui.resourceUri).toBe("ui://test/view.html");
       expect(ui.visibility).toEqual(["app"]);
     });
 
@@ -178,8 +178,8 @@ describe("registerAppTool", () => {
         "my-tool",
         {
           _meta: {
-            ui: { resourceUri: "ui://new/widget.html" },
-            [RESOURCE_URI_META_KEY]: "ui://old/widget.html",
+            ui: { resourceUri: "ui://new/view.html" },
+            [RESOURCE_URI_META_KEY]: "ui://old/view.html",
           },
         } as any,
         async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
@@ -188,9 +188,9 @@ describe("registerAppTool", () => {
       const meta = capturedConfig?._meta as Record<string, unknown>;
       // Both should remain unchanged
       expect((meta.ui as { resourceUri: string }).resourceUri).toBe(
-        "ui://new/widget.html",
+        "ui://new/view.html",
       );
-      expect(meta[RESOURCE_URI_META_KEY]).toBe("ui://old/widget.html");
+      expect(meta[RESOURCE_URI_META_KEY]).toBe("ui://old/view.html");
     });
   });
 });
@@ -215,7 +215,7 @@ describe("registerAppResource", () => {
     const callback = async () => ({
       contents: [
         {
-          uri: "ui://test/widget.html",
+          uri: "ui://test/view.html",
           mimeType: RESOURCE_MIME_TYPE,
           text: "<html/>",
         },
@@ -225,7 +225,7 @@ describe("registerAppResource", () => {
     registerAppResource(
       mockServer as unknown as Pick<McpServer, "registerResource">,
       "My Resource",
-      "ui://test/widget.html",
+      "ui://test/view.html",
       {
         description: "A test resource",
         _meta: { ui: {} },
@@ -235,7 +235,7 @@ describe("registerAppResource", () => {
 
     expect(mockServer.registerResource).toHaveBeenCalledTimes(1);
     expect(capturedName).toBe("My Resource");
-    expect(capturedUri).toBe("ui://test/widget.html");
+    expect(capturedUri).toBe("ui://test/view.html");
     expect(capturedConfig?.mimeType).toBe(RESOURCE_MIME_TYPE);
     expect(capturedConfig?.description).toBe("A test resource");
   });
@@ -255,7 +255,7 @@ describe("registerAppResource", () => {
     registerAppResource(
       mockServer as unknown as Pick<McpServer, "registerResource">,
       "My Resource",
-      "ui://test/widget.html",
+      "ui://test/view.html",
       {
         mimeType: "text/html",
         _meta: { ui: {} },
@@ -263,7 +263,7 @@ describe("registerAppResource", () => {
       async () => ({
         contents: [
           {
-            uri: "ui://test/widget.html",
+            uri: "ui://test/view.html",
             mimeType: "text/html",
             text: "<html/>",
           },
@@ -295,7 +295,7 @@ describe("registerAppResource", () => {
     const expectedResult = {
       contents: [
         {
-          uri: "ui://test/widget.html",
+          uri: "ui://test/view.html",
           mimeType: RESOURCE_MIME_TYPE,
           text: "<html>content</html>",
         },
@@ -306,7 +306,7 @@ describe("registerAppResource", () => {
     registerAppResource(
       mockServer as unknown as Pick<McpServer, "registerResource">,
       "My Resource",
-      "ui://test/widget.html",
+      "ui://test/view.html",
       { _meta: { ui: {} } },
       callback,
     );

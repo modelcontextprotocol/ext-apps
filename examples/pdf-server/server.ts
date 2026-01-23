@@ -189,7 +189,7 @@ The viewer supports zoom, navigation, text selection, and fullscreen mode.`,
         ],
         structuredContent: result,
         _meta: {
-          widgetUUID: randomUUID(),
+          viewUUID: randomUUID(),
         },
       };
     },

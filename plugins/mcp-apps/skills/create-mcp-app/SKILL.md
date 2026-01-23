@@ -1,6 +1,6 @@
 ---
 name: Create MCP App
-description: This skill should be used when the user asks to "create an MCP App", "add a UI to an MCP tool", "build an interactive MCP widget", "scaffold an MCP App", or needs guidance on MCP Apps SDK patterns, UI-resource registration, MCP App lifecycle, or host integration. Provides comprehensive guidance for building MCP Apps with interactive UIs.
+description: This skill should be used when the user asks to "create an MCP App", "add a UI to an MCP tool", "build an interactive MCP View", "scaffold an MCP App", or needs guidance on MCP Apps SDK patterns, UI-resource registration, MCP App lifecycle, or host integration. Provides comprehensive guidance for building MCP Apps with interactive UIs.
 ---
 
 # Create MCP App
@@ -253,7 +253,7 @@ app.ontoolinput = (params) => {
 
 ### Visibility-Based Resource Management
 
-Pause expensive operations (animations, WebGL, polling) when widget scrolls out of viewport:
+Pause expensive operations (animations, WebGL, polling) when view scrolls out of viewport:
 
 ```typescript
 const observer = new IntersectionObserver((entries) => {

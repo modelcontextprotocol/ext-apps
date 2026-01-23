@@ -12,8 +12,8 @@ import { McpUiStyles, McpUiTheme } from "./types";
  * @example Check current theme
  * {@includeCode ./styles.examples.ts#getDocumentTheme_checkCurrent}
  *
- * @see {@link applyDocumentTheme} to set the theme
- * @see {@link McpUiTheme} for the theme type
+ * @see {@link applyDocumentTheme `applyDocumentTheme`} to set the theme
+ * @see {@link McpUiTheme `McpUiTheme`} for the theme type
  */
 export function getDocumentTheme(): McpUiTheme {
   const theme = document.documentElement.getAttribute("data-theme");
@@ -51,8 +51,8 @@ export function getDocumentTheme(): McpUiTheme {
  * }
  * ```
  *
- * @see {@link getDocumentTheme} to read the current theme
- * @see {@link McpUiTheme} for the theme type
+ * @see {@link getDocumentTheme `getDocumentTheme`} to read the current theme
+ * @see {@link McpUiTheme `McpUiTheme`} for the theme type
  */
 export function applyDocumentTheme(theme: McpUiTheme): void {
   const root = document.documentElement;
@@ -63,7 +63,7 @@ export function applyDocumentTheme(theme: McpUiTheme): void {
 /**
  * Apply host style variables as CSS custom properties on an element.
  *
- * This function takes the `variables` object from {@link McpUiHostContext.styles} and sets
+ * This function takes the `variables` object from {@link McpUiHostContext.styles `McpUiHostContext.styles`} and sets
  * each CSS variable on the specified root element (defaults to `document.documentElement`).
  * This allows apps to use the host's theming values via CSS variables like
  * `var(--color-background-primary)`.
@@ -77,8 +77,21 @@ export function applyDocumentTheme(theme: McpUiTheme): void {
  * @example Apply to a specific element
  * {@includeCode ./styles.examples.ts#applyHostStyleVariables_toElement}
  *
- * @see {@link McpUiStyles} for the available CSS variables
- * @see {@link McpUiHostContext} for the full host context structure
+ * @example Use host style variables in CSS
+ * ```css
+ * body {
+ *   background-color: var(--color-background-primary);
+ *   color: var(--color-text-primary);
+ * }
+ *
+ * .card {
+ *   background-color: var(--color-background-secondary);
+ *   border: 1px solid var(--color-border-primary);
+ * }
+ * ```
+ *
+ * @see {@link McpUiStyles `McpUiStyles`} for the available CSS variables
+ * @see {@link McpUiHostContext `McpUiHostContext`} for the full host context structure
  */
 export function applyHostStyleVariables(
   styles: McpUiStyles,
@@ -116,11 +129,11 @@ export function applyHostStyleVariables(
  * @example Use host fonts in CSS
  * ```css
  * body {
- *   font-family: "Anthropic Sans", sans-serif;
+ *   font-family: var(--font-sans, system-ui, sans-serif);
  * }
  * ```
  *
- * @see {@link McpUiHostContext} for the full host context structure
+ * @see {@link McpUiHostContext `McpUiHostContext`} for the full host context structure
  */
 export function applyHostFonts(fontCss: string): void {
   const styleId = "__mcp-host-fonts";

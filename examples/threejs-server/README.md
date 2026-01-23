@@ -134,7 +134,7 @@ React component that:
 
 ### Visibility-Based Pause
 
-Animation automatically pauses when the widget scrolls out of view:
+Animation automatically pauses when the view scrolls out of view:
 
 - Uses `IntersectionObserver` to track visibility (browser-native, no polling)
 - Wraps `requestAnimationFrame` to skip frames when not visible

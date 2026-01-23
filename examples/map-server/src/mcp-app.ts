@@ -71,7 +71,7 @@ let persistViewTimer: ReturnType<typeof setTimeout> | null = null;
 // Track whether tool input has been received (to know if we should restore persisted state)
 let hasReceivedToolInput = false;
 
-let widgetUUID: string | undefined = undefined;
+let viewUUID: string | undefined = undefined;
 
 /**
  * Persisted camera state for localStorage
@@ -122,7 +122,7 @@ function schedulePersistViewState(cesiumViewer: any): void {
  * Persist current view state to localStorage
  */
 function persistViewState(cesiumViewer: any): void {
-  if (!widgetUUID) {
+  if (!viewUUID) {
     log.info("No storage key available, skipping view persistence");
     return;
   }
@@ -132,8 +132,8 @@ function persistViewState(cesiumViewer: any): void {
 
   try {
     const value = JSON.stringify(state);
-    localStorage.setItem(widgetUUID, value);
-    log.info("Persisted view state:", widgetUUID, value);
+    localStorage.setItem(viewUUID, value);
+    log.info("Persisted view state:", viewUUID, value);
   } catch (e) {
     log.warn("Failed to persist view state:", e);
   }
@@ -143,10 +143,10 @@ function persistViewState(cesiumViewer: any): void {
  * Load persisted view state from localStorage
  */
 function loadPersistedViewState(): PersistedCameraState | null {
-  if (!widgetUUID) return null;
+  if (!viewUUID) return null;
 
   try {
-    const stored = localStorage.getItem(widgetUUID);
+    const stored = localStorage.getItem(viewUUID);
     if (!stored) {
       console.info("No persisted view state found");
       return null;
@@ -938,16 +938,14 @@ app.ontoolinput = async (params) => {
 //   },
 // );
 
-// Handle tool result - extract widgetUUID and restore persisted view if available
+// Handle tool result - extract viewUUID and restore persisted view if available
 app.ontoolresult = async (result) => {
-  widgetUUID = result._meta?.widgetUUID
-    ? String(result._meta.widgetUUID)
-    : undefined;
-  log.info("Tool result received, widgetUUID:", widgetUUID);
+  viewUUID = result._meta?.viewUUID ? String(result._meta.viewUUID) : undefined;
+  log.info("Tool result received, viewUUID:", viewUUID);
 
-  // Now that we have widgetUUID, try to restore persisted view
+  // Now that we have viewUUID, try to restore persisted view
   // This overrides the tool input position if a saved state exists
-  if (viewer && widgetUUID) {
+  if (viewer && viewUUID) {
     const restored = restorePersistedView(viewer);
     if (restored) {
       log.info("Restored persisted view from tool result handler");
