@@ -201,9 +201,10 @@ def say(
     # 2. Provide the resourceUri metadata
     # 3. Show the final text in the tool result
     # 4. Provide widget UUID for multi-player coordination
+    autoplay_note = "playing automatically" if autoPlay else "ready to play on click"
     return [types.TextContent(
         type="text",
-        text=f"Displayed a TTS widget with voice '{voice}'. Click to play/pause, use toolbar to restart or fullscreen.",
+        text=f"The text is now displayed in a TTS widget and {autoplay_note} (voice: {voice}). The user can see and hear it - do not repeat the text.",
         _meta={"widgetUUID": widget_uuid},
     )]
 
@@ -692,7 +693,8 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: var(--font-sans); }
-    .container { padding: 16px; min-height: 100px; position: relative; outline: none; }
+    .container { padding: 16px; position: relative; outline: none; }
+    .container.showingInfo { padding-bottom: 140px; } /* Space for info popup */
     .textWrapper { position: relative; }
     .textDisplay {
       font-size: 16px; line-height: 1.6; padding: 8px; border-radius: 6px;
@@ -730,26 +732,10 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
     .fullscreenBtn .collapseIcon { display: none; }
     .container.fullscreen .fullscreenBtn .expandIcon { display: none; }
     .container.fullscreen .fullscreenBtn .collapseIcon { display: block; }
-    /* Info button - bottom right */
-    .infoBtn {
-      position: absolute;
-      bottom: 8px; right: 8px;
-      width: 24px; height: 24px;
-      border: none; border-radius: 50%;
-      background: rgba(128, 128, 128, 0.4);
-      color: white; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: bold; font-style: italic; font-family: serif;
-      opacity: 0.5;
-      transition: opacity 0.2s, background 0.2s;
-      z-index: 10;
-    }
-    .container:hover .infoBtn { opacity: 0.8; }
-    .infoBtn:hover { opacity: 1; background: rgba(128, 128, 128, 0.7); }
-    /* Info popup */
+    /* Info popup - positioned below toolbar */
     .infoPopup {
       position: absolute;
-      bottom: 40px; right: 8px;
+      top: 44px; right: 8px;
       background: rgba(0, 0, 0, 0.9);
       color: white;
       padding: 12px 16px;
@@ -1344,7 +1330,7 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
               <span className="pending">{pendingText}</span>
             </div>
           </div>
-          {/* Toolbar - top right */}
+          {/* Toolbar - top right: Play/Pause, Reset, (i), Fullscreen */}
           <div className="toolbar">
             <button className="controlBtn" onClick={togglePlayPause} title="Play/Pause">
               {status === "playing" ? (
@@ -1355,11 +1341,14 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
                 <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
               )}
             </button>
-            <button className="controlBtn" onClick={restartPlayback} title="Restart">
+            <button className="controlBtn" onClick={restartPlayback} title="Reset">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                 <path d="M3 3v5h5"/>
               </svg>
+            </button>
+            <button className="controlBtn infoBtn" onClick={() => setShowInfo(!showInfo)} title="Attribution info">
+              <span style={{fontStyle: "italic", fontFamily: "serif", fontWeight: "bold"}}>i</span>
             </button>
             <button className={`controlBtn fullscreenBtn` + (fullscreenAvailable ? ` available` : ``)} onClick={toggleFullscreen} title="Toggle fullscreen">
               <svg className="expandIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1370,8 +1359,6 @@ EMBEDDED_WIDGET_HTML = """<!DOCTYPE html>
               </svg>
             </button>
           </div>
-          {/* Info button - bottom right */}
-          <button className="infoBtn" onClick={() => setShowInfo(!showInfo)} title="Attribution info">i</button>
           {showInfo && (
             <div className="infoPopup">
               <h4>Powered by Pocket TTS</h4>
