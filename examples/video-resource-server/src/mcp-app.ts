@@ -63,7 +63,15 @@ function showPlayer(dataUri: string, info: string) {
 // MCP Apps SDK Integration
 // =============================================================================
 
-const app = new App({ name: "Video Resource Player", version: "1.0.0" });
+/** Preferred height for inline mode - fills viewport but gives host a size hint */
+const PREFERRED_INLINE_HEIGHT = 400;
+
+// autoResize: false - we manually send size since video fills its container
+const app = new App(
+  { name: "Video Resource Player", version: "1.0.0" },
+  {},
+  { autoResize: false },
+);
 
 // Handle tool result - Requests a resource via resources/read and converts the
 // base64 blob to a data URI for use in the browser.
@@ -131,4 +139,6 @@ app.connect().then(() => {
   if (ctx) {
     handleHostContextChanged(ctx);
   }
+  // Send preferred size for inline mode
+  app.sendSizeChanged({ height: PREFERRED_INLINE_HEIGHT });
 });

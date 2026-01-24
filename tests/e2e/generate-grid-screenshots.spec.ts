@@ -26,8 +26,8 @@ const EXTRA_WAIT_MS: Record<string, number> = {
 };
 
 // Servers to skip (screenshots maintained manually)
-const SKIP_SERVERS = new Set([
-  "video-resource", // Uses custom screenshot from PR comment
+const SKIP_SERVERS = new Set<string>([
+  // Previously had video-resource, but now it auto-generates like other servers
 ]);
 
 // Optional: filter to a single example via EXAMPLE env var (folder name)
