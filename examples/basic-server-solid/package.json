@@ -26,7 +26,7 @@
     "@modelcontextprotocol/sdk": "^1.24.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "solid-js": "1.9.10",
+    "solid-js": "1.9.11",
     "zod": "^4.1.13"
   },
   "devDependencies": {
