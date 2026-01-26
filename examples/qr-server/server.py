@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "mcp @ git+https://github.com/modelcontextprotocol/python-sdk@main",
+#     "mcp>=1.26.0",
 #     "qrcode[pil]>=8.0",
 #     "uvicorn>=0.34.0",
 #     "starlette>=0.46.0",
@@ -27,7 +27,17 @@ VIEW_URI = "ui://qr-server/view.html"
 HOST = os.environ.get("HOST", "0.0.0.0")  # 0.0.0.0 for Docker compatibility
 PORT = int(os.environ.get("PORT", "3001"))
 
-mcp = FastMCP("QR Code Server")
+# Transport security settings for HTTP mode
+# Allow Docker bridge IP for container-to-host communication
+transport_security = TransportSecuritySettings(
+    allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*", "172.17.0.1:*"]
+)
+
+mcp = FastMCP(
+    "QR Code Server",
+    stateless_http=True,
+    transport_security=transport_security,
+)
 
 # Embedded View HTML for self-contained usage (uv run <url> or unbundled)
 EMBEDDED_VIEW_HTML = """<!DOCTYPE html>
@@ -162,11 +172,7 @@ if __name__ == "__main__":
         mcp.run(transport="stdio")
     else:
         # HTTP mode for basic-host (default) - with CORS
-        # Allow Docker bridge IP for container-to-host communication
-        security = TransportSecuritySettings(
-            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*", "172.17.0.1:*"]
-        )
-        app = mcp.streamable_http_app(stateless_http=True, transport_security=security)
+        app = mcp.streamable_http_app()
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
