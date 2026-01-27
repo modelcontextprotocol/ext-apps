@@ -45,6 +45,7 @@ import type {
   ResourceMetadata,
   ToolCallback,
   ReadResourceCallback,
+  RegisteredResource,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   AnySchema,
@@ -305,8 +306,8 @@ export function registerAppResource(
   uri: string,
   config: McpUiAppResourceConfig,
   readCallback: ReadResourceCallback,
-): void {
-  server.registerResource(
+): RegisteredResource {
+  return server.registerResource(
     name,
     uri,
     {
