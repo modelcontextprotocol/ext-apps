@@ -209,6 +209,11 @@ export const McpUiResourceCspSchema = z.object({
     .array(z.string())
     .optional()
     .describe("Allowed base URIs for the document (base-uri directive)."),
+  /** @description Trusted Types policy names  (trusted-types directive) */
+  trustedTypes: z
+    .array(z.string())
+    .optional()
+    .describe("Trusted Types policy names  (trusted-types directive)"),
 });
 
 /**

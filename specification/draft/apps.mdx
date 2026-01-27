@@ -151,6 +151,20 @@ interface McpUiResourceCsp {
      * ["https://cdn.example.com"]
      */
     baseUriDomains?: string[],
+    /**
+     * Trusted Types policy names for controlled runtime code evaluation.
+     *
+     * When declared, enables Trusted Types enforcement and allows the app to
+     * create named policies that produce trusted script content for use with
+     * `eval()` or `new Function()`.
+     *
+     * Each name must match a policy the app explicitly creates via
+     * `trustedTypes.createPolicy()`.
+     *
+     * @example
+     * ["formula-evaluator", "template-engine"]
+     */
+    trustedTypes?: string[],
 }
 
 interface UIResourceMeta {
@@ -245,6 +259,7 @@ The resource content is returned via `resources/read`:
           resourceDomains?: string[]; // Origins for static resources (scripts, images, styles, fonts).
           frameDomains?: string[]; // Origins for nested iframes (frame-src directive).
           baseUriDomains?: string[]; // Allowed base URIs for the document (base-uri directive).
+          trustedTypes?: string[];   // Trusted Types policy names for runtime code evaluation
         };
         permissions?: {
           camera?: {};           // Request camera access
@@ -903,7 +918,7 @@ type McpUiStyleVariableKey =
 }
 ```
 - Views can use the `applyHostStyleVariables` utility (or `useHostStyleVariables` if they prefer a React hook) to easily populate the host-provided CSS variables into their style sheet
-- Views can use the `applyDocumentTheme` utility (or `useDocumentTheme` if they prefer a React hook) to easily respond to Host Context `theme` changes in a way that is compatible with the host's light/dark color variables 
+- Views can use the `applyDocumentTheme` utility (or `useDocumentTheme` if they prefer a React hook) to easily respond to Host Context `theme` changes in a way that is compatible with the host's light/dark color variables
 
 Example usage of standardized CSS variables:
 
@@ -1728,9 +1743,12 @@ Hosts MUST enforce Content Security Policies based on resource metadata.
 const csp = resource._meta?.ui?.csp; // `resource` is extracted from the `contents` of the `resources/read` result
 const permissions = resource._meta?.ui?.permissions;
 
-const cspValue = `
+// Only add 'unsafe-eval' when Trusted Types is declared (provides controlled evaluation)
+const evalDirective = csp?.trustedTypes ? " 'unsafe-eval'" : '';
+
+let cspValue = `
   default-src 'none';
-  script-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
+  script-src 'self' 'unsafe-inline'${evalDirective} ${csp?.resourceDomains?.join(' ') || ''};
   style-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
   connect-src 'self' ${csp?.connectDomains?.join(' ') || ''};
   img-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};
@@ -1740,6 +1758,14 @@ const cspValue = `
   object-src 'none';
   base-uri ${csp?.baseUriDomains?.join(' ') || "'self'"};
 `;
+
+// Add Trusted Types directives when trustedTypes is declared
+if (csp?.trustedTypes) {
+  cspValue += `
+  require-trusted-types-for 'script';
+  trusted-types ${csp.trustedTypes.join(' ')};
+`;
+}
 
 // Permission Policy for iframe allow attribute
 const allowList: string[] = [];
@@ -1759,6 +1785,59 @@ const allowAttribute = allowList.join(' ');
 
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
 - **Resource consumption:** Malicious View can consume CPU/memory. Hosts should implement resource limits.
+
+#### 5. Trusted Types for Runtime Code Evaluation
+
+Apps that need runtime code evaluation (e.g., `eval()`, `new Function()`) can declare Trusted Types policies. This provides controlled evaluation through browser-enforced policy callbacks.
+
+**Example resource declaration:**
+
+```json
+{
+  "contents": [{
+    "uri": "ui://formula-evaluator/calculator",
+    "mimeType": "text/html;profile=mcp-app",
+    "text": "<!DOCTYPE html>...",
+    "_meta": {
+      "ui": {
+        "csp": {
+          "trustedTypes": ["formula-evaluator"]
+        }
+      }
+    }
+  }]
+}
+```
+
+**Example app usage:**
+
+```typescript
+// Create a Trusted Types policy in the app
+const formulaPolicy = trustedTypes.createPolicy('formula-evaluator', {
+  createScript: (input: string) => {
+    // Validate/sanitize the input before allowing evaluation
+    if (!isValidFormula(input)) {
+      throw new Error('Invalid formula syntax');
+    }
+    return input;
+  }
+});
+
+// Use the policy to safely evaluate formulas
+// Note: a workaround is currently required for Chromium https://github.com/w3c/trusted-types/wiki/Trusted-Types-for-function-constructor
+function evaluateFormula(formula: string, variables: Record<string, number>) {
+  const trustedScript = formulaPolicy.createScript(`
+    return (${formula});
+  `);
+
+  const fn = new Function(...Object.keys(variables), trustedScript);
+  return fn(...Object.values(variables));
+}
+```
+
+**Sandbox proxy considerations:**
+
+Web-based hosts that use a sandbox proxy to load View HTML content may need to declare an additional Trusted Types policy for the sandbox itself. When Trusted Types is enforced, the sandbox cannot use `innerHTML` or `document.write()` to inject the View's HTML without a policy. The sandbox SHOULD create its own policy named `mcp-app-sandbox` for this purpose, separate from any policies declared by the View. Apps MUST not themselves declare a policy named `mcp-app-sandbox`.
 
 ## Reservations in MCP
 

@@ -548,6 +548,8 @@ export interface McpUiResourceCsp {
   frameDomains?: string[];
   /** @description Allowed base URIs for the document (base-uri directive). */
   baseUriDomains?: string[];
+  /** @description Trusted Types policy names  (trusted-types directive) */
+  trustedTypes?: string[];
 }
 
 /**
