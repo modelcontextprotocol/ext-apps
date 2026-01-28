@@ -1,5 +1,5 @@
 {
-  "name": "dicom-viewer-mcp-prototype",
+  "name": "@modelcontextprotocol/server-dicom-viewer",
   "version": "1.0.0",
   "type": "module",
   "description": "A prototype MCP App that displays DICOM medical images in Claude Desktop",
@@ -41,7 +41,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sharp": "^0.33.5",
-    "zod": "^4.1.13"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

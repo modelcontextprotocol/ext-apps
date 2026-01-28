@@ -2,10 +2,40 @@
  * @file DICOM Viewer MCP App - displays server-rendered DICOM series
  */
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import styles from "./mcp-app.module.css";
+
+// ── Debug logging ──
+const DEBUG = true;
+function dbg(...args: unknown[]) {
+  if (!DEBUG) return;
+  console.log("[DICOM-DBG]", ...args);
+  // Also write to a visible element so we can see it even without devtools
+  try {
+    let el = document.getElementById("__dicom_debug__");
+    if (!el) {
+      el = document.createElement("pre");
+      el.id = "__dicom_debug__";
+      el.style.cssText =
+        "position:fixed;top:0;left:0;right:0;z-index:99999;background:red;color:white;" +
+        "font-size:11px;padding:4px 8px;max-height:40vh;overflow:auto;pointer-events:none;white-space:pre-wrap;";
+      (document.body ?? document.documentElement).appendChild(el);
+    }
+    el.textContent += args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" ") + "\n";
+  } catch { /* ignore */ }
+}
+
+dbg("script executing", {
+  readyState: document.readyState,
+  hasBody: !!document.body,
+  hasRoot: !!document.getElementById("root"),
+  locationHref: location.href,
+  windowDICOM_IMAGES: !!(window as any).__DICOM_IMAGES__,
+  windowSERIES_INFO: !!(window as any).__SERIES_INFO__,
+});
 
 // Get embedded data from global variables injected by the server
 declare global {
@@ -33,6 +63,8 @@ declare global {
 }
 
 function DicomViewerApp() {
+  dbg("DicomViewerApp render");
+
   const [hostContext, setHostContext] = useState<
     McpUiHostContext | undefined
   >();
@@ -41,21 +73,31 @@ function DicomViewerApp() {
     appInfo: { name: "DICOM Viewer", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (app) => {
+      dbg("onAppCreated called", { appId: app?.constructor?.name });
       app.onteardown = async () => ({});
-      app.onerror = console.error;
+      app.onerror = (err) => {
+        dbg("app.onerror", err);
+        console.error(err);
+      };
       app.onhostcontextchanged = (params) => {
+        dbg("onhostcontextchanged", params);
         setHostContext((prev) => ({ ...prev, ...params }));
       };
     },
   });
 
+  dbg("useApp result", { hasApp: !!app, hasError: !!error, errorMsg: error?.message });
+
   useEffect(() => {
     if (app) {
-      setHostContext(app.getHostContext());
+      const ctx = app.getHostContext();
+      dbg("getHostContext", ctx);
+      setHostContext(ctx);
     }
   }, [app]);
 
   if (error) {
+    dbg("rendering error state", error.message);
     return (
       <div className={styles.error}>
         <div className={styles.errorTitle}>Connection Error</div>
@@ -65,6 +107,7 @@ function DicomViewerApp() {
   }
 
   if (!app) {
+    dbg("rendering loading state (no app yet)");
     return (
       <div className={styles.loading}>
         <div className={styles.spinner} />
@@ -73,14 +116,16 @@ function DicomViewerApp() {
     );
   }
 
-  return <DicomViewerInner hostContext={hostContext} />;
+  dbg("rendering DicomViewerInner");
+  return <DicomViewerInner hostContext={hostContext} app={app} />;
 }
 
 interface DicomViewerInnerProps {
   hostContext?: McpUiHostContext;
+  app: NonNullable<ReturnType<typeof useApp>["app"]>;
 }
 
-function DicomViewerInner({ hostContext }: DicomViewerInnerProps) {
+function DicomViewerInner({ hostContext, app }: DicomViewerInnerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentSlice, setCurrentSlice] = useState(0);
   const [scale, setScale] = useState(1);
@@ -88,11 +133,26 @@ function DicomViewerInner({ hostContext }: DicomViewerInnerProps) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const positionStart = useRef({ x: 0, y: 0 });
+  const [sliceError, setSliceError] = useState<string | null>(null);
+  const [isLoadingSlice, setIsLoadingSlice] = useState(false);
 
-  const images = window.__DICOM_IMAGES__ ?? [];
+  const initialImages = window.__DICOM_IMAGES__ ?? [];
   const infos = window.__DICOM_INFOS__ ?? [];
   const seriesInfo = window.__SERIES_INFO__;
-  const totalSlices = images.length;
+  const totalSlices =
+    seriesInfo?.totalSlices ?? infos.length ?? initialImages.length;
+  const [loadedImages, setLoadedImages] = useState<Record<number, string>>(
+    () => {
+      const map: Record<number, string> = {};
+      initialImages.forEach((img, index) => {
+        if (img) {
+          map[index] = img;
+        }
+      });
+      return map;
+    },
+  );
+  const currentImage = loadedImages[currentSlice];
 
   // Navigate to specific slice
   const goToSlice = useCallback(
@@ -101,6 +161,48 @@ function DicomViewerInner({ hostContext }: DicomViewerInnerProps) {
     },
     [totalSlices],
   );
+
+  useEffect(() => {
+    if (!app || totalSlices === 0 || currentImage) {
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingSlice(true);
+    setSliceError(null);
+
+    app
+      .callServerTool({
+        name: "get-dicom-slice",
+        arguments: { index: currentSlice },
+      })
+      .then((result: CallToolResult) => {
+        if (cancelled) return;
+        if (result.isError) {
+          setSliceError("Failed to load slice image.");
+          return;
+        }
+        const dataUrl = extractDataUrl(result);
+        if (!dataUrl) {
+          setSliceError("No image data returned from server.");
+          return;
+        }
+        setLoadedImages((prev) => ({ ...prev, [currentSlice]: dataUrl }));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setSliceError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingSlice(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [app, currentSlice, currentImage, totalSlices]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -190,7 +292,7 @@ function DicomViewerInner({ hostContext }: DicomViewerInnerProps) {
     setScale((s) => Math.max(0.1, s / 1.2));
   }, []);
 
-  if (images.length === 0) {
+  if (totalSlices === 0) {
     return (
       <div className={styles.error}>
         <div className={styles.errorTitle}>No Images</div>
@@ -237,16 +339,32 @@ function DicomViewerInner({ hostContext }: DicomViewerInnerProps) {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <img
-          src={images[currentSlice]}
-          alt={`DICOM Slice ${currentSlice + 1}`}
-          className={styles.image}
-          style={{
-            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-            cursor: isDragging ? "grabbing" : "grab",
-          }}
-          draggable={false}
-        />
+        {currentImage ? (
+          <img
+            src={currentImage}
+            alt={`DICOM Slice ${currentSlice + 1}`}
+            className={styles.image}
+            style={{
+              transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+              cursor: isDragging ? "grabbing" : "grab",
+            }}
+            draggable={false}
+          />
+        ) : (
+          <div className={styles.imagePlaceholder}>
+            <div>
+              <div className={styles.imagePlaceholderTitle}>
+                {sliceError ? "Unable to load slice" : "Loading slice..."}
+              </div>
+              <div className={styles.imagePlaceholderMessage}>
+                {sliceError ??
+                  (isLoadingSlice
+                    ? "Fetching image data from the server."
+                    : "Waiting for image data.")}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Slice indicator overlay */}
         <div className={styles.sliceOverlay}>
@@ -314,8 +432,48 @@ function DicomViewerInner({ hostContext }: DicomViewerInnerProps) {
   );
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <DicomViewerApp />
-  </StrictMode>,
-);
+function extractDataUrl(result: CallToolResult): string | null {
+  const structured = result.structuredContent;
+  if (
+    structured &&
+    typeof structured === "object" &&
+    "dataUrl" in structured &&
+    typeof (structured as { dataUrl?: unknown }).dataUrl === "string"
+  ) {
+    return (structured as { dataUrl: string }).dataUrl;
+  }
+
+  for (const block of result.content ?? []) {
+    if (block.type === "text") {
+      const text = (block as { text?: unknown }).text;
+      if (typeof text === "string" && text.startsWith("data:image/")) {
+        return text;
+      }
+    }
+  }
+
+  return null;
+}
+
+dbg("about to createRoot");
+const rootEl = document.getElementById("root");
+dbg("root element", { found: !!rootEl, tagName: rootEl?.tagName, childCount: rootEl?.childNodes?.length });
+
+if (!rootEl) {
+  dbg("FATAL: no root element found!");
+  document.body.innerHTML = '<pre style="color:red;font-size:20px;padding:20px;">FATAL: no #root element</pre>';
+} else {
+  try {
+    const root = createRoot(rootEl);
+    dbg("createRoot succeeded, calling render");
+    root.render(
+      <StrictMode>
+        <DicomViewerApp />
+      </StrictMode>,
+    );
+    dbg("render() called successfully");
+  } catch (err) {
+    dbg("FATAL: createRoot/render threw", err);
+    document.body.innerHTML = `<pre style="color:red;font-size:16px;padding:20px;">createRoot error: ${err}</pre>`;
+  }
+}

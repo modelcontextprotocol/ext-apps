@@ -19,10 +19,10 @@ A prototype MCP (Model Context Protocol) App that displays DICOM medical images 
 
 1. The MCP server scans the `./dicom/` folder for all `.dcm` files
 2. Parses each DICOM file using `dicom-parser`
-3. Converts pixel data to PNG using `sharp` with proper windowing
-4. Sorts slices by Instance Number or Slice Location
-5. Embeds all images in the HTML resource sent to Claude Desktop
-6. The client displays images with interactive navigation controls
+3. Extracts slice metadata and sorts by Instance Number or Slice Location
+4. Sends a compact HTML UI resource to the host (no embedded images)
+5. The client requests slices on-demand via the `get-dicom-slice` tool
+6. The server converts each slice to JPEG with proper windowing and returns it
 
 This approach avoids CSP (Content Security Policy) restrictions in Claude Desktop by doing all DICOM processing server-side.
 
@@ -143,7 +143,7 @@ Currently supports uncompressed DICOM files (Explicit/Implicit VR Little Endian)
 ## Limitations
 
 - Uncompressed DICOM only (no JPEG/JPEG2000 compression)
-- All slices are loaded at once (may be slow for very large series)
+- Slice images are fetched on demand (first load per slice can be slow)
 - Single series at a time
 
 ## Author
