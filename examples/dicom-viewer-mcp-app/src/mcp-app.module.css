@@ -5,7 +5,10 @@
   height: 100%;
   background: #000;
   color: #fff;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 .header {
