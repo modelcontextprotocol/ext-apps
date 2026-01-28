@@ -1,0 +1,7 @@
+node_modules/
+dist/
+
+# DICOM files (large, users add their own)
+.DS_Store
+dicom/
+!.gitkeep

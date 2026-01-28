@@ -1,0 +1,321 @@
+/**
+ * @file DICOM Viewer MCP App - displays server-rendered DICOM series
+ */
+import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import { useApp } from "@modelcontextprotocol/ext-apps/react";
+import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import styles from "./mcp-app.module.css";
+
+// Get embedded data from global variables injected by the server
+declare global {
+  interface Window {
+    __DICOM_IMAGES__?: string[];
+    __DICOM_INFOS__?: Array<{
+      filename: string;
+      width: number;
+      height: number;
+      bitsStored: number;
+      instanceNumber?: number;
+      sliceLocation?: number;
+      photometricInterpretation: string;
+    }>;
+    __SERIES_INFO__?: {
+      patientName?: string;
+      studyDescription?: string;
+      seriesDescription?: string;
+      totalSlices: number;
+      width: number;
+      height: number;
+      bitsStored: number;
+    };
+  }
+}
+
+function DicomViewerApp() {
+  const [hostContext, setHostContext] = useState<
+    McpUiHostContext | undefined
+  >();
+
+  const { app, error } = useApp({
+    appInfo: { name: "DICOM Viewer", version: "1.0.0" },
+    capabilities: {},
+    onAppCreated: (app) => {
+      app.onteardown = async () => ({});
+      app.onerror = console.error;
+      app.onhostcontextchanged = (params) => {
+        setHostContext((prev) => ({ ...prev, ...params }));
+      };
+    },
+  });
+
+  useEffect(() => {
+    if (app) {
+      setHostContext(app.getHostContext());
+    }
+  }, [app]);
+
+  if (error) {
+    return (
+      <div className={styles.error}>
+        <div className={styles.errorTitle}>Connection Error</div>
+        <div className={styles.errorMessage}>{error.message}</div>
+      </div>
+    );
+  }
+
+  if (!app) {
+    return (
+      <div className={styles.loading}>
+        <div className={styles.spinner} />
+        <div>Connecting...</div>
+      </div>
+    );
+  }
+
+  return <DicomViewerInner hostContext={hostContext} />;
+}
+
+interface DicomViewerInnerProps {
+  hostContext?: McpUiHostContext;
+}
+
+function DicomViewerInner({ hostContext }: DicomViewerInnerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [currentSlice, setCurrentSlice] = useState(0);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const positionStart = useRef({ x: 0, y: 0 });
+
+  const images = window.__DICOM_IMAGES__ ?? [];
+  const infos = window.__DICOM_INFOS__ ?? [];
+  const seriesInfo = window.__SERIES_INFO__;
+  const totalSlices = images.length;
+
+  // Navigate to specific slice
+  const goToSlice = useCallback(
+    (index: number) => {
+      setCurrentSlice(Math.max(0, Math.min(totalSlices - 1, index)));
+    },
+    [totalSlices],
+  );
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        goToSlice(currentSlice - 1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        goToSlice(currentSlice + 1);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        goToSlice(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        goToSlice(totalSlices - 1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentSlice, goToSlice, totalSlices]);
+
+  // Handle mouse wheel - scroll for navigation when not pressing Ctrl, zoom when pressing Ctrl
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+
+      if (e.ctrlKey || e.metaKey) {
+        // Zoom
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        setScale((s) => Math.min(10, Math.max(0.1, s * delta)));
+      } else {
+        // Navigate slices
+        if (e.deltaY > 0) {
+          goToSlice(currentSlice + 1);
+        } else {
+          goToSlice(currentSlice - 1);
+        }
+      }
+    },
+    [currentSlice, goToSlice],
+  );
+
+  // Handle mouse down for pan
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      setIsDragging(true);
+      dragStart.current = { x: e.clientX, y: e.clientY };
+      positionStart.current = { ...position };
+    },
+    [position],
+  );
+
+  // Handle mouse move for pan
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPosition({
+        x: positionStart.current.x + dx,
+        y: positionStart.current.y + dy,
+      });
+    },
+    [isDragging],
+  );
+
+  // Handle mouse up
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Reset view
+  const handleReset = useCallback(() => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  }, []);
+
+  // Zoom controls
+  const handleZoomIn = useCallback(() => {
+    setScale((s) => Math.min(10, s * 1.2));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setScale((s) => Math.max(0.1, s / 1.2));
+  }, []);
+
+  if (images.length === 0) {
+    return (
+      <div className={styles.error}>
+        <div className={styles.errorTitle}>No Images</div>
+        <div className={styles.errorMessage}>
+          No DICOM images found in ./dicom/ folder
+        </div>
+      </div>
+    );
+  }
+
+  const currentInfo = infos[currentSlice];
+  const infoText = seriesInfo
+    ? `${seriesInfo.width} x ${seriesInfo.height} | ${seriesInfo.bitsStored}-bit`
+    : "";
+
+  return (
+    <main
+      className={styles.main}
+      style={{
+        paddingTop: hostContext?.safeAreaInsets?.top,
+        paddingRight: hostContext?.safeAreaInsets?.right,
+        paddingBottom: hostContext?.safeAreaInsets?.bottom,
+        paddingLeft: hostContext?.safeAreaInsets?.left,
+      }}
+    >
+      <div className={styles.header}>
+        <div className={styles.headerLeft}>
+          <h1 className={styles.title}>DICOM Viewer</h1>
+          {seriesInfo?.seriesDescription && (
+            <span className={styles.seriesDesc}>
+              {seriesInfo.seriesDescription}
+            </span>
+          )}
+        </div>
+        <span className={styles.info}>{infoText}</span>
+      </div>
+
+      <div
+        ref={containerRef}
+        className={styles.viewportContainer}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <img
+          src={images[currentSlice]}
+          alt={`DICOM Slice ${currentSlice + 1}`}
+          className={styles.image}
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+            cursor: isDragging ? "grabbing" : "grab",
+          }}
+          draggable={false}
+        />
+
+        {/* Slice indicator overlay */}
+        <div className={styles.sliceOverlay}>
+          <span className={styles.sliceNumber}>
+            {currentSlice + 1} / {totalSlices}
+          </span>
+          {currentInfo?.instanceNumber !== undefined && (
+            <span className={styles.instanceNumber}>
+              Instance: {currentInfo.instanceNumber}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.controls}>
+        {/* Slice navigation */}
+        {totalSlices > 1 && (
+          <div className={styles.sliceControls}>
+            <button
+              onClick={() => goToSlice(currentSlice - 1)}
+              disabled={currentSlice === 0}
+              title="Previous slice (←)"
+            >
+              ◀
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={totalSlices - 1}
+              value={currentSlice}
+              onChange={(e) => goToSlice(parseInt(e.target.value, 10))}
+              className={styles.slider}
+            />
+            <button
+              onClick={() => goToSlice(currentSlice + 1)}
+              disabled={currentSlice === totalSlices - 1}
+              title="Next slice (→)"
+            >
+              ▶
+            </button>
+          </div>
+        )}
+
+        {/* Zoom controls */}
+        <div className={styles.zoomControls}>
+          <button onClick={handleZoomOut} title="Zoom Out">
+            −
+          </button>
+          <span className={styles.zoomLevel}>{Math.round(scale * 100)}%</span>
+          <button onClick={handleZoomIn} title="Zoom In">
+            +
+          </button>
+          <button onClick={handleReset} title="Reset View">
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Help text */}
+      <div className={styles.helpText}>
+        Scroll: navigate slices | Ctrl+Scroll: zoom | Drag: pan | Arrow keys:
+        navigate
+      </div>
+    </main>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <DicomViewerApp />
+  </StrictMode>,
+);
