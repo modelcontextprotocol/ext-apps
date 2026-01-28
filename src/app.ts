@@ -358,27 +358,20 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * @example Progressive rendering of tool arguments
    * ```ts source="./app.examples.ts#App_ontoolinputpartial_progressiveRendering"
-   * let toolInputs: Record<string, unknown> | null = null;
-   * let toolInputsPartial: Record<string, unknown> | null = null;
+   * const codePreview = document.querySelector<HTMLPreElement>("#code-preview")!;
+   * const canvas = document.querySelector<HTMLCanvasElement>("#canvas")!;
    *
    * app.ontoolinputpartial = (params) => {
-   *   toolInputsPartial = params.arguments as Record<string, unknown>;
-   *   render();
+   *   codePreview.textContent = (params.arguments?.code as string) ?? "";
+   *   codePreview.style.display = "block";
+   *   canvas.style.display = "none";
    * };
    *
    * app.ontoolinput = (params) => {
-   *   toolInputs = params.arguments as Record<string, unknown>;
-   *   toolInputsPartial = null;
-   *   render();
+   *   codePreview.style.display = "none";
+   *   canvas.style.display = "block";
+   *   render(params.arguments?.code as string);
    * };
-   *
-   * function render() {
-   *   if (toolInputs) {
-   *     renderFinalUI(toolInputs);
-   *   } else {
-   *     renderLoadingUI(toolInputsPartial); // e.g., shimmer with partial preview
-   *   }
-   * }
    * ```
    *
    * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
@@ -486,8 +479,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * @example Respond to theme changes
    * ```ts source="./app.examples.ts#App_onhostcontextchanged_respondToTheme"
-   * app.onhostcontextchanged = (params) => {
-   *   if (params.theme === "dark") {
+   * app.onhostcontextchanged = (ctx) => {
+   *   if (ctx.theme === "dark") {
    *     document.body.classList.add("dark-theme");
    *   } else {
    *     document.body.classList.remove("dark-theme");
@@ -945,11 +938,12 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * @example Toggle display mode
    * ```ts source="./app.examples.ts#App_requestDisplayMode_toggle"
+   * const container = document.getElementById("main")!;
    * const ctx = app.getHostContext();
-   * if (ctx?.availableDisplayModes?.includes("fullscreen")) {
-   *   const target = ctx.displayMode === "fullscreen" ? "inline" : "fullscreen";
-   *   const result = await app.requestDisplayMode({ mode: target });
-   *   console.log("Now in:", result.mode);
+   * const newMode = ctx?.displayMode === "inline" ? "fullscreen" : "inline";
+   * if (ctx?.availableDisplayModes?.includes(newMode)) {
+   *   const result = await app.requestDisplayMode({ mode: newMode });
+   *   container.classList.toggle("fullscreen", result.mode === "fullscreen");
    * }
    * ```
    *

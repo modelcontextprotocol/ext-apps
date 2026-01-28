@@ -44,9 +44,9 @@ export function getDocumentTheme(): McpUiTheme {
  * @example Apply theme from host context
  * ```ts source="./styles.examples.ts#applyDocumentTheme_fromHostContext"
  * // Apply when host context changes
- * app.onhostcontextchanged = (params) => {
- *   if (params.theme) {
- *     applyDocumentTheme(params.theme);
+ * app.onhostcontextchanged = (ctx) => {
+ *   if (ctx.theme) {
+ *     applyDocumentTheme(ctx.theme);
  *   }
  * };
  *
@@ -95,9 +95,9 @@ export function applyDocumentTheme(theme: McpUiTheme): void {
  * document.body.style.background = "var(--color-background-primary)";
  *
  * // Apply when host context changes
- * app.onhostcontextchanged = (params) => {
- *   if (params.styles?.variables) {
- *     applyHostStyleVariables(params.styles.variables);
+ * app.onhostcontextchanged = (ctx) => {
+ *   if (ctx.styles?.variables) {
+ *     applyHostStyleVariables(ctx.styles.variables);
  *   }
  * };
  *
@@ -112,10 +112,10 @@ export function applyDocumentTheme(theme: McpUiTheme): void {
  *
  * @example Apply to a specific element
  * ```ts source="./styles.examples.ts#applyHostStyleVariables_toElement"
- * app.onhostcontextchanged = (params) => {
+ * app.onhostcontextchanged = (ctx) => {
  *   const container = document.getElementById("app-root");
- *   if (container && params.styles?.variables) {
- *     applyHostStyleVariables(params.styles.variables, container);
+ *   if (container && ctx.styles?.variables) {
+ *     applyHostStyleVariables(ctx.styles.variables, container);
  *   }
  * };
  * ```
@@ -163,9 +163,9 @@ export function applyHostStyleVariables(
  * @example Apply fonts from host context
  * ```ts source="./styles.examples.ts#applyHostFonts_fromHostContext"
  * // Apply when host context changes
- * app.onhostcontextchanged = (params) => {
- *   if (params.styles?.css?.fonts) {
- *     applyHostFonts(params.styles.css.fonts);
+ * app.onhostcontextchanged = (ctx) => {
+ *   if (ctx.styles?.css?.fonts) {
+ *     applyHostFonts(ctx.styles.css.fonts);
  *   }
  * };
  *

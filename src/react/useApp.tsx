@@ -102,8 +102,8 @@ export interface AppState {
  *       app.onerror = (error) => {
  *         console.log("Error:", error);
  *       };
- *       app.onhostcontextchanged = (params) => {
- *         setHostContext((prev) => ({ ...prev, ...params }));
+ *       app.onhostcontextchanged = (ctx) => {
+ *         setHostContext((prev) => ({ ...prev, ...ctx }));
  *       };
  *     },
  *   });

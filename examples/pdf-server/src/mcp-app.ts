@@ -13,12 +13,14 @@ import {
   applyHostStyleVariables,
 } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ContentBlock } from "@modelcontextprotocol/sdk/spec.types.js";
 import * as pdfjsLib from "pdfjs-dist";
 import { TextLayer } from "pdfjs-dist";
 import "./global.css";
 import "./mcp-app.css";
 
 const MAX_MODEL_CONTEXT_LENGTH = 15000;
+const MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION = 768; // Max screenshot dimension
 const CHUNK_SIZE = 500 * 1024; // 500KB chunks
 
 // Configure PDF.js worker
@@ -298,7 +300,47 @@ async function updatePageContext() {
 
     const contextText = `${header}\n\nPage content:\n${content}`;
 
-    app.updateModelContext({ content: [{ type: "text", text: contextText }] });
+    // Build content array with text and optional screenshot
+    const contentBlocks: ContentBlock[] = [{ type: "text", text: contextText }];
+
+    // Add screenshot if host supports image content
+    if (app.getHostCapabilities()?.updateModelContext?.image) {
+      try {
+        // Scale down to reduce token usage (tokens depend on dimensions)
+        const sourceCanvas = canvasEl;
+        const scale = Math.min(
+          1,
+          MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION /
+            Math.max(sourceCanvas.width, sourceCanvas.height),
+        );
+        const targetWidth = Math.round(sourceCanvas.width * scale);
+        const targetHeight = Math.round(sourceCanvas.height * scale);
+
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = targetWidth;
+        tempCanvas.height = targetHeight;
+        const ctx = tempCanvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
+          const dataUrl = tempCanvas.toDataURL("image/png");
+          const base64Data = dataUrl.split(",")[1];
+          if (base64Data) {
+            contentBlocks.push({
+              type: "image",
+              data: base64Data,
+              mimeType: "image/png",
+            });
+            log.info(
+              `Added screenshot to model context (${targetWidth}x${targetHeight})`,
+            );
+          }
+        }
+      } catch (err) {
+        log.info("Failed to capture screenshot:", err);
+      }
+    }
+
+    app.updateModelContext({ content: contentBlocks });
   } catch (err) {
     log.error("Error updating context:", err);
   }

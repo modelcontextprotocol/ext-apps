@@ -145,33 +145,25 @@ async function App_ontoolinput_setter(app: App) {
  */
 function App_ontoolinputpartial_progressiveRendering(app: App) {
   //#region App_ontoolinputpartial_progressiveRendering
-  let toolInputs: Record<string, unknown> | null = null;
-  let toolInputsPartial: Record<string, unknown> | null = null;
+  const codePreview = document.querySelector<HTMLPreElement>("#code-preview")!;
+  const canvas = document.querySelector<HTMLCanvasElement>("#canvas")!;
 
   app.ontoolinputpartial = (params) => {
-    toolInputsPartial = params.arguments as Record<string, unknown>;
-    render();
+    codePreview.textContent = (params.arguments?.code as string) ?? "";
+    codePreview.style.display = "block";
+    canvas.style.display = "none";
   };
 
   app.ontoolinput = (params) => {
-    toolInputs = params.arguments as Record<string, unknown>;
-    toolInputsPartial = null;
-    render();
+    codePreview.style.display = "none";
+    canvas.style.display = "block";
+    render(params.arguments?.code as string);
   };
-
-  function render() {
-    if (toolInputs) {
-      renderFinalUI(toolInputs);
-    } else {
-      renderLoadingUI(toolInputsPartial); // e.g., shimmer with partial preview
-    }
-  }
   //#endregion App_ontoolinputpartial_progressiveRendering
 }
 
-// Stubs for App_ontoolinputpartial_progressiveRendering example
-declare function renderLoadingUI(data: Record<string, unknown> | null): void;
-declare function renderFinalUI(data: Record<string, unknown>): void;
+// Stub for App_ontoolinputpartial_progressiveRendering example
+declare function render(code: string): void;
 
 /**
  * Example: Display tool execution results using ontoolresult.
@@ -205,8 +197,8 @@ function App_ontoolcancelled_handleCancellation(app: App) {
  */
 function App_onhostcontextchanged_respondToTheme(app: App) {
   //#region App_onhostcontextchanged_respondToTheme
-  app.onhostcontextchanged = (params) => {
-    if (params.theme === "dark") {
+  app.onhostcontextchanged = (ctx) => {
+    if (ctx.theme === "dark") {
       document.body.classList.add("dark-theme");
     } else {
       document.body.classList.remove("dark-theme");
@@ -220,10 +212,19 @@ function App_onhostcontextchanged_respondToTheme(app: App) {
  */
 function App_onhostcontextchanged_respondToDisplayMode(app: App) {
   //#region App_onhostcontextchanged_respondToDisplayMode
-  app.onhostcontextchanged = (params) => {
-    if (params.displayMode) {
-      const isFullscreen = params.displayMode === "fullscreen";
-      document.body.classList.toggle("fullscreen", isFullscreen);
+  app.onhostcontextchanged = (ctx) => {
+    // Adjust to current display mode
+    if (ctx.displayMode) {
+      const container = document.getElementById("main")!;
+      const isFullscreen = ctx.displayMode === "fullscreen";
+      container.classList.toggle("fullscreen", isFullscreen);
+    }
+
+    // Adjust display mode controls
+    if (ctx.availableDisplayModes) {
+      const fullscreenBtn = document.getElementById("fullscreen-btn")!;
+      const canFullscreen = ctx.availableDisplayModes.includes("fullscreen");
+      fullscreenBtn.style.display = canFullscreen ? "block" : "none";
     }
   };
   //#endregion App_onhostcontextchanged_respondToDisplayMode
@@ -424,11 +425,12 @@ async function App_openLink_documentation(app: App) {
  */
 async function App_requestDisplayMode_toggle(app: App) {
   //#region App_requestDisplayMode_toggle
+  const container = document.getElementById("main")!;
   const ctx = app.getHostContext();
-  if (ctx?.availableDisplayModes?.includes("fullscreen")) {
-    const target = ctx.displayMode === "fullscreen" ? "inline" : "fullscreen";
-    const result = await app.requestDisplayMode({ mode: target });
-    console.log("Now in:", result.mode);
+  const newMode = ctx?.displayMode === "inline" ? "fullscreen" : "inline";
+  if (ctx?.availableDisplayModes?.includes(newMode)) {
+    const result = await app.requestDisplayMode({ mode: newMode });
+    container.classList.toggle("fullscreen", result.mode === "fullscreen");
   }
   //#endregion App_requestDisplayMode_toggle
 }

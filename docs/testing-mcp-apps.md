@@ -21,8 +21,9 @@ The [`basic-host`](https://github.com/modelcontextprotocol/ext-apps/tree/main/ex
 
    ```bash
    git clone https://github.com/modelcontextprotocol/ext-apps.git
-   cd ext-apps/examples/basic-host
+   cd ext-apps
    npm install
+   cd examples/basic-host
    ```
 
 2. Start basic-host, pointing it to your MCP server:
