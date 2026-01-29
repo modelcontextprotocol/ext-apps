@@ -8,40 +8,6 @@ import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import styles from "./mcp-app.module.css";
 
-// ── Debug logging ──
-const DEBUG = true;
-function dbg(...args: unknown[]) {
-  if (!DEBUG) return;
-  console.log("[DICOM-DBG]", ...args);
-  // Also write to a visible element so we can see it even without devtools
-  try {
-    let el = document.getElementById("__dicom_debug__");
-    if (!el) {
-      el = document.createElement("pre");
-      el.id = "__dicom_debug__";
-      el.style.cssText =
-        "position:fixed;top:0;left:0;right:0;z-index:99999;background:red;color:white;" +
-        "font-size:11px;padding:4px 8px;max-height:40vh;overflow:auto;pointer-events:none;white-space:pre-wrap;";
-      (document.body ?? document.documentElement).appendChild(el);
-    }
-    el.textContent +=
-      args
-        .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
-        .join(" ") + "\n";
-  } catch {
-    /* ignore */
-  }
-}
-
-dbg("script executing", {
-  readyState: document.readyState,
-  hasBody: !!document.body,
-  hasRoot: !!document.getElementById("root"),
-  locationHref: location.href,
-  windowDICOM_IMAGES: !!(window as any).__DICOM_IMAGES__,
-  windowSERIES_INFO: !!(window as any).__SERIES_INFO__,
-});
-
 // Get embedded data from global variables injected by the server
 declare global {
   interface Window {
@@ -68,8 +34,6 @@ declare global {
 }
 
 function DicomViewerApp() {
-  dbg("DicomViewerApp render");
-
   const [hostContext, setHostContext] = useState<
     McpUiHostContext | undefined
   >();
@@ -78,35 +42,21 @@ function DicomViewerApp() {
     appInfo: { name: "DICOM Viewer", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (app) => {
-      dbg("onAppCreated called", { appId: app?.constructor?.name });
       app.onteardown = async () => ({});
-      app.onerror = (err) => {
-        dbg("app.onerror", err);
-        console.error(err);
-      };
+      app.onerror = console.error;
       app.onhostcontextchanged = (params) => {
-        dbg("onhostcontextchanged", params);
         setHostContext((prev) => ({ ...prev, ...params }));
       };
     },
   });
 
-  dbg("useApp result", {
-    hasApp: !!app,
-    hasError: !!error,
-    errorMsg: error?.message,
-  });
-
   useEffect(() => {
     if (app) {
-      const ctx = app.getHostContext();
-      dbg("getHostContext", ctx);
-      setHostContext(ctx);
+      setHostContext(app.getHostContext());
     }
   }, [app]);
 
   if (error) {
-    dbg("rendering error state", error.message);
     return (
       <div className={styles.error}>
         <div className={styles.errorTitle}>Connection Error</div>
@@ -116,7 +66,6 @@ function DicomViewerApp() {
   }
 
   if (!app) {
-    dbg("rendering loading state (no app yet)");
     return (
       <div className={styles.loading}>
         <div className={styles.spinner} />
@@ -125,7 +74,6 @@ function DicomViewerApp() {
     );
   }
 
-  dbg("rendering DicomViewerInner");
   return <DicomViewerInner hostContext={hostContext} app={app} />;
 }
 
@@ -464,30 +412,8 @@ function extractDataUrl(result: CallToolResult): string | null {
   return null;
 }
 
-dbg("about to createRoot");
-const rootEl = document.getElementById("root");
-dbg("root element", {
-  found: !!rootEl,
-  tagName: rootEl?.tagName,
-  childCount: rootEl?.childNodes?.length,
-});
-
-if (!rootEl) {
-  dbg("FATAL: no root element found!");
-  document.body.innerHTML =
-    '<pre style="color:red;font-size:20px;padding:20px;">FATAL: no #root element</pre>';
-} else {
-  try {
-    const root = createRoot(rootEl);
-    dbg("createRoot succeeded, calling render");
-    root.render(
-      <StrictMode>
-        <DicomViewerApp />
-      </StrictMode>,
-    );
-    dbg("render() called successfully");
-  } catch (err) {
-    dbg("FATAL: createRoot/render threw", err);
-    document.body.innerHTML = `<pre style="color:red;font-size:16px;padding:20px;">createRoot error: ${err}</pre>`;
-  }
-}
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <DicomViewerApp />
+  </StrictMode>,
+);

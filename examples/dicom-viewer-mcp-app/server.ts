@@ -447,25 +447,13 @@ export function createServer(): McpServer {
     resourceUri,
     { mimeType: RESOURCE_MIME_TYPE },
     async (): Promise<ReadResourceResult> => {
-      console.error("[DICOM-SRV] resource handler called");
-      console.error("[DICOM-SRV] DIST_DIR =", DIST_DIR);
-      console.error("[DICOM-SRV] DICOM_DIR =", DICOM_DIR);
-      console.error("[DICOM-SRV] IS_SOURCE =", IS_SOURCE);
-
       // Read the HTML template
       let html: string;
       const templatePath = path.join(DIST_DIR, "mcp-app.html");
       try {
         html = await fs.readFile(templatePath, "utf-8");
-        console.error("[DICOM-SRV] template loaded, size =", html.length);
-        console.error(
-          "[DICOM-SRV] template first 200 chars:",
-          html.slice(0, 200),
-        );
-        console.error("[DICOM-SRV] template last 200 chars:", html.slice(-200));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error("[DICOM-SRV] FAILED to read template:", message);
         const errorHtml = buildErrorHtml(
           "DICOM Viewer UI not built",
           `Unable to read the UI bundle at ${templatePath}.`,
@@ -483,27 +471,14 @@ export function createServer(): McpServer {
       }
 
       // Ensure there's visible fallback content if scripts fail to run.
-      const htmlBeforeFallback = html.length;
       html = injectRootFallback(html);
-      console.error(
-        "[DICOM-SRV] injectRootFallback changed html:",
-        html.length !== htmlBeforeFallback,
-        "| new size:",
-        html.length,
-      );
 
       // Load DICOM metadata (no image data)
       let series: DicomSeriesIndex;
       try {
         series = await loadDicomSeriesIndex();
-        console.error(
-          "[DICOM-SRV] series loaded:",
-          series.files.length,
-          "files",
-        );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error("[DICOM-SRV] FAILED to load series:", message);
         const errorHtml = buildErrorHtml(
           "Unable to load DICOM series",
           message,
@@ -530,7 +505,6 @@ export function createServer(): McpServer {
         height: series.infos[0].height,
         bitsStored: series.infos[0].bitsStored,
       };
-      console.error("[DICOM-SRV] seriesInfo:", JSON.stringify(seriesInfo));
 
       // Only inject lightweight metadata — full infos are fetched on demand
       // via get-dicom-slice. Keep the payload small (Claude Desktop may have
@@ -547,24 +521,7 @@ window.__DICOM_IMAGES__ = [];
 window.__DICOM_INFOS__ = ${JSON.stringify(slimInfos).replace(/</g, "\\u003c")};
 window.__SERIES_INFO__ = ${JSON.stringify(seriesInfo).replace(/</g, "\\u003c")};
 </script>`;
-      console.error("[DICOM-SRV] dataScript length:", dataScript.length);
-
-      const headReplaced = html.includes("</head>");
       html = html.replace("</head>", `${dataScript}</head>`);
-      console.error("[DICOM-SRV] </head> found and replaced:", headReplaced);
-      console.error("[DICOM-SRV] final HTML size:", html.length);
-      console.error("[DICOM-SRV] final HTML first 300:", html.slice(0, 300));
-      console.error("[DICOM-SRV] final HTML last 300:", html.slice(-300));
-
-      // Count script tags
-      const openScripts = (html.match(/<script[\s>]/g) || []).length;
-      const closeScripts = (html.match(/<\/script>/g) || []).length;
-      console.error(
-        "[DICOM-SRV] script tags: open =",
-        openScripts,
-        "close =",
-        closeScripts,
-      );
 
       return {
         contents: [
