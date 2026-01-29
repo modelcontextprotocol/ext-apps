@@ -212,7 +212,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     private _capabilities: McpUiAppCapabilities = {},
     private options: AppOptions = { autoResize: true },
   ) {
-    super(options);
+    super({ enforceStrictCapabilities: true, ...options });
 
     this.setRequestHandler(PingRequestSchema, (request) => {
       console.log("Received ping:", request.params);
@@ -636,7 +636,59 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @internal
    */
   assertCapabilityForMethod(method: AppRequest["method"]): void {
-    // TODO
+    const caps = this.getHostCapabilities();
+
+    // If we're not connected yet (caps is undefined), we skip validation.
+    // The Protocol class handles connection state checks separately if needed.
+    if (!caps) {
+      return;
+    }
+
+    switch (method) {
+      case "ui/open-link":
+        if (!caps.openLinks) {
+          throw new Error(
+            `Host does not support opening links (required for ${method})`,
+          );
+        }
+        break;
+      case "ui/message":
+        if (!caps.message) {
+          throw new Error(
+            `Host does not support messages (required for ${method})`,
+          );
+        }
+        break;
+      case "ui/update-model-context":
+        if (!caps.updateModelContext) {
+          throw new Error(
+            `Host does not support model context updates (required for ${method})`,
+          );
+        }
+        break;
+      case "tools/call":
+      case "tools/list":
+        if (!caps.serverTools) {
+          throw new Error(
+            `Host does not support server tools (required for ${method})`,
+          );
+        }
+        break;
+      case "resources/list":
+      case "resources/read":
+      case "resources/templates/list":
+        if (!caps.serverResources) {
+          throw new Error(
+            `Host does not support server resources (required for ${method})`,
+          );
+        }
+        break;
+      case "ui/request-display-mode":
+        // Display mode requests don't require a specific capability object,
+        // but checking availableDisplayModes in context would be the runtime check.
+        // Capabilities doesn't have a flag for this, it's core UI.
+        break;
+    }
   }
 
   /**
@@ -666,7 +718,27 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @internal
    */
   assertNotificationCapability(method: AppNotification["method"]): void {
-    // TODO
+    const caps = this.getHostCapabilities();
+
+    if (!caps) {
+      return;
+    }
+
+    switch (method) {
+      case "notifications/message":
+        if (!caps.logging) {
+          throw new Error(
+            `Host does not support logging (required for ${method})`,
+          );
+        }
+        break;
+      case "ui/notifications/size-changed":
+        // Core capability, always allowed
+        break;
+      case "ui/notifications/initialized":
+        // Core capability, always allowed
+        break;
+    }
   }
 
   /**
