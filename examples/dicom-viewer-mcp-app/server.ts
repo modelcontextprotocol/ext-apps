@@ -376,9 +376,13 @@ export function createServer(): McpServer {
     },
     async (args): Promise<CallToolResult> => {
       const rawIndex =
-        typeof args === "object" && args !== null ? (args as any).index : undefined;
+        typeof args === "object" && args !== null
+          ? (args as any).index
+          : undefined;
       const index =
-        typeof rawIndex === "number" ? rawIndex : Number.parseInt(String(rawIndex), 10);
+        typeof rawIndex === "number"
+          ? rawIndex
+          : Number.parseInt(String(rawIndex), 10);
 
       if (!Number.isInteger(index) || index < 0) {
         return {
@@ -454,7 +458,10 @@ export function createServer(): McpServer {
       try {
         html = await fs.readFile(templatePath, "utf-8");
         console.error("[DICOM-SRV] template loaded, size =", html.length);
-        console.error("[DICOM-SRV] template first 200 chars:", html.slice(0, 200));
+        console.error(
+          "[DICOM-SRV] template first 200 chars:",
+          html.slice(0, 200),
+        );
         console.error("[DICOM-SRV] template last 200 chars:", html.slice(-200));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -478,13 +485,22 @@ export function createServer(): McpServer {
       // Ensure there's visible fallback content if scripts fail to run.
       const htmlBeforeFallback = html.length;
       html = injectRootFallback(html);
-      console.error("[DICOM-SRV] injectRootFallback changed html:", html.length !== htmlBeforeFallback, "| new size:", html.length);
+      console.error(
+        "[DICOM-SRV] injectRootFallback changed html:",
+        html.length !== htmlBeforeFallback,
+        "| new size:",
+        html.length,
+      );
 
       // Load DICOM metadata (no image data)
       let series: DicomSeriesIndex;
       try {
         series = await loadDicomSeriesIndex();
-        console.error("[DICOM-SRV] series loaded:", series.files.length, "files");
+        console.error(
+          "[DICOM-SRV] series loaded:",
+          series.files.length,
+          "files",
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error("[DICOM-SRV] FAILED to load series:", message);
@@ -543,7 +559,12 @@ window.__SERIES_INFO__ = ${JSON.stringify(seriesInfo).replace(/</g, "\\u003c")};
       // Count script tags
       const openScripts = (html.match(/<script[\s>]/g) || []).length;
       const closeScripts = (html.match(/<\/script>/g) || []).length;
-      console.error("[DICOM-SRV] script tags: open =", openScripts, "close =", closeScripts);
+      console.error(
+        "[DICOM-SRV] script tags: open =",
+        openScripts,
+        "close =",
+        closeScripts,
+      );
 
       return {
         contents: [

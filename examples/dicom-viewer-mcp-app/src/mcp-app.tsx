@@ -24,8 +24,13 @@ function dbg(...args: unknown[]) {
         "font-size:11px;padding:4px 8px;max-height:40vh;overflow:auto;pointer-events:none;white-space:pre-wrap;";
       (document.body ?? document.documentElement).appendChild(el);
     }
-    el.textContent += args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" ") + "\n";
-  } catch { /* ignore */ }
+    el.textContent +=
+      args
+        .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+        .join(" ") + "\n";
+  } catch {
+    /* ignore */
+  }
 }
 
 dbg("script executing", {
@@ -86,7 +91,11 @@ function DicomViewerApp() {
     },
   });
 
-  dbg("useApp result", { hasApp: !!app, hasError: !!error, errorMsg: error?.message });
+  dbg("useApp result", {
+    hasApp: !!app,
+    hasError: !!error,
+    errorMsg: error?.message,
+  });
 
   useEffect(() => {
     if (app) {
@@ -457,11 +466,16 @@ function extractDataUrl(result: CallToolResult): string | null {
 
 dbg("about to createRoot");
 const rootEl = document.getElementById("root");
-dbg("root element", { found: !!rootEl, tagName: rootEl?.tagName, childCount: rootEl?.childNodes?.length });
+dbg("root element", {
+  found: !!rootEl,
+  tagName: rootEl?.tagName,
+  childCount: rootEl?.childNodes?.length,
+});
 
 if (!rootEl) {
   dbg("FATAL: no root element found!");
-  document.body.innerHTML = '<pre style="color:red;font-size:20px;padding:20px;">FATAL: no #root element</pre>';
+  document.body.innerHTML =
+    '<pre style="color:red;font-size:20px;padding:20px;">FATAL: no #root element</pre>';
 } else {
   try {
     const root = createRoot(rootEl);
