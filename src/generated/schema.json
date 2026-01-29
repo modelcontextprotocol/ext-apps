@@ -191,6 +191,13 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "trustedTypes": {
+                  "description": "Trusted Types policy names  (trusted-types directive)",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "additionalProperties": false
@@ -2537,6 +2544,13 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "trustedTypes": {
+                      "description": "Trusted Types policy names  (trusted-types directive)",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "additionalProperties": false
@@ -3900,6 +3914,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "trustedTypes": {
+          "description": "Trusted Types policy names  (trusted-types directive)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -3935,6 +3956,13 @@
             },
             "baseUriDomains": {
               "description": "Allowed base URIs for the document (base-uri directive).",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "trustedTypes": {
+              "description": "Trusted Types policy names  (trusted-types directive)",
               "type": "array",
               "items": {
                 "type": "string"
@@ -4104,6 +4132,13 @@
                 },
                 "baseUriDomains": {
                   "description": "Allowed base URIs for the document (base-uri directive).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "trustedTypes": {
+                  "description": "Trusted Types policy names  (trusted-types directive)",
                   "type": "array",
                   "items": {
                     "type": "string"
