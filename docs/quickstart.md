@@ -449,7 +449,6 @@ MCP server listening on http://localhost:3001/mcp
 git clone https://github.com/modelcontextprotocol/ext-apps.git
 cd ext-apps
 npm install
-npm run build
 cd examples/basic-host
 npm start
 ```
