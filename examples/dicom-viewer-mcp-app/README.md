@@ -102,6 +102,7 @@ Place your DICOM files (`.dcm`) in the `./dicom/` folder:
 Add the server to your Claude Desktop configuration using the MCP Client Configuration section above.
 
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
 ### 3. Restart Claude Desktop
 
 After updating the configuration, fully quit and restart Claude Desktop.
