@@ -70,7 +70,7 @@ Add the server to your Claude Desktop configuration:
     "dicom-viewer": {
       "command": "node",
       "args": [
-        "/absolute/path/to/dicom-viewer-mcp-prototype/dist/index.js",
+        "/path/to/ext-apps/examples/dicom-viewer-mcp-app/dist/index.js",
         "--stdio"
       ]
     }
