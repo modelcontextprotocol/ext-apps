@@ -440,7 +440,7 @@ export function createServer(): McpServer {
     },
   );
 
-  // Register the resource - converts all DICOM files to PNGs and embeds them in HTML
+  // Register the HTML viewer resource; DICOM slices are converted to JPEGs on demand via get-dicom-slice
   registerAppResource(
     server,
     resourceUri,
