@@ -1,4 +1,4 @@
-# DICOM Viewer MCP Prototype
+# DICOM Viewer MCP App
 
 A prototype MCP (Model Context Protocol) App that displays DICOM medical images directly in Claude Desktop. Built using the [MCP Apps SDK](https://github.com/modelcontextprotocol/ext-apps).
 
