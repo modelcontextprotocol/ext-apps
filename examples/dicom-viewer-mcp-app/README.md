@@ -110,7 +110,7 @@ npm run dev
 ## Project Structure
 
 ```
-dicom-viewer-mcp-prototype/
+dicom-viewer-mcp-app/
 ├── dicom/                  # Place DICOM files here (a single series)
 │   └── .gitkeep
 ├── src/
