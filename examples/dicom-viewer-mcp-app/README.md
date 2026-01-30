@@ -4,6 +4,45 @@ A prototype MCP (Model Context Protocol) App that displays DICOM medical images 
 
 ![DICOM Viewer Screenshot](screenshot.png)
 
+## MCP Client Configuration
+
+Add to your MCP client configuration (stdio transport):
+
+```json
+{
+  "mcpServers": {
+    "dicom-viewer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--silent",
+        "--registry=https://registry.npmjs.org/",
+        "@modelcontextprotocol/server-dicom-viewer",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
+
+### Local Development
+
+To test local modifications, use this configuration (replace `~/code/ext-apps` with your clone path):
+
+```json
+{
+  "mcpServers": {
+    "dicom-viewer": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd ~/code/ext-apps/examples/dicom-viewer-mcp-app && npm run build >&2 && node dist/index.js --stdio"
+      ]
+    }
+  }
+}
+```
+
 ## Features
 
 - View DICOM medical images directly within Claude Desktop
@@ -11,7 +50,7 @@ A prototype MCP (Model Context Protocol) App that displays DICOM medical images 
 - **Keyboard shortcuts** - arrow keys for navigation, Home/End for first/last slice
 - Pan and zoom controls for image inspection
 - Displays image metadata (dimensions, bit depth, instance number)
-- Server-side rendering using `dicom-parser` and `sharp`
+- Server-side rendering to JPEG using `dicom-parser` and `sharp`
 - Handles DICOM window/level and rescale slope/intercept
 - Automatic sorting by Instance Number or Slice Location
 
@@ -60,24 +99,9 @@ Place your DICOM files (`.dcm`) in the `./dicom/` folder:
 
 ### 2. Configure Claude Desktop
 
-Add the server to your Claude Desktop configuration:
+Add the server to your Claude Desktop configuration using the MCP Client Configuration section above.
 
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "dicom-viewer": {
-      "command": "node",
-      "args": [
-        "/path/to/ext-apps/examples/dicom-viewer-mcp-app/dist/index.js",
-        "--stdio"
-      ]
-    }
-  }
-}
-```
-
 ### 3. Restart Claude Desktop
 
 After updating the configuration, fully quit and restart Claude Desktop.

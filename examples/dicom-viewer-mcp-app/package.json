@@ -8,22 +8,11 @@
     "url": "https://github.com/modelcontextprotocol/ext-apps",
     "directory": "examples/dicom-viewer-mcp-app"
   },
-  "author": "Thales Matheus (https://github.com/ThalesMMS)",
   "license": "MIT",
   "main": "dist/server.js",
-  "types": "dist/server.d.ts",
-  "bin": {
-    "mcp-server-dicom-viewer": "dist/index.js"
-  },
   "files": [
     "dist"
   ],
-  "exports": {
-    ".": {
-      "types": "./dist/server.d.ts",
-      "default": "./dist/server.js"
-    }
-  },
   "scripts": {
     "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --banner \"#!/usr/bin/env node\"",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
@@ -41,7 +30,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sharp": "^0.33.5",
-    "zod": "^4.0.0"
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -55,5 +44,15 @@
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
     "vite-plugin-singlefile": "^2.3.0"
+  },
+  "types": "dist/server.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "bin": {
+    "mcp-server-dicom-viewer": "dist/index.js"
   }
 }
