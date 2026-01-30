@@ -209,7 +209,7 @@ function getDicomImageInfo(
 }
 
 /**
- * Converts DICOM pixel data to a PNG image buffer
+ * Converts DICOM pixel data to a JPEG image buffer
  */
 async function dicomToPng(
   dicomBuffer: Buffer,
