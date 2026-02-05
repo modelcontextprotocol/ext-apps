@@ -178,16 +178,38 @@ async function executeThreeCode(
   height: number,
   visibilityAwareRAF: (callback: FrameRequestCallback) => number,
 ): Promise<void> {
-  const fn = new Function(
-    "ctx",
-    "canvas",
-    "width",
-    "height",
-    "requestAnimationFrame",
-    `const { THREE, OrbitControls, EffectComposer, RenderPass, UnrealBloomPass } = ctx;
-     return (async () => { ${code} })();`,
-  );
-  await fn(threeContext, canvas, width, height, visibilityAwareRAF);
+  // Use a unique ID to avoid conflicts
+  const scriptId = `threejs_ctx_${Math.random().toString(36).slice(2, 11)}`;
+
+  // Expose context to window temporarily so the script tag can access it
+  (window as any)[scriptId] = {
+    threeContext,
+    canvas,
+    width,
+    height,
+    visibilityAwareRAF,
+  };
+
+  const wrappedCode = `
+    (async () => {
+      const { threeContext, canvas, width, height, visibilityAwareRAF } = window['${scriptId}'];
+      const { THREE, OrbitControls, EffectComposer, RenderPass, UnrealBloomPass } = threeContext;
+      const requestAnimationFrame = visibilityAwareRAF;
+      
+      try {
+        ${code}
+      } catch (e) {
+        console.error('Three.js execution error:', e);
+      } finally {
+        delete window['${scriptId}'];
+      }
+    })();
+  `;
+
+  const script = document.createElement("script");
+  script.textContent = wrappedCode;
+  document.head.appendChild(script);
+  script.remove();
 }
 
 // =============================================================================
