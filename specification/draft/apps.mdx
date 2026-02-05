@@ -491,8 +491,8 @@ If the Host is a web page, it MUST wrap the View and communicate with it through
 
 1. The Host and the Sandbox MUST have different origins.
 2. The Sandbox MUST have the following permissions: `allow-scripts`, `allow-same-origin`.
-3. The Sandbox MUST send a `ui/notifications/sandbox-proxy-ready` notification to the host when it's ready to process an `ui/notifications/sandbox-resource-ready` notification.
-4. Once the Sandbox is ready, the Host MUST send the raw HTML resource to load in a `ui/notifications/sandbox-resource-ready` notification.
+3. The Sandbox SHOULD send a `ui/notifications/sandbox-proxy-ready` notification to the host when it's ready to process an `ui/notifications/sandbox-resource-ready` notification.
+4. Once the Sandbox is ready, the Host SHOULD send the raw HTML resource to load in a `ui/notifications/sandbox-resource-ready` notification.
 5. The Sandbox MUST load the raw HTML of the View with CSP settings that:
    - Enforce the domains declared in `ui.csp` metadata
    - If `frameDomains` is provided, allow nested iframes from declared origins; otherwise use `frame-src 'none'`
