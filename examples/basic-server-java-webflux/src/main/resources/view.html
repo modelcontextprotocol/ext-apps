@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="color-scheme" content="light dark">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { overflow: hidden; background: transparent; font-family: system-ui, -apple-system, sans-serif; }
+    body { padding: 12px; width: 100%; }
+
+    .display {
+      background: #f5f5f5; border-radius: 12px; padding: 16px;
+      margin-bottom: 16px; min-height: 64px;
+      display: flex; flex-direction: column; justify-content: center; align-items: flex-end;
+    }
+    .expression { font-size: 14px; color: #666; margin-bottom: 4px; }
+    .result { font-size: 32px; font-weight: 700; color: #1a1a1a; }
+    .result.error { color: #dc3545; font-size: 18px; }
+
+    .inputs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .inputs input {
+      flex: 1; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;
+      font-size: 18px; text-align: center; background: #fff; color: #1a1a1a;
+      outline: none; transition: border-color 0.2s;
+    }
+    .inputs input:focus { border-color: #4f46e5; }
+
+    .operations { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .op-btn {
+      padding: 14px; border: none; border-radius: 8px; font-size: 16px;
+      font-weight: 600; cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .op-btn:active { transform: scale(0.97); }
+    .op-btn.add { background: #4f46e5; color: white; }
+    .op-btn.add:hover { background: #4338ca; }
+    .op-btn.subtract { background: #f59e0b; color: white; }
+    .op-btn.subtract:hover { background: #d97706; }
+    .op-btn.multiply { background: #10b981; color: white; }
+    .op-btn.multiply:hover { background: #059669; }
+    .op-btn.divide { background: #ef4444; color: white; }
+    .op-btn.divide:hover { background: #dc2626; }
+
+    .label { font-size: 12px; color: #888; text-align: center; margin-top: 12px; }
+
+    @media (prefers-color-scheme: dark) {
+      .display { background: #2a2a2a; }
+      .expression { color: #aaa; }
+      .result { color: #f0f0f0; }
+      .inputs input { background: #2a2a2a; color: #f0f0f0; border-color: #444; }
+      .inputs input:focus { border-color: #818cf8; }
+    }
+  </style>
+</head>
+<body>
+  <div class="display">
+    <div class="expression" id="expression"></div>
+    <div class="result" id="result">0</div>
+  </div>
+  <div class="inputs">
+    <input type="number" id="a" value="0" placeholder="a">
+    <input type="number" id="b" value="0" placeholder="b">
+  </div>
+  <div class="operations">
+    <button class="op-btn add" data-op="add">+ Add</button>
+    <button class="op-btn subtract" data-op="subtract">- Subtract</button>
+    <button class="op-btn multiply" data-op="multiply">* Multiply</button>
+    <button class="op-btn divide" data-op="divide">/ Divide</button>
+  </div>
+  <div class="label">Java MCP Server + ext-apps SDK</div>
+
+  <script type="module">
+    import { App } from "https://unpkg.com/@modelcontextprotocol/ext-apps@0.4.0/app-with-deps";
+
+    const app = new App({ name: "Calculator", version: "1.0.0" });
+
+    function showResult(data) {
+      const expr = document.getElementById("expression");
+      const res = document.getElementById("result");
+      if (data.expression) expr.textContent = data.expression;
+      if (data.result !== undefined) {
+        const n = data.result;
+        res.textContent = n === Math.floor(n) && isFinite(n) ? n.toFixed(0) : n;
+        res.classList.remove("error");
+      }
+    }
+
+    function showError(msg) {
+      const res = document.getElementById("result");
+      res.textContent = msg;
+      res.classList.add("error");
+    }
+
+    app.ontoolresult = ({ content, structuredContent }) => {
+      if (structuredContent) {
+        showResult(structuredContent);
+      } else if (content?.length) {
+        const text = content.find(c => c.type === "text");
+        if (text) {
+          document.getElementById("expression").textContent = "";
+          document.getElementById("result").textContent = text.text;
+        }
+      }
+    };
+
+    app.onhostcontextchanged = (ctx) => {
+      if (ctx.safeAreaInsets) {
+        document.body.style.paddingTop = ctx.safeAreaInsets.top + "px";
+        document.body.style.paddingRight = ctx.safeAreaInsets.right + "px";
+        document.body.style.paddingBottom = ctx.safeAreaInsets.bottom + "px";
+        document.body.style.paddingLeft = ctx.safeAreaInsets.left + "px";
+      }
+    };
+
+    app.connect().then(() => {
+      const ctx = app.getHostContext();
+      if (ctx) app.onhostcontextchanged(ctx);
+    });
+
+    function parseTextResult(text) {
+      const match = text.match(/^(.+?)\s*=\s*(.+)$/);
+      if (match) {
+        return { expression: text, result: parseFloat(match[2]) };
+      }
+      return null;
+    }
+
+    document.querySelectorAll("[data-op]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const operation = btn.dataset.op;
+        const a = parseFloat(document.getElementById("a").value) || 0;
+        const b = parseFloat(document.getElementById("b").value) || 0;
+        try {
+          const response = await app.callServerTool({
+            name: "calculate",
+            arguments: { operation, a, b }
+          });
+          if (response?.structuredContent) {
+            showResult(response.structuredContent);
+          } else if (response?.content?.length) {
+            const text = response.content.find(c => c.type === "text");
+            if (text?.text?.startsWith("Error:")) {
+              showError(text.text);
+            } else if (text) {
+              const parsed = parseTextResult(text.text);
+              if (parsed) {
+                showResult(parsed);
+              } else {
+                document.getElementById("result").textContent = text.text;
+              }
+            }
+          }
+        } catch (e) {
+          showError("Error: " + e.message);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

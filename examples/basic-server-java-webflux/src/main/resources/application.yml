@@ -1,0 +1,17 @@
+server:
+  port: ${PORT:3001}
+  shutdown: graceful
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+logging:
+  level:
+    com.example.calculator: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
