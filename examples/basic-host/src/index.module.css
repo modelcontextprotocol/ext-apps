@@ -1,7 +1,7 @@
 /* Theme toggle button */
 .themeToggle {
   position: fixed;
-  top: 1rem;
+  bottom: 1rem;
   right: 1rem;
   width: 2.5rem;
   height: 2.5rem;
