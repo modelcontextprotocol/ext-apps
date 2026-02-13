@@ -152,11 +152,14 @@ jobs:
 
       - name: Create test project and install from git
         shell: bash
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: |
           mkdir test-project
           cd test-project
           npm init -y
           # Install from the PR branch (use head repo for fork PRs)
-          npm install "git+https://github.com/${{ github.event.pull_request.head.repo.full_name || github.repository }}#${{ github.head_ref || github.ref_name }}"
+          npm install "git+https://github.com/${HEAD_REPO}#${HEAD_REF}"
           # Verify the package is usable (ESM import)
           node --input-type=module -e "import { App } from '@modelcontextprotocol/ext-apps'; console.log('Import successful:', typeof App)"
