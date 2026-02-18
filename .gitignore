@@ -8,8 +8,32 @@ docs/api/
 tmp/
 intermediate-findings/
 
+# Environment + logs
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.log
+
+# Coverage + caches
+coverage/
+.nyc_output/
+.cache/
+.eslintcache
+.stylelintcache
+.turbo/
+
 # Playwright
 playwright-report/
 test-results/
 __pycache__/
 *.pyc
+
+# Browser test screenshots
+tests/browser/__screenshots__/
+
+# Planning/proposal docs (not for commit)
+proposal/
+docs/http-adapter-error-handling-plan.md
+docs/project-notes.md

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
-import { Client } from "@modelcontextprotocol/sdk/client";
 import { App, McpUiAppCapabilities, PostMessageTransport } from "../app";
 export * from "../app";
 
@@ -131,15 +130,27 @@ export function useApp({
 
     async function connect() {
       try {
-        const transport = new PostMessageTransport(
-          window.parent,
-          window.parent,
-        );
         const app = new App(appInfo, capabilities);
 
         // Register handlers BEFORE connecting
         onAppCreated?.(app);
 
+        // Standalone mode: when not in an iframe, provide the app without
+        // attempting connection. This enables testing/development outside
+        // an MCP host context - the app will have isConnected: false.
+        if (typeof window === "undefined" || window.self === window.top) {
+          if (mounted) {
+            setApp(app);
+            setIsConnected(false);
+            setError(null);
+          }
+          return;
+        }
+
+        const transport = new PostMessageTransport(
+          window.parent,
+          window.parent,
+        );
         await app.connect(transport);
 
         if (mounted) {

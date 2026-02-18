@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTTP Adapter Host Test</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 16px;
+      }
+      #status {
+        font-size: 14px;
+        color: #333;
+        margin-bottom: 12px;
+      }
+      #app-frame {
+        width: 100%;
+        height: 240px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Booting HTTP adapter host…</div>
+    <iframe id="app-frame" title="HTTP Adapter App"></iframe>
+    <script type="module" src="/src/http-adapter-host.ts"></script>
+  </body>
+</html>

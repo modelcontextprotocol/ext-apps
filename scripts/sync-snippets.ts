@@ -46,7 +46,7 @@
  * Run: npm run sync:snippets
  */
 
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -54,6 +54,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
 const SRC_DIR = join(PROJECT_ROOT, "src");
+const PACKAGES_DIR = join(PROJECT_ROOT, "packages");
 const DOCS_DIR = join(PROJECT_ROOT, "docs");
 
 /** Processing mode based on file type */
@@ -493,6 +494,28 @@ function findMarkdownFiles(dir: string): string[] {
   return files;
 }
 
+function findPackageSourceDirs(rootDir: string): string[] {
+  if (!existsSync(rootDir)) {
+    return [];
+  }
+
+  const entries = readdirSync(rootDir, { withFileTypes: true });
+  const sourceDirs: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const srcDir = join(rootDir, entry.name, "src");
+    if (existsSync(srcDir)) {
+      sourceDirs.push(srcDir);
+    }
+  }
+
+  return sourceDirs;
+}
+
 async function main() {
   console.log("🔧 Syncing code snippets from example files...\n");
 
@@ -500,10 +523,13 @@ async function main() {
   const results: FileProcessingResult[] = [];
 
   // Process TypeScript source files (JSDoc mode)
-  const sourceFiles = findSourceFiles(SRC_DIR);
-  for (const filePath of sourceFiles) {
-    const result = processFile(filePath, cache, "jsdoc");
-    results.push(result);
+  const sourceRoots = [SRC_DIR, ...findPackageSourceDirs(PACKAGES_DIR)];
+  for (const sourceRoot of sourceRoots) {
+    const sourceFiles = findSourceFiles(sourceRoot);
+    for (const filePath of sourceFiles) {
+      const result = processFile(filePath, cache, "jsdoc");
+      results.push(result);
+    }
   }
 
   // Process markdown documentation files

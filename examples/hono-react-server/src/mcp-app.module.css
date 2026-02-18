@@ -1,0 +1,231 @@
+.main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--color-text-secondary, #666);
+  font-size: 0.875rem;
+}
+
+.card {
+  background: var(--color-surface, #f5f5f5);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card {
+    background: var(--color-surface, #2a2a2a);
+  }
+}
+
+.card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.modeCard {
+  composes: card;
+  text-align: center;
+  border: 2px solid var(--color-primary, #3b82f6);
+}
+
+.modeLabel {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary, #666);
+  margin-bottom: 0.25rem;
+}
+
+.modeValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-primary, #3b82f6);
+}
+
+.modeDescription {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #666);
+  margin-top: 0.5rem;
+  font-family: ui-monospace, monospace;
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.button {
+  padding: 0.5rem 1rem;
+  background: var(--color-primary, #3b82f6);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: 6px;
+  background: var(--color-background, #fff);
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .input {
+    border-color: var(--color-border, #444);
+    background: var(--color-background, #1a1a1a);
+  }
+}
+
+.input:focus {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: -1px;
+}
+
+.itemList {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border, #eee);
+}
+
+@media (prefers-color-scheme: dark) {
+  .item {
+    border-color: var(--color-border, #333);
+  }
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.itemName {
+  flex: 1;
+  font-weight: 500;
+}
+
+.itemDate {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #666);
+}
+
+.deleteButton {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: var(--color-danger, #ef4444);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+}
+
+.deleteButton:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.deleteButton:disabled {
+  opacity: 0.5;
+}
+
+.empty {
+  text-align: center;
+  color: var(--color-text-secondary, #666);
+  font-style: italic;
+  margin: 1rem 0;
+}
+
+/* Toggle switch */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  background: var(--color-border, #ccc);
+  border-radius: 11px;
+  transition: background 0.2s;
+}
+
+.toggleSlider::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle input:checked + .toggleSlider {
+  background: var(--color-primary, #3b82f6);
+}
+
+.toggle input:checked + .toggleSlider::before {
+  transform: translateX(18px);
+}
+
+.toggleLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #666);
+}
+
+/* Error text */
+.errorText {
+  color: var(--color-warning, #f59e0b);
+}

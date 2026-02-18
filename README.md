@@ -131,6 +131,10 @@ The [`examples/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/exa
 | [![Basic](examples/basic-server-react/grid-cell.png "Starter template")](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react) | The same app built with different frameworks — pick your favorite!<br><br>[React](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react) · [Vue](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vue) · [Svelte](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-svelte) · [Preact](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-preact) · [Solid](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-solid) · [Vanilla JS](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) |
 <!-- prettier-ignore-end -->
 
+Additional example:
+
+- [**Hono React Server**](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/hono-react-server) — Dual-mode HTTP pattern (Hono + React, type-safe `hc` client).
+
 ### Running the Examples
 
 #### With basic-host
@@ -452,6 +456,13 @@ Then configure your MCP client to build and run the local server. Replace `~/cod
       "args": [
         "-c",
         "cd ~/code/ext-apps/examples/customer-segmentation-server && npm run build >&2 && node dist/index.js --stdio"
+      ]
+    },
+    "hono-react": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd ~/code/ext-apps/examples/hono-react-server && npm run build >&2 && node dist/main.js --stdio"
       ]
     },
     "map": {

@@ -26,6 +26,10 @@ function buildJs(
 }
 
 await Promise.all([
+  buildJs("src/generated/schema.ts", {
+    outdir: "dist/src/generated",
+    external: ["zod"],
+  }),
   buildJs("src/app.ts", {
     outdir: "dist/src",
     external: ["@modelcontextprotocol/sdk"],

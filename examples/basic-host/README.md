@@ -9,6 +9,7 @@ This basic host can also be used to test MCP Apps during local development.
 - [`index.html`](index.html) / [`src/index.tsx`](src/index.tsx) - React UI host with tool selection, parameter input, and iframe management
 - [`sandbox.html`](sandbox.html) / [`src/sandbox.ts`](src/sandbox.ts) - Outer iframe proxy with security validation and bidirectional message relay
 - [`src/implementation.ts`](src/implementation.ts) - Core logic: server connection, tool calling, and AppBridge setup
+- [`http-adapter-host.test.html`](http-adapter-host.test.html) / [`http-adapter-app.test.html`](http-adapter-app.test.html) - Test-only harness for HTTP adapter E2E coverage
 
 ## Getting Started
 

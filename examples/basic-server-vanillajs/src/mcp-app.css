@@ -1,6 +1,13 @@
 .main {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-notice-bg: #eff6ff;
+  --color-panel-bg: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-muted: #64748b;
+
   width: 100%;
-  max-width: 425px;
+  max-width: 720px;
   box-sizing: border-box;
 
   > * {
@@ -9,71 +16,106 @@
   }
 
   > * + * {
-    margin-top: var(--spacing-lg);
+    margin-top: 1.5rem;
   }
 }
 
-.action {
+.hero {
+  h1 {
+    margin: 0 0 0.25rem;
+    font-size: 1.5rem;
+  }
+
+  p {
+    margin: 0;
+    color: var(--color-muted);
+  }
+}
+
+.panel {
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-panel-bg);
+  display: grid;
+  gap: 0.75rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+
   > * {
-    margin-top: 0;
-    margin-bottom: 0;
-    width: 100%;
+    margin: 0;
+    flex: 1 1 200px;
+    min-width: 0;
   }
 
-  > * + * {
-    margin-top: var(--spacing-sm);
-  }
-
-  /* Server time row: flex layout for consistent mask width in E2E tests */
   > p {
     display: flex;
     align-items: baseline;
-    gap: var(--spacing-xs);
+    gap: 0.25em;
   }
 
   /* Consistent font for form inputs (inherits from global.css) */
   textarea,
   input {
-    display: block;
     font-family: inherit;
     font-size: inherit;
   }
 
   button {
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: 0.5rem 1rem;
     border: none;
-    border-radius: var(--border-radius-md);
-    color: var(--color-text-on-accent);
-    font-weight: var(--font-weight-bold);
-    background-color: var(--color-accent);
+    border-radius: 6px;
+    color: white;
+    font-weight: bold;
+    background-color: var(--color-primary);
     cursor: pointer;
+    flex: 0 0 auto;
 
-    &:hover {
-      background-color: color-mix(in srgb, var(--color-accent) 85%, var(--color-background-inverse));
-    }
-
+    &:hover,
     &:focus-visible {
-      outline: calc(var(--border-width-regular) * 2) solid var(--color-ring-primary);
-      outline-offset: var(--border-width-regular);
+      background-color: var(--color-primary-hover);
     }
   }
 }
 
+.meta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.code-block {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px dashed var(--color-border);
+  background: white;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 4rem;
+}
+
 .notice {
-  padding: var(--spacing-sm) var(--spacing-md);
-  color: var(--color-text-info);
+  padding: 0.5rem 0.75rem;
+  color: var(--color-primary);
   text-align: center;
   font-style: italic;
-  background-color: var(--color-background-info);
+  background-color: var(--color-notice-bg);
 
   &::before {
     content: "ℹ️ ";
     font-style: normal;
   }
-}
-
-/* Server time fills remaining width for consistent E2E screenshot masking */
-#server-time {
-  flex: 1;
-  min-width: 0;
 }

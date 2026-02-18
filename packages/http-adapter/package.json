@@ -1,0 +1,35 @@
+{
+  "name": "@modelcontextprotocol/ext-apps-http-adapter",
+  "version": "1.0.1",
+  "license": "MIT",
+  "description": "HTTP adapter for MCP Apps.",
+  "type": "module",
+  "main": "./dist/init.js",
+  "exports": {
+    ".": {
+      "types": "./dist/init.d.ts",
+      "default": "./dist/init.js"
+    },
+    "./fetch-wrapper": {
+      "types": "./dist/fetch-wrapper/fetch.d.ts",
+      "default": "./dist/fetch-wrapper/fetch.js"
+    },
+    "./xhr-wrapper": {
+      "types": "./dist/xhr-wrapper/xhr.d.ts",
+      "default": "./dist/xhr-wrapper/xhr.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/run-bun.mjs build.bun.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "file:../.."
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.24.0",
+    "zod": "^3.25.0 || ^4.0.0"
+  }
+}
