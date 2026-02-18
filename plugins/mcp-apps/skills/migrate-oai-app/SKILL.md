@@ -48,7 +48,7 @@ See `/tmp/mcp-ext-apps/examples/basic-server-{framework}/` for basic SDK usage e
 | `basic-server-svelte/` | `server.ts`, `src/App.svelte` |
 | `basic-server-preact/` | `server.ts`, `src/mcp-app.tsx` |
 | `basic-server-solid/` | `server.ts`, `src/mcp-app.tsx` |
-
+| `basic-server-angular/` | `server.ts`, `src/mcp-app.ts` |
 ## CSP Investigation
 
 MCP Apps HTML is served as an MCP resource, not as a web page, and runs in a sandboxed iframe with no same-origin server. **Every** origin must be declared in CSP—including the origin serving your JS/CSS bundles (`localhost` in dev, your CDN in production). Missing origins fail silently.

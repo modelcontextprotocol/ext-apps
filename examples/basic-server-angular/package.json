@@ -1,0 +1,63 @@
+{
+  "name": "@modelcontextprotocol/server-basic-angular",
+  "version": "1.0.1",
+  "type": "module",
+  "description": "Basic MCP App Server example using Angular",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "directory": "examples/basic-server-angular"
+  },
+  "license": "MIT",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "bin": {
+    "mcp-server-basic-angular": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --banner \"#!/usr/bin/env node\"",
+    "watch": "cross-env INPUT=mcp-app.html vite build --watch",
+    "serve": "bun --watch main.ts",
+    "start": "cross-env NODE_ENV=development concurrently --kill-others-on-fail \"npm run build\" \"npm run serve\"",
+    "dev": "cross-env NODE_ENV=development concurrently \"npm run watch\" \"npm run serve\"",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@angular/common": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0",
+    "@modelcontextprotocol/ext-apps": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.24.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "rxjs": "^7.8.1",
+    "tslib": "^2.8.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.2.3",
+    "@angular/build": "^21.0.0",
+    "@angular-devkit/build-angular": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/compiler-cli": "^21.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "22.10.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "ts-morph": "^24.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}

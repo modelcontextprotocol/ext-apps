@@ -88,7 +88,7 @@ Standalone docs in `docs/` (listed in `typedoc.config.mjs` `projectDocuments`) c
 
 Uses npm workspaces. Full examples in `examples/` are separate packages:
 
-- `basic-server-*` - Starter templates (vanillajs, react, vue, svelte, preact, solid). Use these as the basis for new examples.
+- `basic-server-*` - Starter templates (vanillajs, react, vue, svelte, preact, solid, angular). Use these as the basis for new examples.
 - `basic-host` - Reference host implementation
 - Other examples showcase specific features (charts, 3D, video, etc.)
 

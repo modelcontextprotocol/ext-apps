@@ -61,7 +61,7 @@ Learn and adapt from `/tmp/mcp-ext-apps/examples/basic-server-{framework}/`:
 | `basic-server-svelte/` | `server.ts`, `src/App.svelte` |
 | `basic-server-preact/` | `server.ts`, `src/mcp-app.tsx` |
 | `basic-server-solid/` | `server.ts`, `src/mcp-app.tsx` |
-
+| `basic-server-angular/` | `server.ts`, `src/mcp-app.ts` |
 Each template includes:
 - Complete `server.ts` with `registerAppTool` and `registerAppResource`
 - Client-side app with all lifecycle handlers

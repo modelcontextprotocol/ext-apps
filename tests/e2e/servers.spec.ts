@@ -72,6 +72,11 @@ const ALL_SERVERS = [
     dir: "integration-server",
   },
   {
+    key: "basic-angular",
+    name: "Basic MCP App Server (Angular)",
+    dir: "basic-server-angular",
+  },
+  {
     key: "basic-preact",
     name: "Basic MCP App Server (Preact)",
     dir: "basic-server-preact",

@@ -24,6 +24,7 @@ jobs:
       - run: |
           npx pkg-pr-new publish \
             . \
+            ./examples/basic-server-angular \
             ./examples/basic-server-react \
             ./examples/basic-server-vanillajs \
             ./examples/budget-allocator-server \
