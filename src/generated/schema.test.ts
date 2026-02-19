@@ -103,6 +103,18 @@ export type McpUiResourceMetaSchemaInferredType = z.infer<
   typeof generated.McpUiResourceMetaSchema
 >;
 
+export type McpUiSamplingMessageSchemaInferredType = z.infer<
+  typeof generated.McpUiSamplingMessageSchema
+>;
+
+export type McpUiSamplingCreateMessageRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiSamplingCreateMessageRequestSchema
+>;
+
+export type McpUiSamplingCreateMessageResultSchemaInferredType = z.infer<
+  typeof generated.McpUiSamplingCreateMessageResultSchema
+>;
+
 export type McpUiRequestDisplayModeRequestSchemaInferredType = z.infer<
   typeof generated.McpUiRequestDisplayModeRequestSchema
 >;
@@ -261,6 +273,24 @@ expectType<McpUiInitializedNotificationSchemaInferredType>(
 );
 expectType<spec.McpUiResourceMeta>({} as McpUiResourceMetaSchemaInferredType);
 expectType<McpUiResourceMetaSchemaInferredType>({} as spec.McpUiResourceMeta);
+expectType<spec.McpUiSamplingMessage>(
+  {} as McpUiSamplingMessageSchemaInferredType,
+);
+expectType<McpUiSamplingMessageSchemaInferredType>(
+  {} as spec.McpUiSamplingMessage,
+);
+expectType<spec.McpUiSamplingCreateMessageRequest>(
+  {} as McpUiSamplingCreateMessageRequestSchemaInferredType,
+);
+expectType<McpUiSamplingCreateMessageRequestSchemaInferredType>(
+  {} as spec.McpUiSamplingCreateMessageRequest,
+);
+expectType<spec.McpUiSamplingCreateMessageResult>(
+  {} as McpUiSamplingCreateMessageResultSchemaInferredType,
+);
+expectType<McpUiSamplingCreateMessageResultSchemaInferredType>(
+  {} as spec.McpUiSamplingCreateMessageResult,
+);
 expectType<spec.McpUiRequestDisplayModeRequest>(
   {} as McpUiRequestDisplayModeRequestSchemaInferredType,
 );

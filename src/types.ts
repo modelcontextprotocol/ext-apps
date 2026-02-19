@@ -26,6 +26,7 @@ export {
   INITIALIZE_METHOD,
   INITIALIZED_METHOD,
   REQUEST_DISPLAY_MODE_METHOD,
+  SAMPLING_CREATE_MESSAGE_METHOD,
   type McpUiTheme,
   type McpUiDisplayMode,
   type McpUiStyleVariableKey,
@@ -62,6 +63,9 @@ export {
   type McpUiToolVisibility,
   type McpUiToolMeta,
   type McpUiClientCapabilities,
+  type McpUiSamplingMessage,
+  type McpUiSamplingCreateMessageRequest,
+  type McpUiSamplingCreateMessageResult,
 } from "./spec.types.js";
 
 // Import types needed for protocol type unions (not re-exported, just used internally)
@@ -72,6 +76,8 @@ import type {
   McpUiUpdateModelContextRequest,
   McpUiResourceTeardownRequest,
   McpUiRequestDisplayModeRequest,
+  McpUiSamplingCreateMessageRequest,
+  McpUiSamplingCreateMessageResult,
   McpUiHostContextChangedNotification,
   McpUiToolInputNotification,
   McpUiToolInputPartialNotification,
@@ -123,6 +129,9 @@ export {
   McpUiRequestDisplayModeResultSchema,
   McpUiToolVisibilitySchema,
   McpUiToolMetaSchema,
+  McpUiSamplingMessageSchema,
+  McpUiSamplingCreateMessageRequestSchema,
+  McpUiSamplingCreateMessageResultSchema,
 } from "./generated/schema.js";
 
 // Re-export SDK types used in protocol type unions
@@ -163,6 +172,7 @@ export type AppRequest =
   | McpUiUpdateModelContextRequest
   | McpUiResourceTeardownRequest
   | McpUiRequestDisplayModeRequest
+  | McpUiSamplingCreateMessageRequest
   | CallToolRequest
   | ListToolsRequest
   | ListResourcesRequest
@@ -210,6 +220,7 @@ export type AppResult =
   | McpUiMessageResult
   | McpUiResourceTeardownResult
   | McpUiRequestDisplayModeResult
+  | McpUiSamplingCreateMessageResult
   | CallToolResult
   | ListToolsResult
   | ListResourcesResult

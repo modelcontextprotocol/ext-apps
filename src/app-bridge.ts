@@ -79,6 +79,9 @@ import {
   McpUiRequestDisplayModeResult,
   McpUiResourcePermissions,
   McpUiToolMeta,
+  McpUiSamplingCreateMessageRequest,
+  McpUiSamplingCreateMessageRequestSchema,
+  McpUiSamplingCreateMessageResult,
 } from "./types";
 export * from "./types";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
@@ -731,6 +734,64 @@ export class AppBridge extends Protocol<
   ) {
     this.setRequestHandler(
       McpUiUpdateModelContextRequestSchema,
+      async (request, extra) => {
+        return callback(request.params, extra);
+      },
+    );
+  }
+
+  /**
+   * Register a handler for sampling/createMessage requests from the view.
+   *
+   * The view sends `sampling/createMessage` requests when it needs an LLM
+   * completion. The host fulfills the request using its configured LLM provider.
+   * This handler is only called if the host advertises `sampling` in its
+   * capabilities during initialization.
+   *
+   * The handler receives the conversation messages, an optional system prompt,
+   * and an optional max token limit, and should return the LLM's response.
+   *
+   * **Security considerations:**
+   * - Hosts SHOULD implement rate limiting to prevent abuse
+   * - Hosts SHOULD apply content filtering/moderation policies
+   * - Hosts SHOULD log sampling requests for audit purposes
+   * - Hosts MAY enforce cost management controls (e.g., per-session token budgets)
+   *
+   * @param callback - Handler that receives sampling params and returns a result
+   *   - `params.messages` - Conversation messages providing context
+   *   - `params.systemPrompt` - Optional system prompt to guide LLM behavior
+   *   - `params.maxTokens` - Optional maximum number of tokens to generate
+   *   - `extra` - Request metadata (abort signal, session info)
+   *   - Returns: `Promise<McpUiSamplingCreateMessageResult>` with model, role, content, and stopReason
+   *
+   * @example
+   * ```typescript
+   * bridge.oncreatesamplingmessage = async ({ messages, systemPrompt, maxTokens }, extra) => {
+   *   const response = await llmProvider.createCompletion({
+   *     messages,
+   *     systemPrompt,
+   *     maxTokens: maxTokens ?? 1024,
+   *   });
+   *   return {
+   *     model: response.model,
+   *     stopReason: response.stopReason,
+   *     role: "assistant",
+   *     content: { type: "text", text: response.text },
+   *   };
+   * };
+   * ```
+   *
+   * @see {@link McpUiSamplingCreateMessageRequest `McpUiSamplingCreateMessageRequest`} for the request type
+   * @see {@link McpUiSamplingCreateMessageResult `McpUiSamplingCreateMessageResult`} for the result type
+   */
+  set oncreatesamplingmessage(
+    callback: (
+      params: McpUiSamplingCreateMessageRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<McpUiSamplingCreateMessageResult>,
+  ) {
+    this.setRequestHandler(
+      McpUiSamplingCreateMessageRequestSchema,
       async (request, extra) => {
         return callback(request.params, extra);
       },

@@ -47,6 +47,8 @@ import {
   McpUiToolResultNotificationSchema,
   McpUiRequestDisplayModeRequest,
   McpUiRequestDisplayModeResultSchema,
+  McpUiSamplingCreateMessageRequest,
+  McpUiSamplingCreateMessageResultSchema,
 } from "./types";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
@@ -966,6 +968,75 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
         params,
       },
       McpUiRequestDisplayModeResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * Request an LLM completion from the host.
+   *
+   * Sends a `sampling/createMessage` request to the host, which fulfills it
+   * using its configured LLM provider. This enables Views to leverage the
+   * host's language model capabilities without needing direct API access.
+   *
+   * The host must advertise `sampling` in its capabilities during initialization
+   * for this method to succeed. Check capabilities before calling:
+   *
+   * ```typescript
+   * if (app.getHostCapabilities()?.sampling) {
+   *   const result = await app.createSamplingMessage({ ... });
+   * }
+   * ```
+   *
+   * @param params - Sampling request parameters
+   *   - `messages` - Conversation messages providing context for the completion
+   *   - `systemPrompt` - Optional system prompt to guide LLM behavior
+   *   - `maxTokens` - Optional maximum number of tokens to generate
+   * @param options - Request options (timeout, abort signal, etc.)
+   * @returns Result containing the LLM's response with model info, role, content, and stop reason
+   *
+   * @throws {McpError} With `MethodNotFound` code if the host does not support sampling
+   * @throws {McpError} With `InvalidRequest` code if the request is malformed
+   * @throws {Error} If the request times out or the connection is lost
+   *
+   * @example Basic text completion
+   * ```typescript
+   * const result = await app.createSamplingMessage({
+   *   messages: [
+   *     { role: "user", content: { type: "text", text: "Summarize this data" } },
+   *   ],
+   *   maxTokens: 512,
+   * });
+   * console.log(result.content.text);
+   * ```
+   *
+   * @example Multi-turn conversation with system prompt
+   * ```typescript
+   * const result = await app.createSamplingMessage({
+   *   messages: [
+   *     { role: "user", content: { type: "text", text: "What is 2+2?" } },
+   *     { role: "assistant", content: { type: "text", text: "4" } },
+   *     { role: "user", content: { type: "text", text: "And 3+3?" } },
+   *   ],
+   *   systemPrompt: "You are a helpful math tutor.",
+   *   maxTokens: 256,
+   * });
+   * ```
+   *
+   * @see {@link McpUiSamplingCreateMessageRequest `McpUiSamplingCreateMessageRequest`} for the request type
+   * @see {@link McpUiSamplingCreateMessageResult `McpUiSamplingCreateMessageResult`} for the result type
+   * @see {@link McpUiHostCapabilities `McpUiHostCapabilities`} for checking sampling support
+   */
+  createSamplingMessage(
+    params: McpUiSamplingCreateMessageRequest["params"],
+    options?: RequestOptions,
+  ) {
+    return this.request(
+      <McpUiSamplingCreateMessageRequest>{
+        method: "sampling/createMessage",
+        params,
+      },
+      McpUiSamplingCreateMessageResultSchema,
       options,
     );
   }

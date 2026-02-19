@@ -523,6 +523,21 @@ export const McpUiHostCapabilitiesSchema = z.object({
   message: McpUiSupportedContentBlockModalitiesSchema.optional().describe(
     "Host supports receiving content messages (ui/message) from the view.",
   ),
+  /** @description Host can fulfill sampling requests (sampling/createMessage) from the View. */
+  sampling: z
+    .object({
+      /** @description Supported content modalities for sampling messages (default: ["text"]). */
+      supportedModalities: z
+        .array(z.union([z.literal("text"), z.literal("image")]))
+        .optional()
+        .describe(
+          'Supported content modalities for sampling messages (default: ["text"]).',
+        ),
+    })
+    .optional()
+    .describe(
+      "Host can fulfill sampling requests (sampling/createMessage) from the View.",
+    ),
 });
 
 /**
@@ -617,6 +632,92 @@ export const McpUiResourceMetaSchema = z.object({
       "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
     ),
 });
+
+/**
+ * @description A message in a sampling conversation.
+ *
+ * Used as input to `sampling/createMessage` requests. Each message has a role
+ * (user or assistant) and content that can be text or image.
+ */
+export const McpUiSamplingMessageSchema = z.object({
+  /** @description The role of the message sender. */
+  role: z
+    .union([z.literal("user"), z.literal("assistant")])
+    .describe("The role of the message sender."),
+  /** @description The content of the message. */
+  content: z
+    .union([
+      z.object({
+        type: z.literal("text"),
+        text: z.string(),
+      }),
+      z.object({
+        type: z.literal("image"),
+        data: z.string(),
+        mimeType: z.string(),
+      }),
+    ])
+    .describe("The content of the message."),
+});
+
+/**
+ * @description Request to create a sampling message (LLM completion) from the host.
+ *
+ * The View sends this request when it needs an LLM completion. The host
+ * fulfills the request using its configured LLM provider. The host MAY
+ * enforce rate limits, content filtering, and cost controls.
+ *
+ * Requires the host to advertise `sampling` in its capabilities.
+ *
+ * @see {@link app!App.createSamplingMessage `App.createSamplingMessage`} for the method that sends this request
+ */
+export const McpUiSamplingCreateMessageRequestSchema = z.object({
+  method: z.literal("sampling/createMessage"),
+  params: z.object({
+    /** @description Conversation messages providing context for the completion. */
+    messages: z
+      .array(McpUiSamplingMessageSchema)
+      .describe("Conversation messages providing context for the completion."),
+    /** @description Optional system prompt to guide the LLM's behavior. */
+    systemPrompt: z
+      .string()
+      .optional()
+      .describe("Optional system prompt to guide the LLM's behavior."),
+    /** @description Optional maximum number of tokens to generate. */
+    maxTokens: z
+      .number()
+      .optional()
+      .describe("Optional maximum number of tokens to generate."),
+  }),
+});
+
+/**
+ * @description Result from a sampling/createMessage request.
+ * @see {@link McpUiSamplingCreateMessageRequest `McpUiSamplingCreateMessageRequest`}
+ */
+export const McpUiSamplingCreateMessageResultSchema = z
+  .object({
+    /** @description The model that generated the completion. */
+    model: z.string().describe("The model that generated the completion."),
+    /** @description The reason the model stopped generating (e.g., "endTurn", "maxTokens"). */
+    stopReason: z
+      .string()
+      .describe(
+        'The reason the model stopped generating (e.g., "endTurn", "maxTokens").',
+      ),
+    /** @description The role of the generated message (always "assistant"). */
+    role: z
+      .literal("assistant")
+      .describe('The role of the generated message (always "assistant").'),
+    /** @description The generated content. */
+    content: z
+      .object({
+        type: z.literal("text"),
+        text: z.string(),
+      })
+      .describe("The generated content."),
+  })
+  .passthrough();
 
 /**
  * @description Request to change the display mode of the UI.

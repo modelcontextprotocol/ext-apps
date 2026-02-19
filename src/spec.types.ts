@@ -473,6 +473,11 @@ export interface McpUiHostCapabilities {
   updateModelContext?: McpUiSupportedContentBlockModalities;
   /** @description Host supports receiving content messages (ui/message) from the view. */
   message?: McpUiSupportedContentBlockModalities;
+  /** @description Host can fulfill sampling requests (sampling/createMessage) from the View. */
+  sampling?: {
+    /** @description Supported content modalities for sampling messages (default: ["text"]). */
+    supportedModalities?: Array<"text" | "image">;
+  };
 }
 
 /**
@@ -675,6 +680,64 @@ export interface McpUiResourceMeta {
 }
 
 /**
+ * @description A message in a sampling conversation.
+ *
+ * Used as input to `sampling/createMessage` requests. Each message has a role
+ * (user or assistant) and content that can be text or image.
+ */
+export interface McpUiSamplingMessage {
+  /** @description The role of the message sender. */
+  role: "user" | "assistant";
+  /** @description The content of the message. */
+  content:
+    | { type: "text"; text: string }
+    | { type: "image"; data: string; mimeType: string };
+}
+
+/**
+ * @description Request to create a sampling message (LLM completion) from the host.
+ *
+ * The View sends this request when it needs an LLM completion. The host
+ * fulfills the request using its configured LLM provider. The host MAY
+ * enforce rate limits, content filtering, and cost controls.
+ *
+ * Requires the host to advertise `sampling` in its capabilities.
+ *
+ * @see {@link app!App.createSamplingMessage `App.createSamplingMessage`} for the method that sends this request
+ */
+export interface McpUiSamplingCreateMessageRequest {
+  method: "sampling/createMessage";
+  params: {
+    /** @description Conversation messages providing context for the completion. */
+    messages: McpUiSamplingMessage[];
+    /** @description Optional system prompt to guide the LLM's behavior. */
+    systemPrompt?: string;
+    /** @description Optional maximum number of tokens to generate. */
+    maxTokens?: number;
+  };
+}
+
+/**
+ * @description Result from a sampling/createMessage request.
+ * @see {@link McpUiSamplingCreateMessageRequest `McpUiSamplingCreateMessageRequest`}
+ */
+export interface McpUiSamplingCreateMessageResult {
+  /** @description The model that generated the completion. */
+  model: string;
+  /** @description The reason the model stopped generating (e.g., "endTurn", "maxTokens"). */
+  stopReason: string;
+  /** @description The role of the generated message (always "assistant"). */
+  role: "assistant";
+  /** @description The generated content. */
+  content: { type: "text"; text: string };
+  /**
+   * Index signature required for MCP SDK `Protocol` class compatibility.
+   * Note: The generated schema uses passthrough() to allow additional properties.
+   */
+  [key: string]: unknown;
+}
+
+/**
  * @description Request to change the display mode of the UI.
  * The host will respond with the actual display mode that was set,
  * which may differ from the requested mode if not supported.
@@ -771,6 +834,8 @@ export const INITIALIZED_METHOD: McpUiInitializedNotification["method"] =
   "ui/notifications/initialized";
 export const REQUEST_DISPLAY_MODE_METHOD: McpUiRequestDisplayModeRequest["method"] =
   "ui/request-display-mode";
+export const SAMPLING_CREATE_MESSAGE_METHOD: McpUiSamplingCreateMessageRequest["method"] =
+  "sampling/createMessage";
 
 /**
  * @description MCP Apps capability settings advertised by clients to servers.
