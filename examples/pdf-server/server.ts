@@ -2,7 +2,7 @@
  * PDF MCP Server
  *
  * An MCP server that displays PDFs in an interactive viewer.
- * Supports local files and remote URLs from academic sources (arxiv, biorxiv, etc).
+ * Supports local files and remote HTTPS URLs.
  *
  * Tools:
  * - list_pdfs: List available PDFs
@@ -41,26 +41,6 @@ export const CACHE_MAX_LIFETIME_MS = 60_000; // 60 seconds
 
 /** Max size for cached PDFs (defensive limit to prevent memory exhaustion) */
 export const CACHE_MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
-
-/** Allowed remote origins (security allowlist) */
-export const allowedRemoteOrigins = new Set([
-  "https://agrirxiv.org",
-  "https://arxiv.org",
-  "https://chemrxiv.org",
-  "https://edarxiv.org",
-  "https://engrxiv.org",
-  "https://hal.science",
-  "https://osf.io",
-  "https://psyarxiv.com",
-  "https://ssrn.com",
-  "https://www.biorxiv.org",
-  "https://www.eartharxiv.org",
-  "https://www.medrxiv.org",
-  "https://www.preprints.org",
-  "https://www.researchsquare.com",
-  "https://www.sportarxiv.org",
-  "https://zenodo.org",
-]);
 
 /** Allowed local file paths (populated from CLI args) */
 export const allowedLocalFiles = new Set<string>();
@@ -119,14 +99,11 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
     return { valid: true };
   }
 
-  // Remote URL - check against allowed origins
+  // Remote URL - require HTTPS
   try {
     const parsed = new URL(url);
-    const origin = `${parsed.protocol}//${parsed.hostname}`;
-    if (
-      ![...allowedRemoteOrigins].some((allowed) => origin.startsWith(allowed))
-    ) {
-      return { valid: false, error: `Origin not allowed: ${origin}` };
+    if (parsed.protocol !== "https:") {
+      return { valid: false, error: `Only HTTPS URLs are allowed: ${url}` };
     }
     return { valid: true };
   } catch {
@@ -352,7 +329,7 @@ export function createServer(): McpServer {
   // Create session-local cache (isolated per server instance)
   const { readPdfRange } = createPdfCache();
 
-  // Tool: list_pdfs - List available PDFs (local files + allowed origins)
+  // Tool: list_pdfs - List available PDFs
   server.tool(
     "list_pdfs",
     "List available PDFs that can be displayed",
@@ -365,17 +342,16 @@ export function createServer(): McpServer {
         pdfs.push({ url: pathToFileUrl(filePath), type: "local" });
       }
 
-      // Note: Remote URLs from allowed origins can be loaded dynamically
+      // Note: Remote HTTPS URLs can be loaded dynamically
       const text =
         pdfs.length > 0
-          ? `Available PDFs:\n${pdfs.map((p) => `- ${p.url} (${p.type})`).join("\n")}\n\nRemote PDFs from ${[...allowedRemoteOrigins].join(", ")} can also be loaded dynamically.`
-          : `No local PDFs configured. Remote PDFs from ${[...allowedRemoteOrigins].join(", ")} can be loaded dynamically.`;
+          ? `Available PDFs:\n${pdfs.map((p) => `- ${p.url} (${p.type})`).join("\n")}\n\nAny remote PDF accessible via HTTPS can also be loaded dynamically.`
+          : `No local PDFs configured. Any remote PDF accessible via HTTPS can be loaded dynamically.`;
 
       return {
         content: [{ type: "text", text }],
         structuredContent: {
           localFiles: pdfs.filter((p) => p.type === "local").map((p) => p.url),
-          allowedOrigins: [...allowedRemoteOrigins],
         },
       };
     },
@@ -455,11 +431,6 @@ export function createServer(): McpServer {
     },
   );
 
-  // Build allowed domains list for tool description (strip https:// and www.)
-  const allowedDomains = [...allowedRemoteOrigins]
-    .map((origin) => origin.replace(/^https?:\/\/(www\.)?/, ""))
-    .join(", ");
-
   // Tool: display_pdf - Show interactive viewer
   registerAppTool(
     server,
@@ -470,7 +441,7 @@ export function createServer(): McpServer {
 
 Accepts:
 - Local files explicitly added to the server (use list_pdfs to see available files)
-- Remote PDFs from: ${allowedDomains}`,
+- Any remote PDF accessible via HTTPS`,
       inputSchema: {
         url: z.string().default(DEFAULT_PDF).describe("PDF URL"),
         page: z.number().min(1).default(1).describe("Initial page"),
