@@ -325,6 +325,7 @@ body {
   overflow: hidden; /* No scrolling on main - only canvas-container scrolls */
   border-radius: 0;
   border: none;
+  padding: 0 !important; /* Ignore safe area insets in fullscreen */
 }
 
 .main.fullscreen .viewer {
