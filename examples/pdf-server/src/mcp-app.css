@@ -261,46 +261,6 @@ body {
   --min-font-size-inv: calc(1 / var(--min-font-size, 1));
 }
 
-/* Page Loading Overlay - shown while page data is being fetched */
-.page-loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 4px;
-  z-index: 10;
-}
-
-.page-loading-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem 2rem;
-  background: var(--bg000);
-  border: 1px solid var(--bg200);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.page-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg200);
-  border-top-color: var(--text100);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.page-loading-text {
-  font-size: 0.85rem;
-  color: var(--text100);
-}
 
 .text-layer :is(span, br) {
   color: transparent;

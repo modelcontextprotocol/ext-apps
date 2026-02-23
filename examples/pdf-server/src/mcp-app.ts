@@ -624,9 +624,6 @@ async function renderPage() {
   isRendering = true;
   pendingPage = null;
 
-  // Show loading overlay while page data is being fetched
-  showPageLoadingOverlay();
-
   try {
     const pageToRender = currentPage;
     const page = await pdfDocument.getPage(pageToRender);
@@ -719,7 +716,6 @@ async function renderPage() {
     log.error("Error rendering page:", err);
     showError(`Failed to render page ${currentPage}`);
   } finally {
-    hidePageLoadingOverlay();
     preloadPaused = false;
     isRendering = false;
 
@@ -1013,39 +1009,6 @@ type RangeResult = { bytes: Uint8Array; totalBytes: number };
 const rangeCache = new Map<string, RangeResult>();
 const inflightRequests = new Map<string, Promise<RangeResult>>();
 
-// Page loading overlay state — shown after a delay so cached pages never flash it
-let pageLoadingOverlay: HTMLElement | null = null;
-let pageLoadingTimer: ReturnType<typeof setTimeout> | null = null;
-const PAGE_LOADING_DELAY_MS = 150;
-
-function showPageLoadingOverlay() {
-  if (pageLoadingOverlay || pageLoadingTimer) return; // Already showing or scheduled
-
-  pageLoadingTimer = setTimeout(() => {
-    pageLoadingTimer = null;
-    const overlay = document.createElement("div");
-    overlay.className = "page-loading-overlay";
-    overlay.innerHTML = `
-      <div class="page-loading-content">
-        <div class="page-loading-spinner"></div>
-        <span class="page-loading-text">Loading page...</span>
-      </div>
-    `;
-    canvasContainerEl.appendChild(overlay);
-    pageLoadingOverlay = overlay;
-  }, PAGE_LOADING_DELAY_MS);
-}
-
-function hidePageLoadingOverlay() {
-  if (pageLoadingTimer) {
-    clearTimeout(pageLoadingTimer);
-    pageLoadingTimer = null;
-  }
-  if (pageLoadingOverlay) {
-    pageLoadingOverlay.remove();
-    pageLoadingOverlay = null;
-  }
-}
 
 // Max bytes per server request (must match server's MAX_CHUNK_BYTES)
 const MAX_CHUNK_BYTES = 512 * 1024;
