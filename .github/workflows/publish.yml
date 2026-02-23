@@ -24,11 +24,16 @@ jobs:
       - run: |
           npx pkg-pr-new publish \
             . \
+            ./examples/basic-server-preact \
             ./examples/basic-server-react \
+            ./examples/basic-server-solid \
+            ./examples/basic-server-svelte \
             ./examples/basic-server-vanillajs \
+            ./examples/basic-server-vue \
             ./examples/budget-allocator-server \
             ./examples/cohort-heatmap-server \
             ./examples/customer-segmentation-server \
+            ./examples/debug-server \
             ./examples/map-server \
             ./examples/pdf-server \
             ./examples/scenario-modeler-server \

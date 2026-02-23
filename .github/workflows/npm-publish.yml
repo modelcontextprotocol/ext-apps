@@ -107,6 +107,7 @@ jobs:
           - budget-allocator-server
           - cohort-heatmap-server
           - customer-segmentation-server
+          - debug-server
           - map-server
           - pdf-server
           - scenario-modeler-server
