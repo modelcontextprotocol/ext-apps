@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-cohort-heatmap",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
   "description": "Cohort heatmap MCP App Server for retention analysis",
   "repository": {

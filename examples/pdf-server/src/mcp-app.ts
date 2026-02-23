@@ -21,8 +21,6 @@ import "./mcp-app.css";
 
 const MAX_MODEL_CONTEXT_LENGTH = 15000;
 const MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION = 768; // Max screenshot dimension
-const CHUNK_SIZE = 500 * 1024; // 500KB chunks
-
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.mjs",
@@ -36,7 +34,6 @@ const log = {
 
 // State
 let pdfDocument: pdfjsLib.PDFDocumentProxy | null = null;
-let pdfBytes: Uint8Array | null = null;
 let currentPage = 1;
 let totalPages = 0;
 let scale = 1.0;
@@ -66,9 +63,6 @@ const zoomLevelEl = document.getElementById("zoom-level")!;
 const fullscreenBtn = document.getElementById(
   "fullscreen-btn",
 ) as HTMLButtonElement;
-const progressContainerEl = document.getElementById("progress-container")!;
-const progressBarEl = document.getElementById("progress-bar")!;
-const progressTextEl = document.getElementById("progress-text")!;
 const searchBtn = document.getElementById("search-btn") as HTMLButtonElement;
 searchBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14" y2="14"/></svg>`;
 const searchBarEl = document.getElementById("search-bar")!;
@@ -102,10 +96,18 @@ const pageTextItemsCache = new Map<number, string[]>();
 let allMatches: SearchMatch[] = [];
 let currentMatchIndex = -1;
 
+// Preload state — goToPage sets preloadPaused=true, renderPage's finally resets it.
+// The preloader's while(preloadPaused) loop yields so interactive loads always win.
+let preloadPaused = false;
+let pagesLoaded = 0;
+let preloadErrors: Array<{ page: number; err: unknown }> = [];
+const loadingIndicatorEl = document.getElementById("loading-indicator")!;
+const loadingIndicatorArc = loadingIndicatorEl.querySelector(
+  ".loading-indicator-arc",
+) as SVGCircleElement;
+
 // Track current display mode
 let currentDisplayMode: "inline" | "fullscreen" = "inline";
-
-// Layout constants are no longer used - we calculate dynamically from actual element dimensions
 
 /**
  * Request the host to resize the app to fit the current PDF page.
@@ -138,41 +140,18 @@ function requestFitToContent() {
   const paddingBottom = parseFloat(containerStyle.paddingBottom);
 
   // Calculate required height:
-  // toolbar + search-bar + padding-top + page-wrapper height + padding-bottom + buffer
+  // toolbar + padding-top + page-wrapper height + padding-bottom + buffer
+  // Note: search bar is absolutely positioned over the document area, so excluded
   const toolbarHeight = toolbarEl.offsetHeight;
-  const searchBarHeight = searchOpen ? searchBarEl.offsetHeight : 0;
   const pageWrapperHeight = pageWrapperEl.offsetHeight;
   const BUFFER = 10; // Buffer for sub-pixel rounding and browser quirks
   const totalHeight =
-    toolbarHeight +
-    searchBarHeight +
-    paddingTop +
-    pageWrapperHeight +
-    paddingBottom +
-    BUFFER;
+    toolbarHeight + paddingTop + pageWrapperHeight + paddingBottom + BUFFER;
 
   app.sendSizeChanged({ height: totalHeight });
 }
 
 // --- Search Functions ---
-
-async function extractAllPageText() {
-  if (!pdfDocument) return;
-  for (let i = 1; i <= totalPages; i++) {
-    if (pageTextCache.has(i)) continue;
-    try {
-      const page = await pdfDocument.getPage(i);
-      const textContent = await page.getTextContent();
-      const items = (textContent.items as Array<{ str?: string }>).map(
-        (item) => item.str || "",
-      );
-      pageTextItemsCache.set(i, items);
-      pageTextCache.set(i, items.join(""));
-    } catch (err) {
-      log.error("Error extracting text for page", i, err);
-    }
-  }
-}
 
 function performSearch(query: string) {
   allMatches = [];
@@ -320,10 +299,12 @@ function clearHighlights() {
 
 function updateSearchUI() {
   const hasQuery = searchQuery.length > 0;
+  const stillLoading = totalPages > 0 && pagesLoaded < totalPages;
+  const suffix = stillLoading ? " (loading\u2026)" : "";
   if (allMatches.length === 0) {
-    searchMatchCountEl.textContent = hasQuery ? "No matches" : "";
+    searchMatchCountEl.textContent = hasQuery ? `No matches${suffix}` : "";
   } else {
-    searchMatchCountEl.textContent = `${currentMatchIndex + 1} of ${allMatches.length}`;
+    searchMatchCountEl.textContent = `${currentMatchIndex + 1} of ${allMatches.length}${suffix}`;
   }
   searchPrevBtn.disabled = allMatches.length === 0;
   searchNextBtn.disabled = allMatches.length === 0;
@@ -344,8 +325,7 @@ function openSearch() {
   searchBarEl.style.display = "flex";
   updateSearchUI();
   searchInputEl.focus();
-  requestFitToContent();
-  extractAllPageText();
+  // Text extraction is handled by the background preloader
 }
 
 function closeSearch() {
@@ -358,7 +338,6 @@ function closeSearch() {
   currentMatchIndex = -1;
   clearHighlights();
   updateSearchUI();
-  requestFitToContent();
 }
 
 function toggleSearch() {
@@ -645,6 +624,9 @@ async function renderPage() {
   isRendering = true;
   pendingPage = null;
 
+  // Show loading overlay while page data is being fetched
+  showPageLoadingOverlay();
+
   try {
     const pageToRender = currentPage;
     const page = await pdfDocument.getPage(pageToRender);
@@ -737,6 +719,8 @@ async function renderPage() {
     log.error("Error rendering page:", err);
     showError(`Failed to render page ${currentPage}`);
   } finally {
+    hidePageLoadingOverlay();
+    preloadPaused = false;
     isRendering = false;
 
     // If there's a pending page, render it now
@@ -786,6 +770,7 @@ function loadSavedPage(): number | null {
 function goToPage(page: number) {
   const targetPage = Math.max(1, Math.min(page, totalPages));
   if (targetPage !== currentPage) {
+    preloadPaused = true;
     currentPage = targetPage;
     saveCurrentPage();
     renderPage();
@@ -1002,12 +987,14 @@ function parseToolResult(result: CallToolResult): {
   title?: string;
   pageCount: number;
   initialPage: number;
+  totalBytes: number;
 } | null {
   return result.structuredContent as {
     url: string;
     title?: string;
     pageCount: number;
     initialPage: number;
+    totalBytes: number;
   } | null;
 }
 
@@ -1021,74 +1008,273 @@ interface PdfBytesChunk {
   hasMore: boolean;
 }
 
-// Update progress bar
-function updateProgress(loaded: number, total: number) {
-  const percent = Math.round((loaded / total) * 100);
-  progressBarEl.style.width = `${percent}%`;
-  progressTextEl.textContent = `${(loaded / 1024).toFixed(0)} KB / ${(total / 1024).toFixed(0)} KB (${percent}%)`;
+// Range request caching — avoid duplicate fetches for the same range
+type RangeResult = { bytes: Uint8Array; totalBytes: number };
+const rangeCache = new Map<string, RangeResult>();
+const inflightRequests = new Map<string, Promise<RangeResult>>();
+
+// Page loading overlay state — shown after a delay so cached pages never flash it
+let pageLoadingOverlay: HTMLElement | null = null;
+let pageLoadingTimer: ReturnType<typeof setTimeout> | null = null;
+const PAGE_LOADING_DELAY_MS = 150;
+
+function showPageLoadingOverlay() {
+  if (pageLoadingOverlay || pageLoadingTimer) return; // Already showing or scheduled
+
+  pageLoadingTimer = setTimeout(() => {
+    pageLoadingTimer = null;
+    const overlay = document.createElement("div");
+    overlay.className = "page-loading-overlay";
+    overlay.innerHTML = `
+      <div class="page-loading-content">
+        <div class="page-loading-spinner"></div>
+        <span class="page-loading-text">Loading page...</span>
+      </div>
+    `;
+    canvasContainerEl.appendChild(overlay);
+    pageLoadingOverlay = overlay;
+  }, PAGE_LOADING_DELAY_MS);
 }
 
-// Load PDF in chunks with progress
-async function loadPdfInChunks(urlToLoad: string): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = [];
-  let offset = 0;
-  let totalBytes = 0;
-  let hasMore = true;
+function hidePageLoadingOverlay() {
+  if (pageLoadingTimer) {
+    clearTimeout(pageLoadingTimer);
+    pageLoadingTimer = null;
+  }
+  if (pageLoadingOverlay) {
+    pageLoadingOverlay.remove();
+    pageLoadingOverlay = null;
+  }
+}
 
-  // Show progress UI
-  progressContainerEl.style.display = "block";
-  updateProgress(0, 1);
+// Max bytes per server request (must match server's MAX_CHUNK_BYTES)
+const MAX_CHUNK_BYTES = 512 * 1024;
 
-  while (hasMore) {
-    const result = await app.callServerTool({
-      name: "read_pdf_bytes",
-      arguments: { url: urlToLoad, offset, byteCount: CHUNK_SIZE },
+/**
+ * Fetch a single chunk from the server (up to MAX_CHUNK_BYTES).
+ * Deduplicates concurrent requests for the same range via inflightRequests.
+ */
+async function fetchChunk(
+  url: string,
+  begin: number,
+  end: number,
+): Promise<RangeResult> {
+  const cacheKey = `${url}:${begin}-${end}`;
+  const cached = rangeCache.get(cacheKey);
+  if (cached) return cached;
+
+  // Deduplicate: reuse in-flight request for the same range
+  const inflight = inflightRequests.get(cacheKey);
+  if (inflight) return inflight;
+
+  const request = (async (): Promise<RangeResult> => {
+    try {
+      const result = await app.callServerTool({
+        name: "read_pdf_bytes",
+        arguments: { url, offset: begin, byteCount: end - begin },
+      });
+
+      if (result.isError) {
+        const errorText =
+          result.content?.map((c) => ("text" in c ? c.text : "")).join(" ") ||
+          "";
+        throw new Error(`Tool error: ${errorText}`);
+      }
+
+      if (!result.structuredContent) {
+        throw new Error("No structuredContent in tool response");
+      }
+
+      const chunk = result.structuredContent as unknown as PdfBytesChunk;
+      const binaryString = atob(chunk.bytes);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const entry: RangeResult = { bytes, totalBytes: chunk.totalBytes };
+      rangeCache.set(cacheKey, entry);
+      return entry;
+    } finally {
+      inflightRequests.delete(cacheKey);
+    }
+  })();
+
+  inflightRequests.set(cacheKey, request);
+  return request;
+}
+
+/**
+ * Fetch a byte range from the PDF, splitting into parallel sub-requests
+ * if the range exceeds MAX_CHUNK_BYTES.
+ */
+async function fetchRange(
+  url: string,
+  begin: number,
+  end: number,
+): Promise<RangeResult> {
+  const size = end - begin;
+
+  // Single chunk — no splitting needed
+  if (size <= MAX_CHUNK_BYTES) {
+    return fetchChunk(url, begin, end);
+  }
+
+  // Split into parallel sub-requests
+  const chunks: Array<{ begin: number; end: number }> = [];
+  for (let offset = begin; offset < end; offset += MAX_CHUNK_BYTES) {
+    chunks.push({
+      begin: offset,
+      end: Math.min(offset + MAX_CHUNK_BYTES, end),
     });
-
-    // Check for errors
-    if (result.isError) {
-      const errorText = result.content
-        ?.map((c) => ("text" in c ? c.text : ""))
-        .join(" ");
-      throw new Error(`Tool error: ${errorText}`);
-    }
-
-    if (!result.structuredContent) {
-      throw new Error("No structuredContent in tool response");
-    }
-
-    const chunk = result.structuredContent as unknown as PdfBytesChunk;
-    totalBytes = chunk.totalBytes;
-    hasMore = chunk.hasMore;
-
-    // Decode base64 chunk
-    const binaryString = atob(chunk.bytes);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    chunks.push(bytes);
-
-    offset += chunk.byteCount;
-    updateProgress(offset, totalBytes);
   }
-
-  // Combine all chunks
-  const fullPdf = new Uint8Array(totalBytes);
-  let pos = 0;
-  for (const chunk of chunks) {
-    fullPdf.set(chunk, pos);
-    pos += chunk.length;
-  }
-
   log.info(
-    `PDF loaded: ${(totalBytes / 1024).toFixed(0)} KB in ${chunks.length} chunks`,
+    `Splitting range ${begin}-${end} (${(size / 1024) | 0} KB) into ${chunks.length} parallel chunks`,
   );
-  return fullPdf;
+
+  const results = await Promise.all(
+    chunks.map((c) => fetchChunk(url, c.begin, c.end)),
+  );
+
+  // Reassemble into a single buffer
+  const totalLen = results.reduce((sum, r) => sum + r.bytes.length, 0);
+  const combined = new Uint8Array(totalLen);
+  let pos = 0;
+  for (const r of results) {
+    combined.set(r.bytes, pos);
+    pos += r.bytes.length;
+  }
+
+  const entry = { bytes: combined, totalBytes: results[0].totalBytes };
+  rangeCache.set(`${url}:${begin}-${end}`, entry);
+  return entry;
+}
+
+/**
+ * Load PDF progressively using PDFDataRangeTransport.
+ * PDF.js will request ranges as needed to render pages.
+ */
+async function loadPdfProgressively(
+  urlToLoad: string,
+  fileSizeBytes: number,
+): Promise<{
+  document: pdfjsLib.PDFDocumentProxy;
+  totalBytes: number;
+}> {
+  const fileTotalBytes = fileSizeBytes;
+  log.info(`PDF file size: ${(fileTotalBytes / 1024) | 0} KB`);
+
+  class AppRangeTransport extends pdfjsLib.PDFDataRangeTransport {
+    requestDataRange(begin: number, end: number) {
+      fetchRange(urlToLoad, begin, end)
+        .then((result) => {
+          this.onDataRange(begin, result.bytes);
+        })
+        .catch((err: unknown) => {
+          log.error(`Error fetching range ${begin}-${end}:`, err);
+        });
+    }
+  }
+
+  // Create transport with total file size, no initial data — PDF.js will request what it needs
+  const transport = new AppRangeTransport(fileTotalBytes, null);
+
+  const loadingTask = pdfjsLib.getDocument({ range: transport });
+
+  try {
+    const document = await loadingTask.promise;
+    log.info(
+      `PDF document ready, ${document.numPages} pages, ${fileTotalBytes} bytes`,
+    );
+    return { document, totalBytes: fileTotalBytes };
+  } catch (err: unknown) {
+    log.error("Error loading PDF document:", err);
+    throw err;
+  }
+}
+
+// --- Loading indicator ---
+
+const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * 8; // ~50.27
+
+function updateLoadingIndicator() {
+  if (totalPages <= 0) return;
+  const pct = pagesLoaded / totalPages;
+  const offset = CIRCLE_CIRCUMFERENCE * (1 - pct);
+  loadingIndicatorArc.style.strokeDashoffset = String(offset);
+  loadingIndicatorEl.style.display = "inline-flex";
+  loadingIndicatorEl.title = `${pagesLoaded}/${totalPages} pages loaded`;
+  if (preloadErrors.length > 0) {
+    loadingIndicatorEl.classList.add("error");
+    const failedPages = preloadErrors.map((e) => e.page).join(", ");
+    loadingIndicatorEl.title += ` (errors on pages: ${failedPages})`;
+  }
+}
+
+function finalizeLoadingIndicator() {
+  updateLoadingIndicator();
+  if (preloadErrors.length > 0) return; // Keep visible with error state
+  setTimeout(() => {
+    loadingIndicatorEl.style.opacity = "0";
+    setTimeout(() => {
+      loadingIndicatorEl.style.display = "none";
+      loadingIndicatorEl.style.opacity = "";
+    }, 300);
+  }, 500);
+}
+
+// --- Background preloader ---
+
+let preloadSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Schedule a debounced search refresh while preloading */
+function scheduleSearchRefresh() {
+  if (!searchOpen || !searchQuery) return;
+  if (preloadSearchTimer) return; // already scheduled
+  preloadSearchTimer = setTimeout(() => {
+    preloadSearchTimer = null;
+    if (searchOpen && searchQuery) performSearch(searchQuery);
+  }, 500);
+}
+
+async function startPreloading() {
+  if (!pdfDocument) return;
+  log.info("Starting background preload of", totalPages, "pages");
+  for (let i = 1; i <= totalPages; i++) {
+    if (pageTextCache.has(i)) {
+      pagesLoaded++;
+      updateLoadingIndicator();
+      continue;
+    }
+
+    // Yield to interactive navigation
+    while (preloadPaused) await new Promise((r) => setTimeout(r, 50));
+
+    try {
+      const page = await pdfDocument.getPage(i);
+      const textContent = await page.getTextContent();
+      const items = (textContent.items as Array<{ str?: string }>).map(
+        (item) => item.str || "",
+      );
+      pageTextItemsCache.set(i, items);
+      pageTextCache.set(i, items.join(""));
+      pagesLoaded++;
+      updateLoadingIndicator();
+      scheduleSearchRefresh();
+    } catch (err) {
+      preloadErrors.push({ page: i, err });
+      log.error("Preload error page", i, err);
+      updateLoadingIndicator();
+    }
+  }
+  log.info("Background preload complete:", pagesLoaded, "pages loaded");
+  finalizeLoadingIndicator();
+  // Final search update
+  if (searchOpen && searchQuery) performSearch(searchQuery);
 }
 
 // Handle tool result
-app.ontoolresult = async (result) => {
+app.ontoolresult = async (result: CallToolResult) => {
   log.info("Received tool result:", result);
 
   const parsed = parseToolResult(result);
@@ -1099,7 +1285,8 @@ app.ontoolresult = async (result) => {
 
   pdfUrl = parsed.url;
   pdfTitle = parsed.title;
-  totalPages = parsed.pageCount;
+  // Note: pageCount may not be accurate until document loads
+  totalPages = parsed.pageCount || 1;
   viewUUID = result._meta?.viewUUID ? String(result._meta.viewUUID) : undefined;
 
   // Restore saved page or use initial page
@@ -1107,36 +1294,41 @@ app.ontoolresult = async (result) => {
   currentPage =
     savedPage && savedPage <= parsed.pageCount ? savedPage : parsed.initialPage;
 
-  log.info(
-    "URL:",
-    pdfUrl,
-    "Pages:",
-    parsed.pageCount,
-    "Starting:",
-    currentPage,
-  );
+  log.info("URL:", pdfUrl, "Starting at page:", currentPage);
 
   showLoading("Loading PDF...");
 
   try {
-    pdfBytes = await loadPdfInChunks(pdfUrl);
+    // Use progressive loading - document available as soon as initial data arrives
+    const { document, totalBytes } = await loadPdfProgressively(
+      pdfUrl,
+      parsed.totalBytes,
+    );
+    pdfDocument = document;
+    totalPages = document.numPages;
 
-    showLoading("Rendering PDF...");
+    log.info("PDF loaded, pages:", totalPages, "bytes:", totalBytes);
 
-    pdfDocument = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
-    totalPages = pdfDocument.numPages;
-
-    log.info("PDF loaded, pages:", totalPages);
+    // Reset preload state for new PDF
+    pagesLoaded = 0;
+    preloadErrors = [];
+    pageTextCache.clear();
+    pageTextItemsCache.clear();
+    loadingIndicatorEl.classList.remove("error");
+    loadingIndicatorEl.style.opacity = "";
+    loadingIndicatorEl.style.display = "none";
 
     showViewer();
     renderPage();
+    // Start background preloading of all pages for text extraction
+    startPreloading();
   } catch (err) {
     log.error("Error loading PDF:", err);
     showError(err instanceof Error ? err.message : String(err));
   }
 };
 
-app.onerror = (err) => {
+app.onerror = (err: unknown) => {
   log.error("App error:", err);
   showError(err instanceof Error ? err.message : String(err));
 };

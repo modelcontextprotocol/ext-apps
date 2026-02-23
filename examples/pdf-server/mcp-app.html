@@ -11,14 +11,6 @@
       <div id="loading" class="loading">
         <div class="spinner"></div>
         <p id="loading-text">Loading PDF...</p>
-        <div
-          id="progress-container"
-          class="progress-container"
-          style="display: none"
-        >
-          <div id="progress-bar" class="progress-bar"></div>
-        </div>
-        <p id="progress-text" class="progress-text"></p>
       </div>
 
       <!-- Error State -->
@@ -33,6 +25,13 @@
         <div class="toolbar">
           <div class="toolbar-left">
             <span id="pdf-title" class="pdf-title">Document</span>
+            <div id="loading-indicator" class="loading-indicator" style="display: none"
+                 title="Loading pages...">
+              <svg viewBox="0 0 20 20" width="14" height="14">
+                <circle class="loading-indicator-bg" cx="10" cy="10" r="8"/>
+                <circle class="loading-indicator-arc" cx="10" cy="10" r="8"/>
+              </svg>
+            </div>
           </div>
           <div class="toolbar-center">
             <button id="prev-btn" class="nav-btn" title="Previous page (←)">

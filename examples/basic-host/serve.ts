@@ -82,6 +82,8 @@ function buildCspHeader(csp?: McpUiResourceCsp): string {
     `img-src 'self' data: blob: ${resourceDomains}`.trim(),
     // Fonts: same-origin + data/blob URIs + specified domains
     `font-src 'self' data: blob: ${resourceDomains}`.trim(),
+    // Media (audio/video): same-origin + data/blob URIs + specified domains
+    `media-src 'self' data: blob: ${resourceDomains}`.trim(),
     // Network requests: same-origin + specified API/tile domains
     `connect-src 'self' ${connectDomains}`.trim(),
     // Workers: same-origin + blob (dynamic workers) + specified domains

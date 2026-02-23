@@ -1,7 +1,7 @@
 {
   "homepage": "https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host",
   "name": "@modelcontextprotocol/ext-apps-basic-host",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && concurrently \"cross-env INPUT=index.html vite build\" \"cross-env INPUT=sandbox.html vite build\"",

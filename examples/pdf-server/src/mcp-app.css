@@ -68,28 +68,6 @@ body {
   color: var(--text100);
 }
 
-/* Progress Bar */
-.progress-container {
-  width: 100%;
-  max-width: 200px;
-  height: 3px;
-  background: var(--bg200);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  background: var(--text100);
-  width: 0%;
-  transition: width 0.15s ease-out;
-}
-
-.progress-text {
-  font-size: 0.7rem;
-  color: var(--text200);
-}
-
 /* Error State */
 .error {
   display: flex;
@@ -138,6 +116,8 @@ body {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  align-items: center;
 }
 
 .pdf-title {
@@ -281,6 +261,47 @@ body {
   --min-font-size-inv: calc(1 / var(--min-font-size, 1));
 }
 
+/* Page Loading Overlay - shown while page data is being fetched */
+.page-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.page-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 2rem;
+  background: var(--bg000);
+  border: 1px solid var(--bg200);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.page-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--bg200);
+  border-top-color: var(--text100);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.page-loading-text {
+  font-size: 0.85rem;
+  color: var(--text100);
+}
+
 .text-layer :is(span, br) {
   color: transparent;
   position: absolute;
@@ -325,6 +346,7 @@ body {
   overflow: hidden; /* No scrolling on main - only canvas-container scrolls */
   border-radius: 0;
   border: none;
+  padding: 0 !important; /* Ignore safe area insets in fullscreen */
 }
 
 .main.fullscreen .viewer {
@@ -458,4 +480,31 @@ body {
     background: rgba(255, 165, 0, 0.5);
     mix-blend-mode: screen;
   }
+}
+
+/* Loading Indicator (pie) */
+.loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+  transition: opacity 0.3s;
+}
+.loading-indicator-bg {
+  fill: none;
+  stroke: var(--bg200);
+  stroke-width: 3;
+}
+.loading-indicator-arc {
+  fill: none;
+  stroke: var(--text100);
+  stroke-width: 3;
+  stroke-dasharray: 50.27; /* 2*pi*8 */
+  stroke-dashoffset: 50.27;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dashoffset 0.3s;
+}
+.loading-indicator.error .loading-indicator-arc {
+  stroke: #e74c3c;
 }

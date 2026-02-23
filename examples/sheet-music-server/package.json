@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-sheet-music",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
   "description": "MCP App Server for rendering and playing sheet music from ABC notation",
   "repository": {

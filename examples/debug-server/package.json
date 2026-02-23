@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-debug",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
   "description": "Debug MCP App Server for testing all SDK capabilities",
   "repository": {
@@ -9,11 +9,20 @@
     "directory": "examples/debug-server"
   },
   "license": "MIT",
-  "main": "server.ts",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "bin": {
+    "mcp-server-debug": "dist/index.js"
+  },
   "files": [
-    "server.ts",
     "dist"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
   "scripts": {
     "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --banner \"#!/usr/bin/env node\"",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
