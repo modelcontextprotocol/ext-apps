@@ -1009,7 +1009,6 @@ type RangeResult = { bytes: Uint8Array; totalBytes: number };
 const rangeCache = new Map<string, RangeResult>();
 const inflightRequests = new Map<string, Promise<RangeResult>>();
 
-
 // Max bytes per server request (must match server's MAX_CHUNK_BYTES)
 const MAX_CHUNK_BYTES = 512 * 1024;
 
