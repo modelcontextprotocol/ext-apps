@@ -357,7 +357,13 @@ async function refreshRoots(server: Server): Promise<void> {
         const dir = fileUrlToPath(root.uri);
         const resolved = path.resolve(dir);
         try {
-          if (fs.statSync(resolved).isDirectory()) {
+          const s = fs.statSync(resolved);
+          if (s.isFile()) {
+            console.error(
+              `[pdf-server] Root is a file, not a directory (skipped): ${resolved}`,
+            );
+            allowedLocalFiles.add(resolved);
+          } else if (s.isDirectory()) {
             allowedLocalDirs.add(resolved);
             console.error(`[pdf-server] Root directory allowed: ${resolved}`);
           }
