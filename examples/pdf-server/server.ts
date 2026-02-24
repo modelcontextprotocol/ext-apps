@@ -354,23 +354,15 @@ export function createPdfCache(): PdfCache {
 // MCP Roots
 // =============================================================================
 
-/** Optional structured logger for JSONL interaction logging. */
-export type InteractionLogger = (entry: Record<string, unknown>) => void;
-
 /**
  * Query the client for roots and update allowedLocalDirs with any file:// roots
  * that point to existing directories.
  */
-async function refreshRoots(
-  server: Server,
-  trigger: "initialized" | "roots/list_changed",
-  log?: InteractionLogger,
-): Promise<void> {
+async function refreshRoots(server: Server): Promise<void> {
   if (!server.getClientCapabilities()?.roots) return;
 
   try {
     const { roots } = await server.listRoots();
-    log?.({ event: "roots/list", trigger, roots });
     allowedLocalDirs.clear();
     for (const root of roots) {
       if (root.uri.startsWith("file://")) {
@@ -403,17 +395,17 @@ async function refreshRoots(
 // MCP Server Factory
 // =============================================================================
 
-export function createServer(log?: InteractionLogger): McpServer {
+export function createServer(): McpServer {
   const server = new McpServer({ name: "PDF Server", version: "2.0.0" });
 
   // Fetch roots on initialization and subscribe to changes
   server.server.oninitialized = () => {
-    refreshRoots(server.server, "initialized", log);
+    refreshRoots(server.server);
   };
   server.server.setNotificationHandler(
     RootsListChangedNotificationSchema,
     async () => {
-      await refreshRoots(server.server, "roots/list_changed", log);
+      await refreshRoots(server.server);
     },
   );
 

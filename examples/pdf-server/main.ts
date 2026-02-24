@@ -10,11 +10,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type {
-  Transport,
-  TransportSendOptions,
-} from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import cors from "cors";
 import type { Request, Response } from "express";
 import {
@@ -29,56 +24,6 @@ import {
   allowedLocalDirs,
 } from "./server.js";
 
-// =============================================================================
-// JSONL Interaction Logger
-// =============================================================================
-
-const LOG_PATH = path.join(import.meta.dirname, "interactions.jsonl");
-
-/** Append a JSONL line to the log file. */
-function logInteraction(entry: Record<string, unknown>): void {
-  const line = JSON.stringify({
-    timestamp: new Date().toISOString(),
-    ...entry,
-  });
-  fs.appendFile(LOG_PATH, line + "\n", (err) => {
-    if (err) console.error("[pdf-server] Failed to write log:", err.message);
-  });
-}
-
-/**
- * Wraps an MCP transport to log every incoming and outgoing JSON-RPC message
- * to a JSONL file at `interactions.jsonl` next to this script.
- */
-function withLogging<T extends Transport>(transport: T): T {
-  const originalSend = transport.send.bind(transport);
-
-  transport.send = async (
-    message: JSONRPCMessage,
-    options?: TransportSendOptions,
-  ): Promise<void> => {
-    logInteraction({ direction: "server→client", message });
-    return originalSend(message, options);
-  };
-
-  // Intercept the onmessage setter so we can log before the real handler runs
-  let realOnMessage = transport.onmessage;
-  Object.defineProperty(transport, "onmessage", {
-    get: () => realOnMessage,
-    set: (handler: typeof transport.onmessage) => {
-      realOnMessage = handler
-        ? (message, extra) => {
-            logInteraction({ direction: "client→server", message });
-            handler(message, extra);
-          }
-        : handler;
-    },
-    configurable: true,
-  });
-
-  return transport;
-}
-
 /**
  * Starts an MCP server with Streamable HTTP transport in stateless mode.
  */
@@ -92,11 +37,9 @@ export async function startStreamableHTTPServer(
 
   app.all("/mcp", async (req: Request, res: Response) => {
     const server = createServer();
-    const transport = withLogging(
-      new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      }),
-    );
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
 
     res.on("close", () => {
       transport.close().catch(() => {});
@@ -143,7 +86,7 @@ export async function startStreamableHTTPServer(
 export async function startStdioServer(
   createServer: () => McpServer,
 ): Promise<void> {
-  await createServer().connect(withLogging(new StdioServerTransport()));
+  await createServer().connect(new StdioServerTransport());
 }
 
 function parseArgs(): { urls: string[]; stdio: boolean } {
@@ -195,15 +138,12 @@ async function main() {
     }
   }
 
-  console.error(
-    `[pdf-server] Ready (${urls.length} URL(s) configured, logging to ${LOG_PATH})`,
-  );
+  console.error(`[pdf-server] Ready (${urls.length} URL(s) configured)`);
 
-  const factory = () => createServer(logInteraction);
   if (stdio) {
-    await startStdioServer(factory);
+    await startStdioServer(createServer);
   } else {
-    await startStreamableHTTPServer(factory);
+    await startStreamableHTTPServer(createServer);
   }
 }
 
