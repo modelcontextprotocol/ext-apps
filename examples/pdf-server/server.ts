@@ -106,7 +106,9 @@ export function isAncestorDir(dir: string, filePath: string): boolean {
  * Handles Unix paths (/...), home-relative (~), and Windows drive letters (C:\...).
  */
 function isLocalPath(url: string): boolean {
-  return url.startsWith("/") || url.startsWith("~") || /^[A-Za-z]:[/\\]/.test(url);
+  return (
+    url.startsWith("/") || url.startsWith("~") || /^[A-Za-z]:[/\\]/.test(url)
+  );
 }
 
 export function validateUrl(url: string): { valid: boolean; error?: string } {
@@ -125,11 +127,20 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
 
     if (!exactMatch && !dirMatch) {
       const diagnostics = [...allowedLocalDirs].map((d) => {
-        const rel = path.relative(d, resolved);
-        return `dir=${d} rel=${rel} match=${isAncestorDir(d, resolved)}`;
+        // Find first char that differs to diagnose encoding issues
+        const prefix = resolved.substring(0, d.length);
+        let firstDiff = "";
+        for (let i = 0; i < Math.min(d.length, prefix.length); i++) {
+          if (d[i] !== prefix[i]) {
+            firstDiff = `firstDiff@${i}: dir=0x${d.charCodeAt(i).toString(16)} file=0x${prefix.charCodeAt(i).toString(16)}`;
+            break;
+          }
+        }
+        if (!firstDiff && d.length === prefix.length) firstDiff = "IDENTICAL_PREFIX";
+        return `match=${isAncestorDir(d, resolved)} ${firstDiff} resolvedLen=${resolved.length} dirLen=${d.length}`;
       });
       console.error(
-        `[pdf-server] validateUrl REJECTED:\n  url=${url}\n  resolved=${resolved}\n  diagnostics:\n    ${diagnostics.join("\n    ")}`,
+        `[pdf-server] REJECTED url=${JSON.stringify(url)}\n  resolved=${JSON.stringify(resolved)}\n  dirs=${JSON.stringify([...allowedLocalDirs])}\n  ${diagnostics.join("\n  ")}`,
       );
       return {
         valid: false,
@@ -556,7 +567,10 @@ Accepts:
 - Local files under directories provided by the client as MCP roots
 - Any remote PDF accessible via HTTPS`,
       inputSchema: {
-        url: z.string().default(DEFAULT_PDF).describe("PDF URL or local file path"),
+        url: z
+          .string()
+          .default(DEFAULT_PDF)
+          .describe("PDF URL or local file path"),
         page: z.number().min(1).default(1).describe("Initial page"),
       },
       outputSchema: z.object({
