@@ -104,6 +104,7 @@ export function isAncestorDir(dir: string, filePath: string): boolean {
 /**
  * Try to resolve a path through symlinks using fs.realpathSync.
  * Returns the original path if resolution fails (e.g., file doesn't exist yet).
+ * Useful when sandbox/container path remapping uses symlinks.
  */
 function tryRealpath(p: string): string {
   try {
@@ -125,7 +126,11 @@ function isLocalPath(url: string): boolean {
 
 export function validateUrl(url: string): { valid: boolean; error?: string } {
   if (isFileUrl(url) || isLocalPath(url)) {
-    const filePath = isFileUrl(url) ? fileUrlToPath(url) : url;
+    // fileUrlToPath already decodes percent-encoding; for bare paths,
+    // decode here in case the client sends %20 for spaces etc.
+    const filePath = isFileUrl(url)
+      ? fileUrlToPath(url)
+      : decodeURIComponent(url);
     const resolved = path.resolve(filePath);
     // Resolve through symlinks/bind mounts to handle sandbox path remapping
     // (e.g., client sends /sessions/... but roots use /Users/...)
@@ -290,7 +295,7 @@ export function createPdfCache(): PdfCache {
     if (isFileUrl(normalized) || isLocalPath(normalized)) {
       const filePath = isFileUrl(normalized)
         ? fileUrlToPath(normalized)
-        : normalized;
+        : decodeURIComponent(normalized);
       const stats = await fs.promises.stat(filePath);
       const totalBytes = stats.size;
 

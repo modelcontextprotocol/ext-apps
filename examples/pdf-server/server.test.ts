@@ -312,6 +312,25 @@ describe("validateUrl with MCP roots (allowedLocalDirs)", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("should decode percent-encoded bare paths (e.g. %20 for spaces)", () => {
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf test "));
+    const testFile = path.join(tmpDir, "file.txt");
+
+    try {
+      fs.writeFileSync(testFile, "hello");
+      allowedLocalDirs.add(tmpDir);
+
+      // Encode spaces as %20 in the path (as some clients do)
+      const encoded = testFile.replace(/ /g, "%20");
+      const result = validateUrl(encoded);
+      expect(result.valid).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true });
+    }
+  });
+
   it("should allow file accessed via symlink when real dir is allowed", () => {
     const fs = require("node:fs");
     const os = require("node:os");
