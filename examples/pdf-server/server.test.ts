@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   createPdfCache,
   validateUrl,
+  isAncestorDir,
   allowedLocalFiles,
   allowedLocalDirs,
   pathToFileUrl,
@@ -270,5 +271,66 @@ describe("validateUrl with MCP roots (allowedLocalDirs)", () => {
     );
     expect(result.valid).toBe(false);
     expect(result.error).toContain("File not found");
+  });
+
+  it("should allow a file under an allowed dir with trailing slash", () => {
+    const dir = path.resolve(import.meta.dirname);
+    // Simulate a dir stored with a trailing slash (e.g. from CLI path)
+    allowedLocalDirs.add(dir + "/");
+
+    const filePath = path.join(dir, "server.ts");
+    const result = validateUrl(pathToFileUrl(filePath));
+    expect(result.valid).toBe(true);
+  });
+
+  it("should allow a file under a grandparent allowed dir", () => {
+    // Allow a directory two levels up from the file
+    const grandparent = path.resolve(path.join(import.meta.dirname, ".."));
+    allowedLocalDirs.add(grandparent);
+
+    const filePath = path.join(import.meta.dirname, "server.ts");
+    const result = validateUrl(pathToFileUrl(filePath));
+    expect(result.valid).toBe(true);
+  });
+});
+
+describe("isAncestorDir", () => {
+  it("should return true for a direct child", () => {
+    expect(isAncestorDir("/Users/test/dir", "/Users/test/dir/file.pdf")).toBe(
+      true,
+    );
+  });
+
+  it("should return true for a nested child", () => {
+    expect(isAncestorDir("/Users/test", "/Users/test/sub/dir/file.pdf")).toBe(
+      true,
+    );
+  });
+
+  it("should return false for a file outside the dir", () => {
+    expect(isAncestorDir("/Users/test/dir", "/Users/test/other/file.pdf")).toBe(
+      false,
+    );
+  });
+
+  it("should return false for the dir itself", () => {
+    expect(isAncestorDir("/Users/test/dir", "/Users/test/dir")).toBe(false);
+  });
+
+  it("should prevent .. traversal", () => {
+    expect(
+      isAncestorDir("/Users/test/dir", "/Users/test/dir/../other/file.pdf"),
+    ).toBe(false);
+  });
+
+  it("should prevent prefix-based traversal", () => {
+    // /tmp/safe should NOT match /tmp/safevil/file.pdf
+    expect(isAncestorDir("/tmp/safe", "/tmp/safevil/file.pdf")).toBe(false);
+  });
+
+  it("should handle dirs with trailing slash", () => {
+    expect(isAncestorDir("/Users/test/dir/", "/Users/test/dir/file.pdf")).toBe(
+      true,
+    );
   });
 });

@@ -89,27 +89,39 @@ export function pathToFileUrl(filePath: string): string {
   return `file://${encodeURIComponent(absolutePath).replace(/%2F/g, "/")}`;
 }
 
+/**
+ * Check if `dir` is an ancestor of `filePath` using path.relative,
+ * which is more robust than string prefix matching (handles normalization).
+ */
+export function isAncestorDir(dir: string, filePath: string): boolean {
+  const rel = path.relative(dir, filePath);
+  // Must be non-empty (not the dir itself when checking files),
+  // must not start with ".." (escaping), and must not be absolute (different root).
+  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
 export function validateUrl(url: string): { valid: boolean; error?: string } {
   if (isFileUrl(url)) {
     const filePath = fileUrlToPath(url);
     const resolved = path.resolve(filePath);
 
-    // Check exact match (CLI args)
-    const exactMatch = allowedLocalFiles.has(filePath);
+    // Check exact match (CLI args / roots)
+    const exactMatch = allowedLocalFiles.has(resolved);
 
-    // Check directory match (MCP roots)
-    const dirMatch = [...allowedLocalDirs].some(
-      (dir) => resolved === dir || resolved.startsWith(dir + path.sep),
+    // Check directory match (MCP roots / CLI dirs) using path.relative
+    // which is more robust than string prefix matching.
+    const dirMatch = [...allowedLocalDirs].some((dir) =>
+      isAncestorDir(dir, resolved),
     );
 
     if (!exactMatch && !dirMatch) {
       return {
         valid: false,
-        error: `Local file not in allowed list: ${filePath}`,
+        error: `Local file not in allowed list: \n${resolved}\nAllowed files: ${[...allowedLocalFiles].join(", ")}\nAllowed directories:\n${[...allowedLocalDirs].join("\n")}`,
       };
     }
-    if (!fs.existsSync(filePath)) {
-      return { valid: false, error: `File not found: ${filePath}` };
+    if (!fs.existsSync(resolved)) {
+      return { valid: false, error: `File not found: ${resolved}` };
     }
     return { valid: true };
   }
@@ -342,15 +354,23 @@ export function createPdfCache(): PdfCache {
 // MCP Roots
 // =============================================================================
 
+/** Optional structured logger for JSONL interaction logging. */
+export type InteractionLogger = (entry: Record<string, unknown>) => void;
+
 /**
  * Query the client for roots and update allowedLocalDirs with any file:// roots
  * that point to existing directories.
  */
-async function refreshRoots(server: Server): Promise<void> {
+async function refreshRoots(
+  server: Server,
+  trigger: "initialized" | "roots/list_changed",
+  log?: InteractionLogger,
+): Promise<void> {
   if (!server.getClientCapabilities()?.roots) return;
 
   try {
     const { roots } = await server.listRoots();
+    log?.({ event: "roots/list", trigger, roots });
     allowedLocalDirs.clear();
     for (const root of roots) {
       if (root.uri.startsWith("file://")) {
@@ -383,17 +403,17 @@ async function refreshRoots(server: Server): Promise<void> {
 // MCP Server Factory
 // =============================================================================
 
-export function createServer(): McpServer {
+export function createServer(log?: InteractionLogger): McpServer {
   const server = new McpServer({ name: "PDF Server", version: "2.0.0" });
 
   // Fetch roots on initialization and subscribe to changes
   server.server.oninitialized = () => {
-    refreshRoots(server.server);
+    refreshRoots(server.server, "initialized", log);
   };
   server.server.setNotificationHandler(
     RootsListChangedNotificationSchema,
     async () => {
-      await refreshRoots(server.server);
+      await refreshRoots(server.server, "roots/list_changed", log);
     },
   );
 
