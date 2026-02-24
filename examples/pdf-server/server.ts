@@ -101,9 +101,17 @@ export function isAncestorDir(dir: string, filePath: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
+/**
+ * Check if `url` looks like an absolute local file path (not a URL scheme).
+ * Handles Unix paths (/...), home-relative (~), and Windows drive letters (C:\...).
+ */
+function isLocalPath(url: string): boolean {
+  return url.startsWith("/") || url.startsWith("~") || /^[A-Za-z]:[/\\]/.test(url);
+}
+
 export function validateUrl(url: string): { valid: boolean; error?: string } {
-  if (isFileUrl(url)) {
-    const filePath = fileUrlToPath(url);
+  if (isFileUrl(url) || isLocalPath(url)) {
+    const filePath = isFileUrl(url) ? fileUrlToPath(url) : url;
     const resolved = path.resolve(filePath);
 
     // Check exact match (CLI args / roots)
@@ -116,12 +124,16 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
     );
 
     if (!exactMatch && !dirMatch) {
+      const diagnostics = [...allowedLocalDirs].map((d) => {
+        const rel = path.relative(d, resolved);
+        return `dir=${d} rel=${rel} match=${isAncestorDir(d, resolved)}`;
+      });
       console.error(
-        `[pdf-server] validateUrl REJECTED: url=${url}\n  filePath=${filePath}\n  resolved=${resolved}\n  allowedDirs=${JSON.stringify([...allowedLocalDirs])}\n  dirChecks=${JSON.stringify([...allowedLocalDirs].map((d) => ({ dir: d, rel: path.relative(d, resolved), match: isAncestorDir(d, resolved) })))}`,
+        `[pdf-server] validateUrl REJECTED:\n  url=${url}\n  resolved=${resolved}\n  diagnostics:\n    ${diagnostics.join("\n    ")}`,
       );
       return {
         valid: false,
-        error: `Local file not in allowed list: \n${resolved}\nAllowed files: ${[...allowedLocalFiles].join(", ")}\nAllowed directories:\n${[...allowedLocalDirs].join("\n")}`,
+        error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}\nDiagnostics: ${diagnostics.join(" | ")}`,
       };
     }
     if (!fs.existsSync(resolved)) {
@@ -254,8 +266,10 @@ export function createPdfCache(): PdfCache {
     const normalized = isArxivUrl(url) ? normalizeArxivUrl(url) : url;
     const clampedByteCount = Math.min(byteCount, MAX_CHUNK_BYTES);
 
-    if (isFileUrl(normalized)) {
-      const filePath = fileUrlToPath(normalized);
+    if (isFileUrl(normalized) || isLocalPath(normalized)) {
+      const filePath = isFileUrl(normalized)
+        ? fileUrlToPath(normalized)
+        : normalized;
       const stats = await fs.promises.stat(filePath);
       const totalBytes = stats.size;
 
@@ -463,7 +477,7 @@ export function createServer(): McpServer {
       title: "Read PDF Bytes",
       description: "Read a range of bytes from a PDF (max 512KB per request)",
       inputSchema: {
-        url: z.string().describe("PDF URL"),
+        url: z.string().describe("PDF URL or local file path"),
         offset: z.number().min(0).default(0).describe("Byte offset"),
         byteCount: z
           .number()
@@ -542,7 +556,7 @@ Accepts:
 - Local files under directories provided by the client as MCP roots
 - Any remote PDF accessible via HTTPS`,
       inputSchema: {
-        url: z.string().default(DEFAULT_PDF).describe("PDF URL"),
+        url: z.string().default(DEFAULT_PDF).describe("PDF URL or local file path"),
         page: z.number().min(1).default(1).describe("Initial page"),
       },
       outputSchema: z.object({
