@@ -48,7 +48,7 @@
     "start": "npm run examples:dev",
     "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
     "sync:snippets": "bun scripts/sync-snippets.ts",
-    "build": "npm run generate:schemas && npm run sync:snippets && node scripts/run-bun.mjs build.bun.ts",
+    "build": "npm run generate:schemas && npm run sync:snippets && node scripts/run-bun.mjs build.bun.ts && node scripts/link-self.mjs",
     "prepack": "npm run build",
     "build:all": "npm run examples:build",
     "test": "bun test src",
