@@ -379,7 +379,6 @@ describe("validateUrl with MCP roots (allowedLocalDirs)", () => {
       fs.rmSync(tmpDir, { recursive: true });
     }
   });
-
 });
 
 describe("isAncestorDir", () => {
