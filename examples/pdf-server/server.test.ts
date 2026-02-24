@@ -311,6 +311,55 @@ describe("validateUrl with MCP roots (allowedLocalDirs)", () => {
     const result = validateUrl(filePath);
     expect(result.valid).toBe(true);
   });
+
+  it("should allow file accessed via symlink when real dir is allowed", () => {
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf-test-"));
+    const realDir = path.join(tmpDir, "real");
+    const linkDir = path.join(tmpDir, "link");
+    const testFile = path.join(realDir, "test.txt");
+
+    try {
+      fs.mkdirSync(realDir);
+      fs.writeFileSync(testFile, "hello");
+      fs.symlinkSync(realDir, linkDir);
+
+      // Allow the REAL directory
+      allowedLocalDirs.add(realDir);
+
+      // Access via the SYMLINK path — should still be allowed
+      const symlinkPath = path.join(linkDir, "test.txt");
+      const result = validateUrl(symlinkPath);
+      expect(result.valid).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true });
+    }
+  });
+
+  it("should allow file when allowed dir is a symlink to real parent", () => {
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf-test-"));
+    const realDir = path.join(tmpDir, "real");
+    const linkDir = path.join(tmpDir, "link");
+    const testFile = path.join(realDir, "test.txt");
+
+    try {
+      fs.mkdirSync(realDir);
+      fs.writeFileSync(testFile, "hello");
+      fs.symlinkSync(realDir, linkDir);
+
+      // Allow the SYMLINK directory
+      allowedLocalDirs.add(linkDir);
+
+      // Access via the REAL path — should still be allowed
+      const result = validateUrl(testFile);
+      expect(result.valid).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true });
+    }
+  });
 });
 
 describe("isAncestorDir", () => {

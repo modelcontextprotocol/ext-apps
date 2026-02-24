@@ -102,6 +102,18 @@ export function isAncestorDir(dir: string, filePath: string): boolean {
 }
 
 /**
+ * Try to resolve a path through symlinks using fs.realpathSync.
+ * Returns the original path if resolution fails (e.g., file doesn't exist yet).
+ */
+function tryRealpath(p: string): string {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
+/**
  * Check if `url` looks like an absolute local file path (not a URL scheme).
  * Handles Unix paths (/...), home-relative (~), and Windows drive letters (C:\...).
  */
@@ -115,36 +127,34 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
   if (isFileUrl(url) || isLocalPath(url)) {
     const filePath = isFileUrl(url) ? fileUrlToPath(url) : url;
     const resolved = path.resolve(filePath);
+    // Resolve through symlinks/bind mounts to handle sandbox path remapping
+    // (e.g., client sends /sessions/... but roots use /Users/...)
+    const real = tryRealpath(resolved);
 
-    // Check exact match (CLI args / roots)
-    const exactMatch = allowedLocalFiles.has(resolved);
+    // Check exact match (CLI args / roots) — try both resolved and realpath
+    const exactMatch =
+      allowedLocalFiles.has(resolved) || allowedLocalFiles.has(real);
 
-    // Check directory match (MCP roots / CLI dirs) using path.relative
-    // which is more robust than string prefix matching.
-    const dirMatch = [...allowedLocalDirs].some((dir) =>
-      isAncestorDir(dir, resolved),
-    );
+    // Check directory match (MCP roots / CLI dirs) using path.relative.
+    // Try both the resolved path and its realpath against both the raw dir
+    // and its realpath, to handle sandbox path remapping in either direction.
+    const dirMatch = [...allowedLocalDirs].some((dir) => {
+      const realDir = tryRealpath(dir);
+      return (
+        isAncestorDir(dir, resolved) ||
+        isAncestorDir(dir, real) ||
+        isAncestorDir(realDir, resolved) ||
+        isAncestorDir(realDir, real)
+      );
+    });
 
     if (!exactMatch && !dirMatch) {
-      const diagnostics = [...allowedLocalDirs].map((d) => {
-        // Find first char that differs to diagnose encoding issues
-        const prefix = resolved.substring(0, d.length);
-        let firstDiff = "";
-        for (let i = 0; i < Math.min(d.length, prefix.length); i++) {
-          if (d[i] !== prefix[i]) {
-            firstDiff = `firstDiff@${i}: dir=0x${d.charCodeAt(i).toString(16)} file=0x${prefix.charCodeAt(i).toString(16)}`;
-            break;
-          }
-        }
-        if (!firstDiff && d.length === prefix.length) firstDiff = "IDENTICAL_PREFIX";
-        return `match=${isAncestorDir(d, resolved)} ${firstDiff} resolvedLen=${resolved.length} dirLen=${d.length}`;
-      });
       console.error(
-        `[pdf-server] REJECTED url=${JSON.stringify(url)}\n  resolved=${JSON.stringify(resolved)}\n  dirs=${JSON.stringify([...allowedLocalDirs])}\n  ${diagnostics.join("\n  ")}`,
+        `[pdf-server] Local file not in allowed list: ${resolved} (real: ${real})\n  Allowed dirs: ${[...allowedLocalDirs].join(", ")}`,
       );
       return {
         valid: false,
-        error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}\nDiagnostics: ${diagnostics.join(" | ")}`,
+        error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}`,
       };
     }
     if (!fs.existsSync(resolved)) {
@@ -399,14 +409,21 @@ async function refreshRoots(server: Server): Promise<void> {
         const resolved = path.resolve(dir);
         try {
           const s = fs.statSync(resolved);
+          // Use realpath to resolve symlinks/bind mounts, so sandbox paths
+          // (e.g., /sessions/...) and host paths (e.g., /Users/...) both match.
+          const real = tryRealpath(resolved);
           if (s.isFile()) {
             console.error(
               `[pdf-server] Root is a file, not a directory (skipped): ${resolved}`,
             );
             allowedLocalFiles.add(resolved);
+            if (real !== resolved) allowedLocalFiles.add(real);
           } else if (s.isDirectory()) {
             allowedLocalDirs.add(resolved);
-            console.error(`[pdf-server] Root directory allowed: ${resolved}`);
+            if (real !== resolved) allowedLocalDirs.add(real);
+            console.error(
+              `[pdf-server] Root directory allowed: ${resolved}${real !== resolved ? ` (real: ${real})` : ""}`,
+            );
           }
         } catch {
           // stat failed — skip non-existent roots
