@@ -102,16 +102,40 @@ export function isAncestorDir(dir: string, filePath: string): boolean {
 }
 
 /**
- * Try to resolve a path through symlinks using fs.realpathSync.
- * Returns the original path if resolution fails (e.g., file doesn't exist yet).
- * Useful when sandbox/container path remapping uses symlinks.
+ * Check if two paths refer to the same directory by comparing device+inode.
+ * Works across bind mounts and symlinks where path strings differ but the
+ * underlying filesystem location is the same.
  */
-function tryRealpath(p: string): string {
+function isSameDir(a: string, b: string): boolean {
   try {
-    return fs.realpathSync(p);
+    const sa = fs.statSync(a);
+    const sb = fs.statSync(b);
+    return sa.dev === sb.dev && sa.ino === sb.ino;
   } catch {
-    return p;
+    return false;
   }
+}
+
+/**
+ * Check if `filePath` is under `allowedDir`, handling bind mounts.
+ * First tries fast string-based comparison (path.relative), then
+ * falls back to inode comparison by walking up the directory tree.
+ */
+function isUnderAllowedDir(filePath: string, allowedDir: string): boolean {
+  // Fast path: string comparison works when paths are in the same namespace
+  if (isAncestorDir(allowedDir, filePath)) return true;
+
+  // Slow path: walk up the directory tree and compare inodes.
+  // Handles bind mounts where paths differ but point to the same location.
+  let current = path.dirname(filePath);
+  const root = path.parse(current).root;
+  while (current !== root) {
+    if (isSameDir(current, allowedDir)) return true;
+    const parent = path.dirname(current);
+    if (parent === current) break; // safety: reached root
+    current = parent;
+  }
+  return false;
 }
 
 /**
@@ -132,44 +156,26 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
       ? fileUrlToPath(url)
       : decodeURIComponent(url);
     const resolved = path.resolve(filePath);
-    // Resolve through symlinks/bind mounts to handle sandbox path remapping
-    // (e.g., client sends /sessions/... but roots use /Users/...)
-    const real = tryRealpath(resolved);
 
-    // Check exact match (CLI args / roots) — try both resolved and realpath
+    // Check exact match (CLI args / roots)
     const exactMatch =
-      allowedLocalFiles.has(resolved) || allowedLocalFiles.has(real);
+      allowedLocalFiles.has(resolved) ||
+      [...allowedLocalFiles].some((f) => isSameDir(f, resolved));
 
-    // Check directory match (MCP roots / CLI dirs) using path.relative.
-    // Try both the resolved path and its realpath against both the raw dir
-    // and its realpath, to handle sandbox path remapping in either direction.
-    const dirMatch = [...allowedLocalDirs].some((dir) => {
-      const realDir = tryRealpath(dir);
-      return (
-        isAncestorDir(dir, resolved) ||
-        isAncestorDir(dir, real) ||
-        isAncestorDir(realDir, resolved) ||
-        isAncestorDir(realDir, real)
-      );
-    });
+    // Check directory match (MCP roots / CLI dirs).
+    // Uses inode comparison to handle bind mounts (e.g., VM sandbox paths
+    // like /sessions/... that map to host paths like /Users/...).
+    const dirMatch = [...allowedLocalDirs].some((dir) =>
+      isUnderAllowedDir(resolved, dir),
+    );
 
     if (!exactMatch && !dirMatch) {
-      // Hex dump first 30 chars to catch invisible Unicode differences
-      const hex = (s: string, n = 30) =>
-        [...s.slice(0, n)].map((c) => c.charCodeAt(0).toString(16).padStart(4, "0")).join(" ");
-      const dirDetails = [...allowedLocalDirs].map((d) => {
-        const rel = path.relative(d, resolved);
-        return `dir_hex=[${hex(d)}]\nres_hex=[${hex(resolved)}]\nrel=${JSON.stringify(rel)} ancestor=${isAncestorDir(d, resolved)}`;
-      });
-      const diag = [
-        `resolved=${JSON.stringify(resolved)}`,
-        `allowedFiles=${JSON.stringify([...allowedLocalFiles])}`,
-        ...dirDetails,
-      ].join("\n");
-      console.error(`[pdf-server] REJECTED:\n${diag}`);
+      console.error(
+        `[pdf-server] Local file not in allowed list: ${resolved}\n  Allowed dirs: ${[...allowedLocalDirs].join(", ")}`,
+      );
       return {
         valid: false,
-        error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}\nDiagnostics:\n${diag}`,
+        error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}`,
       };
     }
     if (!fs.existsSync(resolved)) {
@@ -424,20 +430,15 @@ async function refreshRoots(server: Server): Promise<void> {
         const resolved = path.resolve(dir);
         try {
           const s = fs.statSync(resolved);
-          // Use realpath to resolve symlinks/bind mounts, so sandbox paths
-          // (e.g., /sessions/...) and host paths (e.g., /Users/...) both match.
-          const real = tryRealpath(resolved);
           if (s.isFile()) {
             console.error(
               `[pdf-server] Root is a file, not a directory (skipped): ${resolved}`,
             );
             allowedLocalFiles.add(resolved);
-            if (real !== resolved) allowedLocalFiles.add(real);
           } else if (s.isDirectory()) {
             allowedLocalDirs.add(resolved);
-            if (real !== resolved) allowedLocalDirs.add(real);
             console.error(
-              `[pdf-server] Root directory allowed: ${resolved}${real !== resolved ? ` (real: ${real})` : ""}`,
+              `[pdf-server] Root directory allowed: ${resolved}`,
             );
           }
         } catch {
