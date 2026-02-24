@@ -60,7 +60,7 @@ const DIST_DIR = import.meta.filename.endsWith(".ts")
 // =============================================================================
 
 export function isFileUrl(url: string): boolean {
-  return url.startsWith("file://");
+  return url.startsWith("file://") || url.startsWith("computer://");
 }
 
 export function isArxivUrl(url: string): boolean {
@@ -81,7 +81,10 @@ export function normalizeArxivUrl(url: string): string {
 }
 
 export function fileUrlToPath(fileUrl: string): string {
-  return decodeURIComponent(fileUrl.replace("file://", ""));
+  // Support both file:// and computer:// (used by some clients for local files)
+  return decodeURIComponent(
+    fileUrl.replace(/^(?:file|computer):\/\//, ""),
+  );
 }
 
 export function pathToFileUrl(filePath: string): string {
@@ -365,7 +368,7 @@ async function refreshRoots(server: Server): Promise<void> {
     const { roots } = await server.listRoots();
     allowedLocalDirs.clear();
     for (const root of roots) {
-      if (root.uri.startsWith("file://")) {
+      if (isFileUrl(root.uri)) {
         const dir = fileUrlToPath(root.uri);
         const resolved = path.resolve(dir);
         try {

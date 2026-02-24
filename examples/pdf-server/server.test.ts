@@ -292,6 +292,16 @@ describe("validateUrl with MCP roots (allowedLocalDirs)", () => {
     const result = validateUrl(pathToFileUrl(filePath));
     expect(result.valid).toBe(true);
   });
+
+  it("should accept computer:// URLs as local files", () => {
+    const dir = path.resolve(import.meta.dirname);
+    allowedLocalDirs.add(dir);
+
+    const filePath = path.join(dir, "server.ts");
+    const encoded = encodeURIComponent(filePath).replace(/%2F/g, "/");
+    const result = validateUrl(`computer://${encoded}`);
+    expect(result.valid).toBe(true);
+  });
 });
 
 describe("isAncestorDir", () => {
