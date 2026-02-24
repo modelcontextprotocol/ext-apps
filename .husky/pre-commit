@@ -17,5 +17,5 @@ fi
 npm run build:all
 npm run prettier:fix
 
-# Stage any changes to generated files (they may have been reformatted by prettier)
-git add src/generated/
+# Stage any files reformatted by prettier (generated files, source, docs, etc.)
+git diff --name-only --diff-filter=M | xargs -r git add

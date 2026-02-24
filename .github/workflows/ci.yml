@@ -10,6 +10,35 @@ permissions:
   contents: read
 
 jobs:
+  prettier-fix:
+    name: Auto-fix formatting
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ github.token }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - run: npm ci
+
+      - run: npm run prettier:fix
+
+      - name: Commit formatting changes
+        run: |
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "style: auto-fix prettier formatting"
+          git push
+
   build:
     strategy:
       fail-fast: false
