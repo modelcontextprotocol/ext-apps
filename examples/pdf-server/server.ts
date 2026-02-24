@@ -82,9 +82,7 @@ export function normalizeArxivUrl(url: string): string {
 
 export function fileUrlToPath(fileUrl: string): string {
   // Support both file:// and computer:// (used by some clients for local files)
-  return decodeURIComponent(
-    fileUrl.replace(/^(?:file|computer):\/\//, ""),
-  );
+  return decodeURIComponent(fileUrl.replace(/^(?:file|computer):\/\//, ""));
 }
 
 export function pathToFileUrl(filePath: string): string {
@@ -118,6 +116,9 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
     );
 
     if (!exactMatch && !dirMatch) {
+      console.error(
+        `[pdf-server] validateUrl REJECTED: url=${url}\n  filePath=${filePath}\n  resolved=${resolved}\n  allowedDirs=${JSON.stringify([...allowedLocalDirs])}\n  dirChecks=${JSON.stringify([...allowedLocalDirs].map((d) => ({ dir: d, rel: path.relative(d, resolved), match: isAncestorDir(d, resolved) })))}`,
+      );
       return {
         valid: false,
         error: `Local file not in allowed list: \n${resolved}\nAllowed files: ${[...allowedLocalFiles].join(", ")}\nAllowed directories:\n${[...allowedLocalDirs].join("\n")}`,

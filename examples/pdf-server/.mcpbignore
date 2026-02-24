@@ -7,6 +7,9 @@ src/
 # Tests
 *.test.*
 
+# Debug logs
+*.jsonl
+
 # Development assets
 screenshot.png
 grid-cell.png
