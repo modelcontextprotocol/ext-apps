@@ -13,3 +13,6 @@ playwright-report/
 test-results/
 __pycache__/
 *.pyc
+
+# MCPB bundles (built artifacts)
+*.mcpb

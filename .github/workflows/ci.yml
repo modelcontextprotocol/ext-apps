@@ -66,6 +66,11 @@ jobs:
 
       - run: npm run prettier
 
+      - name: Build MCPB bundle (pdf-server)
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: npx -y @anthropic-ai/mcpb pack
+        working-directory: examples/pdf-server
+
   e2e:
     runs-on: ubuntu-latest
     steps:
