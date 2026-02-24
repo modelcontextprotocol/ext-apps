@@ -154,12 +154,25 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
     });
 
     if (!exactMatch && !dirMatch) {
-      console.error(
-        `[pdf-server] Local file not in allowed list: ${resolved} (real: ${real})\n  Allowed dirs: ${[...allowedLocalDirs].join(", ")}`,
-      );
+      // Build detailed diagnostics for debugging
+      const dirDetails = [...allowedLocalDirs].map((d) => {
+        const realD = tryRealpath(d);
+        const rel = path.relative(d, resolved);
+        return `dir=${JSON.stringify(d)} rel=${JSON.stringify(rel)} ancestor=${isAncestorDir(d, resolved)}${realD !== d ? ` realDir=${JSON.stringify(realD)}` : ""}`;
+      });
+      const diag = [
+        `url=${JSON.stringify(url)}`,
+        `resolved=${JSON.stringify(resolved)}`,
+        real !== resolved ? `real=${JSON.stringify(real)}` : null,
+        `allowedFiles=[${[...allowedLocalFiles].map((f) => JSON.stringify(f)).join(", ")}]`,
+        ...dirDetails,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      console.error(`[pdf-server] REJECTED:\n${diag}`);
       return {
         valid: false,
-        error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}`,
+        error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}\nDiagnostics:\n${diag}`,
       };
     }
     if (!fs.existsSync(resolved)) {
