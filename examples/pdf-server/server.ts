@@ -154,21 +154,18 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
     });
 
     if (!exactMatch && !dirMatch) {
-      // Build detailed diagnostics for debugging
+      // Hex dump first 30 chars to catch invisible Unicode differences
+      const hex = (s: string, n = 30) =>
+        [...s.slice(0, n)].map((c) => c.charCodeAt(0).toString(16).padStart(4, "0")).join(" ");
       const dirDetails = [...allowedLocalDirs].map((d) => {
-        const realD = tryRealpath(d);
         const rel = path.relative(d, resolved);
-        return `dir=${JSON.stringify(d)} rel=${JSON.stringify(rel)} ancestor=${isAncestorDir(d, resolved)}${realD !== d ? ` realDir=${JSON.stringify(realD)}` : ""}`;
+        return `dir_hex=[${hex(d)}]\nres_hex=[${hex(resolved)}]\nrel=${JSON.stringify(rel)} ancestor=${isAncestorDir(d, resolved)}`;
       });
       const diag = [
-        `url=${JSON.stringify(url)}`,
         `resolved=${JSON.stringify(resolved)}`,
-        real !== resolved ? `real=${JSON.stringify(real)}` : null,
-        `allowedFiles=[${[...allowedLocalFiles].map((f) => JSON.stringify(f)).join(", ")}]`,
+        `allowedFiles=${JSON.stringify([...allowedLocalFiles])}`,
         ...dirDetails,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      ].join("\n");
       console.error(`[pdf-server] REJECTED:\n${diag}`);
       return {
         valid: false,
