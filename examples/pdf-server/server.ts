@@ -102,40 +102,34 @@ export function isAncestorDir(dir: string, filePath: string): boolean {
 }
 
 /**
- * Check if two paths refer to the same directory by comparing device+inode.
- * Works across bind mounts and symlinks where path strings differ but the
- * underlying filesystem location is the same.
+ * Try to resolve a VM-internal path to a host path by matching the path suffix
+ * against allowed directories.
+ *
+ * When the MCP server runs on the host but receives unrewritten VM paths
+ * (e.g., /sessions/name/mnt/uploads/file.pdf), this finds the equivalent host
+ * path (e.g., /Users/.../uploads/file.pdf) by matching directory basenames.
+ *
+ * Returns the host path if found, or null.
  */
-function isSameDir(a: string, b: string): boolean {
-  try {
-    const sa = fs.statSync(a);
-    const sb = fs.statSync(b);
-    return sa.dev === sb.dev && sa.ino === sb.ino;
-  } catch {
-    return false;
+function resolveVmPath(
+  vmPath: string,
+  allowedDirs: ReadonlySet<string>,
+): string | null {
+  const parts = vmPath.split(path.sep);
+  for (const dir of allowedDirs) {
+    const dirBasename = path.basename(dir);
+    // Find the mount point in the VM path by matching the directory basename
+    const idx = parts.lastIndexOf(dirBasename);
+    if (idx >= 0) {
+      // Join allowed dir with the relative path after the mount point
+      const relativeParts = parts.slice(idx + 1);
+      const candidate = path.join(dir, ...relativeParts);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
   }
-}
-
-/**
- * Check if `filePath` is under `allowedDir`, handling bind mounts.
- * First tries fast string-based comparison (path.relative), then
- * falls back to inode comparison by walking up the directory tree.
- */
-function isUnderAllowedDir(filePath: string, allowedDir: string): boolean {
-  // Fast path: string comparison works when paths are in the same namespace
-  if (isAncestorDir(allowedDir, filePath)) return true;
-
-  // Slow path: walk up the directory tree and compare inodes.
-  // Handles bind mounts where paths differ but point to the same location.
-  let current = path.dirname(filePath);
-  const root = path.parse(current).root;
-  while (current !== root) {
-    if (isSameDir(current, allowedDir)) return true;
-    const parent = path.dirname(current);
-    if (parent === current) break; // safety: reached root
-    current = parent;
-  }
-  return false;
+  return null;
 }
 
 /**
@@ -148,7 +142,11 @@ function isLocalPath(url: string): boolean {
   );
 }
 
-export function validateUrl(url: string): { valid: boolean; error?: string } {
+export function validateUrl(url: string): {
+  valid: boolean;
+  error?: string;
+  resolvedPath?: string;
+} {
   if (isFileUrl(url) || isLocalPath(url)) {
     // fileUrlToPath already decodes percent-encoding; for bare paths,
     // decode here in case the client sends %20 for spaces etc.
@@ -158,30 +156,64 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
     const resolved = path.resolve(filePath);
 
     // Check exact match (CLI args / roots)
-    const exactMatch =
-      allowedLocalFiles.has(resolved) ||
-      [...allowedLocalFiles].some((f) => isSameDir(f, resolved));
+    if (allowedLocalFiles.has(resolved)) {
+      if (!fs.existsSync(resolved)) {
+        return { valid: false, error: `File not found: ${resolved}` };
+      }
+      return { valid: true, resolvedPath: resolved };
+    }
 
     // Check directory match (MCP roots / CLI dirs).
-    // Uses inode comparison to handle bind mounts (e.g., VM sandbox paths
-    // like /sessions/... that map to host paths like /Users/...).
-    const dirMatch = [...allowedLocalDirs].some((dir) =>
-      isUnderAllowedDir(resolved, dir),
-    );
+    // Try both the raw path and its realpath (resolves symlinks).
+    let realResolved: string | undefined;
+    try {
+      realResolved = fs.realpathSync(resolved);
+    } catch {
+      // File may not exist yet at this path
+    }
+    if (
+      [...allowedLocalDirs].some((dir) => {
+        let realDir: string | undefined;
+        try {
+          realDir = fs.realpathSync(dir);
+        } catch {
+          // Dir may not exist
+        }
+        return (
+          isAncestorDir(dir, resolved) ||
+          (realResolved != null && isAncestorDir(dir, realResolved)) ||
+          (realDir != null && isAncestorDir(realDir, resolved)) ||
+          (realDir != null &&
+            realResolved != null &&
+            isAncestorDir(realDir, realResolved))
+        );
+      })
+    ) {
+      if (!fs.existsSync(resolved)) {
+        return { valid: false, error: `File not found: ${resolved}` };
+      }
+      return { valid: true, resolvedPath: resolved };
+    }
 
-    if (!exactMatch && !dirMatch) {
+    // VM path fallback: the path may be a VM-internal path
+    // (e.g., /sessions/.../mnt/uploads/file.pdf) that wasn't rewritten
+    // to the host path. Try to find the file in allowed dirs by matching
+    // the directory basename as a mount point.
+    const hostPath = resolveVmPath(resolved, allowedLocalDirs);
+    if (hostPath) {
       console.error(
-        `[pdf-server] Local file not in allowed list: ${resolved}\n  Allowed dirs: ${[...allowedLocalDirs].join(", ")}`,
+        `[pdf-server] Resolved VM path: ${resolved} → ${hostPath}`,
       );
-      return {
-        valid: false,
-        error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}`,
-      };
+      return { valid: true, resolvedPath: hostPath };
     }
-    if (!fs.existsSync(resolved)) {
-      return { valid: false, error: `File not found: ${resolved}` };
-    }
-    return { valid: true };
+
+    console.error(
+      `[pdf-server] Local file not in allowed list: ${resolved}\n  Allowed dirs: ${[...allowedLocalDirs].join(", ")}`,
+    );
+    return {
+      valid: false,
+      error: `Local file not in allowed list: ${resolved}\nAllowed directories: ${[...allowedLocalDirs].join(", ")}`,
+    };
   }
 
   // Remote URL - require HTTPS
@@ -437,9 +469,7 @@ async function refreshRoots(server: Server): Promise<void> {
             allowedLocalFiles.add(resolved);
           } else if (s.isDirectory()) {
             allowedLocalDirs.add(resolved);
-            console.error(
-              `[pdf-server] Root directory allowed: ${resolved}`,
-            );
+            console.error(`[pdf-server] Root directory allowed: ${resolved}`);
           }
         } catch {
           // stat failed — skip non-existent roots
@@ -550,8 +580,16 @@ export function createServer(): McpServer {
       }
 
       try {
-        const normalized = isArxivUrl(url) ? normalizeArxivUrl(url) : url;
-        const { data, totalBytes } = await readPdfRange(url, offset, byteCount);
+        // Use resolved host path if VM path was remapped
+        const effectiveUrl = validation.resolvedPath ?? url;
+        const normalized = isArxivUrl(effectiveUrl)
+          ? normalizeArxivUrl(effectiveUrl)
+          : effectiveUrl;
+        const { data, totalBytes } = await readPdfRange(
+          effectiveUrl,
+          offset,
+          byteCount,
+        );
 
         // Base64 encode for JSON transport
         const bytes = Buffer.from(data).toString("base64");
@@ -624,13 +662,18 @@ Accepts:
         };
       }
 
+      // Use resolved host path if VM path was remapped
+      const effectiveUrl = validation.resolvedPath ?? normalized;
+
       // Probe file size so the client can set up range transport without an extra fetch
-      const { totalBytes } = await readPdfRange(normalized, 0, 1);
+      const { totalBytes } = await readPdfRange(effectiveUrl, 0, 1);
 
       return {
-        content: [{ type: "text", text: `Displaying PDF: ${normalized}` }],
+        content: [
+          { type: "text", text: `Displaying PDF: ${effectiveUrl}` },
+        ],
         structuredContent: {
-          url: normalized,
+          url: effectiveUrl,
           initialPage: page,
           totalBytes,
         },
