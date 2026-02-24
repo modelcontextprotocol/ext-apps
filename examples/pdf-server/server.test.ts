@@ -380,32 +380,6 @@ describe("validateUrl with MCP roots (allowedLocalDirs)", () => {
     }
   });
 
-  it("should resolve VM-internal paths via directory basename matching", () => {
-    const fs = require("node:fs");
-    const os = require("node:os");
-    // Simulate: host has /tmp/xxx/uploads/file.txt
-    //           VM sends /sessions/name/mnt/uploads/file.txt
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf-vm-test-"));
-    const hostUploads = path.join(tmpDir, "uploads");
-    fs.mkdirSync(hostUploads);
-    fs.writeFileSync(path.join(hostUploads, "report.pdf"), "fake-pdf");
-
-    try {
-      // Allow the host uploads directory
-      allowedLocalDirs.add(hostUploads);
-
-      // Simulate VM-internal path that shares the "uploads" basename
-      const vmPath = "/sessions/gallant-tender-mayer/mnt/uploads/report.pdf";
-      const result = validateUrl(vmPath);
-      expect(result.valid).toBe(true);
-      // The resolved path should point to the host file
-      expect(result.resolvedPath).toBe(
-        path.join(hostUploads, "report.pdf"),
-      );
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true });
-    }
-  });
 });
 
 describe("isAncestorDir", () => {

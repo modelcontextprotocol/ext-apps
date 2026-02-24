@@ -102,37 +102,6 @@ export function isAncestorDir(dir: string, filePath: string): boolean {
 }
 
 /**
- * Try to resolve a VM-internal path to a host path by matching the path suffix
- * against allowed directories.
- *
- * When the MCP server runs on the host but receives unrewritten VM paths
- * (e.g., /sessions/name/mnt/uploads/file.pdf), this finds the equivalent host
- * path (e.g., /Users/.../uploads/file.pdf) by matching directory basenames.
- *
- * Returns the host path if found, or null.
- */
-function resolveVmPath(
-  vmPath: string,
-  allowedDirs: ReadonlySet<string>,
-): string | null {
-  const parts = vmPath.split(path.sep);
-  for (const dir of allowedDirs) {
-    const dirBasename = path.basename(dir);
-    // Find the mount point in the VM path by matching the directory basename
-    const idx = parts.lastIndexOf(dirBasename);
-    if (idx >= 0) {
-      // Join allowed dir with the relative path after the mount point
-      const relativeParts = parts.slice(idx + 1);
-      const candidate = path.join(dir, ...relativeParts);
-      if (fs.existsSync(candidate)) {
-        return candidate;
-      }
-    }
-  }
-  return null;
-}
-
-/**
  * Check if `url` looks like an absolute local file path (not a URL scheme).
  * Handles Unix paths (/...), home-relative (~), and Windows drive letters (C:\...).
  */
@@ -145,7 +114,6 @@ function isLocalPath(url: string): boolean {
 export function validateUrl(url: string): {
   valid: boolean;
   error?: string;
-  resolvedPath?: string;
 } {
   if (isFileUrl(url) || isLocalPath(url)) {
     // fileUrlToPath already decodes percent-encoding; for bare paths,
@@ -160,7 +128,7 @@ export function validateUrl(url: string): {
       if (!fs.existsSync(resolved)) {
         return { valid: false, error: `File not found: ${resolved}` };
       }
-      return { valid: true, resolvedPath: resolved };
+      return { valid: true };
     }
 
     // Check directory match (MCP roots / CLI dirs).
@@ -192,19 +160,7 @@ export function validateUrl(url: string): {
       if (!fs.existsSync(resolved)) {
         return { valid: false, error: `File not found: ${resolved}` };
       }
-      return { valid: true, resolvedPath: resolved };
-    }
-
-    // VM path fallback: the path may be a VM-internal path
-    // (e.g., /sessions/.../mnt/uploads/file.pdf) that wasn't rewritten
-    // to the host path. Try to find the file in allowed dirs by matching
-    // the directory basename as a mount point.
-    const hostPath = resolveVmPath(resolved, allowedLocalDirs);
-    if (hostPath) {
-      console.error(
-        `[pdf-server] Resolved VM path: ${resolved} → ${hostPath}`,
-      );
-      return { valid: true, resolvedPath: hostPath };
+      return { valid: true };
     }
 
     console.error(
@@ -580,13 +536,9 @@ export function createServer(): McpServer {
       }
 
       try {
-        // Use resolved host path if VM path was remapped
-        const effectiveUrl = validation.resolvedPath ?? url;
-        const normalized = isArxivUrl(effectiveUrl)
-          ? normalizeArxivUrl(effectiveUrl)
-          : effectiveUrl;
+        const normalized = isArxivUrl(url) ? normalizeArxivUrl(url) : url;
         const { data, totalBytes } = await readPdfRange(
-          effectiveUrl,
+          normalized,
           offset,
           byteCount,
         );
@@ -662,18 +614,13 @@ Accepts:
         };
       }
 
-      // Use resolved host path if VM path was remapped
-      const effectiveUrl = validation.resolvedPath ?? normalized;
-
       // Probe file size so the client can set up range transport without an extra fetch
-      const { totalBytes } = await readPdfRange(effectiveUrl, 0, 1);
+      const { totalBytes } = await readPdfRange(normalized, 0, 1);
 
       return {
-        content: [
-          { type: "text", text: `Displaying PDF: ${effectiveUrl}` },
-        ],
+        content: [{ type: "text", text: `Displaying PDF: ${normalized}` }],
         structuredContent: {
-          url: effectiveUrl,
+          url: normalized,
           initialPage: page,
           totalBytes,
         },
