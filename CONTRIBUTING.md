@@ -289,79 +289,193 @@ Most example servers have a `start:stdio` script that builds and launches in std
   "mcpServers": {
     "basic-react": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/basic-server-react", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/basic-server-react",
+        "run",
+        "start:stdio"
+      ]
     },
     "basic-vanillajs": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/basic-server-vanillajs", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/basic-server-vanillajs",
+        "run",
+        "start:stdio"
+      ]
     },
     "basic-vue": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/basic-server-vue", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/basic-server-vue",
+        "run",
+        "start:stdio"
+      ]
     },
     "basic-svelte": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/basic-server-svelte", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/basic-server-svelte",
+        "run",
+        "start:stdio"
+      ]
     },
     "basic-preact": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/basic-server-preact", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/basic-server-preact",
+        "run",
+        "start:stdio"
+      ]
     },
     "basic-solid": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/basic-server-solid", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/basic-server-solid",
+        "run",
+        "start:stdio"
+      ]
     },
     "budget-allocator": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/budget-allocator-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/budget-allocator-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "cohort-heatmap": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/cohort-heatmap-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/cohort-heatmap-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "customer-segmentation": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/customer-segmentation-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/customer-segmentation-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "map": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/map-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/map-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "pdf": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/pdf-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/pdf-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "scenario-modeler": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/scenario-modeler-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/scenario-modeler-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "shadertoy": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/shadertoy-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/shadertoy-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "sheet-music": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/sheet-music-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/sheet-music-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "system-monitor": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/system-monitor-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/system-monitor-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "threejs": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/threejs-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/threejs-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "transcript": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/transcript-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/transcript-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "video-resource": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/video-resource-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/video-resource-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "wiki-explorer": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "~/code/ext-apps/examples/wiki-explorer-server", "run", "start:stdio"]
+      "args": [
+        "--silent",
+        "--prefix",
+        "~/code/ext-apps/examples/wiki-explorer-server",
+        "run",
+        "start:stdio"
+      ]
     },
     "qr": {
       "command": "bash",
