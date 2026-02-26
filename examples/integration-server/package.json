@@ -7,10 +7,10 @@
     "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --banner \"#!/usr/bin/env node\"",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
     "serve:http": "bun --watch main.ts",
-    "serve:stdio": "bun server.ts --stdio",
+    "serve:stdio": "bun main.ts --stdio",
     "start": "npm run start:http",
     "start:http": "cross-env NODE_ENV=development npm run build && npm run serve:http",
-    "start:stdio": "cross-env NODE_ENV=development npm run build && npm run serve:stdio",
+    "start:stdio": "cross-env NODE_ENV=development npm run build 1>&2 && npm run serve:stdio",
     "dev": "cross-env NODE_ENV=development concurrently \"npm run watch\" \"npm run serve:http\"",
     "serve": "bun --watch main.ts"
   },

@@ -19,7 +19,7 @@
     "serve": "bun --watch main.ts",
     "serve:stdio": "bun main.ts --stdio",
     "start": "cross-env NODE_ENV=development npm run build && npm run serve",
-    "start:stdio": "cross-env NODE_ENV=development npm run build && npm run serve:stdio",
+    "start:stdio": "cross-env NODE_ENV=development npm run build 1>&2 && npm run serve:stdio",
     "dev": "cross-env NODE_ENV=development concurrently \"npm run watch\" \"npm run serve\"",
     "prepublishOnly": "npm run build"
   },
