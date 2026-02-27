@@ -22,6 +22,7 @@ import {
   allowedLocalFiles,
   DEFAULT_PDF,
   allowedLocalDirs,
+  type CreateServerOptions,
 } from "./server.js";
 
 /**
@@ -89,14 +90,21 @@ export async function startStdioServer(
   await createServer().connect(new StdioServerTransport());
 }
 
-function parseArgs(): { urls: string[]; stdio: boolean } {
+function parseArgs(): {
+  urls: string[];
+  stdio: boolean;
+  useClientRoots: boolean;
+} {
   const args = process.argv.slice(2);
   const urls: string[] = [];
   let stdio = false;
+  let useClientRoots = false;
 
   for (const arg of args) {
     if (arg === "--stdio") {
       stdio = true;
+    } else if (arg === "--use-client-roots") {
+      useClientRoots = true;
     } else if (!arg.startsWith("-")) {
       // Convert local paths to file:// URLs, normalize arxiv URLs
       let url = arg;
@@ -113,11 +121,15 @@ function parseArgs(): { urls: string[]; stdio: boolean } {
     }
   }
 
-  return { urls: urls.length > 0 ? urls : [DEFAULT_PDF], stdio };
+  return {
+    urls: urls.length > 0 ? urls : [DEFAULT_PDF],
+    stdio,
+    useClientRoots,
+  };
 }
 
 async function main() {
-  const { urls, stdio } = parseArgs();
+  const { urls, stdio, useClientRoots } = parseArgs();
 
   // Register local files in whitelist
   for (const url of urls) {
@@ -140,10 +152,12 @@ async function main() {
 
   console.error(`[pdf-server] Ready (${urls.length} URL(s) configured)`);
 
+  const serverOpts: CreateServerOptions = { useClientRoots };
+
   if (stdio) {
-    await startStdioServer(createServer);
+    await startStdioServer(() => createServer(serverOpts));
   } else {
-    await startStreamableHTTPServer(createServer);
+    await startStreamableHTTPServer(() => createServer(serverOpts));
   }
 }
 

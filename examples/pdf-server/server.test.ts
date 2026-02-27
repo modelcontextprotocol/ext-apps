@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import path from "node:path";
 import {
   createPdfCache,
+  createServer,
   validateUrl,
   isAncestorDir,
   allowedLocalFiles,
@@ -419,5 +420,29 @@ describe("isAncestorDir", () => {
     expect(isAncestorDir("/Users/test/dir/", "/Users/test/dir/file.pdf")).toBe(
       true,
     );
+  });
+});
+
+describe("createServer useClientRoots option", () => {
+  it("should not set up roots handlers by default", () => {
+    const server = createServer();
+    // When useClientRoots is false (default), oninitialized should NOT
+    // be overridden by our roots logic.
+    expect(server.server.oninitialized).toBeUndefined();
+    server.close();
+  });
+
+  it("should not set up roots handlers when useClientRoots is false", () => {
+    const server = createServer({ useClientRoots: false });
+    expect(server.server.oninitialized).toBeUndefined();
+    server.close();
+  });
+
+  it("should set up roots handlers when useClientRoots is true", () => {
+    const server = createServer({ useClientRoots: true });
+    // When useClientRoots is true, oninitialized should be set to
+    // the roots refresh handler.
+    expect(server.server.oninitialized).toBeFunction();
+    server.close();
   });
 });

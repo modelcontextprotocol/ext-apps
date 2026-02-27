@@ -149,9 +149,26 @@ bun examples/pdf-server/main.ts ./local.pdf https://arxiv.org/pdf/2401.00001.pdf
 bun examples/pdf-server/main.ts --stdio ./papers/
 ```
 
+## Security: Client Roots
+
+When the server is started with `--stdio`, MCP clients may advertise **roots** — `file://` URIs pointing to directories on the client's file system. Because the server resolves these paths locally, accepting them by default would let a remote client expose arbitrary directories on the server's machine.
+
+For this reason, **client roots are ignored by default**. To opt in, pass `--use-client-roots`:
+
+```bash
+# Trust that the client is local and its roots are safe
+bun examples/pdf-server/main.ts --stdio --use-client-roots
+```
+
+When the flag is omitted the server logs:
+
+```
+[pdf-server] Client roots are ignored (default for security). Pass --use-client-roots to allow the client to expose local directories.
+```
+
 ## Allowed Sources
 
-- **Local files**: Must be passed as CLI arguments
+- **Local files**: Must be passed as CLI arguments (or via client roots when `--use-client-roots` is set)
 - **Remote URLs**: arxiv.org, biorxiv.org, medrxiv.org, chemrxiv.org, zenodo.org, osf.io, hal.science, ssrn.com, and more
 
 ## Tools
