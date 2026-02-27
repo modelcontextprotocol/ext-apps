@@ -153,18 +153,18 @@ bun examples/pdf-server/main.ts --stdio ./papers/
 
 MCP clients may advertise **roots** — `file://` URIs pointing to directories on the client's file system. The server uses these to allow access to local files under those directories.
 
-- **HTTP mode** (default): Client roots are **enabled** — the client is typically on the same machine, so the roots are safe.
-- **Stdio mode** (`--stdio`): Client roots are **ignored** by default — the client may be remote, and its roots would be resolved against the server's filesystem. To opt in, pass `--use-client-roots`:
+- **Stdio mode** (`--stdio`): Client roots are **always enabled** — the client is typically on the same machine (e.g. Claude Desktop), so the roots are safe.
+- **HTTP mode** (default): Client roots are **ignored** by default — the client may be remote, and its roots would be resolved against the server's filesystem. To opt in, pass `--use-client-roots`:
 
 ```bash
-# Trust that the stdio client is local and its roots are safe
-bun examples/pdf-server/main.ts --stdio --use-client-roots
+# Trust that the HTTP client is local and its roots are safe
+bun examples/pdf-server/main.ts --use-client-roots
 ```
 
 When roots are ignored the server logs:
 
 ```
-[pdf-server] Client roots are ignored (default for security). Pass --use-client-roots to allow the client to expose local directories.
+[pdf-server] Client roots are ignored (default for remote transports). Pass --use-client-roots to allow the client to expose local directories.
 ```
 
 ## Allowed Sources
