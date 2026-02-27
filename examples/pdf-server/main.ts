@@ -152,7 +152,13 @@ async function main() {
 
   console.error(`[pdf-server] Ready (${urls.length} URL(s) configured)`);
 
-  const serverOpts: CreateServerOptions = { useClientRoots };
+  // For stdio the client is typically remote — roots would expose the
+  // server's filesystem.  Only honour them with an explicit opt-in.
+  // For HTTP the client is local, so roots are safe by default.
+  const effectiveUseClientRoots = useClientRoots || !stdio;
+  const serverOpts: CreateServerOptions = {
+    useClientRoots: effectiveUseClientRoots,
+  };
 
   if (stdio) {
     await startStdioServer(() => createServer(serverOpts));

@@ -151,16 +151,17 @@ bun examples/pdf-server/main.ts --stdio ./papers/
 
 ## Security: Client Roots
 
-When the server is started with `--stdio`, MCP clients may advertise **roots** — `file://` URIs pointing to directories on the client's file system. Because the server resolves these paths locally, accepting them by default would let a remote client expose arbitrary directories on the server's machine.
+MCP clients may advertise **roots** — `file://` URIs pointing to directories on the client's file system. The server uses these to allow access to local files under those directories.
 
-For this reason, **client roots are ignored by default**. To opt in, pass `--use-client-roots`:
+- **HTTP mode** (default): Client roots are **enabled** — the client is typically on the same machine, so the roots are safe.
+- **Stdio mode** (`--stdio`): Client roots are **ignored** by default — the client may be remote, and its roots would be resolved against the server's filesystem. To opt in, pass `--use-client-roots`:
 
 ```bash
-# Trust that the client is local and its roots are safe
+# Trust that the stdio client is local and its roots are safe
 bun examples/pdf-server/main.ts --stdio --use-client-roots
 ```
 
-When the flag is omitted the server logs:
+When roots are ignored the server logs:
 
 ```
 [pdf-server] Client roots are ignored (default for security). Pass --use-client-roots to allow the client to expose local directories.
@@ -168,7 +169,7 @@ When the flag is omitted the server logs:
 
 ## Allowed Sources
 
-- **Local files**: Must be passed as CLI arguments (or via client roots when `--use-client-roots` is set)
+- **Local files**: Must be passed as CLI arguments (or via client roots when enabled)
 - **Remote URLs**: arxiv.org, biorxiv.org, medrxiv.org, chemrxiv.org, zenodo.org, osf.io, hal.science, ssrn.com, and more
 
 ## Tools
