@@ -22,7 +22,6 @@ import {
   allowedLocalFiles,
   DEFAULT_PDF,
   allowedLocalDirs,
-  type CreateServerOptions,
 } from "./server.js";
 
 /**
@@ -152,19 +151,12 @@ async function main() {
 
   console.error(`[pdf-server] Ready (${urls.length} URL(s) configured)`);
 
-  // For stdio the client is typically local (e.g. Claude Desktop on the
-  // same machine), so honouring client roots is safe by default.
-  // For HTTP the client is remote — roots would expose the server's
-  // filesystem.  Only honour them with an explicit opt-in.
-  const effectiveUseClientRoots = useClientRoots || stdio;
-  const serverOpts: CreateServerOptions = {
-    useClientRoots: effectiveUseClientRoots,
-  };
-
   if (stdio) {
-    await startStdioServer(() => createServer(serverOpts));
+    // stdio → client is local (e.g. Claude Desktop), roots are safe
+    await startStdioServer(() => createServer({ useClientRoots: true }));
   } else {
-    await startStreamableHTTPServer(() => createServer(serverOpts));
+    // HTTP → client is remote, only honour roots with explicit opt-in
+    await startStreamableHTTPServer(() => createServer({ useClientRoots }));
   }
 }
 
