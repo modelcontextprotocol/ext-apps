@@ -447,15 +447,18 @@ export interface CreateServerOptions {
   /**
    * Whether to honour MCP roots sent by the client.
    *
-   * When a server is started with `--stdio`, the connecting client may
-   * advertise `roots` that refer to directories on the **client's** file
-   * system.  Because the server resolves those paths locally, accepting
-   * them by default would give the remote client access to arbitrary
-   * directories on the **server's** machine.
+   * When a server is exposed over HTTP, the connecting client is
+   * typically remote and may advertise `roots` that refer to
+   * directories on the **client's** file system.  Because the server
+   * resolves those paths locally, accepting them by default would give
+   * the remote client access to arbitrary directories on the
+   * **server's** machine.
    *
-   * Set this to `true` only when you trust the client (e.g. the client
-   * is running on the same host) or the server was started with the
-   * explicit `--use-client-roots` flag.
+   * For stdio the client is typically local (e.g. Claude Desktop on the
+   * same machine), so roots are safe and enabled by default.
+   *
+   * Set this to `true` for HTTP only when you trust the client, or
+   * pass the `--use-client-roots` CLI flag.
    *
    * @default false
    */
@@ -479,7 +482,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     );
   } else {
     console.error(
-      "[pdf-server] Client roots are ignored (default for security). " +
+      "[pdf-server] Client roots are ignored (default for remote transports). " +
         "Pass --use-client-roots to allow the client to expose local directories.",
     );
   }
