@@ -56,3 +56,37 @@ function PostMessageTransport_constructor_host() {
   );
   //#endregion PostMessageTransport_constructor_host
 }
+
+/**
+ * Example: Host with deferred target to fix the initialization race condition.
+ *
+ * Connect the bridge _before_ loading the iframe so the host is already
+ * listening when the iframe sends `ui/initialize` on script load.
+ * Call `setTarget()` once `iframe.onload` fires to flush queued messages.
+ */
+async function PostMessageTransport_host_deferred(bridge: AppBridge) {
+  //#region PostMessageTransport_host_deferred
+  const iframe = document.createElement("iframe");
+  const transport = new PostMessageTransport(); // no target yet
+  await bridge.connect(transport); // start listening immediately
+  document.body.appendChild(iframe);
+  iframe.srcdoc = "<html>...</html>"; // load the app
+  iframe.onload = () => {
+    transport.setTarget(iframe.contentWindow!); // flush queued messages
+  };
+  //#endregion PostMessageTransport_host_deferred
+}
+
+/**
+ * Example: Creating deferred transport for host (constructor only).
+ */
+async function PostMessageTransport_constructor_host_deferred(
+  bridge: AppBridge,
+) {
+  //#region PostMessageTransport_constructor_host_deferred
+  const transport = new PostMessageTransport();
+  await bridge.connect(transport);
+  // ... set iframe.srcdoc, then:
+  // iframe.onload = () => transport.setTarget(iframe.contentWindow!);
+  //#endregion PostMessageTransport_constructor_host_deferred
+}

@@ -17,9 +17,9 @@ import {
  *
  * ## Security
  *
- * The `eventSource` parameter is required and validates the message source window
- * by checking `event.source`. For views, pass `window.parent`.
- * For hosts, pass `iframe.contentWindow` to validate the iframe source.
+ * The `eventSource` parameter validates the message source window by checking
+ * `event.source`. For views, pass `window.parent`. For hosts, pass
+ * `iframe.contentWindow` to validate the iframe source.
  *
  * ## Usage
  *
@@ -29,7 +29,7 @@ import {
  * await app.connect(transport);
  * ```
  *
- * **Host**:
+ * **Host (target known upfront)**:
  * ```ts source="./message-transport.examples.ts#PostMessageTransport_host"
  * const iframe = document.getElementById("app-iframe") as HTMLIFrameElement;
  * const transport = new PostMessageTransport(
@@ -39,10 +39,31 @@ import {
  * await bridge.connect(transport);
  * ```
  *
+ * **Host (deferred target — fixes race condition)**:
+ *
+ * The iframe sends `ui/initialize` as soon as its script loads, which can happen
+ * before the host has a chance to call `bridge.connect()` after `iframe.onload`.
+ * To fix this, connect the bridge _before_ loading the iframe, then call
+ * `setTarget()` once the iframe is ready:
+ *
+ * ```ts source="./message-transport.examples.ts#PostMessageTransport_host_deferred"
+ * const iframe = document.createElement("iframe");
+ * const transport = new PostMessageTransport(); // no target yet
+ * await bridge.connect(transport); // start listening immediately
+ * document.body.appendChild(iframe);
+ * iframe.srcdoc = "<html>...</html>"; // load the app
+ * iframe.onload = () => {
+ *   transport.setTarget(iframe.contentWindow!); // flush queued messages
+ * };
+ * ```
+ *
  * @see {@link app!App.connect `App.connect`} for View usage
  * @see {@link app-bridge!AppBridge.connect `AppBridge.connect`} for Host usage
  */
 export class PostMessageTransport implements Transport {
+  private eventTarget: Window | undefined;
+  private eventSource: MessageEventSource | undefined;
+  private messageQueue: JSONRPCMessage[] = [];
   private messageListener: (
     this: Window,
     ev: WindowEventMap["message"],
@@ -51,9 +72,15 @@ export class PostMessageTransport implements Transport {
   /**
    * Create a new PostMessageTransport.
    *
-   * @param eventTarget - Target window to send messages to (default: `window.parent`)
-   * @param eventSource - Source window for message validation. For views, pass
-   *   `window.parent`. For hosts, pass `iframe.contentWindow`.
+   * Both parameters are optional to support the deferred-target pattern where
+   * the host connects the bridge before the iframe is loaded. Call
+   * {@link setTarget} after `iframe.onload` to provide the target and flush
+   * any queued outgoing messages.
+   *
+   * @param eventTarget - Target window to send messages to. Omit to defer until
+   *   {@link setTarget} is called (outgoing messages will be queued).
+   * @param eventSource - Source window for message validation. Omit to accept
+   *   messages from any source until {@link setTarget} is called.
    *
    * @example View connecting to parent
    * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_view"
@@ -68,13 +95,20 @@ export class PostMessageTransport implements Transport {
    *   iframe.contentWindow!,
    * );
    * ```
+   *
+   * @example Host with deferred target (fixes race condition)
+   * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_host_deferred"
+   * const transport = new PostMessageTransport();
+   * await bridge.connect(transport);
+   * // ... set iframe.srcdoc, then:
+   * // iframe.onload = () => transport.setTarget(iframe.contentWindow!);
+   * ```
    */
-  constructor(
-    private eventTarget: Window = window.parent,
-    private eventSource: MessageEventSource,
-  ) {
+  constructor(eventTarget?: Window, eventSource?: MessageEventSource) {
+    this.eventTarget = eventTarget;
+    this.eventSource = eventSource;
     this.messageListener = (event) => {
-      if (eventSource && event.source !== this.eventSource) {
+      if (this.eventSource && event.source !== this.eventSource) {
         console.debug("Ignoring message from unknown source", event);
         return;
       }
@@ -104,6 +138,24 @@ export class PostMessageTransport implements Transport {
   }
 
   /**
+   * Set the target window for outgoing messages and the expected source for
+   * incoming message validation.
+   *
+   * Call this after `iframe.onload` when using the deferred-target pattern.
+   * Any messages queued while no target was set are flushed immediately.
+   *
+   * @param target - The iframe's `contentWindow`
+   */
+  setTarget(target: Window): void {
+    this.eventTarget = target;
+    this.eventSource = target;
+    for (const message of this.messageQueue) {
+      this.eventTarget.postMessage(message, "*");
+    }
+    this.messageQueue = [];
+  }
+
+  /**
    * Begin listening for messages from the event source.
    *
    * Registers a message event listener on the window. Must be called before
@@ -124,7 +176,11 @@ export class PostMessageTransport implements Transport {
    */
   async send(message: JSONRPCMessage, options?: TransportSendOptions) {
     console.debug("Sending message", message);
-    this.eventTarget.postMessage(message, "*");
+    if (this.eventTarget) {
+      this.eventTarget.postMessage(message, "*");
+    } else {
+      this.messageQueue.push(message);
+    }
   }
 
   /**
@@ -134,6 +190,7 @@ export class PostMessageTransport implements Transport {
    */
   async close() {
     window.removeEventListener("message", this.messageListener);
+    this.messageQueue = [];
     this.onclose?.();
   }
 
