@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "dev": "bun run worker.js"
+  }
+}

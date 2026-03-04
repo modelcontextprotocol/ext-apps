@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
+  "name": "basic-server-vanillajs-without-libs",
+  "compatibility_date": "2026-02-24",
+  "main": "worker.js"
+}
