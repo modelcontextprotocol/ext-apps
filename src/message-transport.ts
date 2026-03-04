@@ -21,6 +21,10 @@ import {
  * `event.source`. For views, pass `window.parent`. For hosts, pass
  * `iframe.contentWindow` to validate the iframe source.
  *
+ * When using the deferred-target pattern (no `eventSource` at construction),
+ * messages from any source are accepted until `setTarget()` is called. Keep
+ * this window as short as possible.
+ *
  * ## Usage
  *
  * **View**:
@@ -96,13 +100,7 @@ export class PostMessageTransport implements Transport {
    * );
    * ```
    *
-   * @example Host with deferred target (fixes race condition)
-   * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_host_deferred"
-   * const transport = new PostMessageTransport();
-   * await bridge.connect(transport);
-   * // ... set iframe.srcdoc, then:
-   * // iframe.onload = () => transport.setTarget(iframe.contentWindow!);
-   * ```
+   * For the deferred-target pattern, see the class-level documentation above.
    */
   constructor(eventTarget?: Window, eventSource?: MessageEventSource) {
     this.eventTarget = eventTarget;

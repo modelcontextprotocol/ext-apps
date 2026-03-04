@@ -76,17 +76,3 @@ async function PostMessageTransport_host_deferred(bridge: AppBridge) {
   };
   //#endregion PostMessageTransport_host_deferred
 }
-
-/**
- * Example: Creating deferred transport for host (constructor only).
- */
-async function PostMessageTransport_constructor_host_deferred(
-  bridge: AppBridge,
-) {
-  //#region PostMessageTransport_constructor_host_deferred
-  const transport = new PostMessageTransport();
-  await bridge.connect(transport);
-  // ... set iframe.srcdoc, then:
-  // iframe.onload = () => transport.setTarget(iframe.contentWindow!);
-  //#endregion PostMessageTransport_constructor_host_deferred
-}

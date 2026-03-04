@@ -17,12 +17,7 @@ function setupMockWindow() {
         listeners.push(handler as (event: MessageEvent) => void);
       },
     ),
-    removeEventListener: mock(
-      (_type: string, handler: EventListenerOrEventListenerObject) => {
-        const idx = listeners.indexOf(handler as (event: MessageEvent) => void);
-        if (idx !== -1) listeners.splice(idx, 1);
-      },
-    ),
+    removeEventListener: mock((_type: string) => {}),
     dispatch: (event: MessageEvent) => {
       for (const handler of listeners) handler(event);
     },
@@ -32,9 +27,7 @@ function setupMockWindow() {
 }
 
 function makeIframeWindow(postMessageFn: ReturnType<typeof mock>) {
-  return {
-    postMessage: postMessageFn,
-  } as unknown as Window;
+  return { postMessage: postMessageFn } as unknown as Window;
 }
 
 describe("PostMessageTransport", () => {
@@ -42,149 +35,104 @@ describe("PostMessageTransport", () => {
     setupMockWindow();
   });
 
-  describe("backward compatibility — target provided at construction", () => {
-    it("sends messages immediately when target is set upfront", async () => {
-      const postMessage = mock(() => {});
-      const iframeWindow = makeIframeWindow(postMessage);
-      const transport = new PostMessageTransport(iframeWindow, iframeWindow);
+  it("sends immediately when target is provided at construction (backward compat)", async () => {
+    const postMessage = mock(() => {});
+    const iframeWindow = makeIframeWindow(postMessage);
+    const transport = new PostMessageTransport(iframeWindow, iframeWindow);
 
-      await transport.start();
-      await transport.send(makeMessage(1));
+    await transport.start();
+    await transport.send(makeMessage(1));
 
-      expect(postMessage).toHaveBeenCalledTimes(1);
-      expect(postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 1 }),
-        "*",
-      );
-    });
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      "*",
+    );
   });
 
-  describe("deferred target — setTarget()", () => {
-    it("queues outgoing messages before setTarget() is called", async () => {
-      const postMessage = mock(() => {});
-      const transport = new PostMessageTransport();
+  it("queues messages before setTarget(), flushes in order on setTarget()", async () => {
+    const postMessage = mock(() => {});
+    const transport = new PostMessageTransport();
 
-      await transport.start();
-      await transport.send(makeMessage(1));
-      await transport.send(makeMessage(2));
+    await transport.start();
+    await transport.send(makeMessage(1));
+    await transport.send(makeMessage(2));
 
-      // No target yet — nothing should have been sent
-      expect(postMessage).not.toHaveBeenCalled();
-    });
+    expect(postMessage).not.toHaveBeenCalled();
 
-    it("flushes queued messages on setTarget()", async () => {
-      const postMessage = mock(() => {});
-      const iframeWindow = makeIframeWindow(postMessage);
-      const transport = new PostMessageTransport();
+    transport.setTarget(makeIframeWindow(postMessage));
 
-      await transport.start();
-      await transport.send(makeMessage(1));
-      await transport.send(makeMessage(2));
-
-      transport.setTarget(iframeWindow);
-
-      expect(postMessage).toHaveBeenCalledTimes(2);
-      expect(postMessage).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({ id: 1 }),
-        "*",
-      );
-      expect(postMessage).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({ id: 2 }),
-        "*",
-      );
-    });
-
-    it("sends subsequent messages directly after setTarget()", async () => {
-      const postMessage = mock(() => {});
-      const iframeWindow = makeIframeWindow(postMessage);
-      const transport = new PostMessageTransport();
-
-      await transport.start();
-      transport.setTarget(iframeWindow);
-      await transport.send(makeMessage(3));
-
-      expect(postMessage).toHaveBeenCalledTimes(1);
-      expect(postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 3 }),
-        "*",
-      );
-    });
+    expect(postMessage).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ id: 1 }),
+      "*",
+    );
+    expect(postMessage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ id: 2 }),
+      "*",
+    );
   });
 
-  describe("incoming message handling", () => {
-    it("calls onmessage for valid JSON-RPC messages", async () => {
-      const mockWindowCtx = setupMockWindow();
-      const transport = new PostMessageTransport();
-      const received: JSONRPCMessage[] = [];
-      transport.onmessage = (msg) => received.push(msg);
+  it("routes subsequent messages to new target when setTarget() is called again", async () => {
+    const postMessage1 = mock(() => {});
+    const postMessage2 = mock(() => {});
+    const transport = new PostMessageTransport();
 
-      await transport.start();
+    await transport.start();
+    transport.setTarget(makeIframeWindow(postMessage1));
+    await transport.send(makeMessage(1));
 
-      const validMessage: JSONRPCMessage = {
-        jsonrpc: "2.0",
-        id: 42,
-        method: "ui/initialize",
-        params: {},
-      };
-      mockWindowCtx.dispatch(
-        new MessageEvent("message", { data: validMessage }),
-      );
+    transport.setTarget(makeIframeWindow(postMessage2));
+    await transport.send(makeMessage(2));
 
-      expect(received).toHaveLength(1);
-      expect(received[0]).toMatchObject({ id: 42 });
-    });
-
-    it("ignores messages from unexpected sources when eventSource is set", async () => {
-      const mockWindowCtx = setupMockWindow();
-      const iframeWindow = makeIframeWindow(mock(() => {}));
-      const transport = new PostMessageTransport(iframeWindow, iframeWindow);
-      const received: JSONRPCMessage[] = [];
-      transport.onmessage = (msg) => received.push(msg);
-
-      await transport.start();
-
-      const validMessage: JSONRPCMessage = {
-        jsonrpc: "2.0",
-        id: 10,
-        method: "ui/initialize",
-        params: {},
-      };
-      // source defaults to null — does NOT match iframeWindow
-      mockWindowCtx.dispatch(
-        new MessageEvent("message", { data: validMessage }),
-      );
-
-      expect(received).toHaveLength(0);
-    });
+    expect(postMessage1).toHaveBeenCalledTimes(1);
+    expect(postMessage2).toHaveBeenCalledTimes(1);
   });
 
-  describe("close()", () => {
-    it("clears the message queue on close", async () => {
-      const postMessage = mock(() => {});
-      const iframeWindow = makeIframeWindow(postMessage);
-      const transport = new PostMessageTransport();
+  it("forwards valid messages to onmessage and ignores unknown sources", async () => {
+    const mockWindowCtx = setupMockWindow();
+    const iframeWindow = makeIframeWindow(mock(() => {}));
+    const received: JSONRPCMessage[] = [];
 
-      await transport.start();
-      await transport.send(makeMessage(1));
-      await transport.close();
+    // With a known source: only messages from that source pass through
+    const filtered = new PostMessageTransport(iframeWindow, iframeWindow);
+    filtered.onmessage = (msg) => received.push(msg);
+    await filtered.start();
 
-      transport.setTarget(iframeWindow);
+    mockWindowCtx.dispatch(
+      new MessageEvent("message", {
+        data: { jsonrpc: "2.0", id: 1, method: "ui/initialize", params: {} },
+      }),
+    );
+    expect(received).toHaveLength(0); // source=null, not iframeWindow
 
-      // Queue was cleared on close — nothing should be sent
-      expect(postMessage).not.toHaveBeenCalled();
-    });
+    // Without a known source (deferred): all sources pass through
+    const open = new PostMessageTransport();
+    open.onmessage = (msg) => received.push(msg);
+    await open.start();
 
-    it("calls onclose callback", async () => {
-      const onclose = mock(() => {});
-      const transport = new PostMessageTransport();
-      transport.onclose = onclose;
+    mockWindowCtx.dispatch(
+      new MessageEvent("message", {
+        data: { jsonrpc: "2.0", id: 2, method: "ui/initialize", params: {} },
+      }),
+    );
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({ id: 2 });
+  });
 
-      await transport.start();
-      await transport.close();
+  it("clears the message queue and fires onclose on close()", async () => {
+    const postMessage = mock(() => {});
+    const onclose = mock(() => {});
+    const transport = new PostMessageTransport();
+    transport.onclose = onclose;
 
-      expect(onclose).toHaveBeenCalledTimes(1);
-    });
+    await transport.start();
+    await transport.send(makeMessage(1));
+    await transport.close();
+
+    transport.setTarget(makeIframeWindow(postMessage));
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(onclose).toHaveBeenCalledTimes(1);
   });
 });
