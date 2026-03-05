@@ -64,7 +64,6 @@ export type McpUiStyleVariableKey =
   | "--color-text-success"
   | "--color-text-warning"
   | "--color-text-disabled"
-  | "--color-text-ghost"
   // Border colors
   | "--color-border-primary"
   | "--color-border-secondary"

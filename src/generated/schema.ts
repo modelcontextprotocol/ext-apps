@@ -51,7 +51,6 @@ export const McpUiStyleVariableKeySchema = z
     z.literal("--color-text-success"),
     z.literal("--color-text-warning"),
     z.literal("--color-text-disabled"),
-    z.literal("--color-text-ghost"),
     z.literal("--color-border-primary"),
     z.literal("--color-border-secondary"),
     z.literal("--color-border-tertiary"),
