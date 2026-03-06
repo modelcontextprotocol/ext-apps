@@ -39,7 +39,10 @@ npm test
 # Check JSDoc comment syntax and `{@link}` references
 npm exec typedoc -- --treatValidationWarningsAsErrors --emit none
 
-# Regenerate package-lock.json (especially on setups w/ custom npm registry)
+# Regenerate package-lock.json
+# Note: repo .npmrc pins registry to npmjs.org, so a plain `npm i` is safe even
+# if your global npm config points elsewhere. The Docker step below is optional
+# — it locks linux-amd64 optionalDependencies (sharp, rollup, bun) for CI.
 rm -fR  package-lock.json node_modules && \
   docker run  --rm -it --platform linux/amd64 -v $PWD:/src:rw -w /src node:latest npm i && \
   rm -fR node_modules && \
