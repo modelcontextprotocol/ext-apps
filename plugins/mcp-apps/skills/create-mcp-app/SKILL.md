@@ -312,6 +312,21 @@ See `examples/shadertoy-server/` for complete implementation.
 6. **No text fallback** - Always provide `content` array for non-UI hosts
 7. **Hardcoded styles** - Use host CSS variables for theme integration
 8. **No streaming for large inputs** - Use `ontoolinputpartial` to show progress during generation
+9. **CSP `_meta` in wrong location** - Put `_meta.ui.csp` in the `contents` array (readCallback), NOT in the `registerResource` config. Only the contents location is read by hosts:
+   ```typescript
+   async () => ({
+     contents: [{
+       uri, mimeType, text: html,
+       _meta: { ui: { csp: { connectDomains: ["https://api.example.com"] } } }
+     }]
+   })
+   ```
+10. **Localhost in CSP blocked** - CSP validation blocks `localhost`, `127.0.0.1`, and private IPs to prevent security issues. Use a tunnel (Cloudflare, ngrok) for local development.
+11. **CORS vs CSP confusion** - CSP controls what *your app can request*. CORS controls what *external servers will accept*. If requests fail with "No Access-Control-Allow-Origin header", that's a CORS issue on the target server, not CSP. Use `ui.domain` to get a stable origin for CORS allowlists:
+    ```bash
+    # Compute your stable origin for CORS allowlist
+    node -e "console.log(require('crypto').createHash('sha256').update('https://your-server.com/mcp').digest('hex').slice(0,32)+'.claudemcpcontent.com')"
+    ```
 
 ## Testing
 
