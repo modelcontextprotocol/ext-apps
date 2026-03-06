@@ -1119,13 +1119,14 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
         scheduled = false;
         const html = document.documentElement;
 
-        // Measure actual content size by temporarily setting html to fit-content.
-        // This shrinks html to fit body (including body margins), giving us the
-        // true minimum size needed by the content.
+        // Measure actual content size by temporarily overriding html sizing.
+        // Width uses fit-content so content wraps at the host-provided width.
+        // Height uses max-content because fit-content would clamp to the viewport
+        // height when content is taller than the iframe, causing internal scrolling.
         const originalWidth = html.style.width;
         const originalHeight = html.style.height;
         html.style.width = "fit-content";
-        html.style.height = "fit-content";
+        html.style.height = "max-content";
         const rect = html.getBoundingClientRect();
         html.style.width = originalWidth;
         html.style.height = originalHeight;
