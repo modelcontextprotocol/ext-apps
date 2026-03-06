@@ -123,7 +123,7 @@ async function discoverVideos() {
   }
 
   try {
-    const resourceList = await app.listServerResources({});
+    const resourceList = await app.listServerResources();
 
     const videoResources = resourceList.resources.filter((r) =>
       r.uri.startsWith("videos://"),

@@ -335,7 +335,7 @@ async function App_listServerResources_buildPicker(
 ) {
   //#region App_listServerResources_buildPicker
   try {
-    const result = await app.listServerResources({});
+    const result = await app.listServerResources();
     const videoResources = result.resources.filter((r) =>
       r.mimeType?.startsWith("video/"),
     );

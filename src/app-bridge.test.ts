@@ -794,7 +794,7 @@ describe("App <-> AppBridge integration", () => {
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
 
-      const result = await app.listServerResources({});
+      const result = await app.listServerResources();
 
       expect(receivedRequests).toHaveLength(1);
       expect(result.resources).toEqual(resources);
@@ -826,7 +826,11 @@ describe("App <-> AppBridge integration", () => {
     it("onreadresource handles readServerResource() calls from App", async () => {
       const requestParams = { uri: "videos://bunny-1mb" };
       const contents = [
-        { uri: "videos://bunny-1mb", blob: "dmlkZW9kYXRh", mimeType: "video/mp4" },
+        {
+          uri: "videos://bunny-1mb",
+          blob: "dmlkZW9kYXRh",
+          mimeType: "video/mp4",
+        },
       ];
       const receivedRequests: unknown[] = [];
 

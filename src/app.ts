@@ -805,7 +805,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * Results may be paginated using the `cursor` parameter for servers with many resources.
    *
-   * @param params - Optional parameters (empty object `{}` for all resources, or `{ cursor }` for pagination)
+   * @param params - Optional parameters (omit for all resources, or `{ cursor }` for pagination)
    * @param options - Request options (timeout, etc.)
    * @returns List of resources with their URIs, names, descriptions, mimeTypes, and optional pagination cursor
    *
@@ -815,7 +815,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @example Discover available videos and build a picker UI
    * ```ts source="./app.examples.ts#App_listServerResources_buildPicker"
    * try {
-   *   const result = await app.listServerResources({});
+   *   const result = await app.listServerResources();
    *   const videoResources = result.resources.filter((r) =>
    *     r.mimeType?.startsWith("video/"),
    *   );
@@ -833,7 +833,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @see {@link readServerResource `readServerResource`} to read a specific resource
    */
   async listServerResources(
-    params: ListResourcesRequest["params"],
+    params?: ListResourcesRequest["params"],
     options?: RequestOptions,
   ): Promise<ListResourcesResult> {
     return await this.request(
