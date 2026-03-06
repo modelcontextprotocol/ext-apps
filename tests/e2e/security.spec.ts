@@ -290,8 +290,10 @@ test.describe("Origin Validation Infrastructure", () => {
     const outerIframe = page.locator("iframe").first();
     const outerSandbox = await outerIframe.getAttribute("sandbox");
 
-    // Outer frame should NOT have allow-same-origin (different origin from host)
-    // This ensures the sandbox cannot access host window properties
+    // Outer frame should NOT have allow-top-navigation (prevents navigating the host page).
+    // Isolation from the host comes from the separate origin (sandbox runs on port 8081
+    // vs host's 8080), not from omitting allow-same-origin — the outer frame has it
+    // (see implementation.ts:167).
     expect(outerSandbox).not.toContain("allow-top-navigation");
 
     // The app should still function despite the restrictions
@@ -313,36 +315,27 @@ test.describe("Cross-App Message Injection Protection", () => {
   test("app rejects messages from sources other than its parent", async ({
     page,
   }) => {
-    // Capture any "unknown source" rejection logs
-    const rejectionLogs: string[] = [];
-    page.on("console", (msg) => {
-      const text = msg.text();
-      if (
-        text.includes("unknown source") ||
-        text.includes("Ignoring message")
-      ) {
-        rejectionLogs.push(text);
-      }
-    });
+    // Capture rejection logs from message-transport.ts (console.debug)
+    const rejectionLogs = captureConsoleLogs(
+      page,
+      /Ignoring message from unknown source/,
+    );
 
     await loadServer(page, "Integration Test Server");
+    await expect(getAppFrame(page).locator("body")).toBeVisible();
 
-    const appFrame = getAppFrame(page);
-    await expect(appFrame.locator("body")).toBeVisible();
-
-    // Try to inject a message from the page context (simulating cross-app attack)
-    // This simulates what would happen if another app tried to postMessage to this app
-    await page.evaluate(() => {
-      // Get reference to the inner app iframe
-      const outerIframe = document.querySelector("iframe");
-      if (!outerIframe?.contentWindow) return;
-
-      const innerIframe = outerIframe.contentDocument?.querySelector("iframe");
-      if (!innerIframe?.contentWindow) return;
-
-      // Try to send a fake JSON-RPC message (simulating malicious app)
-      // This should be rejected because event.source won't match window.parent
-      innerIframe.contentWindow.postMessage(
+    // window.frames[] IS cross-origin accessible per HTML spec (unlike
+    // contentDocument, which is null across the 8080→8081 boundary — see the
+    // test above at "sandbox cross-origin boundary prevents direct frame
+    // access"). This is the real attack path from the threat model comment: a
+    // malicious sibling app can reach
+    //   window.parent.parent.frames[victimIdx].frames[0].postMessage(...)
+    // and the message WILL be delivered. PostMessageTransport's event.source
+    // check is the only defense.
+    const injected = await page.evaluate(() => {
+      const victim = (window.frames[0] as Window | undefined)?.frames?.[0];
+      if (!victim) return "UNREACHABLE";
+      victim.postMessage(
         {
           jsonrpc: "2.0",
           result: { content: [{ type: "text", text: "Injected!" }] },
@@ -350,23 +343,19 @@ test.describe("Cross-App Message Injection Protection", () => {
         },
         "*",
       );
+      return "POSTED";
     });
 
-    // Wait for message to be processed
-    await page.waitForTimeout(500);
+    // Sentinel — if frames[] traversal ever breaks (e.g. frame hierarchy
+    // changes), the test FAILS here instead of passing vacuously. The previous
+    // version of this test used contentDocument?.querySelector() which
+    // silently short-circuited to undefined and never posted anything.
+    expect(injected).toBe("POSTED");
 
-    // The injected message should have been rejected
-    // (it won't cause visible harm even if not logged, but ideally we see rejection)
-    // The app should still be functional (not corrupted by the injection)
-    await expect(appFrame.locator("body")).toBeVisible();
-
-    // Verify legitimate communication still works after attempted injection
-    const sendMessageBtn = appFrame.locator('button:has-text("Send Message")');
-    if (await sendMessageBtn.isVisible()) {
-      await sendMessageBtn.click();
-      await page.waitForTimeout(300);
-      // If we get here without errors, the app wasn't corrupted
-    }
+    // Assert PostMessageTransport rejected it (event.source !== window.parent)
+    await expect
+      .poll(() => rejectionLogs.length, { timeout: 2000 })
+      .toBeGreaterThan(0);
   });
 
   test("PostMessageTransport is configured with source validation", async ({
