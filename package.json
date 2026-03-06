@@ -44,7 +44,6 @@
     "examples/*"
   ],
   "scripts": {
-    "postinstall": "node scripts/setup-bun.mjs || echo 'setup-bun.mjs failed or not available'",
     "start": "npm run examples:dev",
     "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
     "sync:snippets": "bun scripts/sync-snippets.ts",
@@ -62,7 +61,7 @@
     "examples:start": "NODE_ENV=development npm run build && bun examples/run-all.ts start",
     "examples:dev": "NODE_ENV=development bun examples/run-all.ts dev",
     "watch": "nodemon --watch src --ext ts,tsx --exec 'bun build.bun.ts'",
-    "prepare": "node scripts/setup-bun.mjs && npm run build && husky",
+    "prepare": "npm run build && husky",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
     "generate:screenshots": "npm run build:all && docker run --rm -e EXAMPLE -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'apt-get update -qq && apt-get install -qq -y python3-venv curl > /dev/null && curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.local/bin:$PATH\" && npm i -g bun && npm ci && npx playwright test tests/e2e/generate-grid-screenshots.spec.ts'",
@@ -101,6 +100,7 @@
     "typedoc": "^0.28.14",
     "typedoc-github-theme": "^0.4.0",
     "typescript": "^5.9.3",
+    "bun": "^1.2.21",
     "zod": "^4.1.13"
   },
   "peerDependencies": {
@@ -116,25 +116,6 @@
     "react-dom": {
       "optional": true
     }
-  },
-  "optionalDependencies": {
-    "@oven/bun-darwin-aarch64": "^1.2.21",
-    "@oven/bun-darwin-x64": "^1.2.21",
-    "@oven/bun-darwin-x64-baseline": "^1.2.21",
-    "@oven/bun-linux-aarch64": "^1.2.21",
-    "@oven/bun-linux-aarch64-musl": "^1.2.21",
-    "@oven/bun-linux-x64": "^1.2.21",
-    "@oven/bun-linux-x64-baseline": "^1.2.21",
-    "@oven/bun-linux-x64-musl": "^1.2.21",
-    "@oven/bun-linux-x64-musl-baseline": "^1.2.21",
-    "@oven/bun-windows-x64": "^1.2.21",
-    "@oven/bun-windows-x64-baseline": "^1.2.21",
-    "@rollup/rollup-darwin-arm64": "^4.53.3",
-    "@rollup/rollup-darwin-x64": "^4.53.3",
-    "@rollup/rollup-linux-arm64-gnu": "^4.53.3",
-    "@rollup/rollup-linux-x64-gnu": "^4.53.3",
-    "@rollup/rollup-win32-arm64-msvc": "^4.53.3",
-    "@rollup/rollup-win32-x64-msvc": "^4.53.3"
   },
   "overrides": {
     "seroval": "1.4.1",
