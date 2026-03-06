@@ -11,10 +11,16 @@ import {
   CallToolResultSchema,
   EmptyResultSchema,
   Implementation,
+  ListResourcesRequest,
+  ListResourcesResult,
+  ListResourcesResultSchema,
   ListToolsRequest,
   ListToolsRequestSchema,
   LoggingMessageNotification,
   PingRequestSchema,
+  ReadResourceRequest,
+  ReadResourceResult,
+  ReadResourceResultSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { AppNotification, AppRequest, AppResult } from "./types";
 import { PostMessageTransport } from "./message-transport";
@@ -735,6 +741,104 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     return await this.request(
       { method: "tools/call", params },
       CallToolResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * Read a resource from the originating MCP server (proxied through the host).
+   *
+   * Apps can read resources to access files, data, or other content provided by
+   * the MCP server. Resources are identified by URI (e.g., `file:///path/to/file`
+   * or custom schemes like `videos://bunny-1mb`). The host proxies the request to
+   * the actual MCP server and returns the resource content.
+   *
+   * @param params - Resource URI to read
+   * @param options - Request options (timeout, etc.)
+   * @returns Resource content with URI, name, description, mimeType, and contents array
+   *
+   * @throws {Error} If the resource does not exist on the server
+   * @throws {Error} If the request times out or the connection is lost
+   * @throws {Error} If the host rejects the request
+   *
+   * @example Read a video resource and play it
+   * ```ts source="./app.examples.ts#App_readServerResource_playVideo"
+   * try {
+   *   const result = await app.readServerResource({
+   *     uri: "videos://bunny-1mb",
+   *   });
+   *   const content = result.contents[0];
+   *   if (content && "blob" in content) {
+   *     const binary = Uint8Array.from(atob(content.blob), (c) =>
+   *       c.charCodeAt(0),
+   *     );
+   *     const url = URL.createObjectURL(
+   *       new Blob([binary], { type: content.mimeType || "video/mp4" }),
+   *     );
+   *     videoElement.src = url;
+   *     videoElement.play();
+   *   }
+   * } catch (error) {
+   *   console.error("Failed to read resource:", error);
+   * }
+   * ```
+   *
+   * @see {@link listServerResources `listServerResources`} to discover available resources
+   */
+  async readServerResource(
+    params: ReadResourceRequest["params"],
+    options?: RequestOptions,
+  ): Promise<ReadResourceResult> {
+    return await this.request(
+      { method: "resources/read", params },
+      ReadResourceResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * List available resources from the originating MCP server (proxied through the host).
+   *
+   * Apps can list resources to discover what content is available on the MCP server.
+   * This enables dynamic resource discovery and building resource browsers or pickers.
+   * The host proxies the request to the actual MCP server and returns the resource list.
+   *
+   * Results may be paginated using the `cursor` parameter for servers with many resources.
+   *
+   * @param params - Optional parameters (omit for all resources, or `{ cursor }` for pagination)
+   * @param options - Request options (timeout, etc.)
+   * @returns List of resources with their URIs, names, descriptions, mimeTypes, and optional pagination cursor
+   *
+   * @throws {Error} If the request times out or the connection is lost
+   * @throws {Error} If the host rejects the request
+   *
+   * @example Discover available videos and build a picker UI
+   * ```ts source="./app.examples.ts#App_listServerResources_buildPicker"
+   * try {
+   *   const result = await app.listServerResources();
+   *   const videoResources = result.resources.filter((r) =>
+   *     r.mimeType?.startsWith("video/"),
+   *   );
+   *   videoResources.forEach((resource) => {
+   *     const option = document.createElement("option");
+   *     option.value = resource.uri;
+   *     option.textContent = resource.description || resource.name;
+   *     selectElement.appendChild(option);
+   *   });
+   * } catch (error) {
+   *   console.error("Failed to list resources:", error);
+   * }
+   * ```
+   *
+   * @see {@link readServerResource `readServerResource`} to read a specific resource
+   */
+  async listServerResources(
+    params?: ListResourcesRequest["params"],
+    options?: RequestOptions,
+  ): Promise<ListResourcesResult> {
+    return await this.request(
+      { method: "resources/list", params },
+      ListResourcesResultSchema,
       options,
     );
   }

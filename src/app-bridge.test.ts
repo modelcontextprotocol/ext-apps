@@ -779,6 +779,27 @@ describe("App <-> AppBridge integration", () => {
       expect(result.resources).toEqual(resources);
     });
 
+    it("onlistresources handles listServerResources() calls from App", async () => {
+      const resources = [
+        { uri: "test://res-1", name: "Resource 1" },
+        { uri: "test://res-2", name: "Resource 2", mimeType: "video/mp4" },
+      ];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onlistresources = async (params) => {
+        receivedRequests.push(params);
+        return { resources };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.listServerResources();
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(result.resources).toEqual(resources);
+    });
+
     it("onreadresource setter registers handler for resources/read requests", async () => {
       const requestParams = { uri: "test://resource" };
       const contents = [{ uri: "test://resource", text: "content" }];
@@ -796,6 +817,32 @@ describe("App <-> AppBridge integration", () => {
         { method: "resources/read", params: requestParams },
         ReadResourceResultSchema,
       );
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(receivedRequests[0]).toMatchObject(requestParams);
+      expect(result.contents).toEqual(contents);
+    });
+
+    it("onreadresource handles readServerResource() calls from App", async () => {
+      const requestParams = { uri: "videos://bunny-1mb" };
+      const contents = [
+        {
+          uri: "videos://bunny-1mb",
+          blob: "dmlkZW9kYXRh",
+          mimeType: "video/mp4",
+        },
+      ];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onreadresource = async (params) => {
+        receivedRequests.push(params);
+        return { contents };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.readServerResource(requestParams);
 
       expect(receivedRequests).toHaveLength(1);
       expect(receivedRequests[0]).toMatchObject(requestParams);

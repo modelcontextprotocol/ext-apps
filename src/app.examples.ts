@@ -298,6 +298,60 @@ async function App_callServerTool_fetchWeather(app: App) {
 }
 
 /**
+ * Example: Read a video resource and play it.
+ */
+async function App_readServerResource_playVideo(
+  app: App,
+  videoElement: HTMLVideoElement,
+) {
+  //#region App_readServerResource_playVideo
+  try {
+    const result = await app.readServerResource({
+      uri: "videos://bunny-1mb",
+    });
+    const content = result.contents[0];
+    if (content && "blob" in content) {
+      const binary = Uint8Array.from(atob(content.blob), (c) =>
+        c.charCodeAt(0),
+      );
+      const url = URL.createObjectURL(
+        new Blob([binary], { type: content.mimeType || "video/mp4" }),
+      );
+      videoElement.src = url;
+      videoElement.play();
+    }
+  } catch (error) {
+    console.error("Failed to read resource:", error);
+  }
+  //#endregion App_readServerResource_playVideo
+}
+
+/**
+ * Example: Discover available videos and build a picker UI.
+ */
+async function App_listServerResources_buildPicker(
+  app: App,
+  selectElement: HTMLSelectElement,
+) {
+  //#region App_listServerResources_buildPicker
+  try {
+    const result = await app.listServerResources();
+    const videoResources = result.resources.filter((r) =>
+      r.mimeType?.startsWith("video/"),
+    );
+    videoResources.forEach((resource) => {
+      const option = document.createElement("option");
+      option.value = resource.uri;
+      option.textContent = resource.description || resource.name;
+      selectElement.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Failed to list resources:", error);
+  }
+  //#endregion App_listServerResources_buildPicker
+}
+
+/**
  * Example: Send a text message from user interaction.
  */
 async function App_sendMessage_textFromInteraction(app: App) {
