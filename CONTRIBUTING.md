@@ -277,9 +277,9 @@ cd ext-apps
 npm install
 ```
 
-Then configure your MCP client to build and run the local server. Replace `~/code/ext-apps` with your actual clone path.
+Then configure your MCP client to build and run the local server. Replace `~/src/ext-apps` with your actual clone path.
 
-Most example servers have a `start:stdio` script that builds and launches in stdio mode. Use `npm --silent run start:stdio` for these:
+Most example servers have a `start:stdio` script that builds and launches in stdio mode:
 
 <details>
 <summary>MCP client configuration for local development (all examples)</summary>
@@ -288,207 +288,150 @@ Most example servers have a `start:stdio` script that builds and launches in std
 {
   "mcpServers": {
     "basic-react": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/basic-server-react",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/basic-server-react && npm --silent run start:stdio"
       ]
     },
     "basic-vanillajs": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/basic-server-vanillajs",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/basic-server-vanillajs && npm --silent run start:stdio"
       ]
     },
     "basic-vue": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/basic-server-vue",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/basic-server-vue && npm --silent run start:stdio"
       ]
     },
     "basic-svelte": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/basic-server-svelte",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/basic-server-svelte && npm --silent run start:stdio"
       ]
     },
     "basic-preact": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/basic-server-preact",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/basic-server-preact && npm --silent run start:stdio"
       ]
     },
     "basic-solid": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/basic-server-solid",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/basic-server-solid && npm --silent run start:stdio"
       ]
     },
     "budget-allocator": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/budget-allocator-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/budget-allocator-server && npm --silent run start:stdio"
       ]
     },
     "cohort-heatmap": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/cohort-heatmap-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/cohort-heatmap-server && npm --silent run start:stdio"
       ]
     },
     "customer-segmentation": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/customer-segmentation-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/customer-segmentation-server && npm --silent run start:stdio"
       ]
     },
     "map": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/map-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/map-server && npm --silent run start:stdio"
       ]
     },
     "pdf": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/pdf-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/pdf-server && npm --silent run start:stdio"
       ]
     },
     "scenario-modeler": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/scenario-modeler-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/scenario-modeler-server && npm --silent run start:stdio"
       ]
     },
     "shadertoy": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/shadertoy-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/shadertoy-server && npm --silent run start:stdio"
       ]
     },
     "sheet-music": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/sheet-music-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/sheet-music-server && npm --silent run start:stdio"
       ]
     },
     "system-monitor": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/system-monitor-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/system-monitor-server && npm --silent run start:stdio"
       ]
     },
     "threejs": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/threejs-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/threejs-server && npm --silent run start:stdio"
       ]
     },
     "transcript": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/transcript-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/transcript-server && npm --silent run start:stdio"
       ]
     },
     "video-resource": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/video-resource-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/video-resource-server && npm --silent run start:stdio"
       ]
     },
     "wiki-explorer": {
-      "command": "npm",
+      "command": "bash",
       "args": [
-        "--silent",
-        "--prefix",
-        "~/code/ext-apps/examples/wiki-explorer-server",
-        "run",
-        "start:stdio"
+        "-c",
+        "cd ~/src/ext-apps/examples/wiki-explorer-server && npm --silent run start:stdio"
       ]
     },
     "qr": {
       "command": "bash",
       "args": [
         "-c",
-        "uv run ~/code/ext-apps/examples/qr-server/server.py --stdio"
+        "uv run ~/src/ext-apps/examples/qr-server/server.py --stdio"
       ]
     },
     "say": {
       "command": "bash",
       "args": [
         "-c",
-        "uv run --index https://pypi.org/simple ~/code/ext-apps/examples/say-server/server.py --stdio"
+        "uv run --index https://pypi.org/simple ~/src/ext-apps/examples/say-server/server.py --stdio"
       ]
     }
   }
