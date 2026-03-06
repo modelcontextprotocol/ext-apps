@@ -12,7 +12,7 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && cross-env INPUT=mcp-app.html vite build",
-    "start": "concurrently \"cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch\" \"tsx watch main.ts\""
+    "start": "concurrently --raw \"cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch\" \"tsx watch main.ts\""
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.0.0",

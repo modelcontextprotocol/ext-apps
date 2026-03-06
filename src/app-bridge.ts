@@ -138,7 +138,7 @@ export function getToolUiResourceUri(tool: Partial<Tool>): string | undefined {
  */
 export function isToolVisibilityModelOnly(tool: Partial<Tool>): boolean {
   const uiMeta = tool._meta?.ui as McpUiToolMeta | undefined;
-  const visibility = uiMeta?.visibility as Array<"model" | "app"> | undefined;
+  const visibility = uiMeta?.visibility;
   if (!visibility) return false;
   if (visibility.length === 1 && visibility[0] === "model") return true;
   return false;
@@ -152,7 +152,7 @@ export function isToolVisibilityModelOnly(tool: Partial<Tool>): boolean {
  */
 export function isToolVisibilityAppOnly(tool: Partial<Tool>): boolean {
   const uiMeta = tool._meta?.ui as McpUiToolMeta | undefined;
-  const visibility = uiMeta?.visibility as Array<"model" | "app"> | undefined;
+  const visibility = uiMeta?.visibility;
   if (!visibility) return false;
   if (visibility.length === 1 && visibility[0] === "app") return true;
   return false;

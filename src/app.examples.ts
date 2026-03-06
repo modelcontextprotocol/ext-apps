@@ -12,16 +12,46 @@ import type {
   McpServer,
   ToolCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { App, PostMessageTransport, RESOURCE_URI_META_KEY } from "./app.js";
+import {
+  App,
+  PostMessageTransport,
+  RESOURCE_URI_META_KEY,
+  McpUiToolMeta,
+} from "./app.js";
+import { registerAppTool } from "./server/index.js";
 
 /**
- * Example: How MCP servers use RESOURCE_URI_META_KEY (server-side, not in Apps).
+ * Example: Modern format for registering tools with UI (recommended).
  */
-function RESOURCE_URI_META_KEY_serverSide(
+function RESOURCE_URI_META_KEY_modernFormat(
   server: McpServer,
   handler: ToolCallback,
 ) {
-  //#region RESOURCE_URI_META_KEY_serverSide
+  //#region RESOURCE_URI_META_KEY_modernFormat
+  // Preferred: Use registerAppTool with nested ui.resourceUri
+  registerAppTool(
+    server,
+    "weather",
+    {
+      description: "Get weather forecast",
+      _meta: {
+        ui: { resourceUri: "ui://weather/forecast" },
+      },
+    },
+    handler,
+  );
+  //#endregion RESOURCE_URI_META_KEY_modernFormat
+}
+
+/**
+ * Example: Legacy format using RESOURCE_URI_META_KEY (deprecated).
+ */
+function RESOURCE_URI_META_KEY_legacyFormat(
+  server: McpServer,
+  handler: ToolCallback,
+) {
+  //#region RESOURCE_URI_META_KEY_legacyFormat
+  // Deprecated: Direct use of RESOURCE_URI_META_KEY
   server.registerTool(
     "weather",
     {
@@ -32,16 +62,19 @@ function RESOURCE_URI_META_KEY_serverSide(
     },
     handler,
   );
-  //#endregion RESOURCE_URI_META_KEY_serverSide
+  //#endregion RESOURCE_URI_META_KEY_legacyFormat
 }
 
 /**
- * Example: How hosts check for RESOURCE_URI_META_KEY metadata (host-side).
+ * Example: How hosts check for RESOURCE_URI_META_KEY metadata (must support both formats).
  */
 function RESOURCE_URI_META_KEY_hostSide(tool: Tool) {
   //#region RESOURCE_URI_META_KEY_hostSide
-  // Check tool definition metadata (from tools/list response):
-  const uiUri = tool._meta?.[RESOURCE_URI_META_KEY];
+  // Hosts should check both modern and legacy formats
+  const meta = tool._meta;
+  const uiMeta = meta?.ui as McpUiToolMeta | undefined;
+  const legacyUri = meta?.[RESOURCE_URI_META_KEY] as string | undefined;
+  const uiUri = uiMeta?.resourceUri ?? legacyUri;
   if (typeof uiUri === "string" && uiUri.startsWith("ui://")) {
     // Fetch the resource and display the UI
   }
