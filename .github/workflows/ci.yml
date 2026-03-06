@@ -24,7 +24,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
       - run: npm ci
 
@@ -71,11 +72,16 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - run: npm run build
+
+      - name: Validate TypeDoc links
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: npm exec typedoc -- --treatValidationWarningsAsErrors --emit none
 
       - run: npm run examples:build
 
@@ -111,7 +117,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
       - uses: astral-sh/setup-uv@v7
 
@@ -147,13 +154,13 @@ jobs:
         shell: wsl-bash {0}
         run: |
           sudo apt-get update
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
           sudo apt-get install -y nodejs
 
       - name: Build and test in WSL
         shell: wsl-bash {0}
         run: |
-          npm install
+          npm ci
           npm run build
           npm run examples:build
           npm test
@@ -182,7 +189,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Create test project and install from git
         shell: bash
