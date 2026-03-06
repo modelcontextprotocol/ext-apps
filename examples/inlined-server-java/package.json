@@ -1,0 +1,11 @@
+{
+  "name": "@modelcontextprotocol/server-inlined-java",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP App server in Java with inlined HTML UI (no frontend build step)",
+  "scripts": {
+    "build": "mvn -B package -DskipTests -q",
+    "start": "mvn -B package -DskipTests -q && java -jar target/inlined-server-java-1.0.0.jar",
+    "dev": "mvn -B package -DskipTests -q && java -jar target/inlined-server-java-1.0.0.jar"
+  }
+}

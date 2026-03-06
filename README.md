@@ -171,9 +171,17 @@ directory contains demo apps showcasing real-world use cases.
 | | |
 |:---:|:---|
 | [![Basic](examples/basic-server-react/grid-cell.png "Starter template")](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react) | The same app built with different frameworks — pick your favorite!<br><br>[React](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react) · [Vue](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vue) · [Svelte](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-svelte) · [Preact](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-preact) · [Solid](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-solid) · [Vanilla JS](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) |
+| [![Basic](examples/basic-server-react/grid-cell.png "Inlined Java")](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/inlined-server-java) | [**Inlined Java**](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/inlined-server-java) — MCP App server in Java with the UI inlined as an HTML string (no frontend build step). Loads the SDK from CDN. |
 <!-- prettier-ignore-end -->
 
 ### Running the Examples
+
+#### Prerequisites
+
+Most examples require only Node.js 18+. A few have additional requirements:
+
+- **Python examples** (`qr-server`, `say-server`): [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- **Java example** (`inlined-server-java`): Java 17+ and Maven 3.6+
 
 #### With basic-host
 
@@ -208,8 +216,9 @@ use this pattern:
 ```
 
 For example, to add the map server: `@modelcontextprotocol/server-map`. The
-Python examples (`qr-server`, `say-server`) use `uv run` instead — see their
-READMEs for details.
+Python examples (`qr-server`, `say-server`) use `uv run` instead, and the Java
+example (`inlined-server-java`) requires cloning the repo — see their READMEs
+for details.
 
 #### Local Development
 
