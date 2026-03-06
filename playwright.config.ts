@@ -2,6 +2,13 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Exclude the screenshot generation spec from default runs.
+  // It writes examples/*/grid-cell.png as a side effect and is meant to be
+  // invoked only via `npm run generate:screenshots` (which sets
+  // GENERATE_SCREENSHOTS=1 to bypass this ignore).
+  testIgnore: process.env.GENERATE_SCREENSHOTS
+    ? []
+    : ["**/generate-grid-screenshots.spec.ts"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
