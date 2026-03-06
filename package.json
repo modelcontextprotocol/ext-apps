@@ -26,10 +26,6 @@
       "types": "./dist/src/react/index.d.ts",
       "default": "./dist/src/react/index.js"
     },
-    "./react-with-deps": {
-      "types": "./dist/src/react/index.d.ts",
-      "default": "./dist/src/react/react-with-deps.js"
-    },
     "./app-bridge": {
       "types": "./dist/src/app-bridge.d.ts",
       "default": "./dist/src/app-bridge.js"

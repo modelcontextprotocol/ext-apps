@@ -52,11 +52,6 @@ await Promise.all([
     outdir: "dist/src/react",
     external: ["react", "react-dom", ...PEER_EXTERNALS],
   }),
-  buildJs("src/react/index.tsx", {
-    outdir: "dist/src/react",
-    external: ["react", "react-dom", ...PEER_EXTERNALS],
-    naming: { entry: "react-with-deps.js" },
-  }),
   buildJs("src/server/index.ts", {
     outdir: "dist/src/server",
     external: PEER_EXTERNALS,
