@@ -41,6 +41,34 @@ Host calls tool → Server returns result → Host renders resource UI → UI re
 - Register tools and resources
 - Configure build system with `vite-plugin-singlefile`
 
+### Checking Host UI Support
+
+Not all hosts support MCP Apps. Use `hasUiSupport()` to conditionally register UI-enabled tools:
+
+```typescript
+import { hasUiSupport, registerAppTool } from "@modelcontextprotocol/ext-apps/server";
+
+server.oninitialized = ({ clientCapabilities }) => {
+  if (hasUiSupport(clientCapabilities)) {
+    // Register tool with UI
+    registerAppTool(server, "weather", {
+      description: "Get weather with interactive dashboard",
+      _meta: { ui: { resourceUri: "ui://weather/dashboard" } },
+    }, weatherHandler);
+  } else {
+    // Register text-only fallback for hosts without UI support
+    server.registerTool("weather", {
+      description: "Get weather as text",
+    }, textWeatherHandler);
+  }
+};
+```
+
+**Key points:**
+- Check `clientCapabilities` in `oninitialized` callback
+- `hasUiSupport()` checks both `experimental` and `extensions` fields
+- Provide text-only fallback for non-UI hosts
+
 ## Getting Reference Code
 
 Clone the SDK repository for working examples and API documentation:
@@ -312,6 +340,29 @@ See `examples/shadertoy-server/` for complete implementation.
 6. **No text fallback** - Always provide `content` array for non-UI hosts
 7. **Hardcoded styles** - Use host CSS variables for theme integration
 8. **No streaming for large inputs** - Use `ontoolinputpartial` to show progress during generation
+9. **Don't put base64 in `structuredContent`** - Model sees garbage text. Use `_meta` for binary
+10. **Don't skip text in `content`** - Model needs to know UI was rendered; describe what's shown
+
+## Data Handling: content vs structuredContent vs _meta
+
+Both `content` and `structuredContent` go to model context. `_meta` does not.
+
+- **`content`**: Text, images, audio, video (model processes if capable)
+- **`structuredContent`**: JSON for model + UI (no base64 - model sees garbage text)
+- **`_meta`**: Binary blobs, large data - UI only, never sent to model
+
+```typescript
+// ❌ structuredContent with base64 = model sees nonsense
+return { structuredContent: { pdfData: base64Pdf } };
+
+// ✅ Summary for model, binary in _meta for UI
+return {
+  content: [{ type: "text", text: "Generated invoice #1234" }],
+  _meta: { pdfData: base64Pdf }
+};
+```
+
+**Always include text in `content`** describing what widget was shown (e.g. `"This tool rendered an interactive weather widget showing current conditions, 5-day forecast, and precipitation map for San Francisco"`). Without it, the model has no idea the tool displayed a UI.
 
 ## Testing
 
