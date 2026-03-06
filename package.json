@@ -121,7 +121,6 @@
     "seroval": "1.4.1",
     "seroval-plugins": "1.4.2",
     "solid-js": "1.9.10",
-    "@hono/node-server": "1.19.7",
     "@types/node": "20.19.27"
   }
 }
