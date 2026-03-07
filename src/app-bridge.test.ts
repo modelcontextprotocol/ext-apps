@@ -16,6 +16,7 @@ import {
 import { App } from "./app";
 import {
   AppBridge,
+  buildAllowAttribute,
   getToolUiResourceUri,
   isToolVisibilityModelOnly,
   isToolVisibilityAppOnly,
@@ -1194,6 +1195,57 @@ describe("isToolVisibilityAppOnly", () => {
         _meta: { ui: { resourceUri: "ui://server/app.html" } },
       };
       expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+  });
+});
+
+describe("buildAllowAttribute", () => {
+  describe("returns empty string", () => {
+    it("when permissions is undefined", () => {
+      expect(buildAllowAttribute(undefined)).toBe("");
+    });
+
+    it("when permissions object is empty", () => {
+      expect(buildAllowAttribute({})).toBe("");
+    });
+  });
+
+  describe("returns a single permission directive", () => {
+    it("when only camera is set", () => {
+      expect(buildAllowAttribute({ camera: {} })).toBe("camera");
+    });
+
+    it("when only microphone is set", () => {
+      expect(buildAllowAttribute({ microphone: {} })).toBe("microphone");
+    });
+
+    it("when only geolocation is set", () => {
+      expect(buildAllowAttribute({ geolocation: {} })).toBe("geolocation");
+    });
+
+    it("when only clipboardWrite is set, maps to clipboard-write", () => {
+      expect(buildAllowAttribute({ clipboardWrite: {} })).toBe(
+        "clipboard-write",
+      );
+    });
+  });
+
+  describe("returns multiple directives joined with '; '", () => {
+    it("when camera and microphone are set", () => {
+      expect(buildAllowAttribute({ camera: {}, microphone: {} })).toBe(
+        "camera; microphone",
+      );
+    });
+
+    it("when all permissions are set", () => {
+      expect(
+        buildAllowAttribute({
+          camera: {},
+          microphone: {},
+          geolocation: {},
+          clipboardWrite: {},
+        }),
+      ).toBe("camera; microphone; geolocation; clipboard-write");
     });
   });
 });
