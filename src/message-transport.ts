@@ -17,9 +17,31 @@ import {
  *
  * ## Security
  *
- * The `eventSource` parameter is required and validates the message source window
- * by checking `event.source`. For views, pass `window.parent`.
+ * The `eventSource` parameter validates the message source window by checking
+ * `event.source`. For views, pass `window.parent`.
  * For hosts, pass `iframe.contentWindow` to validate the iframe source.
+ * When `null`, all sources are accepted (useful when the iframe hasn't loaded yet).
+ *
+ * ## Deferred Target (srcdoc iframes)
+ *
+ * When the host creates an iframe dynamically (e.g., via `srcdoc`), `contentWindow`
+ * is not available until the iframe loads. Pass `null` as `eventTarget` and call
+ * {@link setTarget `setTarget`} after the iframe loads. Outgoing messages are queued
+ * until the target is set.
+ *
+ * ```ts source="./message-transport.examples.ts#PostMessageTransport_deferred"
+ * const iframe = document.createElement("iframe");
+ * iframe.sandbox.add("allow-scripts");
+ * document.body.appendChild(iframe);
+ *
+ * const transport = new PostMessageTransport(null, null);
+ * await bridge.connect(transport);
+ *
+ * iframe.srcdoc = htmlContent;
+ * iframe.onload = () => {
+ *   transport.setTarget(iframe.contentWindow!);
+ * };
+ * ```
  *
  * ## Usage
  *
@@ -43,6 +65,9 @@ import {
  * @see {@link app-bridge!AppBridge.connect `AppBridge.connect`} for Host usage
  */
 export class PostMessageTransport implements Transport {
+  private _eventTarget: Window | null;
+  private _eventSource: MessageEventSource | null;
+  private _sendQueue: JSONRPCMessage[] = [];
   private messageListener: (
     this: Window,
     ev: WindowEventMap["message"],
@@ -51,9 +76,12 @@ export class PostMessageTransport implements Transport {
   /**
    * Create a new PostMessageTransport.
    *
-   * @param eventTarget - Target window to send messages to (default: `window.parent`)
+   * @param eventTarget - Target window to send messages to. Pass `null` to defer
+   *   — outgoing messages will be queued until {@link setTarget `setTarget`} is called.
+   *   Defaults to `window.parent` for View usage.
    * @param eventSource - Source window for message validation. For views, pass
-   *   `window.parent`. For hosts, pass `iframe.contentWindow`.
+   *   `window.parent`. For hosts, pass `iframe.contentWindow`. Pass `null` to
+   *   accept messages from any source (useful for deferred/srcdoc iframes).
    *
    * @example View connecting to parent
    * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_view"
@@ -68,13 +96,20 @@ export class PostMessageTransport implements Transport {
    *   iframe.contentWindow!,
    * );
    * ```
+   *
+   * @example Host with deferred target (srcdoc)
+   * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_deferred"
+   * const transport = new PostMessageTransport(null, null);
+   * ```
    */
   constructor(
-    private eventTarget: Window = window.parent,
-    private eventSource: MessageEventSource,
+    eventTarget: Window | null = window.parent,
+    eventSource: MessageEventSource | null,
   ) {
+    this._eventTarget = eventTarget;
+    this._eventSource = eventSource;
     this.messageListener = (event) => {
-      if (eventSource && event.source !== this.eventSource) {
+      if (this._eventSource && event.source !== this._eventSource) {
         console.debug("Ignoring message from unknown source", event);
         return;
       }
@@ -104,6 +139,35 @@ export class PostMessageTransport implements Transport {
   }
 
   /**
+   * Set or update the target window for outgoing messages.
+   *
+   * When the transport was created with a `null` target (deferred mode), call
+   * this method after the iframe loads to provide `contentWindow` and flush
+   * any queued messages. Also updates the event source for incoming message
+   * validation.
+   *
+   * @param target - The iframe's `contentWindow` to send messages to
+   * @param eventSource - Optional new event source for message validation.
+   *   Defaults to `target`, which is correct for most iframe setups.
+   *
+   * @example
+   * ```ts source="./message-transport.examples.ts#PostMessageTransport_setTarget"
+   * const iframe = document.getElementById("app-iframe") as HTMLIFrameElement;
+   * iframe.onload = () => {
+   *   transport.setTarget(iframe.contentWindow!);
+   * };
+   * ```
+   */
+  setTarget(target: Window, eventSource?: MessageEventSource): void {
+    this._eventTarget = target;
+    this._eventSource = eventSource ?? target;
+    for (const message of this._sendQueue) {
+      this._eventTarget.postMessage(message, "*");
+    }
+    this._sendQueue = [];
+  }
+
+  /**
    * Begin listening for messages from the event source.
    *
    * Registers a message event listener on the window. Must be called before
@@ -116,24 +180,32 @@ export class PostMessageTransport implements Transport {
   /**
    * Send a JSON-RPC message to the target window.
    *
-   * Messages are sent using `postMessage` with `"*"` origin, meaning they are visible
-   * to all frames. The receiver should validate the message source for security.
+   * When the target is set, messages are sent immediately using `postMessage`
+   * with `"*"` origin. When the target is `null` (deferred mode), messages are
+   * queued and flushed when {@link setTarget `setTarget`} is called.
    *
    * @param message - JSON-RPC message to send
    * @param options - Optional send options (currently unused)
    */
   async send(message: JSONRPCMessage, options?: TransportSendOptions) {
-    console.debug("Sending message", message);
-    this.eventTarget.postMessage(message, "*");
+    if (this._eventTarget) {
+      console.debug("Sending message", message);
+      this._eventTarget.postMessage(message, "*");
+    } else {
+      console.debug("Queuing message (target not set)", message);
+      this._sendQueue.push(message);
+    }
   }
 
   /**
    * Stop listening for messages and cleanup.
    *
-   * Removes the message event listener and calls the {@link onclose `onclose`} callback if set.
+   * Removes the message event listener, clears any queued messages, and calls
+   * the {@link onclose `onclose`} callback if set.
    */
   async close() {
     window.removeEventListener("message", this.messageListener);
+    this._sendQueue = [];
     this.onclose?.();
   }
 

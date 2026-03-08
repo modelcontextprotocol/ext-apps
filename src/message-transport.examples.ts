@@ -56,3 +56,51 @@ function PostMessageTransport_constructor_host() {
   );
   //#endregion PostMessageTransport_constructor_host
 }
+
+/**
+ * Example: Host with deferred target for srcdoc iframes.
+ *
+ * When loading View HTML via `srcdoc`, `contentWindow` is not available until
+ * the iframe loads. Create the transport with `null` target, connect the bridge
+ * (which starts listening for messages), set `srcdoc`, then call `setTarget()`
+ * after the iframe loads to flush queued outgoing messages.
+ */
+async function PostMessageTransport_deferred(
+  bridge: AppBridge,
+  htmlContent: string,
+) {
+  //#region PostMessageTransport_deferred
+  const iframe = document.createElement("iframe");
+  iframe.sandbox.add("allow-scripts");
+  document.body.appendChild(iframe);
+
+  const transport = new PostMessageTransport(null, null);
+  await bridge.connect(transport);
+
+  iframe.srcdoc = htmlContent;
+  iframe.onload = () => {
+    transport.setTarget(iframe.contentWindow!);
+  };
+  //#endregion PostMessageTransport_deferred
+}
+
+/**
+ * Example: Creating deferred transport (constructor only).
+ */
+function PostMessageTransport_constructor_deferred() {
+  //#region PostMessageTransport_constructor_deferred
+  const transport = new PostMessageTransport(null, null);
+  //#endregion PostMessageTransport_constructor_deferred
+}
+
+/**
+ * Example: Setting the target after iframe loads.
+ */
+function PostMessageTransport_setTarget(transport: PostMessageTransport) {
+  //#region PostMessageTransport_setTarget
+  const iframe = document.getElementById("app-iframe") as HTMLIFrameElement;
+  iframe.onload = () => {
+    transport.setTarget(iframe.contentWindow!);
+  };
+  //#endregion PostMessageTransport_setTarget
+}
