@@ -17,6 +17,8 @@ import { App } from "./app";
 import {
   AppBridge,
   getToolUiResourceUri,
+  isToolVisibilityModelOnly,
+  isToolVisibilityAppOnly,
   type McpUiHostCapabilities,
 } from "./app-bridge";
 
@@ -613,6 +615,40 @@ describe("App <-> AppBridge integration", () => {
     });
   });
 
+  describe("double-connect guard", () => {
+    it("AppBridge.connect() throws if already connected", async () => {
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      // Attempting to connect again with a different transport should throw
+      const [, secondBridgeTransport] = InMemoryTransport.createLinkedPair();
+      await expect(bridge.connect(secondBridgeTransport)).rejects.toThrow(
+        "AppBridge is already connected",
+      );
+    });
+
+    it("App.connect() throws if already connected", async () => {
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      // Attempting to connect again should throw
+      const [secondAppTransport] = InMemoryTransport.createLinkedPair();
+      await expect(app.connect(secondAppTransport)).rejects.toThrow(
+        "App is already connected",
+      );
+    });
+
+    it("AppBridge.connect() throws even when called with the same transport", async () => {
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      // Should throw regardless of whether it's the same or a different transport
+      await expect(bridge.connect(bridgeTransport)).rejects.toThrow(
+        "AppBridge is already connected",
+      );
+    });
+  });
+
   describe("ping", () => {
     it("App responds to ping from bridge", async () => {
       await bridge.connect(bridgeTransport);
@@ -676,6 +712,49 @@ describe("App <-> AppBridge integration", () => {
       expect(result.content).toEqual(resultContent);
     });
 
+    it("ondownloadfile setter registers handler for ui/download-file requests", async () => {
+      const downloadParams = {
+        contents: [
+          {
+            type: "resource" as const,
+            resource: {
+              uri: "file:///export.json",
+              mimeType: "application/json",
+              text: '{"key":"value"}',
+            },
+          },
+        ],
+      };
+      const receivedRequests: unknown[] = [];
+
+      bridge.ondownloadfile = async (params) => {
+        receivedRequests.push(params);
+        return {};
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.downloadFile(downloadParams);
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(receivedRequests[0]).toMatchObject(downloadParams);
+      expect(result).toEqual({});
+    });
+
+    it("callServerTool throws a helpful error when called with a string instead of params object", async () => {
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      await expect(
+        // @ts-expect-error intentionally testing wrong usage
+        app.callServerTool("my_tool"),
+      ).rejects.toThrow(
+        'callServerTool() expects an object as its first argument, but received a string ("my_tool"). ' +
+          'Did you mean: callServerTool({ name: "my_tool", arguments: { ... } })?',
+      );
+    });
+
     it("onlistresources setter registers handler for resources/list requests", async () => {
       const requestParams = {};
       const resources = [{ uri: "test://resource", name: "Test" }];
@@ -700,6 +779,27 @@ describe("App <-> AppBridge integration", () => {
       expect(result.resources).toEqual(resources);
     });
 
+    it("onlistresources handles listServerResources() calls from App", async () => {
+      const resources = [
+        { uri: "test://res-1", name: "Resource 1" },
+        { uri: "test://res-2", name: "Resource 2", mimeType: "video/mp4" },
+      ];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onlistresources = async (params) => {
+        receivedRequests.push(params);
+        return { resources };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.listServerResources();
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(result.resources).toEqual(resources);
+    });
+
     it("onreadresource setter registers handler for resources/read requests", async () => {
       const requestParams = { uri: "test://resource" };
       const contents = [{ uri: "test://resource", text: "content" }];
@@ -717,6 +817,32 @@ describe("App <-> AppBridge integration", () => {
         { method: "resources/read", params: requestParams },
         ReadResourceResultSchema,
       );
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(receivedRequests[0]).toMatchObject(requestParams);
+      expect(result.contents).toEqual(contents);
+    });
+
+    it("onreadresource handles readServerResource() calls from App", async () => {
+      const requestParams = { uri: "videos://bunny-1mb" };
+      const contents = [
+        {
+          uri: "videos://bunny-1mb",
+          blob: "dmlkZW9kYXRh",
+          mimeType: "video/mp4",
+        },
+      ];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onreadresource = async (params) => {
+        receivedRequests.push(params);
+        return { contents };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.readServerResource(requestParams);
 
       expect(receivedRequests).toHaveLength(1);
       expect(receivedRequests[0]).toMatchObject(requestParams);
@@ -918,6 +1044,156 @@ describe("getToolUiResourceUri", () => {
       expect(() => getToolUiResourceUri(tool)).toThrow(
         "Invalid UI resource URI",
       );
+    });
+  });
+});
+
+describe("isToolVisibilityModelOnly", () => {
+  describe("returns true", () => {
+    it("when visibility is exactly ['model']", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: ["model"] } },
+      };
+      expect(isToolVisibilityModelOnly(tool)).toBe(true);
+    });
+  });
+
+  describe("returns false", () => {
+    it("when visibility is ['app']", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: ["app"] } },
+      };
+      expect(isToolVisibilityModelOnly(tool)).toBe(false);
+    });
+
+    it("when visibility is ['model', 'app']", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: ["model", "app"] } },
+      };
+      expect(isToolVisibilityModelOnly(tool)).toBe(false);
+    });
+
+    it("when visibility is ['app', 'model']", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: ["app", "model"] } },
+      };
+      expect(isToolVisibilityModelOnly(tool)).toBe(false);
+    });
+
+    it("when visibility is empty array", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: [] } },
+      };
+      expect(isToolVisibilityModelOnly(tool)).toBe(false);
+    });
+
+    it("when visibility is undefined", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: {} },
+      };
+      expect(isToolVisibilityModelOnly(tool)).toBe(false);
+    });
+
+    it("when _meta.ui is missing", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: {},
+      };
+      expect(isToolVisibilityModelOnly(tool)).toBe(false);
+    });
+
+    it("when _meta is missing", () => {
+      const tool = { name: "test-tool" };
+      expect(isToolVisibilityModelOnly(tool)).toBe(false);
+    });
+
+    it("when tool has resourceUri but no visibility", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { resourceUri: "ui://server/app.html" } },
+      };
+      expect(isToolVisibilityModelOnly(tool)).toBe(false);
+    });
+  });
+});
+
+describe("isToolVisibilityAppOnly", () => {
+  describe("returns true", () => {
+    it("when visibility is exactly ['app']", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: ["app"] } },
+      };
+      expect(isToolVisibilityAppOnly(tool)).toBe(true);
+    });
+  });
+
+  describe("returns false", () => {
+    it("when visibility is ['model']", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: ["model"] } },
+      };
+      expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+
+    it("when visibility is ['model', 'app']", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: ["model", "app"] } },
+      };
+      expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+
+    it("when visibility is ['app', 'model']", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: ["app", "model"] } },
+      };
+      expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+
+    it("when visibility is empty array", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { visibility: [] } },
+      };
+      expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+
+    it("when visibility is undefined", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: {} },
+      };
+      expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+
+    it("when _meta.ui is missing", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: {},
+      };
+      expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+
+    it("when _meta is missing", () => {
+      const tool = { name: "test-tool" };
+      expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+
+    it("when tool has resourceUri but no visibility", () => {
+      const tool = {
+        name: "test-tool",
+        _meta: { ui: { resourceUri: "ui://server/app.html" } },
+      };
+      expect(isToolVisibilityAppOnly(tool)).toBe(false);
     });
   });
 });

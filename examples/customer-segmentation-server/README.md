@@ -4,11 +4,50 @@ A demo MCP App that displays customer data as an interactive scatter/bubble char
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/01-account-age-revenue.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/01-account-age-revenue.png" alt="Account age vs revenue" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/02-tickets-nps-engagement.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/02-tickets-nps-engagement.png" alt="Tickets, NPS, engagement" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/07-age-engagement-revenue.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/07-age-engagement-revenue.png" alt="Age, engagement, revenue" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/01-account-age-revenue.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/01-account-age-revenue.png" alt="Account age vs revenue" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/02-tickets-nps-engagement.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/02-tickets-nps-engagement.png" alt="Tickets, NPS, engagement" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/07-age-engagement-revenue.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/07-age-engagement-revenue.png" alt="Age, engagement, revenue" width="100%"></a></td>
   </tr>
 </table>
+
+## MCP Client Configuration
+
+Add to your MCP client configuration (stdio transport):
+
+```json
+{
+  "mcpServers": {
+    "customer-segmentation": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--silent",
+        "--registry=https://registry.npmjs.org/",
+        "@modelcontextprotocol/server-customer-segmentation",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
+
+### Local Development
+
+To test local modifications, use this configuration (replace `~/code/ext-apps` with your clone path):
+
+```json
+{
+  "mcpServers": {
+    "customer-segmentation": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd ~/code/ext-apps/examples/customer-segmentation-server && npm run build >&2 && node dist/index.js --stdio"
+      ]
+    }
+  }
+}
+```
 
 ## Features
 

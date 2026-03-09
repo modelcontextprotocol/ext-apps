@@ -1,0 +1,189 @@
+/*
+ * MCP Apps custom theme — aligns TypeDoc styling with modelcontextprotocol.io
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ------------------------------------------------------------------ */
+/* Fonts                                                               */
+/* ------------------------------------------------------------------ */
+
+:root {
+	--font-family-text: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--font-family-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+body {
+	font-family: var(--font-family-text);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* ------------------------------------------------------------------ */
+/* Light mode colors                                                   */
+/* ------------------------------------------------------------------ */
+
+:root {
+	--light-color-background: #ffffff;
+	--light-color-background-secondary: #f9fafb;
+	--light-color-background-navbar: #ffffff;
+	--light-color-accent: #e5e7eb;
+	--light-color-text: #111827;
+	--light-color-text-aside: #6b7280;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dark mode colors                                                    */
+/* ------------------------------------------------------------------ */
+
+:root {
+	--dark-color-background: #0f1117;
+	--dark-color-background-secondary: #161b22;
+	--dark-color-background-navbar: #0f1117;
+	--dark-color-accent: #30363d;
+	--dark-color-text: #f0f6fc;
+	--dark-color-text-aside: #8b949e;
+}
+
+/* ------------------------------------------------------------------ */
+/* Header — taller, frosted glass                                      */
+/* ------------------------------------------------------------------ */
+
+:root {
+	--dim-toolbar-contents-height: 3.5rem;
+}
+
+.tsd-page-toolbar {
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+}
+
+@media (prefers-color-scheme: light) {
+	.tsd-page-toolbar {
+		background-color: rgba(255, 255, 255, 0.85);
+	}
+}
+
+@media (prefers-color-scheme: dark) {
+	.tsd-page-toolbar {
+		background-color: rgba(15, 17, 23, 0.75);
+	}
+}
+
+:root[data-theme='light'] .tsd-page-toolbar {
+	background-color: rgba(255, 255, 255, 0.85);
+}
+
+:root[data-theme='dark'] .tsd-page-toolbar {
+	background-color: rgba(15, 17, 23, 0.75);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sidebar navigation (matches modelcontextprotocol.io sidebar)        */
+/* ------------------------------------------------------------------ */
+
+.tsd-navigation a {
+	padding: 0.375rem 0.75rem;
+	font-size: 0.875rem;
+	line-height: 1.5;
+	border-radius: 0.75rem;
+	color: var(--color-text-aside);
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.tsd-navigation a:hover:not(.current) {
+	background-color: rgba(107, 114, 128, 0.05);
+	color: var(--color-text);
+}
+
+.tsd-navigation a.current {
+	background-color: rgba(107, 114, 128, 0.15);
+	color: var(--color-text);
+	font-weight: 700;
+}
+
+/* Group headers (Documents, Security, API Documentation) */
+.tsd-accordion-summary > h3 {
+	font-weight: 600;
+	font-size: 0.875rem;
+	letter-spacing: 0.01em;
+}
+
+.site-menu {
+	padding: 1.25rem 0;
+}
+
+@media (prefers-color-scheme: dark) {
+	.tsd-navigation a {
+		color: var(--color-text-aside);
+	}
+
+	.tsd-navigation a:hover:not(.current) {
+		background-color: rgba(229, 231, 235, 0.05);
+		color: var(--color-text);
+	}
+
+	.tsd-navigation a.current {
+		background-color: rgba(229, 231, 235, 0.15);
+		color: var(--color-text);
+		font-weight: 700;
+	}
+}
+
+:root[data-theme='dark'] .tsd-navigation a {
+	color: var(--color-text-aside);
+}
+
+:root[data-theme='dark'] .tsd-navigation a:hover:not(.current) {
+	background-color: rgba(229, 231, 235, 0.05);
+	color: var(--color-text);
+}
+
+:root[data-theme='dark'] .tsd-navigation a.current {
+	background-color: rgba(229, 231, 235, 0.15);
+	color: var(--color-text);
+	font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ */
+/* Content area                                                        */
+/* ------------------------------------------------------------------ */
+
+.tsd-typography {
+	line-height: 1.6;
+}
+
+.tsd-panel.tsd-typography h1 {
+	margin-top: 0;
+	padding-bottom: 0.4em;
+}
+
+.tsd-panel.tsd-typography h2 {
+	margin-top: 2rem;
+	padding-bottom: 0.3em;
+}
+
+.tsd-panel.tsd-typography h3 {
+	margin-top: 1.75rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Code blocks                                                         */
+/* ------------------------------------------------------------------ */
+
+code,
+pre {
+	font-family: var(--font-family-code);
+	font-size: 1em;
+}
+
+.tsd-typography pre {
+	padding: 1rem 1.25rem;
+	border: 1px solid var(--color-accent);
+}
+
+/* Inline code */
+.tsd-typography code:not(pre code) {
+	padding: 0.15em 0.35em;
+	font-size: 1em;
+}

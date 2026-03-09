@@ -90,7 +90,10 @@ function ShaderToyLite(canvasId) {
 
     // uniforms
     var iFrame = 0;
+    // iMouse state: xy = current position (only updates when button down)
+    // zw = click start position (positive when down, negative when released)
     var iMouse = {x: 0, y: 0, clickX: 0, clickY: 0};
+    var isMouseDown = false;
 
     // shader common source
     var common = "";
@@ -145,19 +148,75 @@ function ShaderToyLite(canvasId) {
             gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         });
 
+        // Mouse event handlers - match official Shadertoy iMouse behavior:
+        // iMouse.xy: current position (only updates when button is down)
+        // iMouse.zw: click position (positive when down, negated when released)
         canvas.addEventListener("mousemove", (event) => {
-            iMouse.x = event.offsetX;
-            iMouse.y = canvas.height - event.offsetY;
+            if (isMouseDown) {
+                iMouse.x = event.offsetX;
+                iMouse.y = canvas.height - event.offsetY;
+            }
         });
 
         canvas.addEventListener("mousedown", (event) => {
-            iMouse.clickX = event.offsetX;
-            iMouse.clickY = canvas.height - event.offsetY;
+            isMouseDown = true;
+            var x = event.offsetX;
+            var y = canvas.height - event.offsetY;
+            iMouse.x = x;
+            iMouse.y = y;
+            iMouse.clickX = x;
+            iMouse.clickY = y;
         });
 
         canvas.addEventListener("mouseup", () => {
-            iMouse.clickX = 0;
-            iMouse.clickY = 0;
+            isMouseDown = false;
+            // Negate click position to indicate button released (Shadertoy convention)
+            iMouse.clickX = -Math.abs(iMouse.clickX);
+            iMouse.clickY = -Math.abs(iMouse.clickY);
+        });
+
+        // Prevent context menu on right-click to avoid interrupting interaction
+        canvas.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+        });
+
+        // Touch support for mobile devices
+        canvas.addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            if (event.touches.length > 0) {
+                var touch = event.touches[0];
+                var rect = canvas.getBoundingClientRect();
+                var x = touch.clientX - rect.left;
+                var y = canvas.height - (touch.clientY - rect.top);
+                isMouseDown = true;
+                iMouse.x = x;
+                iMouse.y = y;
+                iMouse.clickX = x;
+                iMouse.clickY = y;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener("touchmove", (event) => {
+            event.preventDefault();
+            if (isMouseDown && event.touches.length > 0) {
+                var touch = event.touches[0];
+                var rect = canvas.getBoundingClientRect();
+                iMouse.x = touch.clientX - rect.left;
+                iMouse.y = canvas.height - (touch.clientY - rect.top);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener("touchend", (event) => {
+            event.preventDefault();
+            isMouseDown = false;
+            iMouse.clickX = -Math.abs(iMouse.clickX);
+            iMouse.clickY = -Math.abs(iMouse.clickY);
+        }, { passive: false });
+
+        canvas.addEventListener("touchcancel", () => {
+            isMouseDown = false;
+            iMouse.clickX = -Math.abs(iMouse.clickX);
+            iMouse.clickY = -Math.abs(iMouse.clickY);
         });
     }
 

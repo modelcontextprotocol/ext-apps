@@ -13,6 +13,7 @@
 export {
   LATEST_PROTOCOL_VERSION,
   OPEN_LINK_METHOD,
+  DOWNLOAD_FILE_METHOD,
   MESSAGE_METHOD,
   SANDBOX_PROXY_READY_METHOD,
   SANDBOX_RESOURCE_READY_METHOD,
@@ -34,6 +35,8 @@ export {
   type McpUiHostStyles,
   type McpUiOpenLinkRequest,
   type McpUiOpenLinkResult,
+  type McpUiDownloadFileRequest,
+  type McpUiDownloadFileResult,
   type McpUiMessageRequest,
   type McpUiMessageResult,
   type McpUiUpdateModelContextRequest,
@@ -61,12 +64,14 @@ export {
   type McpUiRequestDisplayModeResult,
   type McpUiToolVisibility,
   type McpUiToolMeta,
+  type McpUiClientCapabilities,
 } from "./spec.types.js";
 
 // Import types needed for protocol type unions (not re-exported, just used internally)
 import type {
   McpUiInitializeRequest,
   McpUiOpenLinkRequest,
+  McpUiDownloadFileRequest,
   McpUiMessageRequest,
   McpUiUpdateModelContextRequest,
   McpUiResourceTeardownRequest,
@@ -82,6 +87,7 @@ import type {
   McpUiSandboxProxyReadyNotification,
   McpUiInitializeResult,
   McpUiOpenLinkResult,
+  McpUiDownloadFileResult,
   McpUiMessageResult,
   McpUiResourceTeardownResult,
   McpUiRequestDisplayModeResult,
@@ -95,6 +101,8 @@ export {
   McpUiHostStylesSchema,
   McpUiOpenLinkRequestSchema,
   McpUiOpenLinkResultSchema,
+  McpUiDownloadFileRequestSchema,
+  McpUiDownloadFileResultSchema,
   McpUiMessageRequestSchema,
   McpUiMessageResultSchema,
   McpUiUpdateModelContextRequestSchema,
@@ -158,6 +166,7 @@ import {
 export type AppRequest =
   | McpUiInitializeRequest
   | McpUiOpenLinkRequest
+  | McpUiDownloadFileRequest
   | McpUiMessageRequest
   | McpUiUpdateModelContextRequest
   | McpUiResourceTeardownRequest
@@ -206,6 +215,7 @@ export type AppNotification =
 export type AppResult =
   | McpUiInitializeResult
   | McpUiOpenLinkResult
+  | McpUiDownloadFileResult
   | McpUiMessageResult
   | McpUiResourceTeardownResult
   | McpUiRequestDisplayModeResult

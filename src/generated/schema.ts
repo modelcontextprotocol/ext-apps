@@ -5,8 +5,10 @@ import { z } from "zod";
 import {
   ContentBlockSchema,
   CallToolResultSchema,
+  EmbeddedResourceSchema,
   ImplementationSchema,
   RequestIdSchema,
+  ResourceLinkSchema,
   ToolSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
@@ -49,7 +51,6 @@ export const McpUiStyleVariableKeySchema = z
     z.literal("--color-text-success"),
     z.literal("--color-text-warning"),
     z.literal("--color-text-disabled"),
-    z.literal("--color-text-ghost"),
     z.literal("--color-border-primary"),
     z.literal("--color-border-secondary"),
     z.literal("--color-border-tertiary"),
@@ -135,7 +136,7 @@ export const McpUiStylesSchema = z
 
 /**
  * @description Request to open an external URL in the host's default browser.
- * @see {@link app!App.openLink} for the method that sends this request
+ * @see {@link app!App.openLink `App.openLink`} for the method that sends this request
  */
 export const McpUiOpenLinkRequestSchema = z.object({
   method: z.literal("ui/open-link"),
@@ -147,7 +148,7 @@ export const McpUiOpenLinkRequestSchema = z.object({
 
 /**
  * @description Result from opening a URL.
- * @see {@link McpUiOpenLinkRequest}
+ * @see {@link McpUiOpenLinkRequest `McpUiOpenLinkRequest`}
  */
 export const McpUiOpenLinkResultSchema = z
   .object({
@@ -162,8 +163,24 @@ export const McpUiOpenLinkResultSchema = z
   .passthrough();
 
 /**
+ * @description Result from a file download request.
+ * @see {@link McpUiDownloadFileRequest `McpUiDownloadFileRequest`}
+ */
+export const McpUiDownloadFileResultSchema = z
+  .object({
+    /** @description True if the download failed (e.g., user cancelled or host denied). */
+    isError: z
+      .boolean()
+      .optional()
+      .describe(
+        "True if the download failed (e.g., user cancelled or host denied).",
+      ),
+  })
+  .passthrough();
+
+/**
  * @description Result from sending a message.
- * @see {@link McpUiMessageRequest}
+ * @see {@link McpUiMessageRequest `McpUiMessageRequest`}
  */
 export const McpUiMessageResultSchema = z
   .object({
@@ -178,7 +195,7 @@ export const McpUiMessageResultSchema = z
 /**
  * @description Notification that the sandbox proxy iframe is ready to receive content.
  * @internal
- * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
+ * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#sandbox-proxy
  */
 export const McpUiSandboxProxyReadyNotificationSchema = z.object({
   method: z.literal("ui/notifications/sandbox-proxy-ready"),
@@ -187,67 +204,143 @@ export const McpUiSandboxProxyReadyNotificationSchema = z.object({
 
 /**
  * @description Content Security Policy configuration for UI resources.
+ *
+ * Servers declare which origins their UI requires. Hosts use this to enforce appropriate CSP headers.
+ *
+ * > [!IMPORTANT]
+ * > MCP App HTML runs in a sandboxed iframe with no same-origin server.
+ * > **All** origins must be declared—including where your bundled JS/CSS is
+ * > served from (`localhost` in dev, your CDN in production).
  */
 export const McpUiResourceCspSchema = z.object({
-  /** @description Origins for network requests (fetch/XHR/WebSocket). */
+  /**
+   * @description Origins for network requests (fetch/XHR/WebSocket).
+   *
+   * - Maps to CSP `connect-src` directive
+   * - Empty or omitted → no network connections (secure default)
+   *
+   * @example
+   * ```ts
+   * ["https://api.weather.com", "wss://realtime.service.com"]
+   * ```
+   */
   connectDomains: z
     .array(z.string())
     .optional()
-    .describe("Origins for network requests (fetch/XHR/WebSocket)."),
-  /** @description Origins for static resources (scripts, images, styles, fonts). */
+    .describe(
+      "Origins for network requests (fetch/XHR/WebSocket).\n\n- Maps to CSP `connect-src` directive\n- Empty or omitted \u2192 no network connections (secure default)",
+    ),
+  /**
+   * @description Origins for static resources (images, scripts, stylesheets, fonts, media).
+   *
+   * - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives
+   * - Wildcard subdomains supported: `https://*.example.com`
+   * - Empty or omitted → no network resources (secure default)
+   *
+   * @example
+   * ```ts
+   * ["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]
+   * ```
+   */
   resourceDomains: z
     .array(z.string())
     .optional()
-    .describe("Origins for static resources (scripts, images, styles, fonts)."),
-  /** @description Origins for nested iframes (frame-src directive). */
+    .describe(
+      "Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted \u2192 no network resources (secure default)",
+    ),
+  /**
+   * @description Origins for nested iframes.
+   *
+   * - Maps to CSP `frame-src` directive
+   * - Empty or omitted → no nested iframes allowed (`frame-src 'none'`)
+   *
+   * @example
+   * ```ts
+   * ["https://www.youtube.com", "https://player.vimeo.com"]
+   * ```
+   */
   frameDomains: z
     .array(z.string())
     .optional()
-    .describe("Origins for nested iframes (frame-src directive)."),
-  /** @description Allowed base URIs for the document (base-uri directive). */
+    .describe(
+      "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted \u2192 no nested iframes allowed (`frame-src 'none'`)",
+    ),
+  /**
+   * @description Allowed base URIs for the document.
+   *
+   * - Maps to CSP `base-uri` directive
+   * - Empty or omitted → only same origin allowed (`base-uri 'self'`)
+   *
+   * @example
+   * ```ts
+   * ["https://cdn.example.com"]
+   * ```
+   */
   baseUriDomains: z
     .array(z.string())
     .optional()
-    .describe("Allowed base URIs for the document (base-uri directive)."),
+    .describe(
+      "Allowed base URIs for the document.\n\n- Maps to CSP `base-uri` directive\n- Empty or omitted \u2192 only same origin allowed (`base-uri 'self'`)",
+    ),
 });
 
 /**
  * @description Sandbox permissions requested by the UI resource.
+ *
+ * Servers declare which browser capabilities their UI needs.
  * Hosts MAY honor these by setting appropriate iframe `allow` attributes.
  * Apps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.
  */
 export const McpUiResourcePermissionsSchema = z.object({
-  /** @description Request camera access (Permission Policy `camera` feature). */
+  /**
+   * @description Request camera access.
+   *
+   * Maps to Permission Policy `camera` feature.
+   */
   camera: z
     .object({})
     .optional()
-    .describe("Request camera access (Permission Policy `camera` feature)."),
-  /** @description Request microphone access (Permission Policy `microphone` feature). */
+    .describe(
+      "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
+    ),
+  /**
+   * @description Request microphone access.
+   *
+   * Maps to Permission Policy `microphone` feature.
+   */
   microphone: z
     .object({})
     .optional()
     .describe(
-      "Request microphone access (Permission Policy `microphone` feature).",
+      "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
     ),
-  /** @description Request geolocation access (Permission Policy `geolocation` feature). */
+  /**
+   * @description Request geolocation access.
+   *
+   * Maps to Permission Policy `geolocation` feature.
+   */
   geolocation: z
     .object({})
     .optional()
     .describe(
-      "Request geolocation access (Permission Policy `geolocation` feature).",
+      "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
     ),
-  /** @description Request clipboard write access (Permission Policy `clipboard-write` feature). */
+  /**
+   * @description Request clipboard write access.
+   *
+   * Maps to Permission Policy `clipboard-write` feature.
+   */
   clipboardWrite: z
     .object({})
     .optional()
     .describe(
-      "Request clipboard write access (Permission Policy `clipboard-write` feature).",
+      "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
     ),
 });
 
 /**
- * @description Notification of UI size changes (Guest UI -> Host).
- * @see {@link app!App.sendSizeChanged} for the method to send this from Guest UI
+ * @description Notification of UI size changes (View -> Host).
+ * @see {@link app!App.sendSizeChanged `App.sendSizeChanged`} for the method to send this from View
  */
 export const McpUiSizeChangedNotificationSchema = z.object({
   method: z.literal("ui/notifications/size-changed"),
@@ -260,7 +353,7 @@ export const McpUiSizeChangedNotificationSchema = z.object({
 });
 
 /**
- * @description Notification containing complete tool arguments (Host -> Guest UI).
+ * @description Notification containing complete tool arguments (Host -> View).
  */
 export const McpUiToolInputNotificationSchema = z.object({
   method: z.literal("ui/notifications/tool-input"),
@@ -279,7 +372,7 @@ export const McpUiToolInputNotificationSchema = z.object({
 });
 
 /**
- * @description Notification containing partial/streaming tool arguments (Host -> Guest UI).
+ * @description Notification containing partial/streaming tool arguments (Host -> View).
  */
 export const McpUiToolInputPartialNotificationSchema = z.object({
   method: z.literal("ui/notifications/tool-input-partial"),
@@ -298,7 +391,7 @@ export const McpUiToolInputPartialNotificationSchema = z.object({
 });
 
 /**
- * @description Notification that tool execution was cancelled (Host -> Guest UI).
+ * @description Notification that tool execution was cancelled (Host -> View).
  * Host MUST send this if tool execution was cancelled for any reason (user action,
  * sampling error, classifier intervention, etc.).
  */
@@ -319,7 +412,7 @@ export const McpUiToolCancelledNotificationSchema = z.object({
  * @description CSS blocks that can be injected by apps.
  */
 export const McpUiHostCssSchema = z.object({
-  /** @description CSS for font loading (`@font-face` rules or `@import` statements). Apps must apply using {@link applyHostFonts}. */
+  /** @description CSS for font loading (`@font-face` rules or `@import` statements). Apps must apply using {@link applyHostFonts `applyHostFonts`}. */
   fonts: z.string().optional(),
 });
 
@@ -338,8 +431,8 @@ export const McpUiHostStylesSchema = z.object({
 });
 
 /**
- * @description Request for graceful shutdown of the Guest UI (Host -> Guest UI).
- * @see {@link app-bridge!AppBridge.teardownResource} for the host method that sends this
+ * @description Request for graceful shutdown of the View (Host -> View).
+ * @see {@link app-bridge!AppBridge.teardownResource `AppBridge.teardownResource`} for the host method that sends this
  */
 export const McpUiResourceTeardownRequestSchema = z.object({
   method: z.literal("ui/resource-teardown"),
@@ -348,7 +441,7 @@ export const McpUiResourceTeardownRequestSchema = z.object({
 
 /**
  * @description Result from graceful shutdown request.
- * @see {@link McpUiResourceTeardownRequest}
+ * @see {@link McpUiResourceTeardownRequest `McpUiResourceTeardownRequest`}
  */
 export const McpUiResourceTeardownResultSchema = z.record(
   z.string(),
@@ -387,7 +480,7 @@ export const McpUiSupportedContentBlockModalitiesSchema = z.object({
 
 /**
  * @description Capabilities supported by the host application.
- * @see {@link McpUiInitializeResult} for the initialization result that includes these capabilities
+ * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
 export const McpUiHostCapabilitiesSchema = z.object({
   /** @description Experimental features (structure TBD). */
@@ -400,6 +493,11 @@ export const McpUiHostCapabilitiesSchema = z.object({
     .object({})
     .optional()
     .describe("Host supports opening external URLs."),
+  /** @description Host supports file downloads via ui/download-file. */
+  downloadFile: z
+    .object({})
+    .optional()
+    .describe("Host supports file downloads via ui/download-file."),
   /** @description Host can proxy tool calls to the MCP server. */
   serverTools: z
     .object({
@@ -443,15 +541,15 @@ export const McpUiHostCapabilitiesSchema = z.object({
     McpUiSupportedContentBlockModalitiesSchema.optional().describe(
       "Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns.",
     ),
-  /** @description Host supports receiving content messages (ui/message) from the Guest UI. */
+  /** @description Host supports receiving content messages (ui/message) from the view. */
   message: McpUiSupportedContentBlockModalitiesSchema.optional().describe(
-    "Host supports receiving content messages (ui/message) from the Guest UI.",
+    "Host supports receiving content messages (ui/message) from the view.",
   ),
 });
 
 /**
- * @description Capabilities provided by the Guest UI ({@link app!App}).
- * @see {@link McpUiInitializeRequest} for the initialization request that includes these capabilities
+ * @description Capabilities provided by the View ({@link app!App `App`}).
+ * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`} for the initialization request that includes these capabilities
  */
 export const McpUiAppCapabilitiesSchema = z.object({
   /** @description Experimental features (structure TBD). */
@@ -470,11 +568,16 @@ export const McpUiAppCapabilitiesSchema = z.object({
     })
     .optional()
     .describe("App exposes MCP-style tools that the host can call."),
+  /** @description Display modes the app supports. */
+  availableDisplayModes: z
+    .array(McpUiDisplayModeSchema)
+    .optional()
+    .describe("Display modes the app supports."),
 });
 
 /**
- * @description Notification that Guest UI has completed initialization (Guest UI -> Host).
- * @see {@link app!App.connect} for the method that sends this notification
+ * @description Notification that View has completed initialization (View -> Host).
+ * @see {@link app!App.connect `App.connect`} for the method that sends this notification
  */
 export const McpUiInitializedNotificationSchema = z.object({
   method: z.literal("ui/notifications/initialized"),
@@ -485,25 +588,55 @@ export const McpUiInitializedNotificationSchema = z.object({
  * @description UI Resource metadata for security and rendering configuration.
  */
 export const McpUiResourceMetaSchema = z.object({
-  /** @description Content Security Policy configuration. */
+  /** @description Content Security Policy configuration for UI resources. */
   csp: McpUiResourceCspSchema.optional().describe(
-    "Content Security Policy configuration.",
+    "Content Security Policy configuration for UI resources.",
   ),
-  /** @description Sandbox permissions requested by the UI. */
+  /** @description Sandbox permissions requested by the UI resource. */
   permissions: McpUiResourcePermissionsSchema.optional().describe(
-    "Sandbox permissions requested by the UI.",
+    "Sandbox permissions requested by the UI resource.",
   ),
-  /** @description Dedicated origin for widget sandbox. */
+  /**
+   * @description Dedicated origin for view sandbox.
+   *
+   * Useful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.
+   *
+   * **Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:
+   * - Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)
+   * - URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)
+   *
+   * If omitted, host uses default sandbox origin (typically per-conversation).
+   *
+   * @example
+   * ```ts
+   * "a904794854a047f6.claudemcpcontent.com"
+   * ```
+   *
+   * @example
+   * ```ts
+   * "www-example-com.oaiusercontent.com"
+   * ```
+   */
   domain: z
     .string()
     .optional()
-    .describe("Dedicated origin for widget sandbox."),
-  /** @description Visual boundary preference - true if UI prefers a visible border. */
+    .describe(
+      "Dedicated origin for view sandbox.\n\nUseful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.\n\n**Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:\n- Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)\n- URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)\n\nIf omitted, host uses default sandbox origin (typically per-conversation).",
+    ),
+  /**
+   * @description Visual boundary preference - true if view prefers a visible border.
+   *
+   * Boolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.
+   *
+   * - `true`: request visible border + background
+   * - `false`: request no visible border + background
+   * - omitted: host decides border
+   */
   prefersBorder: z
     .boolean()
     .optional()
     .describe(
-      "Visual boundary preference - true if UI prefers a visible border.",
+      "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
     ),
 });
 
@@ -511,7 +644,7 @@ export const McpUiResourceMetaSchema = z.object({
  * @description Request to change the display mode of the UI.
  * The host will respond with the actual display mode that was set,
  * which may differ from the requested mode if not supported.
- * @see {@link app!App.requestDisplayMode} for the method that sends this request
+ * @see {@link app!App.requestDisplayMode `App.requestDisplayMode`} for the method that sends this request
  */
 export const McpUiRequestDisplayModeRequestSchema = z.object({
   method: z.literal("ui/request-display-mode"),
@@ -523,7 +656,7 @@ export const McpUiRequestDisplayModeRequestSchema = z.object({
 
 /**
  * @description Result from requesting a display mode change.
- * @see {@link McpUiRequestDisplayModeRequest}
+ * @see {@link McpUiRequestDisplayModeRequest `McpUiRequestDisplayModeRequest`}
  */
 export const McpUiRequestDisplayModeResultSchema = z
   .object({
@@ -549,7 +682,10 @@ export const McpUiToolMetaSchema = z.object({
    * URI of the UI resource to display for this tool, if any.
    * This is converted to `_meta["ui/resourceUri"]`.
    *
-   * @example "ui://weather/widget.html"
+   * @example
+   * ```ts
+   * "ui://weather/view.html"
+   * ```
    */
   resourceUri: z.string().optional(),
   /**
@@ -566,8 +702,50 @@ export const McpUiToolMetaSchema = z.object({
 });
 
 /**
+ * @description MCP Apps capability settings advertised by clients to servers.
+ *
+ * Clients advertise these capabilities via the `extensions` field in their
+ * capabilities during MCP initialization. Servers can check for MCP Apps
+ * support using {@link server-helpers!getUiCapability}.
+ */
+export const McpUiClientCapabilitiesSchema = z.object({
+  /**
+   * @description Array of supported MIME types for UI resources.
+   * Must include `"text/html;profile=mcp-app"` for MCP Apps support.
+   */
+  mimeTypes: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Array of supported MIME types for UI resources.\nMust include `"text/html;profile=mcp-app"` for MCP Apps support.',
+    ),
+});
+
+/**
+ * @description Request to download a file through the host.
+ *
+ * Sent from the View to the Host when the app wants to trigger a file download.
+ * Since MCP Apps run in sandboxed iframes where direct downloads are blocked,
+ * this provides a host-mediated mechanism for file exports.
+ * The host SHOULD show a confirmation dialog before initiating the download.
+ *
+ * @see {@link app!App.downloadFile `App.downloadFile`} for the method that sends this request
+ */
+export const McpUiDownloadFileRequestSchema = z.object({
+  method: z.literal("ui/download-file"),
+  params: z.object({
+    /** @description Resource contents to download — embedded (inline data) or linked (host fetches). Uses standard MCP resource types. */
+    contents: z
+      .array(z.union([EmbeddedResourceSchema, ResourceLinkSchema]))
+      .describe(
+        "Resource contents to download \u2014 embedded (inline data) or linked (host fetches). Uses standard MCP resource types.",
+      ),
+  }),
+});
+
+/**
  * @description Request to send a message to the host's chat interface.
- * @see {@link app!App.sendMessage} for the method that sends this request
+ * @see {@link app!App.sendMessage `App.sendMessage`} for the method that sends this request
  */
 export const McpUiMessageRequestSchema = z.object({
   method: z.literal("ui/message"),
@@ -586,7 +764,7 @@ export const McpUiMessageRequestSchema = z.object({
 /**
  * @description Notification containing HTML resource for the sandbox proxy to load.
  * @internal
- * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
+ * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#sandbox-proxy
  */
 export const McpUiSandboxResourceReadyNotificationSchema = z.object({
   method: z.literal("ui/notifications/sandbox-resource-ready"),
@@ -610,7 +788,7 @@ export const McpUiSandboxResourceReadyNotificationSchema = z.object({
 });
 
 /**
- * @description Notification containing tool execution result (Host -> Guest UI).
+ * @description Notification containing tool execution result (Host -> View).
  */
 export const McpUiToolResultNotificationSchema = z.object({
   method: z.literal("ui/notifications/tool-result"),
@@ -619,7 +797,7 @@ export const McpUiToolResultNotificationSchema = z.object({
 });
 
 /**
- * @description Rich context about the host environment provided to Guest UIs.
+ * @description Rich context about the host environment provided to views.
  */
 export const McpUiHostContextSchema = z
   .object({
@@ -651,7 +829,7 @@ export const McpUiHostContextSchema = z
     ),
     /** @description Display modes the host supports. */
     availableDisplayModes: z
-      .array(z.string())
+      .array(McpUiDisplayModeSchema)
       .optional()
       .describe("Display modes the host supports."),
     /**
@@ -739,8 +917,8 @@ export const McpUiHostContextSchema = z
   .passthrough();
 
 /**
- * @description Notification that host context has changed (Host -> Guest UI).
- * @see {@link McpUiHostContext} for the full context structure
+ * @description Notification that host context has changed (Host -> View).
+ * @see {@link McpUiHostContext `McpUiHostContext`} for the full context structure
  */
 export const McpUiHostContextChangedNotificationSchema = z.object({
   method: z.literal("ui/notifications/host-context-changed"),
@@ -751,16 +929,16 @@ export const McpUiHostContextChangedNotificationSchema = z.object({
 });
 
 /**
- * @description Request to update the agent's context without requiring a follow-up action (Guest UI -> Host).
+ * @description Request to update the agent's context without requiring a follow-up action (View -> Host).
  *
  * Unlike `notifications/message` which is for debugging/logging, this request is intended
- * to update the Host's model context. Each request overwrites the previous context sent by the Guest UI.
+ * to update the Host's model context. Each request overwrites the previous context sent by the View.
  * Unlike messages, context updates do not trigger follow-ups.
  *
  * The host will typically defer sending the context to the model until the next user message
  * (including `ui/message`), and will only send the last update received.
  *
- * @see {@link app.App.updateModelContext} for the method that sends this request
+ * @see {@link app.App.updateModelContext `App.updateModelContext`} for the method that sends this request
  */
 export const McpUiUpdateModelContextRequestSchema = z.object({
   method: z.literal("ui/update-model-context"),
@@ -784,8 +962,8 @@ export const McpUiUpdateModelContextRequestSchema = z.object({
 });
 
 /**
- * @description Initialization request sent from Guest UI to Host.
- * @see {@link app!App.connect} for the method that sends this request
+ * @description Initialization request sent from View to Host.
+ * @see {@link app!App.connect `App.connect`} for the method that sends this request
  */
 export const McpUiInitializeRequestSchema = z.object({
   method: z.literal("ui/initialize"),
@@ -804,8 +982,8 @@ export const McpUiInitializeRequestSchema = z.object({
 });
 
 /**
- * @description Initialization result returned from Host to Guest UI.
- * @see {@link McpUiInitializeRequest}
+ * @description Initialization result returned from Host to View.
+ * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`}
  */
 export const McpUiInitializeResultSchema = z
   .object({

@@ -18,29 +18,29 @@ import {
  * ## Security
  *
  * The `eventSource` parameter is required and validates the message source window
- * by checking `event.source`. For guest UIs, pass `window.parent`.
+ * by checking `event.source`. For views, pass `window.parent`.
  * For hosts, pass `iframe.contentWindow` to validate the iframe source.
  *
  * ## Usage
  *
- * **Guest UI**:
- * ```typescript
+ * **View**:
+ * ```ts source="./message-transport.examples.ts#PostMessageTransport_view"
  * const transport = new PostMessageTransport(window.parent, window.parent);
  * await app.connect(transport);
  * ```
  *
  * **Host**:
- * ```typescript
- * const iframe = document.getElementById('app-iframe') as HTMLIFrameElement;
+ * ```ts source="./message-transport.examples.ts#PostMessageTransport_host"
+ * const iframe = document.getElementById("app-iframe") as HTMLIFrameElement;
  * const transport = new PostMessageTransport(
  *   iframe.contentWindow!,
- *   iframe.contentWindow!
+ *   iframe.contentWindow!,
  * );
  * await bridge.connect(transport);
  * ```
  *
- * @see {@link app!App.connect} for Guest UI usage
- * @see {@link app-bridge!AppBridge.connect} for Host usage
+ * @see {@link app!App.connect `App.connect`} for View usage
+ * @see {@link app-bridge!AppBridge.connect `AppBridge.connect`} for Host usage
  */
 export class PostMessageTransport implements Transport {
   private messageListener: (
@@ -52,20 +52,20 @@ export class PostMessageTransport implements Transport {
    * Create a new PostMessageTransport.
    *
    * @param eventTarget - Target window to send messages to (default: `window.parent`)
-   * @param eventSource - Source window for message validation. For guests, pass
+   * @param eventSource - Source window for message validation. For views, pass
    *   `window.parent`. For hosts, pass `iframe.contentWindow`.
    *
-   * @example Guest UI connecting to parent
-   * ```typescript
+   * @example View connecting to parent
+   * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_view"
    * const transport = new PostMessageTransport(window.parent, window.parent);
    * ```
    *
    * @example Host connecting to iframe
-   * ```typescript
-   * const iframe = document.getElementById('app') as HTMLIFrameElement;
+   * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_host"
+   * const iframe = document.getElementById("app-iframe") as HTMLIFrameElement;
    * const transport = new PostMessageTransport(
    *   iframe.contentWindow!,
-   *   iframe.contentWindow!
+   *   iframe.contentWindow!,
    * );
    * ```
    */
@@ -82,7 +82,17 @@ export class PostMessageTransport implements Transport {
       if (parsed.success) {
         console.debug("Parsed message", parsed.data);
         this.onmessage?.(parsed.data);
+      } else if (event.data?.jsonrpc !== "2.0") {
+        // Not a JSON-RPC message at all (e.g. internal frames injected by
+        // the host environment). Ignore silently so the transport stays alive.
+        console.debug(
+          "Ignoring non-JSON-RPC message",
+          parsed.error.message,
+          event,
+        );
       } else {
+        // Has jsonrpc: "2.0" but is otherwise malformed — surface as a real
+        // protocol error.
         console.error("Failed to parse message", parsed.error.message, event);
         this.onerror?.(
           new Error(
@@ -120,7 +130,7 @@ export class PostMessageTransport implements Transport {
   /**
    * Stop listening for messages and cleanup.
    *
-   * Removes the message event listener and calls the {@link onclose} callback if set.
+   * Removes the message event listener and calls the {@link onclose `onclose`} callback if set.
    */
   async close() {
     window.removeEventListener("message", this.messageListener);
@@ -130,7 +140,7 @@ export class PostMessageTransport implements Transport {
   /**
    * Called when the transport is closed.
    *
-   * Set this handler to be notified when {@link close} is called.
+   * Set this handler to be notified when {@link close `close`} is called.
    */
   onclose?: () => void;
 
@@ -147,7 +157,7 @@ export class PostMessageTransport implements Transport {
   /**
    * Called when a valid JSON-RPC message is received.
    *
-   * This handler is invoked after message validation succeeds. The {@link start}
+   * This handler is invoked after message validation succeeds. The {@link start `start`}
    * method must be called before messages will be received.
    *
    * @param message - The validated JSON-RPC message

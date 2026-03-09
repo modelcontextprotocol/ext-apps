@@ -10,6 +10,36 @@ permissions:
   contents: read
 
 jobs:
+  prettier-fix:
+    name: Auto-fix formatting
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ github.token }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run prettier:fix
+
+      - name: Commit formatting changes
+        run: |
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "style: auto-fix prettier formatting"
+          git push
+
   build:
     strategy:
       fail-fast: false
@@ -30,7 +60,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Verify no private URLs in package-lock.json
         shell: bash
@@ -40,13 +70,18 @@ jobs:
         shell: bash
         run: node scripts/check-versions.mjs
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - run: npm run build
+
+      - name: Validate TypeDoc links
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: npm exec typedoc -- --treatValidationWarningsAsErrors --emit none
 
       - run: npm run examples:build
 
@@ -56,24 +91,36 @@ jobs:
           npm run generate:schemas
           git diff --exit-code src/generated/ || (echo "Generated schemas are out of date. Run 'npm run generate:schemas' and commit." && exit 1)
 
+      - name: Verify synced snippets are up-to-date
+        shell: bash
+        run: |
+          npm run sync:snippets
+          git diff --exit-code src/ docs/ || (echo "Synced snippets are out of date. Run 'npm run sync:snippets' and commit." && exit 1)
+
       - run: npm test
 
       - run: npm run prettier
 
+      - name: Build MCPB bundle (pdf-server)
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: npx -y @anthropic-ai/mcpb pack
+        working-directory: examples/pdf-server
+
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
 
       - run: npm ci
 
@@ -84,7 +131,7 @@ jobs:
         run: npx playwright test --reporter=list
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: test-results
@@ -97,9 +144,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: Vampire/setup-wsl@v5
+      - uses: Vampire/setup-wsl@v6
         with:
           distribution: Ubuntu-24.04
 
@@ -107,13 +154,13 @@ jobs:
         shell: wsl-bash {0}
         run: |
           sudo apt-get update
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
           sudo apt-get install -y nodejs
 
       - name: Build and test in WSL
         shell: wsl-bash {0}
         run: |
-          npm install
+          npm ci
           npm run build
           npm run examples:build
           npm test
@@ -140,17 +187,20 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Create test project and install from git
         shell: bash
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: |
           mkdir test-project
           cd test-project
           npm init -y
           # Install from the PR branch (use head repo for fork PRs)
-          npm install "git+https://github.com/${{ github.event.pull_request.head.repo.full_name || github.repository }}#${{ github.head_ref || github.ref_name }}"
+          npm install "git+https://github.com/${HEAD_REPO}#${HEAD_REF}"
           # Verify the package is usable (ESM import)
           node --input-type=module -e "import { App } from '@modelcontextprotocol/ext-apps'; console.log('Import successful:', typeof App)"

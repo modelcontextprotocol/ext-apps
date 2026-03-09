@@ -2,5 +2,7 @@ examples/basic-host/**/*.ts
 examples/basic-host/**/*.tsx
 examples/basic-server-*/**/*.ts
 examples/basic-server-*/**/*.tsx
+examples/quickstart/**/*.ts
 **/vendor/**
+**/.build/**
 SKILL.md

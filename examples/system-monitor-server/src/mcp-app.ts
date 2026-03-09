@@ -13,36 +13,44 @@ Chart.register(...registerables);
 // Types
 // =============================================================================
 
-interface SystemStats {
+// Static system info (received once via ontoolresult from LLM-facing tool)
+interface SystemInfo {
+  hostname: string;
+  platform: string;
+  arch: string;
   cpu: {
-    cores: Array<{ idle: number; total: number }>;
     model: string;
     count: number;
   };
   memory: {
-    usedBytes: number;
     totalBytes: number;
+  };
+}
+
+// Dynamic polling data (received repeatedly via poll-system-stats)
+interface PollStats {
+  cpu: {
+    cores: Array<{ idle: number; total: number }>;
+  };
+  memory: {
+    usedBytes: number;
     usedPercent: number;
     freeBytes: number;
-    usedFormatted: string;
-    totalFormatted: string;
   };
-  system: {
-    hostname: string;
-    platform: string;
-    arch: string;
-    uptime: number;
-    uptimeFormatted: string;
+  uptime: {
+    seconds: number;
   };
   timestamp: string;
 }
 
-interface PollingState {
+interface AppState {
+  // Static info (set once via ontoolresult)
+  systemInfo: SystemInfo | null;
+  // Polling state
   isPolling: boolean;
   intervalId: number | null;
   cpuHistory: number[][]; // [timestamp][coreIndex] = usage%
   labels: string[];
-  coreCount: number;
   chart: Chart | null;
   previousCpuSnapshots: Array<{ idle: number; total: number }> | null;
 }
@@ -92,15 +100,41 @@ const CORE_COLORS = [
   "rgba(244, 114, 182, 0.7)", // pink-light
 ];
 
-const state: PollingState = {
+const state: AppState = {
+  systemInfo: null,
   isPolling: false,
   intervalId: null,
   cpuHistory: [],
   labels: [],
-  coreCount: 0,
   chart: null,
   previousCpuSnapshots: null,
 };
+
+// =============================================================================
+// Formatting Utilities
+// =============================================================================
+
+function formatBytes(bytes: number): string {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  return parts.length > 0 ? parts.join(" ") : "< 1m";
+}
 
 // =============================================================================
 // Chart.js Setup
@@ -179,13 +213,17 @@ function initChart(coreCount: number): Chart {
   });
 }
 
-function updateChart(cpuHistory: number[][], labels: string[]): void {
+function updateChart(
+  cpuHistory: number[][],
+  labels: string[],
+  coreCount: number,
+): void {
   if (!state.chart) return;
 
   state.chart.data.labels = labels;
 
   // Transpose: cpuHistory[time][core] -> datasets[core].data[time]
-  for (let coreIdx = 0; coreIdx < state.coreCount; coreIdx++) {
+  for (let coreIdx = 0; coreIdx < coreCount; coreIdx++) {
     state.chart.data.datasets[coreIdx].data = cpuHistory.map(
       (snapshot) => snapshot[coreIdx] ?? 0,
     );
@@ -200,8 +238,8 @@ function updateChart(cpuHistory: number[][], labels: string[]): void {
 
   // Add 20% headroom, clamp to reasonable bounds
   const headroom = 1.2;
-  const minVisible = state.coreCount * 15; // At least 15% per core visible
-  const absoluteMax = state.coreCount * 100;
+  const minVisible = coreCount * 15; // At least 15% per core visible
+  const absoluteMax = coreCount * 100;
 
   const dynamicMax = Math.min(
     Math.max(currentMax * headroom, minVisible),
@@ -217,7 +255,10 @@ function updateChart(cpuHistory: number[][], labels: string[]): void {
 // UI Updates
 // =============================================================================
 
-function updateMemoryBar(memory: SystemStats["memory"]): void {
+function updateMemoryBar(
+  memory: PollStats["memory"],
+  totalBytes: number,
+): void {
   const percent = memory.usedPercent;
 
   memoryBarFill.style.width = `${percent}%`;
@@ -230,13 +271,18 @@ function updateMemoryBar(memory: SystemStats["memory"]): void {
   }
 
   memoryPercent.textContent = `${percent}%`;
-  memoryDetail.textContent = `${memory.usedFormatted} / ${memory.totalFormatted}`;
+  memoryDetail.textContent = `${formatBytes(memory.usedBytes)} / ${formatBytes(totalBytes)}`;
 }
 
-function updateSystemInfo(system: SystemStats["system"]): void {
-  infoHostname.textContent = system.hostname;
-  infoPlatform.textContent = system.platform;
-  infoUptime.textContent = system.uptimeFormatted;
+// Called once when static system info is received
+function updateStaticSystemInfo(info: SystemInfo): void {
+  infoHostname.textContent = info.hostname;
+  infoPlatform.textContent = info.platform;
+}
+
+// Called on each poll for dynamic uptime
+function updateDynamicUptime(uptime: PollStats["uptime"]): void {
+  infoUptime.textContent = formatUptime(uptime.seconds);
 }
 
 function updateStatus(text: string, isPolling = false, isError = false): void {
@@ -273,19 +319,18 @@ function calculateCpuUsage(
 }
 
 async function fetchStats(): Promise<void> {
+  // systemInfo is guaranteed to exist (polling starts after ontoolresult)
+  const { systemInfo } = state;
+  if (!systemInfo) return;
+
   try {
     const result = await app.callServerTool({
-      name: "refresh-stats", // Use app-only tool for polling
+      name: "poll-system-stats", // App-only tool for polling dynamic data
       arguments: {},
     });
 
-    const stats = result.structuredContent as unknown as SystemStats;
-
-    // Initialize chart on first data if needed
-    if (!state.chart && stats.cpu.count > 0) {
-      state.coreCount = stats.cpu.count;
-      state.chart = initChart(state.coreCount);
-    }
+    const stats = result.structuredContent as unknown as PollStats;
+    const coreCount = systemInfo.cpu.count;
 
     // Calculate CPU usage from raw timing data (client-side)
     const coreUsages = calculateCpuUsage(
@@ -302,10 +347,10 @@ async function fetchStats(): Promise<void> {
       state.labels.shift();
     }
 
-    // Update UI
-    updateChart(state.cpuHistory, state.labels);
-    updateMemoryBar(stats.memory);
-    updateSystemInfo(stats.system);
+    // Update UI with dynamic data
+    updateChart(state.cpuHistory, state.labels, coreCount);
+    updateMemoryBar(stats.memory, systemInfo.memory.totalBytes);
+    updateDynamicUptime(stats.uptime);
 
     const time = new Date().toLocaleTimeString("en-US", { hour12: false });
     updateStatus(time, true);
@@ -366,14 +411,33 @@ pollToggleBtn.addEventListener("click", togglePolling);
 window
   .matchMedia("(prefers-color-scheme: dark)")
   .addEventListener("change", () => {
-    if (state.chart) {
+    if (state.chart && state.systemInfo) {
+      const coreCount = state.systemInfo.cpu.count;
       state.chart.destroy();
-      state.chart = initChart(state.coreCount);
-      updateChart(state.cpuHistory, state.labels);
+      state.chart = initChart(coreCount);
+      updateChart(state.cpuHistory, state.labels, coreCount);
     }
   });
 
 app.onerror = console.error;
+
+// Receive static system info when host sends the initial tool result
+app.ontoolresult = (result) => {
+  const info = result.structuredContent as unknown as SystemInfo;
+
+  if (info) {
+    state.systemInfo = info;
+
+    // Initialize chart with CPU count from static info
+    state.chart = initChart(info.cpu.count);
+
+    // Update static UI elements (hostname, platform)
+    updateStaticSystemInfo(info);
+
+    // Start polling after receiving static info
+    startPolling();
+  }
+};
 
 function handleHostContextChanged(ctx: McpUiHostContext) {
   if (ctx.safeAreaInsets) {
@@ -392,6 +456,3 @@ app.connect().then(() => {
     handleHostContextChanged(ctx);
   }
 });
-
-// Auto-start polling after a short delay
-setTimeout(startPolling, 500);

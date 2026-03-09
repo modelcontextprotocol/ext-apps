@@ -4,10 +4,49 @@ A demo MCP App that renders [ABC notation](https://en.wikipedia.org/wiki/ABC_not
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/sheet-music-server/01-twinkle-twinkle-little-star.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/sheet-music-server/01-twinkle-twinkle-little-star.png" alt="Twinkle, Twinkle Little Star" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/sheet-music-server/02-playing-on-repeat.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/sheet-music-server/02-playing-on-repeat.png" alt="Playing on repeat" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/sheet-music-server/01-twinkle-twinkle-little-star.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/sheet-music-server/01-twinkle-twinkle-little-star.png" alt="Twinkle, Twinkle Little Star" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/sheet-music-server/02-playing-on-repeat.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/sheet-music-server/02-playing-on-repeat.png" alt="Playing on repeat" width="100%"></a></td>
   </tr>
 </table>
+
+## MCP Client Configuration
+
+Add to your MCP client configuration (stdio transport):
+
+```json
+{
+  "mcpServers": {
+    "sheet-music": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--silent",
+        "--registry=https://registry.npmjs.org/",
+        "@modelcontextprotocol/server-sheet-music",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
+
+### Local Development
+
+To test local modifications, use this configuration (replace `~/code/ext-apps` with your clone path):
+
+```json
+{
+  "mcpServers": {
+    "sheet-music": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd ~/code/ext-apps/examples/sheet-music-server && npm run build >&2 && node dist/index.js --stdio"
+      ]
+    }
+  }
+}
+```
 
 ## Features
 

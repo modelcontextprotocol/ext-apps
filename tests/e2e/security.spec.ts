@@ -9,8 +9,23 @@
  * Note: True cross-origin attack testing would require a multi-origin test
  * setup. These tests verify the security infrastructure is in place and
  * functioning correctly for valid communication paths.
+ *
+ * Note: These tests require the integration-server. When using EXAMPLE filter,
+ * set EXAMPLE=integration-server to run these tests.
  */
 import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
+
+// Optional: filter to a single example via EXAMPLE env var (folder name)
+// Security tests require integration-server, skip if filtering to a different example
+const EXAMPLE_FILTER = process.env.EXAMPLE;
+const SKIP_SECURITY_TESTS =
+  EXAMPLE_FILTER && EXAMPLE_FILTER !== "integration-server";
+
+// Skip all security tests if filtering to a non-integration example
+test.skip(
+  () => !!SKIP_SECURITY_TESTS,
+  "Skipped: security tests require integration-server",
+);
 
 /**
  * Capture console messages matching a pattern

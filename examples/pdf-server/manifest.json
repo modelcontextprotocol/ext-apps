@@ -1,0 +1,48 @@
+{
+  "manifest_version": "0.3",
+  "name": "@modelcontextprotocol/server-pdf",
+  "display_name": "PDF (By Anthropic)",
+  "version": "1.0.1",
+  "description": "Read and interact with PDF files using an interactive viewer with search, navigation, and text extraction",
+  "author": {
+    "name": "Anthropic",
+    "url": "https://www.anthropic.com"
+  },
+  "homepage": "https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/pdf-server",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modelcontextprotocol/ext-apps"
+  },
+  "support": "https://github.com/modelcontextprotocol/ext-apps/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js", "--stdio"],
+      "env": {}
+    }
+  },
+  "tools": [
+    {
+      "name": "list_pdfs",
+      "description": "List available PDF files that can be displayed"
+    },
+    {
+      "name": "display_pdf",
+      "description": "Display an interactive PDF viewer with search and navigation"
+    },
+    {
+      "name": "read_pdf_bytes",
+      "description": "Read a range of bytes from a PDF file (max 512KB per request)"
+    }
+  ],
+  "keywords": ["pdf", "documents", "viewer", "reading"],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": { "node": ">=18.0.0" }
+  },
+  "privacy_policies": ["https://www.anthropic.com/privacy"]
+}

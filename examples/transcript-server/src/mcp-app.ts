@@ -68,7 +68,7 @@ app.onteardown = async () => {
 
 app.onerror = log.error;
 
-app.onhostcontextchanged = (ctx: McpUiHostContext) => {
+function handleHostContextChanged(ctx: McpUiHostContext) {
   if (ctx.safeAreaInsets) {
     mainEl.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
     mainEl.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
@@ -78,7 +78,9 @@ app.onhostcontextchanged = (ctx: McpUiHostContext) => {
   if (ctx.theme) {
     applyDocumentTheme(ctx.theme);
   }
-};
+}
+
+app.onhostcontextchanged = handleHostContextChanged;
 
 // ============================================================================
 // Audio Capture
@@ -546,6 +548,6 @@ app.connect().then(() => {
   log.info("Connected to host");
   const ctx = app.getHostContext();
   if (ctx) {
-    app.onhostcontextchanged?.(ctx);
+    handleHostContextChanged(ctx);
   }
 });

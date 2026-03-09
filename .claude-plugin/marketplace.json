@@ -1,0 +1,14 @@
+{
+  "name": "mcp-apps",
+  "description": "Plugins for MCP Apps development",
+  "owner": {
+    "name": "MCP Apps"
+  },
+  "plugins": [
+    {
+      "name": "mcp-apps",
+      "source": "./plugins/mcp-apps",
+      "description": "Skills for creating MCP Apps with the MCP Apps SDK"
+    }
+  ]
+}

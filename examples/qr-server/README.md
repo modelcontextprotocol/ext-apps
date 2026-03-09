@@ -1,15 +1,39 @@
 # QR Code MCP Server
 
-A minimal Python MCP server that generates customizable QR codes with an interactive widget UI.
+A minimal Python MCP server that generates customizable QR codes with an interactive view UI.
 
-![Screenshot](https://modelcontextprotocol.github.io/ext-apps/screenshots/qr-server/screenshot.png)
+![Screenshot](https://apps.extensions.modelcontextprotocol.io/screenshots/qr-server/screenshot.png)
+
+## MCP Client Configuration
+
+First, clone the repository:
+
+```bash
+git clone https://github.com/modelcontextprotocol/ext-apps.git
+```
+
+Then add to your MCP client configuration (stdio transport), replacing `~/code/ext-apps` with your clone path:
+
+```json
+{
+  "mcpServers": {
+    "qr": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "uv run ~/code/ext-apps/examples/qr-server/server.py --stdio"
+      ]
+    }
+  }
+}
+```
 
 ## Features
 
 - Generate QR codes from any text or URL
 - Customizable colors, size, and error correction
-- Interactive widget that displays in MCP-UI enabled clients
-- Supports both HTTP (for web clients) and stdio (for Claude Desktop)
+- Interactive view that displays in MCP-UI enabled clients
+- Supports both HTTP (for web clients) and stdio (for MCP clients)
 
 ## Prerequisites
 
@@ -41,24 +65,13 @@ Connect from basic-host:
 SERVERS='["http://localhost:3108/mcp"]' bun serve.ts
 ```
 
-### Stdio Mode (for Claude Desktop)
+### Stdio Mode (for MCP clients)
 
 ```bash
 uv run server.py --stdio
 ```
 
-Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "qr": {
-      "command": "uv",
-      "args": ["run", "/path/to/qr-server/server.py", "--stdio"]
-    }
-  }
-}
-```
+See [MCP Client Configuration](#mcp-client-configuration) above for how to add this server to your MCP client.
 
 ### Docker (accessing host server from container)
 
@@ -137,19 +150,19 @@ Generate a QR code with optional customization.
 ```
 qr-server/
 ├── server.py      # MCP server (FastMCP + uvicorn, deps inline via PEP 723)
-├── widget.html    # Interactive UI widget
+├── view.html    # Interactive UI view
 └── README.md
 ```
 
 ### Protocol
 
-The widget uses MCP Apps SDK protocol:
+The view uses MCP Apps SDK protocol:
 
-1. Widget sends `ui/initialize` request
+1. The view sends `ui/initialize` request
 2. Host responds with capabilities
-3. Widget sends `ui/notifications/initialized`
+3. The view sends `ui/notifications/initialized`
 4. Host sends `ui/notifications/tool-result` with QR image
-5. Widget renders image and sends `ui/notifications/size-changed`
+5. The view renders image and sends `ui/notifications/size-changed`
 
 ## Dependencies
 

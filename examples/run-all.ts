@@ -6,6 +6,9 @@
  *   bun examples/run-all.ts start  - Build and start all examples
  *   bun examples/run-all.ts dev    - Run all examples in dev/watch mode
  *   bun examples/run-all.ts build  - Build all examples
+ *
+ * Environment:
+ *   EXAMPLE=<folder>  - Run only a single example (e.g., EXAMPLE=say-server)
  */
 
 import { readdirSync, statSync, existsSync } from "fs";
@@ -14,21 +17,36 @@ import concurrently from "concurrently";
 const BASE_PORT = 3101;
 const BASIC_HOST = "basic-host";
 
+// Optional: filter to a single example via EXAMPLE env var (folder name)
+const EXAMPLE_FILTER = process.env.EXAMPLE;
+
 // Find all example directories except basic-host that have a package.json,
 // assign ports, and build URL list
-const servers = readdirSync("examples")
+const allServers = readdirSync("examples")
   .filter(
     (d) =>
       d !== BASIC_HOST &&
       statSync(`examples/${d}`).isDirectory() &&
       existsSync(`examples/${d}/package.json`),
   )
-  .sort() // Sort for consistent port assignment
-  .map((dir, i) => ({
-    dir,
-    port: BASE_PORT + i,
-    url: `http://localhost:${BASE_PORT + i}/mcp`,
-  }));
+  .sort(); // Sort for consistent port assignment
+
+// Filter servers if EXAMPLE is specified
+const filteredDirs = EXAMPLE_FILTER
+  ? allServers.filter((d) => d === EXAMPLE_FILTER)
+  : allServers;
+
+if (EXAMPLE_FILTER && filteredDirs.length === 0) {
+  console.error(`Error: No example found matching EXAMPLE=${EXAMPLE_FILTER}`);
+  console.error(`Available examples: ${allServers.join(", ")}`);
+  process.exit(1);
+}
+
+const servers = filteredDirs.map((dir, i) => ({
+  dir,
+  port: BASE_PORT + i,
+  url: `http://localhost:${BASE_PORT + i}/mcp`,
+}));
 
 const COMMANDS = ["start", "dev", "build"];
 
@@ -43,6 +61,9 @@ if (!command || !COMMANDS.includes(command)) {
 const serversEnv = JSON.stringify(servers.map((s) => s.url));
 
 console.log(`Running command: ${command}`);
+if (EXAMPLE_FILTER) {
+  console.log(`Filtering to single example: ${EXAMPLE_FILTER}`);
+}
 console.log(
   `Server examples: ${servers.map((s) => `${s.dir}:${s.port}`).join(", ")}`,
 );

@@ -69,7 +69,16 @@ export function createServer(): McpServer {
 
   server.registerResource(
     "video",
-    new ResourceTemplate("videos://{id}", { list: undefined }),
+    new ResourceTemplate("videos://{id}", {
+      list: async () => ({
+        resources: Object.entries(VIDEO_LIBRARY).map(([id, video]) => ({
+          uri: `videos://${id}`,
+          name: `video-${id}`,
+          description: `Video: ${video.description}`,
+          mimeType: "video/mp4",
+        })),
+      }),
+    }),
     {
       description: "Video served via MCP resource (base64 blob)",
       mimeType: "video/mp4",

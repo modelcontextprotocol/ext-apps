@@ -4,13 +4,13 @@
  * Renders interactive 3D scenes using Three.js with streaming code preview.
  * Receives all MCP App props from the wrapper.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import type { WidgetProps } from "./mcp-app-wrapper.tsx";
+import type { ViewProps } from "./mcp-app-wrapper.tsx";
 
 // =============================================================================
 // Types
@@ -21,7 +21,7 @@ interface ThreeJSToolInput {
   height?: number;
 }
 
-type ThreeJSAppProps = WidgetProps<ThreeJSToolInput>;
+type ThreeJSAppProps = ViewProps<ThreeJSToolInput>;
 
 // =============================================================================
 // Constants
@@ -30,9 +30,10 @@ type ThreeJSAppProps = WidgetProps<ThreeJSToolInput>;
 // Default demo code shown when no code is provided
 const DEFAULT_THREEJS_CODE = `const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setSize(width, height);
-renderer.setClearColor(0x1a1a2e);
+// Transparent background - scene composites over host UI
+renderer.setClearColor(0x000000, 0);
 
 const cube = new THREE.Mesh(
   new THREE.BoxGeometry(1, 1, 1),
@@ -66,13 +67,6 @@ animate();`;
 // Streaming Preview
 // =============================================================================
 
-const SHIMMER_STYLE = `
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-`;
-
 function LoadingShimmer({ height, code }: { height: number; code?: string }) {
   const preRef = useRef<HTMLPreElement>(null);
 
@@ -85,28 +79,25 @@ function LoadingShimmer({ height, code }: { height: number; code?: string }) {
       style={{
         width: "100%",
         height,
-        borderRadius: 8,
+        borderRadius: "var(--border-radius-lg, 8px)",
         padding: 16,
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
         background:
-          "linear-gradient(90deg, #1a1a2e 25%, #2d2d44 50%, #1a1a2e 75%)",
-        backgroundSize: "200% 100%",
-        animation: "shimmer 1.5s ease-in-out infinite",
+          "linear-gradient(135deg, var(--color-background-secondary, light-dark(#f0f0f5, #2a2a3c)) 0%, var(--color-background-tertiary, light-dark(#e5e5ed, #1e1e2e)) 100%)",
       }}
     >
-      <style>{SHIMMER_STYLE}</style>
       <div
         style={{
-          color: "#888",
-          fontFamily: "system-ui",
+          color: "var(--color-text-tertiary, light-dark(#666, #888))",
+          fontFamily: "var(--font-sans, system-ui)",
           fontSize: 12,
           marginBottom: 8,
         }}
       >
-        🎮 Three.js
+        Three.js
       </div>
       {code && (
         <pre
@@ -116,10 +107,10 @@ function LoadingShimmer({ height, code }: { height: number; code?: string }) {
             padding: 0,
             flex: 1,
             overflow: "auto",
-            color: "#aaa",
-            fontFamily: "monospace",
-            fontSize: 11,
-            lineHeight: 1.4,
+            color: "var(--color-text-ghost, light-dark(#777, #aaa))",
+            fontFamily: "var(--font-mono, monospace)",
+            fontSize: "var(--font-text-xs-size, 11px)",
+            lineHeight: "var(--font-text-xs-line-height, 1.4)",
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
           }}
@@ -135,6 +126,43 @@ function LoadingShimmer({ height, code }: { height: number; code?: string }) {
 // Three.js Execution
 // =============================================================================
 
+// Visibility-aware animation controller
+function createAnimationController() {
+  let isVisible = true;
+  let pendingCallbacks: FrameRequestCallback[] = [];
+  let rafIds: number[] = [];
+
+  const visibilityAwareRAF = (callback: FrameRequestCallback): number => {
+    if (isVisible) {
+      const id = requestAnimationFrame(callback);
+      rafIds.push(id);
+      return id;
+    } else {
+      // Queue callback for when visible again
+      pendingCallbacks.push(callback);
+      return -1;
+    }
+  };
+
+  const setVisible = (visible: boolean) => {
+    isVisible = visible;
+    if (visible && pendingCallbacks.length > 0) {
+      // Resume queued animations
+      const callbacks = pendingCallbacks;
+      pendingCallbacks = [];
+      callbacks.forEach((cb) => visibilityAwareRAF(cb));
+    }
+  };
+
+  const cleanup = () => {
+    rafIds.forEach((id) => cancelAnimationFrame(id));
+    rafIds = [];
+    pendingCallbacks = [];
+  };
+
+  return { visibilityAwareRAF, setVisible, cleanup };
+}
+
 const threeContext = {
   THREE,
   OrbitControls,
@@ -148,16 +176,18 @@ async function executeThreeCode(
   canvas: HTMLCanvasElement,
   width: number,
   height: number,
+  visibilityAwareRAF: (callback: FrameRequestCallback) => number,
 ): Promise<void> {
   const fn = new Function(
     "ctx",
     "canvas",
     "width",
     "height",
+    "requestAnimationFrame",
     `const { THREE, OrbitControls, EffectComposer, RenderPass, UnrealBloomPass } = ctx;
      return (async () => { ${code} })();`,
   );
-  await fn(threeContext, canvas, width, height);
+  await fn(threeContext, canvas, width, height, visibilityAwareRAF);
 }
 
 // =============================================================================
@@ -165,18 +195,20 @@ async function executeThreeCode(
 // =============================================================================
 
 export default function ThreeJSApp({
+  app,
   toolInputs,
   toolInputsPartial,
-  toolResult: _toolResult,
   hostContext,
-  callServerTool: _callServerTool,
-  sendMessage: _sendMessage,
-  openLink: _openLink,
-  sendLog: _sendLog,
 }: ThreeJSAppProps) {
   const [error, setError] = useState<string | null>(null);
+  const [currentDisplayMode, setCurrentDisplayMode] = useState<
+    "inline" | "fullscreen"
+  >("inline");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const animControllerRef = useRef<ReturnType<
+    typeof createAnimationController
+  > | null>(null);
 
   const height = toolInputs?.height ?? toolInputsPartial?.height ?? 400;
   const code = toolInputs?.code || DEFAULT_THREEJS_CODE;
@@ -191,14 +223,73 @@ export default function ThreeJSApp({
     paddingLeft: safeAreaInsets?.left,
   };
 
+  const canFullscreen =
+    hostContext?.availableDisplayModes?.includes("fullscreen") ?? false;
+  const isFullscreen = currentDisplayMode === "fullscreen";
+
+  // Sync display mode from host context
+  useEffect(() => {
+    if (
+      hostContext?.displayMode === "inline" ||
+      hostContext?.displayMode === "fullscreen"
+    ) {
+      setCurrentDisplayMode(hostContext.displayMode);
+    }
+  }, [hostContext?.displayMode]);
+
+  const toggleFullscreen = useCallback(async () => {
+    const newMode = isFullscreen ? "inline" : "fullscreen";
+    try {
+      const result = await app.requestDisplayMode({ mode: newMode });
+      if (result.mode === newMode) {
+        setCurrentDisplayMode(result.mode);
+      }
+    } catch {
+      // ignore
+    }
+  }, [isFullscreen, app]);
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) toggleFullscreen();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isFullscreen, toggleFullscreen]);
+
+  // Visibility-based pause/play
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        animControllerRef.current?.setVisible(entry.isIntersecting);
+      });
+    });
+    observer.observe(containerRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!code || !canvasRef.current || !containerRef.current) return;
 
+    // Cleanup previous animation
+    animControllerRef.current?.cleanup();
+    animControllerRef.current = createAnimationController();
+
     setError(null);
     const width = containerRef.current.offsetWidth || 800;
-    executeThreeCode(code, canvasRef.current, width, height).catch((e) =>
-      setError(e instanceof Error ? e.message : "Unknown error"),
-    );
+    executeThreeCode(
+      code,
+      canvasRef.current,
+      width,
+      height,
+      animControllerRef.current.visibilityAwareRAF,
+    ).catch((e) => setError(e instanceof Error ? e.message : "Unknown error"));
+
+    return () => animControllerRef.current?.cleanup();
   }, [code, height]);
 
   if (isStreaming || !code) {
@@ -212,7 +303,7 @@ export default function ThreeJSApp({
   return (
     <div
       ref={containerRef}
-      className="threejs-container"
+      className={`threejs-container${isFullscreen ? " fullscreen" : ""}`}
       style={containerStyle}
     >
       <canvas
@@ -221,12 +312,35 @@ export default function ThreeJSApp({
         style={{
           width: "100%",
           height,
-          borderRadius: 8,
+          borderRadius: "var(--border-radius-lg, 8px)",
           display: "block",
-          background: "#1a1a2e",
         }}
       />
       {error && <div className="error-overlay">Error: {error}</div>}
+      <button
+        className={`fullscreen-btn${canFullscreen ? " available" : ""}`}
+        title={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
+        onClick={toggleFullscreen}
+      >
+        <svg
+          className="expand-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+        </svg>
+        <svg
+          className="collapse-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+        </svg>
+      </button>
     </div>
   );
 }

@@ -4,11 +4,50 @@ A demo MCP App that displays cohort retention data as an interactive heatmap, sh
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/cohort-heatmap-server/01-initial-view.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/cohort-heatmap-server/01-initial-view.png" alt="Initial view" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/cohort-heatmap-server/02-hover-state.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/cohort-heatmap-server/02-hover-state.png" alt="Hover state" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/cohort-heatmap-server/03-low-retention-hover.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/cohort-heatmap-server/03-low-retention-hover.png" alt="Low retention hover" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/cohort-heatmap-server/01-initial-view.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/cohort-heatmap-server/01-initial-view.png" alt="Initial view" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/cohort-heatmap-server/02-hover-state.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/cohort-heatmap-server/02-hover-state.png" alt="Hover state" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/cohort-heatmap-server/03-low-retention-hover.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/cohort-heatmap-server/03-low-retention-hover.png" alt="Low retention hover" width="100%"></a></td>
   </tr>
 </table>
+
+## MCP Client Configuration
+
+Add to your MCP client configuration (stdio transport):
+
+```json
+{
+  "mcpServers": {
+    "cohort-heatmap": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--silent",
+        "--registry=https://registry.npmjs.org/",
+        "@modelcontextprotocol/server-cohort-heatmap",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
+
+### Local Development
+
+To test local modifications, use this configuration (replace `~/code/ext-apps` with your clone path):
+
+```json
+{
+  "mcpServers": {
+    "cohort-heatmap": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd ~/code/ext-apps/examples/cohort-heatmap-server && npm run build >&2 && node dist/index.js --stdio"
+      ]
+    }
+  }
+}
+```
 
 ## Features
 

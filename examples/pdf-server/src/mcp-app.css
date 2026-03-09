@@ -1,17 +1,40 @@
+:root {
+  color-scheme: light dark;
+
+  /* Background colors */
+  --bg000: light-dark(#ffffff, #1a1a1a);
+  --bg100: light-dark(#f5f5f5, #252525);
+  --bg200: light-dark(#e0e0e0, #333333);
+  --bg300: light-dark(#cccccc, #444444);
+
+  /* Text colors */
+  --text000: light-dark(#1a1a1a, #f0f0f0);
+  --text100: light-dark(#666666, #aaaaaa);
+  --text200: light-dark(#999999, #888888);
+
+  /* Shadows */
+  --shadow-page: light-dark(
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.4)
+  );
+  --selection-bg: light-dark(rgba(0, 0, 255, 0.3), rgba(100, 150, 255, 0.4));
+}
+
 body {
   overscroll-behavior-x: none;
+  display: flex;
 }
 
 .main {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  flex: 1;
   width: 100%;
-  background: var(--bg100, #f5f5f5);
-  color: var(--text000, #1a1a1a);
+  background: var(--bg100);
+  color: var(--text000);
   overflow: hidden; /* Prevent scrollbars in inline mode - we request exact size */
   border-radius: 0.75rem;
-  border: 1px solid var(--bg200, rgba(0, 0, 0, 0.08));
+  border: 1px solid var(--bg200);
 }
 
 /* Loading State */
@@ -28,8 +51,8 @@ body {
 .spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid var(--bg200, #e0e0e0);
-  border-top-color: var(--text100, #888);
+  border: 2px solid var(--bg200);
+  border-top-color: var(--text100);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -42,29 +65,7 @@ body {
 
 #loading-text {
   font-size: 0.8rem;
-  color: var(--text100, #888);
-}
-
-/* Progress Bar */
-.progress-container {
-  width: 100%;
-  max-width: 200px;
-  height: 3px;
-  background: var(--bg200, #e0e0e0);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  background: var(--text100, #888);
-  width: 0%;
-  transition: width 0.15s ease-out;
-}
-
-.progress-text {
-  font-size: 0.7rem;
-  color: var(--text200, #aaa);
+  color: var(--text100);
 }
 
 /* Error State */
@@ -84,7 +85,7 @@ body {
 }
 
 #error-message {
-  color: var(--text200, #999);
+  color: var(--text200);
   max-width: 400px;
 }
 
@@ -94,6 +95,7 @@ body {
   flex-direction: column;
   flex: 1;
   overflow: visible;
+  position: relative;
 }
 
 /* Toolbar */
@@ -102,8 +104,8 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 1rem;
-  background: var(--bg000, #ffffff);
-  border-bottom: 1px solid var(--bg200, #e0e0e0);
+  background: var(--bg000);
+  border-bottom: 1px solid var(--bg200);
   flex-shrink: 0;
   gap: 0.5rem;
   height: 48px;
@@ -114,6 +116,8 @@ body {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  align-items: center;
 }
 
 .pdf-title {
@@ -150,17 +154,17 @@ body {
 .page-input {
   width: 50px;
   padding: 0.25rem 0.5rem;
-  border: 1px solid var(--bg200, #e0e0e0);
+  border: 1px solid var(--bg200);
   border-radius: 4px;
   font-size: 0.85rem;
   text-align: center;
-  background: var(--bg000, #ffffff);
-  color: var(--text000, #1a1a1a);
+  background: var(--bg000);
+  color: var(--text000);
 }
 
 .page-input:focus {
   outline: none;
-  border-color: var(--text100, #666);
+  border-color: var(--text100);
 }
 
 .page-input::-webkit-outer-spin-button,
@@ -174,7 +178,7 @@ body {
 
 .total-pages {
   font-size: 0.85rem;
-  color: var(--text100, #666);
+  color: var(--text100);
   white-space: nowrap;
 }
 
@@ -186,10 +190,10 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--bg200, #e0e0e0);
+  border: 1px solid var(--bg200);
   border-radius: 4px;
-  background: var(--bg000, #ffffff);
-  color: var(--text000, #1a1a1a);
+  background: var(--bg000);
+  color: var(--text000);
   cursor: pointer;
   font-size: 1rem;
   transition: all 0.15s ease;
@@ -198,8 +202,8 @@ body {
 .nav-btn:hover:not(:disabled),
 .zoom-btn:hover:not(:disabled),
 .fullscreen-btn:hover {
-  background: var(--bg100, #f5f5f5);
-  border-color: var(--bg300, #ccc);
+  background: var(--bg100);
+  border-color: var(--bg300);
 }
 
 .nav-btn:disabled,
@@ -210,7 +214,7 @@ body {
 
 .zoom-level {
   font-size: 0.8rem;
-  color: var(--text100, #666);
+  color: var(--text100);
   min-width: 50px;
   text-align: center;
 }
@@ -223,12 +227,12 @@ body {
   justify-content: center;
   align-items: flex-start;
   padding: 1rem;
-  background: var(--bg200, #e0e0e0);
+  background: var(--bg200);
 }
 
 .page-wrapper {
   position: relative;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-page);
   background: white;
 }
 
@@ -236,7 +240,10 @@ body {
   display: block;
 }
 
-/* Text Layer for Selection */
+/* Text Layer for Selection
+ * Critical: must include font-size and transform rules that PDF.js TextLayer
+ * relies on via CSS custom properties (--font-height, --scale-x, --rotate).
+ * Without these, text layer spans won't align with the canvas rendering. */
 .text-layer {
   position: absolute;
   left: 0;
@@ -250,10 +257,12 @@ body {
   forced-color-adjust: none;
   transform-origin: 0 0;
   z-index: 2;
+  /* PDF.js TextLayer sets --min-font-size on container */
+  --min-font-size-inv: calc(1 / var(--min-font-size, 1));
 }
 
-.text-layer span,
-.text-layer br {
+
+.text-layer :is(span, br) {
   color: transparent;
   position: absolute;
   white-space: pre;
@@ -261,8 +270,25 @@ body {
   transform-origin: 0% 0%;
 }
 
+/* PDF.js sets --font-height, --scale-x, --rotate as inline styles on each span.
+ * These rules apply proper font size and transforms to match the canvas. */
+.text-layer > :not(.markedContent),
+.text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--scale-factor, 1) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv, 1));
+}
+
+.text-layer .markedContent {
+  display: contents;
+}
+
 .text-layer ::selection {
-  background: rgba(0, 0, 255, 0.3);
+  background: var(--selection-bg);
 }
 
 .text-layer > span {
@@ -280,6 +306,7 @@ body {
   overflow: hidden; /* No scrolling on main - only canvas-container scrolls */
   border-radius: 0;
   border: none;
+  padding: 0 !important; /* Ignore safe area insets in fullscreen */
 }
 
 .main.fullscreen .viewer {
@@ -289,4 +316,155 @@ body {
 .main.fullscreen .canvas-container {
   min-height: 0; /* Allow flex item to shrink below content size */
   overflow: auto; /* Scroll within the document area only */
+}
+
+/* Search Button */
+.search-btn,
+.nav-btn,
+.zoom-btn,
+.fullscreen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bg200);
+  border-radius: 4px;
+  background: var(--bg000);
+  color: var(--text000);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+}
+
+.search-btn:hover,
+.nav-btn:hover:not(:disabled),
+.zoom-btn:hover:not(:disabled),
+.fullscreen-btn:hover {
+  background: var(--bg100);
+  border-color: var(--bg300);
+}
+
+/* Search Bar */
+.search-bar {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  top: 47px; /* below toolbar (48px - 1px border overlap) */
+  right: -1px; /* align with outer border */
+  padding: 0.375rem 0.5rem;
+  background: var(--bg000);
+  border: 1px solid var(--bg200);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+.search-input {
+  width: 200px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--bg200);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: var(--bg000);
+  color: var(--text000);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--text100);
+}
+
+.search-match-count {
+  font-size: 0.8rem;
+  color: var(--text100);
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.search-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--bg200);
+  border-radius: 4px;
+  background: var(--bg000);
+  color: var(--text000);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+}
+
+.search-nav-btn:hover:not(:disabled) {
+  background: var(--bg100);
+  border-color: var(--bg300);
+}
+
+.search-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Highlight Layer */
+.highlight-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.search-highlight {
+  background: rgba(255, 255, 0, 0.4);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.search-highlight.current {
+  background: rgba(255, 165, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-highlight {
+    background: rgba(255, 255, 0, 0.3);
+    mix-blend-mode: screen;
+  }
+
+  .search-highlight.current {
+    background: rgba(255, 165, 0, 0.5);
+    mix-blend-mode: screen;
+  }
+}
+
+/* Loading Indicator (pie) */
+.loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+  transition: opacity 0.3s;
+}
+.loading-indicator-bg {
+  fill: none;
+  stroke: var(--bg200);
+  stroke-width: 3;
+}
+.loading-indicator-arc {
+  fill: none;
+  stroke: var(--text100);
+  stroke-width: 3;
+  stroke-dasharray: 50.27; /* 2*pi*8 */
+  stroke-dashoffset: 50.27;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dashoffset 0.3s;
+}
+.loading-indicator.error .loading-indicator-arc {
+  stroke: #e74c3c;
 }

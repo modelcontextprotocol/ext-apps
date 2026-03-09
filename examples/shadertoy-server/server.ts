@@ -33,9 +33,23 @@ AVAILABLE UNIFORMS:
 - iTime (float): elapsed time in seconds
 - iTimeDelta (float): time since last frame
 - iFrame (int): frame counter
-- iMouse (vec4): mouse position (xy=current, zw=click)
+- iMouse (vec4): mouse/touch position in pixels (see MOUSE INTERACTION below)
 - iDate (vec4): year, month, day, seconds
 - iChannel0-3 (sampler2D): buffer inputs for multi-pass shaders
+
+MOUSE INTERACTION:
+The iMouse uniform provides interactive mouse/touch input (works on mobile):
+- iMouse.xy: Current position while button/touch is held down (frozen on release)
+- iMouse.zw: Click start position (positive when down, negative when released)
+- iMouse.z > 0: Button is currently pressed
+- iMouse.z < 0: Button was released
+- iMouse.z == 0: Never clicked
+
+Example - camera control:
+  vec2 uv = iMouse.xy / iResolution.xy;  // normalized 0-1
+
+Example - detect click:
+  if (iMouse.z > 0.0) { /* button is down */ }
 
 MULTI-PASS RENDERING:
 - Use bufferA-D parameters for feedback effects, blur chains, simulations

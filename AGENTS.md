@@ -6,11 +6,11 @@ MCP Apps SDK (`@modelcontextprotocol/ext-apps`) enables MCP servers to display i
 
 Key abstractions:
 
-- **Guest** - UI running in an iframe, uses `App` class with `PostMessageTransport` to communicate with host
+- **View** - UI running in an iframe, uses `App` class with `PostMessageTransport` to communicate with host
 - **Host** - Chat client embedding the iframe, uses `AppBridge` class to proxy MCP requests
 - **Server** - MCP server that registers tools/resources with UI metadata
 
-Specification (draft): `specification/draft/apps.mdx`
+Specification (stable): `specification/2026-01-26/apps.mdx`
 
 ## Commands
 
@@ -39,7 +39,10 @@ npm test
 # Check JSDoc comment syntax and `{@link}` references
 npm exec typedoc -- --treatValidationWarningsAsErrors --emit none
 
-# Regenerate package-lock.json (especially on setups w/ custom npm registry)
+# Regenerate package-lock.json
+# Note: repo .npmrc pins registry to npmjs.org, so a plain `npm i` is safe even
+# if your global npm config points elsewhere. The Docker step below is optional
+# — it locks linux-amd64 optionalDependencies (sharp, rollup, bun) for CI.
 rm -fR  package-lock.json node_modules && \
   docker run  --rm -it --platform linux/amd64 -v $PWD:/src:rw -w /src node:latest npm i && \
   rm -fR node_modules && \
@@ -67,20 +70,26 @@ rm -fR  package-lock.json node_modules && \
 ### Protocol Flow
 
 ```
-Guest UI (App) <--PostMessageTransport--> Host (AppBridge) <--MCP Client--> MCP Server
+View (App) <--PostMessageTransport--> Host (AppBridge) <--MCP Client--> MCP Server
 ```
 
-1. Host creates iframe with Guest UI HTML
-2. Guest UI creates `App` instance and calls `connect()` with `PostMessageTransport`
-3. App sends `ui/initialize` request, receives host capabilities and context
+1. Host creates iframe with view HTML
+2. View creates `App` instance and calls `connect()` with `PostMessageTransport`
+3. View sends `ui/initialize` request, receives host capabilities and context
 4. Host sends `sendToolInput()` with tool arguments after initialization
-5. Guest UI can call server tools via `app.callServerTool()` or send messages via `app.sendMessage()`
+5. View can call server tools via `app.callServerTool()` or send messages via `app.sendMessage()`
 6. Host sends `sendToolResult()` when tool execution completes
 7. Host calls `teardownResource()` before unmounting iframe
 
-## Examples
+## Documentation
 
-Uses npm workspaces. Examples in `examples/` are separate packages:
+JSDoc `@example` tags should pull type-checked code from companion `.examples.ts` files (e.g., `app.ts` → `app.examples.ts`). Use ` ```ts source="./file.examples.ts#regionName" ` fences referencing `//#region regionName` blocks; region names follow `exportedName_variant` or `ClassName_methodName_variant` pattern (e.g., `useApp_basicUsage`, `App_hostCapabilities_checkAfterConnection`). For whole-file inclusion (any file type), omit the `#regionName`. Run `npm run sync:snippets` to sync.
+
+Standalone docs in `docs/` (listed in `typedoc.config.mjs` `projectDocuments`) can also have type-checked companion `.ts`/`.tsx` files using the same pattern.
+
+## Full Examples
+
+Uses npm workspaces. Full examples in `examples/` are separate packages:
 
 - `basic-server-*` - Starter templates (vanillajs, react, vue, svelte, preact, solid). Use these as the basis for new examples.
 - `basic-host` - Reference host implementation
@@ -88,4 +97,7 @@ Uses npm workspaces. Examples in `examples/` are separate packages:
 
 ## Claude Code Plugin
 
-The `plugins/mcp-apps/` directory contains a Claude Code plugin distributed via the plugin marketplace. It provides the "Create MCP App" skill (`plugins/mcp-apps/skills/create-mcp-app/SKILL.md`) that guides users through building MCP Apps with interactive UIs.
+The `plugins/mcp-apps/` directory contains a Claude Code plugin distributed via the plugin marketplace. It provides the following Claude Code skills files:
+
+- `plugins/mcp-apps/skills/create-mcp-app/SKILL.md` — for creating an MCP App
+- `plugins/mcp-apps/skills/migrate-oai-app/SKILL.md` — for migrating an app from the OpenAI Apps SDK to the MCP Apps SDK

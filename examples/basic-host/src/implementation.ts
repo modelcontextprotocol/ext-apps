@@ -1,7 +1,10 @@
 import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Resource, Tool } from "@modelcontextprotocol/sdk/types.js";
+import { getTheme, onThemeChange } from "./theme";
+import { HOST_STYLE_VARIABLES } from "./host-styles";
 
 
 const SANDBOX_PROXY_BASE_URL = "http://localhost:8081/sandbox.html";
@@ -19,16 +22,14 @@ export interface ServerInfo {
   name: string;
   client: Client;
   tools: Map<string, Tool>;
+  resources: Map<string, Resource>;
   appHtmlCache: Map<string, string>;
 }
 
 
 export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
-  const client = new Client(IMPLEMENTATION);
-
   log.info("Connecting to server:", serverUrl.href);
-  await client.connect(new StreamableHTTPClientTransport(serverUrl));
-  log.info("Connection successful");
+  const client = await connectWithFallback(serverUrl);
 
   const name = client.getServerVersion()?.name ?? serverUrl.href;
 
@@ -36,7 +37,34 @@ export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
   const tools = new Map(toolsList.tools.map((tool) => [tool.name, tool]));
   log.info("Server tools:", Array.from(tools.keys()));
 
-  return { name, client, tools, appHtmlCache: new Map() };
+  // Fetch resources for listing-level _meta.ui (fallback for content-level)
+  const resourcesList = await client.listResources();
+  const resources = new Map(resourcesList.resources.map((r) => [r.uri, r]));
+  log.info("Server resources:", Array.from(resources.keys()));
+
+  return { name, client, tools, resources, appHtmlCache: new Map() };
+}
+
+async function connectWithFallback(serverUrl: URL): Promise<Client> {
+  // Try Streamable HTTP first (modern transport)
+  try {
+    const client = new Client(IMPLEMENTATION);
+    await client.connect(new StreamableHTTPClientTransport(serverUrl));
+    log.info("Connected via Streamable HTTP transport");
+    return client;
+  } catch (streamableError) {
+    log.info("Streamable HTTP failed:", streamableError);
+  }
+
+  // Fall back to SSE (deprecated but needed for older servers)
+  try {
+    const client = new Client(IMPLEMENTATION);
+    await client.connect(new SSEClientTransport(serverUrl));
+    log.info("Connected via SSE transport");
+    return client;
+  } catch (sseError) {
+    throw new Error(`Could not connect with any transport. SSE error: ${sseError}`);
+  }
 }
 
 
@@ -106,14 +134,23 @@ async function getUiResource(serverInfo: ServerInfo, uri: string): Promise<UiRes
 
   const html = "blob" in content ? atob(content.blob) : content.text;
 
-  // Extract CSP and permissions metadata from resource content._meta.ui (or content.meta for Python SDK)
+  // Extract CSP and permissions metadata, preferring content-level (resources/read)
+  // and falling back to listing-level (resources/list) per the spec
   log.info("Resource content keys:", Object.keys(content));
   log.info("Resource content._meta:", (content as any)._meta);
 
-  // Try both _meta (spec) and meta (Python SDK quirk)
+  // Try both _meta (spec) and meta (Python SDK quirk) for content-level
   const contentMeta = (content as any)._meta || (content as any).meta;
-  const csp = contentMeta?.ui?.csp;
-  const permissions = contentMeta?.ui?.permissions;
+
+  // Get listing-level metadata as fallback
+  const listingResource = serverInfo.resources.get(uri);
+  const listingMeta = (listingResource as any)?._meta;
+  log.info("Resource listing._meta:", listingMeta);
+
+  // Content-level takes precedence, fall back to listing-level
+  const uiMeta = contentMeta?.ui ?? listingMeta?.ui;
+  const csp = uiMeta?.csp;
+  const permissions = uiMeta?.permissions;
 
   return { html, csp, permissions };
 }
@@ -250,14 +287,26 @@ export function newAppBridge(
     // Declare support for model context updates
     updateModelContext: { text: {} },
   }, {
+    // Pass initial host context with theme, display mode, and style variables
     hostContext: {
-      containerDimensions: options?.containerDimensions ?? { maxHeight: 600 },
+      theme: getTheme(),
+      platform: "web",
+      styles: {
+        variables: HOST_STYLE_VARIABLES,
+      },
+      containerDimensions: options?.containerDimensions ?? { maxHeight: 6000 },
       displayMode: options?.displayMode ?? "inline",
       availableDisplayModes: ["inline", "fullscreen"],
     },
   });
 
-  // Register all handlers before calling connect(). The Guest UI can start
+  // Listen for theme changes (from toggle or system) and notify the app
+  onThemeChange((newTheme) => {
+    log.info("Theme changed:", newTheme);
+    appBridge.sendHostContextChange({ theme: newTheme });
+  });
+
+  // Register all handlers before calling connect(). The view can start
   // sending requests immediately after the initialization handshake, so any
   // handlers registered after connect() might miss early requests.
 

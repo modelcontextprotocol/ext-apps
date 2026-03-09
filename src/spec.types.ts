@@ -7,14 +7,16 @@
  * - Use `@description` JSDoc tags to generate `.describe()` calls on schemas
  * - Run `npm run generate:schemas` to regenerate schemas from these types
  *
- * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx
+ * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx
  */
 
 import type {
   CallToolResult,
   ContentBlock,
+  EmbeddedResource,
   Implementation,
   RequestId,
+  ResourceLink,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
@@ -24,7 +26,7 @@ import type {
  * The SDK automatically handles version negotiation during initialization.
  * Apps and hosts don't need to manage protocol versions manually.
  */
-export const LATEST_PROTOCOL_VERSION = "2025-11-21";
+export const LATEST_PROTOCOL_VERSION = "2026-01-26";
 
 /**
  * @description Color theme preference for the host environment.
@@ -62,7 +64,6 @@ export type McpUiStyleVariableKey =
   | "--color-text-success"
   | "--color-text-warning"
   | "--color-text-disabled"
-  | "--color-text-ghost"
   // Border colors
   | "--color-border-primary"
   | "--color-border-secondary"
@@ -144,7 +145,7 @@ export type McpUiStyles = Record<McpUiStyleVariableKey, string | undefined>;
 
 /**
  * @description Request to open an external URL in the host's default browser.
- * @see {@link app!App.openLink} for the method that sends this request
+ * @see {@link app!App.openLink `App.openLink`} for the method that sends this request
  */
 export interface McpUiOpenLinkRequest {
   method: "ui/open-link";
@@ -156,7 +157,7 @@ export interface McpUiOpenLinkRequest {
 
 /**
  * @description Result from opening a URL.
- * @see {@link McpUiOpenLinkRequest}
+ * @see {@link McpUiOpenLinkRequest `McpUiOpenLinkRequest`}
  */
 export interface McpUiOpenLinkResult {
   /** @description True if the host failed to open the URL (e.g., due to security policy). */
@@ -169,8 +170,40 @@ export interface McpUiOpenLinkResult {
 }
 
 /**
+ * @description Request to download a file through the host.
+ *
+ * Sent from the View to the Host when the app wants to trigger a file download.
+ * Since MCP Apps run in sandboxed iframes where direct downloads are blocked,
+ * this provides a host-mediated mechanism for file exports.
+ * The host SHOULD show a confirmation dialog before initiating the download.
+ *
+ * @see {@link app!App.downloadFile `App.downloadFile`} for the method that sends this request
+ */
+export interface McpUiDownloadFileRequest {
+  method: "ui/download-file";
+  params: {
+    /** @description Resource contents to download — embedded (inline data) or linked (host fetches). Uses standard MCP resource types. */
+    contents: (EmbeddedResource | ResourceLink)[];
+  };
+}
+
+/**
+ * @description Result from a file download request.
+ * @see {@link McpUiDownloadFileRequest `McpUiDownloadFileRequest`}
+ */
+export interface McpUiDownloadFileResult {
+  /** @description True if the download failed (e.g., user cancelled or host denied). */
+  isError?: boolean;
+  /**
+   * Index signature required for MCP SDK `Protocol` class compatibility.
+   * Note: The generated schema uses passthrough() to allow additional properties.
+   */
+  [key: string]: unknown;
+}
+
+/**
  * @description Request to send a message to the host's chat interface.
- * @see {@link app!App.sendMessage} for the method that sends this request
+ * @see {@link app!App.sendMessage `App.sendMessage`} for the method that sends this request
  */
 export interface McpUiMessageRequest {
   method: "ui/message";
@@ -184,7 +217,7 @@ export interface McpUiMessageRequest {
 
 /**
  * @description Result from sending a message.
- * @see {@link McpUiMessageRequest}
+ * @see {@link McpUiMessageRequest `McpUiMessageRequest`}
  */
 export interface McpUiMessageResult {
   /** @description True if the host rejected or failed to deliver the message. */
@@ -199,7 +232,7 @@ export interface McpUiMessageResult {
 /**
  * @description Notification that the sandbox proxy iframe is ready to receive content.
  * @internal
- * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
+ * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#sandbox-proxy
  */
 export interface McpUiSandboxProxyReadyNotification {
   method: "ui/notifications/sandbox-proxy-ready";
@@ -209,7 +242,7 @@ export interface McpUiSandboxProxyReadyNotification {
 /**
  * @description Notification containing HTML resource for the sandbox proxy to load.
  * @internal
- * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#sandbox-proxy
+ * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#sandbox-proxy
  */
 export interface McpUiSandboxResourceReadyNotification {
   method: "ui/notifications/sandbox-resource-ready";
@@ -226,8 +259,8 @@ export interface McpUiSandboxResourceReadyNotification {
 }
 
 /**
- * @description Notification of UI size changes (Guest UI -> Host).
- * @see {@link app!App.sendSizeChanged} for the method to send this from Guest UI
+ * @description Notification of UI size changes (View -> Host).
+ * @see {@link app!App.sendSizeChanged `App.sendSizeChanged`} for the method to send this from View
  */
 export interface McpUiSizeChangedNotification {
   method: "ui/notifications/size-changed";
@@ -240,7 +273,7 @@ export interface McpUiSizeChangedNotification {
 }
 
 /**
- * @description Notification containing complete tool arguments (Host -> Guest UI).
+ * @description Notification containing complete tool arguments (Host -> View).
  */
 export interface McpUiToolInputNotification {
   method: "ui/notifications/tool-input";
@@ -251,7 +284,7 @@ export interface McpUiToolInputNotification {
 }
 
 /**
- * @description Notification containing partial/streaming tool arguments (Host -> Guest UI).
+ * @description Notification containing partial/streaming tool arguments (Host -> View).
  */
 export interface McpUiToolInputPartialNotification {
   method: "ui/notifications/tool-input-partial";
@@ -262,7 +295,7 @@ export interface McpUiToolInputPartialNotification {
 }
 
 /**
- * @description Notification containing tool execution result (Host -> Guest UI).
+ * @description Notification containing tool execution result (Host -> View).
  */
 export interface McpUiToolResultNotification {
   method: "ui/notifications/tool-result";
@@ -271,7 +304,7 @@ export interface McpUiToolResultNotification {
 }
 
 /**
- * @description Notification that tool execution was cancelled (Host -> Guest UI).
+ * @description Notification that tool execution was cancelled (Host -> View).
  * Host MUST send this if tool execution was cancelled for any reason (user action,
  * sampling error, classifier intervention, etc.).
  */
@@ -287,7 +320,7 @@ export interface McpUiToolCancelledNotification {
  * @description CSS blocks that can be injected by apps.
  */
 export interface McpUiHostCss {
-  /** @description CSS for font loading (`@font-face` rules or `@import` statements). Apps must apply using {@link applyHostFonts}. */
+  /** @description CSS for font loading (`@font-face` rules or `@import` statements). Apps must apply using {@link applyHostFonts `applyHostFonts`}. */
   fonts?: string;
 }
 
@@ -302,7 +335,7 @@ export interface McpUiHostStyles {
 }
 
 /**
- * @description Rich context about the host environment provided to Guest UIs.
+ * @description Rich context about the host environment provided to views.
  */
 export interface McpUiHostContext {
   /** @description Allow additional properties for forward compatibility. */
@@ -321,7 +354,7 @@ export interface McpUiHostContext {
   /** @description How the UI is currently displayed. */
   displayMode?: McpUiDisplayMode;
   /** @description Display modes the host supports. */
-  availableDisplayModes?: string[];
+  availableDisplayModes?: McpUiDisplayMode[];
   /**
    * @description Container dimensions. Represents the dimensions of the iframe or other
    * container holding the app. Specify either width or maxWidth, and either height or maxHeight.
@@ -375,8 +408,8 @@ export interface McpUiHostContext {
 }
 
 /**
- * @description Notification that host context has changed (Host -> Guest UI).
- * @see {@link McpUiHostContext} for the full context structure
+ * @description Notification that host context has changed (Host -> View).
+ * @see {@link McpUiHostContext `McpUiHostContext`} for the full context structure
  */
 export interface McpUiHostContextChangedNotification {
   method: "ui/notifications/host-context-changed";
@@ -385,16 +418,16 @@ export interface McpUiHostContextChangedNotification {
 }
 
 /**
- * @description Request to update the agent's context without requiring a follow-up action (Guest UI -> Host).
+ * @description Request to update the agent's context without requiring a follow-up action (View -> Host).
  *
  * Unlike `notifications/message` which is for debugging/logging, this request is intended
- * to update the Host's model context. Each request overwrites the previous context sent by the Guest UI.
+ * to update the Host's model context. Each request overwrites the previous context sent by the View.
  * Unlike messages, context updates do not trigger follow-ups.
  *
  * The host will typically defer sending the context to the model until the next user message
  * (including `ui/message`), and will only send the last update received.
  *
- * @see {@link app.App.updateModelContext} for the method that sends this request
+ * @see {@link app.App.updateModelContext `App.updateModelContext`} for the method that sends this request
  */
 export interface McpUiUpdateModelContextRequest {
   method: "ui/update-model-context";
@@ -407,8 +440,8 @@ export interface McpUiUpdateModelContextRequest {
 }
 
 /**
- * @description Request for graceful shutdown of the Guest UI (Host -> Guest UI).
- * @see {@link app-bridge!AppBridge.teardownResource} for the host method that sends this
+ * @description Request for graceful shutdown of the View (Host -> View).
+ * @see {@link app-bridge!AppBridge.teardownResource `AppBridge.teardownResource`} for the host method that sends this
  */
 export interface McpUiResourceTeardownRequest {
   method: "ui/resource-teardown";
@@ -417,7 +450,7 @@ export interface McpUiResourceTeardownRequest {
 
 /**
  * @description Result from graceful shutdown request.
- * @see {@link McpUiResourceTeardownRequest}
+ * @see {@link McpUiResourceTeardownRequest `McpUiResourceTeardownRequest`}
  */
 export interface McpUiResourceTeardownResult {
   /**
@@ -443,13 +476,15 @@ export interface McpUiSupportedContentBlockModalities {
 
 /**
  * @description Capabilities supported by the host application.
- * @see {@link McpUiInitializeResult} for the initialization result that includes these capabilities
+ * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
 export interface McpUiHostCapabilities {
   /** @description Experimental features (structure TBD). */
   experimental?: {};
   /** @description Host supports opening external URLs. */
   openLinks?: {};
+  /** @description Host supports file downloads via ui/download-file. */
+  downloadFile?: {};
   /** @description Host can proxy tool calls to the MCP server. */
   serverTools?: {
     /** @description Host supports tools/list_changed notifications. */
@@ -471,13 +506,13 @@ export interface McpUiHostCapabilities {
   };
   /** @description Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns. */
   updateModelContext?: McpUiSupportedContentBlockModalities;
-  /** @description Host supports receiving content messages (ui/message) from the Guest UI. */
+  /** @description Host supports receiving content messages (ui/message) from the view. */
   message?: McpUiSupportedContentBlockModalities;
 }
 
 /**
- * @description Capabilities provided by the Guest UI ({@link app!App}).
- * @see {@link McpUiInitializeRequest} for the initialization request that includes these capabilities
+ * @description Capabilities provided by the View ({@link app!App `App`}).
+ * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`} for the initialization request that includes these capabilities
  */
 export interface McpUiAppCapabilities {
   /** @description Experimental features (structure TBD). */
@@ -487,11 +522,13 @@ export interface McpUiAppCapabilities {
     /** @description App supports tools/list_changed notifications. */
     listChanged?: boolean;
   };
+  /** @description Display modes the app supports. */
+  availableDisplayModes?: McpUiDisplayMode[];
 }
 
 /**
- * @description Initialization request sent from Guest UI to Host.
- * @see {@link app!App.connect} for the method that sends this request
+ * @description Initialization request sent from View to Host.
+ * @see {@link app!App.connect `App.connect`} for the method that sends this request
  */
 export interface McpUiInitializeRequest {
   method: "ui/initialize";
@@ -506,8 +543,8 @@ export interface McpUiInitializeRequest {
 }
 
 /**
- * @description Initialization result returned from Host to Guest UI.
- * @see {@link McpUiInitializeRequest}
+ * @description Initialization result returned from Host to View.
+ * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`}
  */
 export interface McpUiInitializeResult {
   /** @description Negotiated protocol version string (e.g., "2025-11-21"). */
@@ -526,8 +563,8 @@ export interface McpUiInitializeResult {
 }
 
 /**
- * @description Notification that Guest UI has completed initialization (Guest UI -> Host).
- * @see {@link app!App.connect} for the method that sends this notification
+ * @description Notification that View has completed initialization (View -> Host).
+ * @see {@link app!App.connect `App.connect`} for the method that sends this notification
  */
 export interface McpUiInitializedNotification {
   method: "ui/notifications/initialized";
@@ -536,31 +573,97 @@ export interface McpUiInitializedNotification {
 
 /**
  * @description Content Security Policy configuration for UI resources.
+ *
+ * Servers declare which origins their UI requires. Hosts use this to enforce appropriate CSP headers.
+ *
+ * > [!IMPORTANT]
+ * > MCP App HTML runs in a sandboxed iframe with no same-origin server.
+ * > **All** origins must be declared—including where your bundled JS/CSS is
+ * > served from (`localhost` in dev, your CDN in production).
  */
 export interface McpUiResourceCsp {
-  /** @description Origins for network requests (fetch/XHR/WebSocket). */
+  /**
+   * @description Origins for network requests (fetch/XHR/WebSocket).
+   *
+   * - Maps to CSP `connect-src` directive
+   * - Empty or omitted → no network connections (secure default)
+   *
+   * @example
+   * ```ts
+   * ["https://api.weather.com", "wss://realtime.service.com"]
+   * ```
+   */
   connectDomains?: string[];
-  /** @description Origins for static resources (scripts, images, styles, fonts). */
+  /**
+   * @description Origins for static resources (images, scripts, stylesheets, fonts, media).
+   *
+   * - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives
+   * - Wildcard subdomains supported: `https://*.example.com`
+   * - Empty or omitted → no network resources (secure default)
+   *
+   * @example
+   * ```ts
+   * ["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]
+   * ```
+   */
   resourceDomains?: string[];
-  /** @description Origins for nested iframes (frame-src directive). */
+  /**
+   * @description Origins for nested iframes.
+   *
+   * - Maps to CSP `frame-src` directive
+   * - Empty or omitted → no nested iframes allowed (`frame-src 'none'`)
+   *
+   * @example
+   * ```ts
+   * ["https://www.youtube.com", "https://player.vimeo.com"]
+   * ```
+   */
   frameDomains?: string[];
-  /** @description Allowed base URIs for the document (base-uri directive). */
+  /**
+   * @description Allowed base URIs for the document.
+   *
+   * - Maps to CSP `base-uri` directive
+   * - Empty or omitted → only same origin allowed (`base-uri 'self'`)
+   *
+   * @example
+   * ```ts
+   * ["https://cdn.example.com"]
+   * ```
+   */
   baseUriDomains?: string[];
 }
 
 /**
  * @description Sandbox permissions requested by the UI resource.
+ *
+ * Servers declare which browser capabilities their UI needs.
  * Hosts MAY honor these by setting appropriate iframe `allow` attributes.
  * Apps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.
  */
 export interface McpUiResourcePermissions {
-  /** @description Request camera access (Permission Policy `camera` feature). */
+  /**
+   * @description Request camera access.
+   *
+   * Maps to Permission Policy `camera` feature.
+   */
   camera?: {};
-  /** @description Request microphone access (Permission Policy `microphone` feature). */
+  /**
+   * @description Request microphone access.
+   *
+   * Maps to Permission Policy `microphone` feature.
+   */
   microphone?: {};
-  /** @description Request geolocation access (Permission Policy `geolocation` feature). */
+  /**
+   * @description Request geolocation access.
+   *
+   * Maps to Permission Policy `geolocation` feature.
+   */
   geolocation?: {};
-  /** @description Request clipboard write access (Permission Policy `clipboard-write` feature). */
+  /**
+   * @description Request clipboard write access.
+   *
+   * Maps to Permission Policy `clipboard-write` feature.
+   */
   clipboardWrite?: {};
 }
 
@@ -568,13 +671,41 @@ export interface McpUiResourcePermissions {
  * @description UI Resource metadata for security and rendering configuration.
  */
 export interface McpUiResourceMeta {
-  /** @description Content Security Policy configuration. */
+  /** @description Content Security Policy configuration for UI resources. */
   csp?: McpUiResourceCsp;
-  /** @description Sandbox permissions requested by the UI. */
+  /** @description Sandbox permissions requested by the UI resource. */
   permissions?: McpUiResourcePermissions;
-  /** @description Dedicated origin for widget sandbox. */
+  /**
+   * @description Dedicated origin for view sandbox.
+   *
+   * Useful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.
+   *
+   * **Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:
+   * - Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)
+   * - URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)
+   *
+   * If omitted, host uses default sandbox origin (typically per-conversation).
+   *
+   * @example
+   * ```ts
+   * "a904794854a047f6.claudemcpcontent.com"
+   * ```
+   *
+   * @example
+   * ```ts
+   * "www-example-com.oaiusercontent.com"
+   * ```
+   */
   domain?: string;
-  /** @description Visual boundary preference - true if UI prefers a visible border. */
+  /**
+   * @description Visual boundary preference - true if view prefers a visible border.
+   *
+   * Boolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.
+   *
+   * - `true`: request visible border + background
+   * - `false`: request no visible border + background
+   * - omitted: host decides border
+   */
   prefersBorder?: boolean;
 }
 
@@ -582,7 +713,7 @@ export interface McpUiResourceMeta {
  * @description Request to change the display mode of the UI.
  * The host will respond with the actual display mode that was set,
  * which may differ from the requested mode if not supported.
- * @see {@link app!App.requestDisplayMode} for the method that sends this request
+ * @see {@link app!App.requestDisplayMode `App.requestDisplayMode`} for the method that sends this request
  */
 export interface McpUiRequestDisplayModeRequest {
   method: "ui/request-display-mode";
@@ -594,7 +725,7 @@ export interface McpUiRequestDisplayModeRequest {
 
 /**
  * @description Result from requesting a display mode change.
- * @see {@link McpUiRequestDisplayModeRequest}
+ * @see {@link McpUiRequestDisplayModeRequest `McpUiRequestDisplayModeRequest`}
  */
 export interface McpUiRequestDisplayModeResult {
   /** @description The display mode that was actually set. May differ from requested if not supported. */
@@ -619,7 +750,10 @@ export interface McpUiToolMeta {
    * URI of the UI resource to display for this tool, if any.
    * This is converted to `_meta["ui/resourceUri"]`.
    *
-   * @example "ui://weather/widget.html"
+   * @example
+   * ```ts
+   * "ui://weather/view.html"
+   * ```
    */
   resourceUri?: string;
   /**
@@ -647,6 +781,8 @@ export interface McpUiToolMeta {
  * ```
  */
 export const OPEN_LINK_METHOD: McpUiOpenLinkRequest["method"] = "ui/open-link";
+export const DOWNLOAD_FILE_METHOD: McpUiDownloadFileRequest["method"] =
+  "ui/download-file";
 export const MESSAGE_METHOD: McpUiMessageRequest["method"] = "ui/message";
 export const SANDBOX_PROXY_READY_METHOD: McpUiSandboxProxyReadyNotification["method"] =
   "ui/notifications/sandbox-proxy-ready";
@@ -672,3 +808,18 @@ export const INITIALIZED_METHOD: McpUiInitializedNotification["method"] =
   "ui/notifications/initialized";
 export const REQUEST_DISPLAY_MODE_METHOD: McpUiRequestDisplayModeRequest["method"] =
   "ui/request-display-mode";
+
+/**
+ * @description MCP Apps capability settings advertised by clients to servers.
+ *
+ * Clients advertise these capabilities via the `extensions` field in their
+ * capabilities during MCP initialization. Servers can check for MCP Apps
+ * support using {@link server-helpers!getUiCapability}.
+ */
+export interface McpUiClientCapabilities {
+  /**
+   * @description Array of supported MIME types for UI resources.
+   * Must include `"text/html;profile=mcp-app"` for MCP Apps support.
+   */
+  mimeTypes?: string[];
+}

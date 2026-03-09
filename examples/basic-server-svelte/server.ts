@@ -29,7 +29,7 @@ export function createServer(): McpServer {
       title: "Get Time",
       description: "Returns the current server time as an ISO 8601 string.",
       inputSchema: {},
-      _meta: { ui: { resourceUri } },
+      _meta: { ui: { resourceUri } }, // Links this tool to its UI resource
     },
     async (): Promise<CallToolResult> => {
       const time = new Date().toISOString();

@@ -12,12 +12,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
-      - run: npm install
+          node-version: "22"
+          cache: npm
+      - run: npm ci
       - run: npm run build
       - run: npm run docs
       - uses: peaceiris/actions-gh-pages@v4
@@ -26,3 +27,4 @@ jobs:
           publish_dir: ./docs
           publish_branch: gh-pages
           keep_files: true
+          cname: apps.extensions.modelcontextprotocol.io

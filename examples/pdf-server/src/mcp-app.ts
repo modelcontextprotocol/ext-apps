@@ -6,16 +6,21 @@
  * - Text selection via PDF.js TextLayer
  * - Page navigation, zoom
  */
-import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import {
+  App,
+  type McpUiHostContext,
+  applyDocumentTheme,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ContentBlock } from "@modelcontextprotocol/sdk/spec.types.js";
 import * as pdfjsLib from "pdfjs-dist";
 import { TextLayer } from "pdfjs-dist";
 import "./global.css";
 import "./mcp-app.css";
 
-// const MAX_MODEL_CONTEXT_LENGTH = 5000;
-const MAX_MODEL_CONTEXT_LENGTH = 1500;
-
+const MAX_MODEL_CONTEXT_LENGTH = 15000;
+const MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION = 768; // Max screenshot dimension
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.mjs",
@@ -29,13 +34,12 @@ const log = {
 
 // State
 let pdfDocument: pdfjsLib.PDFDocumentProxy | null = null;
-let pdfBytes: Uint8Array | null = null;
 let currentPage = 1;
 let totalPages = 0;
 let scale = 1.0;
 let pdfUrl = "";
 let pdfTitle: string | undefined;
-let widgetUUID: string | undefined;
+let viewUUID: string | undefined;
 let currentRenderTask: { cancel: () => void } | null = null;
 
 // DOM Elements
@@ -59,14 +63,51 @@ const zoomLevelEl = document.getElementById("zoom-level")!;
 const fullscreenBtn = document.getElementById(
   "fullscreen-btn",
 ) as HTMLButtonElement;
-const progressContainerEl = document.getElementById("progress-container")!;
-const progressBarEl = document.getElementById("progress-bar")!;
-const progressTextEl = document.getElementById("progress-text")!;
+const searchBtn = document.getElementById("search-btn") as HTMLButtonElement;
+searchBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14" y2="14"/></svg>`;
+const searchBarEl = document.getElementById("search-bar")!;
+const searchInputEl = document.getElementById(
+  "search-input",
+) as HTMLInputElement;
+const searchMatchCountEl = document.getElementById("search-match-count")!;
+const searchPrevBtn = document.getElementById(
+  "search-prev-btn",
+) as HTMLButtonElement;
+const searchNextBtn = document.getElementById(
+  "search-next-btn",
+) as HTMLButtonElement;
+const searchCloseBtn = document.getElementById(
+  "search-close-btn",
+) as HTMLButtonElement;
+const highlightLayerEl = document.getElementById("highlight-layer")!;
+
+// Search state
+interface SearchMatch {
+  pageNum: number;
+  index: number;
+  length: number;
+}
+
+let searchOpen = false;
+let searchQuery = "";
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const pageTextCache = new Map<number, string>();
+const pageTextItemsCache = new Map<number, string[]>();
+let allMatches: SearchMatch[] = [];
+let currentMatchIndex = -1;
+
+// Preload state — goToPage sets preloadPaused=true, renderPage's finally resets it.
+// The preloader's while(preloadPaused) loop yields so interactive loads always win.
+let preloadPaused = false;
+let pagesLoaded = 0;
+let preloadErrors: Array<{ page: number; err: unknown }> = [];
+const loadingIndicatorEl = document.getElementById("loading-indicator")!;
+const loadingIndicatorArc = loadingIndicatorEl.querySelector(
+  ".loading-indicator-arc",
+) as SVGCircleElement;
 
 // Track current display mode
 let currentDisplayMode: "inline" | "fullscreen" = "inline";
-
-// Layout constants are no longer used - we calculate dynamically from actual element dimensions
 
 /**
  * Request the host to resize the app to fit the current PDF page.
@@ -100,6 +141,7 @@ function requestFitToContent() {
 
   // Calculate required height:
   // toolbar + padding-top + page-wrapper height + padding-bottom + buffer
+  // Note: search bar is absolutely positioned over the document area, so excluded
   const toolbarHeight = toolbarEl.offsetHeight;
   const pageWrapperHeight = pageWrapperEl.offsetHeight;
   const BUFFER = 10; // Buffer for sub-pixel rounding and browser quirks
@@ -107,6 +149,228 @@ function requestFitToContent() {
     toolbarHeight + paddingTop + pageWrapperHeight + paddingBottom + BUFFER;
 
   app.sendSizeChanged({ height: totalHeight });
+}
+
+// --- Search Functions ---
+
+function performSearch(query: string) {
+  allMatches = [];
+  currentMatchIndex = -1;
+  searchQuery = query;
+
+  if (!query) {
+    updateSearchUI();
+    clearHighlights();
+    return;
+  }
+
+  const lowerQuery = query.toLowerCase();
+  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    const pageText = pageTextCache.get(pageNum);
+    if (!pageText) continue;
+    const lowerText = pageText.toLowerCase();
+    let startIdx = 0;
+    while (true) {
+      const idx = lowerText.indexOf(lowerQuery, startIdx);
+      if (idx === -1) break;
+      allMatches.push({ pageNum, index: idx, length: query.length });
+      startIdx = idx + 1;
+    }
+  }
+
+  // Set current match to first match on or after current page
+  if (allMatches.length > 0) {
+    const idx = allMatches.findIndex((m) => m.pageNum >= currentPage);
+    currentMatchIndex = idx >= 0 ? idx : 0;
+  }
+
+  updateSearchUI();
+  renderHighlights();
+
+  // Navigate to match page if needed
+  if (allMatches.length > 0 && currentMatchIndex >= 0) {
+    const match = allMatches[currentMatchIndex];
+    if (match.pageNum !== currentPage) {
+      goToPage(match.pageNum);
+    }
+  }
+}
+
+function renderHighlights() {
+  clearHighlights();
+  if (!searchQuery || allMatches.length === 0) return;
+
+  const spans = Array.from(
+    textLayerEl.querySelectorAll("span"),
+  ) as HTMLElement[];
+  if (spans.length === 0) return;
+
+  const pageMatches = allMatches.filter((m) => m.pageNum === currentPage);
+  if (pageMatches.length === 0) return;
+
+  const lowerQuery = searchQuery.toLowerCase();
+  const lowerQueryLen = lowerQuery.length;
+
+  // Position highlight divs over matching text using Range API.
+  const wrapperEl = textLayerEl.parentElement!;
+  const wrapperRect = wrapperEl.getBoundingClientRect();
+
+  let domMatchOrdinal = 0;
+
+  for (const span of spans) {
+    const text = span.textContent || "";
+    if (text.length === 0) continue;
+    const lowerText = text.toLowerCase();
+    if (!lowerText.includes(lowerQuery)) continue;
+
+    // Find all match positions within this span
+    const matchPositions: number[] = [];
+    let pos = 0;
+    while (true) {
+      const idx = lowerText.indexOf(lowerQuery, pos);
+      if (idx === -1) break;
+      matchPositions.push(idx);
+      pos = idx + 1;
+    }
+    if (matchPositions.length === 0) continue;
+
+    const textNode = span.firstChild;
+    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) continue;
+
+    for (const idx of matchPositions) {
+      const isCurrentMatch =
+        domMatchOrdinal < pageMatches.length &&
+        allMatches.indexOf(pageMatches[domMatchOrdinal]) === currentMatchIndex;
+
+      try {
+        const range = document.createRange();
+        range.setStart(textNode, idx);
+        range.setEnd(textNode, Math.min(idx + lowerQueryLen, text.length));
+        const rects = range.getClientRects();
+
+        for (let ri = 0; ri < rects.length; ri++) {
+          const r = rects[ri];
+          const div = document.createElement("div");
+          div.className =
+            "search-highlight" + (isCurrentMatch ? " current" : "");
+          div.style.position = "absolute";
+          div.style.left = `${r.left - wrapperRect.left}px`;
+          div.style.top = `${r.top - wrapperRect.top}px`;
+          div.style.width = `${r.width}px`;
+          div.style.height = `${r.height}px`;
+          highlightLayerEl.appendChild(div);
+        }
+      } catch {
+        // Range errors can happen with stale text nodes
+      }
+
+      domMatchOrdinal++;
+    }
+  }
+
+  // Scroll current highlight into view only if not already visible
+  const currentHL = highlightLayerEl.querySelector(
+    ".search-highlight.current",
+  ) as HTMLElement;
+  if (currentHL) {
+    const scrollParent =
+      currentDisplayMode === "fullscreen"
+        ? document.querySelector(".canvas-container")
+        : null;
+    if (scrollParent) {
+      const sr = scrollParent.getBoundingClientRect();
+      const hr = currentHL.getBoundingClientRect();
+      if (hr.top < sr.top || hr.bottom > sr.bottom) {
+        currentHL.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    } else {
+      // Inline mode: check visibility in viewport
+      const hr = currentHL.getBoundingClientRect();
+      if (hr.top < 0 || hr.bottom > window.innerHeight) {
+        currentHL.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }
+  }
+}
+
+function clearHighlights() {
+  highlightLayerEl.innerHTML = "";
+}
+
+function updateSearchUI() {
+  const hasQuery = searchQuery.length > 0;
+  const stillLoading = totalPages > 0 && pagesLoaded < totalPages;
+  const suffix = stillLoading ? " (loading\u2026)" : "";
+  if (allMatches.length === 0) {
+    searchMatchCountEl.textContent = hasQuery ? `No matches${suffix}` : "";
+  } else {
+    searchMatchCountEl.textContent = `${currentMatchIndex + 1} of ${allMatches.length}${suffix}`;
+  }
+  searchPrevBtn.disabled = allMatches.length === 0;
+  searchNextBtn.disabled = allMatches.length === 0;
+  // Hide nav controls when there's no query
+  const vis = hasQuery ? "" : "none";
+  searchMatchCountEl.style.display = vis;
+  searchPrevBtn.style.display = vis;
+  searchNextBtn.style.display = vis;
+}
+
+function openSearch() {
+  if (searchOpen) {
+    searchInputEl.focus();
+    searchInputEl.select();
+    return;
+  }
+  searchOpen = true;
+  searchBarEl.style.display = "flex";
+  updateSearchUI();
+  searchInputEl.focus();
+  // Text extraction is handled by the background preloader
+}
+
+function closeSearch() {
+  if (!searchOpen) return;
+  searchOpen = false;
+  searchBarEl.style.display = "none";
+  searchQuery = "";
+  searchInputEl.value = "";
+  allMatches = [];
+  currentMatchIndex = -1;
+  clearHighlights();
+  updateSearchUI();
+}
+
+function toggleSearch() {
+  if (searchOpen) {
+    closeSearch();
+  } else {
+    openSearch();
+  }
+}
+
+function goToNextMatch() {
+  if (allMatches.length === 0) return;
+  currentMatchIndex = (currentMatchIndex + 1) % allMatches.length;
+  const match = allMatches[currentMatchIndex];
+  updateSearchUI();
+  if (match.pageNum !== currentPage) {
+    goToPage(match.pageNum);
+  } else {
+    renderHighlights();
+  }
+}
+
+function goToPrevMatch() {
+  if (allMatches.length === 0) return;
+  currentMatchIndex =
+    (currentMatchIndex - 1 + allMatches.length) % allMatches.length;
+  const match = allMatches[currentMatchIndex];
+  updateSearchUI();
+  if (match.pageNum !== currentPage) {
+    goToPage(match.pageNum);
+  } else {
+    renderHighlights();
+  }
 }
 
 // Create app instance
@@ -247,7 +511,7 @@ function findSelectionInText(
   return undefined;
 }
 
-// Extract text from current page and update model context as markdown
+// Extract text from current page and update model context
 async function updatePageContext() {
   if (!pdfDocument) return;
 
@@ -276,22 +540,64 @@ async function updatePageContext() {
       );
     }
 
-    // Format content with selection and truncation
+    // Format content with selection markers and truncation
     const content = formatPageContent(
       pageText,
       MAX_MODEL_CONTEXT_LENGTH,
       selection,
     );
 
-    const markdown = `---
-title: ${pdfTitle || ""}
-url: ${pdfUrl}
-current-page: ${currentPage}/${totalPages}
----
+    // Build context with tool ID for multi-tool disambiguation
+    const toolId = app.getHostContext()?.toolInfo?.id;
+    const header = [
+      `PDF viewer${toolId ? ` (${toolId})` : ""}`,
+      pdfTitle ? `"${pdfTitle}"` : pdfUrl,
+      `Current Page: ${currentPage}/${totalPages}`,
+    ].join(" | ");
 
-${content}`;
+    const contextText = `${header}\n\nPage content:\n${content}`;
 
-    app.updateModelContext({ content: [{ type: "text", text: markdown }] });
+    // Build content array with text and optional screenshot
+    const contentBlocks: ContentBlock[] = [{ type: "text", text: contextText }];
+
+    // Add screenshot if host supports image content
+    if (app.getHostCapabilities()?.updateModelContext?.image) {
+      try {
+        // Scale down to reduce token usage (tokens depend on dimensions)
+        const sourceCanvas = canvasEl;
+        const scale = Math.min(
+          1,
+          MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION /
+            Math.max(sourceCanvas.width, sourceCanvas.height),
+        );
+        const targetWidth = Math.round(sourceCanvas.width * scale);
+        const targetHeight = Math.round(sourceCanvas.height * scale);
+
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = targetWidth;
+        tempCanvas.height = targetHeight;
+        const ctx = tempCanvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
+          const dataUrl = tempCanvas.toDataURL("image/png");
+          const base64Data = dataUrl.split(",")[1];
+          if (base64Data) {
+            contentBlocks.push({
+              type: "image",
+              data: base64Data,
+              mimeType: "image/png",
+            });
+            log.info(
+              `Added screenshot to model context (${targetWidth}x${targetHeight})`,
+            );
+          }
+        }
+      } catch (err) {
+        log.info("Failed to capture screenshot:", err);
+      }
+    }
+
+    app.updateModelContext({ content: contentBlocks });
   } catch (err) {
     log.error("Error updating context:", err);
   }
@@ -342,6 +648,8 @@ async function renderPage() {
     textLayerEl.innerHTML = "";
     textLayerEl.style.width = `${viewport.width}px`;
     textLayerEl.style.height = `${viewport.height}px`;
+    // Set --scale-factor so CSS font-size/transform rules work correctly.
+    textLayerEl.style.setProperty("--scale-factor", `${scale}`);
 
     // Render canvas - track the task so we can cancel it
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -381,6 +689,24 @@ async function renderPage() {
     });
     await textLayer.render();
 
+    // Cache page text items if not already cached
+    if (!pageTextItemsCache.has(pageToRender)) {
+      const items = (textContent.items as Array<{ str?: string }>).map(
+        (item) => item.str || "",
+      );
+      pageTextItemsCache.set(pageToRender, items);
+      pageTextCache.set(pageToRender, items.join(""));
+    }
+
+    // Size highlight layer to match canvas
+    highlightLayerEl.style.width = `${viewport.width}px`;
+    highlightLayerEl.style.height = `${viewport.height}px`;
+
+    // Re-render search highlights if search is active
+    if (searchOpen && searchQuery) {
+      renderHighlights();
+    }
+
     updateControls();
     updatePageContext();
 
@@ -390,6 +716,7 @@ async function renderPage() {
     log.error("Error rendering page:", err);
     showError(`Failed to render page ${currentPage}`);
   } finally {
+    preloadPaused = false;
     isRendering = false;
 
     // If there's a pending page, render it now
@@ -404,10 +731,10 @@ async function renderPage() {
 }
 
 function saveCurrentPage() {
-  log.info("saveCurrentPage: key=", widgetUUID, "page=", currentPage);
-  if (widgetUUID) {
+  log.info("saveCurrentPage: key=", viewUUID, "page=", currentPage);
+  if (viewUUID) {
     try {
-      localStorage.setItem(widgetUUID, String(currentPage));
+      localStorage.setItem(viewUUID, String(currentPage));
       log.info("saveCurrentPage: saved successfully");
     } catch (err) {
       log.error("saveCurrentPage: error", err);
@@ -416,10 +743,10 @@ function saveCurrentPage() {
 }
 
 function loadSavedPage(): number | null {
-  log.info("loadSavedPage: key=", widgetUUID);
-  if (!widgetUUID) return null;
+  log.info("loadSavedPage: key=", viewUUID);
+  if (!viewUUID) return null;
   try {
-    const saved = localStorage.getItem(widgetUUID);
+    const saved = localStorage.getItem(viewUUID);
     log.info("loadSavedPage: saved value=", saved);
     if (saved) {
       const page = parseInt(saved, 10);
@@ -439,6 +766,7 @@ function loadSavedPage(): number | null {
 function goToPage(page: number) {
   const targetPage = Math.max(1, Math.min(page, totalPages));
   if (targetPage !== currentPage) {
+    preloadPaused = true;
     currentPage = targetPage;
     saveCurrentPage();
     renderPage();
@@ -500,7 +828,33 @@ prevBtn.addEventListener("click", prevPage);
 nextBtn.addEventListener("click", nextPage);
 zoomOutBtn.addEventListener("click", zoomOut);
 zoomInBtn.addEventListener("click", zoomIn);
+searchBtn.addEventListener("click", toggleSearch);
+searchCloseBtn.addEventListener("click", closeSearch);
+searchPrevBtn.addEventListener("click", goToPrevMatch);
+searchNextBtn.addEventListener("click", goToNextMatch);
 fullscreenBtn.addEventListener("click", toggleFullscreen);
+
+// Search input events
+searchInputEl.addEventListener("input", () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    performSearch(searchInputEl.value);
+  }, 300);
+});
+
+searchInputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (e.shiftKey) {
+      goToPrevMatch();
+    } else {
+      goToNextMatch();
+    }
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    closeSearch();
+  }
+});
 
 pageInputEl.addEventListener("change", () => {
   const page = parseInt(pageInputEl.value, 10);
@@ -519,6 +873,25 @@ pageInputEl.addEventListener("keydown", (e) => {
 
 // Keyboard navigation
 document.addEventListener("keydown", (e) => {
+  // Ctrl/Cmd+F: open our search if closed; if already focused, pass through to browser find
+  if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+    if (!searchOpen) {
+      e.preventDefault();
+      openSearch();
+    } else if (document.activeElement === searchInputEl) {
+      // Already focused — close ours and let browser find open
+      closeSearch();
+    } else {
+      // Open but not focused — re-focus our search
+      e.preventDefault();
+      searchInputEl.focus();
+      searchInputEl.select();
+    }
+    return;
+  }
+
+  // Don't handle nav shortcuts when search input is focused
+  if (document.activeElement === searchInputEl) return;
   if (document.activeElement === pageInputEl) return;
 
   // Ctrl/Cmd+0 to reset zoom
@@ -530,7 +903,10 @@ document.addEventListener("keydown", (e) => {
 
   switch (e.key) {
     case "Escape":
-      if (currentDisplayMode === "fullscreen") {
+      if (searchOpen) {
+        closeSearch();
+        e.preventDefault();
+      } else if (currentDisplayMode === "fullscreen") {
         toggleFullscreen();
         e.preventDefault();
       }
@@ -607,12 +983,14 @@ function parseToolResult(result: CallToolResult): {
   title?: string;
   pageCount: number;
   initialPage: number;
+  totalBytes: number;
 } | null {
   return result.structuredContent as {
     url: string;
     title?: string;
     pageCount: number;
     initialPage: number;
+    totalBytes: number;
   } | null;
 }
 
@@ -626,75 +1004,239 @@ interface PdfBytesChunk {
   hasMore: boolean;
 }
 
-// Update progress bar
-function updateProgress(loaded: number, total: number) {
-  const percent = Math.round((loaded / total) * 100);
-  progressBarEl.style.width = `${percent}%`;
-  progressTextEl.textContent = `${(loaded / 1024).toFixed(0)} KB / ${(total / 1024).toFixed(0)} KB (${percent}%)`;
+// Range request caching — avoid duplicate fetches for the same range
+type RangeResult = { bytes: Uint8Array; totalBytes: number };
+const rangeCache = new Map<string, RangeResult>();
+const inflightRequests = new Map<string, Promise<RangeResult>>();
+
+// Max bytes per server request (must match server's MAX_CHUNK_BYTES)
+const MAX_CHUNK_BYTES = 512 * 1024;
+
+/**
+ * Fetch a single chunk from the server (up to MAX_CHUNK_BYTES).
+ * Deduplicates concurrent requests for the same range via inflightRequests.
+ */
+async function fetchChunk(
+  url: string,
+  begin: number,
+  end: number,
+): Promise<RangeResult> {
+  const cacheKey = `${url}:${begin}-${end}`;
+  const cached = rangeCache.get(cacheKey);
+  if (cached) return cached;
+
+  // Deduplicate: reuse in-flight request for the same range
+  const inflight = inflightRequests.get(cacheKey);
+  if (inflight) return inflight;
+
+  const request = (async (): Promise<RangeResult> => {
+    try {
+      const result = await app.callServerTool({
+        name: "read_pdf_bytes",
+        arguments: { url, offset: begin, byteCount: end - begin },
+      });
+
+      if (result.isError) {
+        const errorText =
+          result.content?.map((c) => ("text" in c ? c.text : "")).join(" ") ||
+          "";
+        throw new Error(`Tool error: ${errorText}`);
+      }
+
+      if (!result.structuredContent) {
+        throw new Error("No structuredContent in tool response");
+      }
+
+      const chunk = result.structuredContent as unknown as PdfBytesChunk;
+      const binaryString = atob(chunk.bytes);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const entry: RangeResult = { bytes, totalBytes: chunk.totalBytes };
+      rangeCache.set(cacheKey, entry);
+      return entry;
+    } finally {
+      inflightRequests.delete(cacheKey);
+    }
+  })();
+
+  inflightRequests.set(cacheKey, request);
+  return request;
 }
 
-// Load PDF in chunks with progress
-async function loadPdfInChunks(urlToLoad: string): Promise<Uint8Array> {
-  const CHUNK_SIZE = 500 * 1024; // 500KB chunks
-  const chunks: Uint8Array[] = [];
-  let offset = 0;
-  let totalBytes = 0;
-  let hasMore = true;
+/**
+ * Fetch a byte range from the PDF, splitting into parallel sub-requests
+ * if the range exceeds MAX_CHUNK_BYTES.
+ */
+async function fetchRange(
+  url: string,
+  begin: number,
+  end: number,
+): Promise<RangeResult> {
+  const size = end - begin;
 
-  // Show progress UI
-  progressContainerEl.style.display = "block";
-  updateProgress(0, 1);
+  // Single chunk — no splitting needed
+  if (size <= MAX_CHUNK_BYTES) {
+    return fetchChunk(url, begin, end);
+  }
 
-  while (hasMore) {
-    const result = await app.callServerTool({
-      name: "read_pdf_bytes",
-      arguments: { url: urlToLoad, offset, byteCount: CHUNK_SIZE },
+  // Split into parallel sub-requests
+  const chunks: Array<{ begin: number; end: number }> = [];
+  for (let offset = begin; offset < end; offset += MAX_CHUNK_BYTES) {
+    chunks.push({
+      begin: offset,
+      end: Math.min(offset + MAX_CHUNK_BYTES, end),
     });
-
-    // Check for errors
-    if (result.isError) {
-      const errorText = result.content
-        ?.map((c) => ("text" in c ? c.text : ""))
-        .join(" ");
-      throw new Error(`Tool error: ${errorText}`);
-    }
-
-    if (!result.structuredContent) {
-      throw new Error("No structuredContent in tool response");
-    }
-
-    const chunk = result.structuredContent as unknown as PdfBytesChunk;
-    totalBytes = chunk.totalBytes;
-    hasMore = chunk.hasMore;
-
-    // Decode base64 chunk
-    const binaryString = atob(chunk.bytes);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    chunks.push(bytes);
-
-    offset += chunk.byteCount;
-    updateProgress(offset, totalBytes);
   }
-
-  // Combine all chunks
-  const fullPdf = new Uint8Array(totalBytes);
-  let pos = 0;
-  for (const chunk of chunks) {
-    fullPdf.set(chunk, pos);
-    pos += chunk.length;
-  }
-
   log.info(
-    `PDF loaded: ${(totalBytes / 1024).toFixed(0)} KB in ${chunks.length} chunks`,
+    `Splitting range ${begin}-${end} (${(size / 1024) | 0} KB) into ${chunks.length} parallel chunks`,
   );
-  return fullPdf;
+
+  const results = await Promise.all(
+    chunks.map((c) => fetchChunk(url, c.begin, c.end)),
+  );
+
+  // Reassemble into a single buffer
+  const totalLen = results.reduce((sum, r) => sum + r.bytes.length, 0);
+  const combined = new Uint8Array(totalLen);
+  let pos = 0;
+  for (const r of results) {
+    combined.set(r.bytes, pos);
+    pos += r.bytes.length;
+  }
+
+  const entry = { bytes: combined, totalBytes: results[0].totalBytes };
+  rangeCache.set(`${url}:${begin}-${end}`, entry);
+  return entry;
+}
+
+/**
+ * Load PDF progressively using PDFDataRangeTransport.
+ * PDF.js will request ranges as needed to render pages.
+ */
+async function loadPdfProgressively(
+  urlToLoad: string,
+  fileSizeBytes: number,
+): Promise<{
+  document: pdfjsLib.PDFDocumentProxy;
+  totalBytes: number;
+}> {
+  const fileTotalBytes = fileSizeBytes;
+  log.info(`PDF file size: ${(fileTotalBytes / 1024) | 0} KB`);
+
+  class AppRangeTransport extends pdfjsLib.PDFDataRangeTransport {
+    requestDataRange(begin: number, end: number) {
+      fetchRange(urlToLoad, begin, end)
+        .then((result) => {
+          this.onDataRange(begin, result.bytes);
+        })
+        .catch((err: unknown) => {
+          log.error(`Error fetching range ${begin}-${end}:`, err);
+        });
+    }
+  }
+
+  // Create transport with total file size, no initial data — PDF.js will request what it needs
+  const transport = new AppRangeTransport(fileTotalBytes, null);
+
+  const loadingTask = pdfjsLib.getDocument({ range: transport });
+
+  try {
+    const document = await loadingTask.promise;
+    log.info(
+      `PDF document ready, ${document.numPages} pages, ${fileTotalBytes} bytes`,
+    );
+    return { document, totalBytes: fileTotalBytes };
+  } catch (err: unknown) {
+    log.error("Error loading PDF document:", err);
+    throw err;
+  }
+}
+
+// --- Loading indicator ---
+
+const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * 8; // ~50.27
+
+function updateLoadingIndicator() {
+  if (totalPages <= 0) return;
+  const pct = pagesLoaded / totalPages;
+  const offset = CIRCLE_CIRCUMFERENCE * (1 - pct);
+  loadingIndicatorArc.style.strokeDashoffset = String(offset);
+  loadingIndicatorEl.style.display = "inline-flex";
+  loadingIndicatorEl.title = `${pagesLoaded}/${totalPages} pages loaded`;
+  if (preloadErrors.length > 0) {
+    loadingIndicatorEl.classList.add("error");
+    const failedPages = preloadErrors.map((e) => e.page).join(", ");
+    loadingIndicatorEl.title += ` (errors on pages: ${failedPages})`;
+  }
+}
+
+function finalizeLoadingIndicator() {
+  updateLoadingIndicator();
+  if (preloadErrors.length > 0) return; // Keep visible with error state
+  setTimeout(() => {
+    loadingIndicatorEl.style.opacity = "0";
+    setTimeout(() => {
+      loadingIndicatorEl.style.display = "none";
+      loadingIndicatorEl.style.opacity = "";
+    }, 300);
+  }, 500);
+}
+
+// --- Background preloader ---
+
+let preloadSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Schedule a debounced search refresh while preloading */
+function scheduleSearchRefresh() {
+  if (!searchOpen || !searchQuery) return;
+  if (preloadSearchTimer) return; // already scheduled
+  preloadSearchTimer = setTimeout(() => {
+    preloadSearchTimer = null;
+    if (searchOpen && searchQuery) performSearch(searchQuery);
+  }, 500);
+}
+
+async function startPreloading() {
+  if (!pdfDocument) return;
+  log.info("Starting background preload of", totalPages, "pages");
+  for (let i = 1; i <= totalPages; i++) {
+    if (pageTextCache.has(i)) {
+      pagesLoaded++;
+      updateLoadingIndicator();
+      continue;
+    }
+
+    // Yield to interactive navigation
+    while (preloadPaused) await new Promise((r) => setTimeout(r, 50));
+
+    try {
+      const page = await pdfDocument.getPage(i);
+      const textContent = await page.getTextContent();
+      const items = (textContent.items as Array<{ str?: string }>).map(
+        (item) => item.str || "",
+      );
+      pageTextItemsCache.set(i, items);
+      pageTextCache.set(i, items.join(""));
+      pagesLoaded++;
+      updateLoadingIndicator();
+      scheduleSearchRefresh();
+    } catch (err) {
+      preloadErrors.push({ page: i, err });
+      log.error("Preload error page", i, err);
+      updateLoadingIndicator();
+    }
+  }
+  log.info("Background preload complete:", pagesLoaded, "pages loaded");
+  finalizeLoadingIndicator();
+  // Final search update
+  if (searchOpen && searchQuery) performSearch(searchQuery);
 }
 
 // Handle tool result
-app.ontoolresult = async (result) => {
+app.ontoolresult = async (result: CallToolResult) => {
   log.info("Received tool result:", result);
 
   const parsed = parseToolResult(result);
@@ -705,52 +1247,66 @@ app.ontoolresult = async (result) => {
 
   pdfUrl = parsed.url;
   pdfTitle = parsed.title;
-  totalPages = parsed.pageCount;
-  widgetUUID = result._meta?.widgetUUID
-    ? String(result._meta.widgetUUID)
-    : undefined;
+  // Note: pageCount may not be accurate until document loads
+  totalPages = parsed.pageCount || 1;
+  viewUUID = result._meta?.viewUUID ? String(result._meta.viewUUID) : undefined;
 
   // Restore saved page or use initial page
   const savedPage = loadSavedPage();
   currentPage =
     savedPage && savedPage <= parsed.pageCount ? savedPage : parsed.initialPage;
 
-  log.info(
-    "URL:",
-    pdfUrl,
-    "Pages:",
-    parsed.pageCount,
-    "Starting:",
-    currentPage,
-  );
+  log.info("URL:", pdfUrl, "Starting at page:", currentPage);
 
   showLoading("Loading PDF...");
 
   try {
-    pdfBytes = await loadPdfInChunks(pdfUrl);
+    // Use progressive loading - document available as soon as initial data arrives
+    const { document, totalBytes } = await loadPdfProgressively(
+      pdfUrl,
+      parsed.totalBytes,
+    );
+    pdfDocument = document;
+    totalPages = document.numPages;
 
-    showLoading("Rendering PDF...");
+    log.info("PDF loaded, pages:", totalPages, "bytes:", totalBytes);
 
-    pdfDocument = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
-    totalPages = pdfDocument.numPages;
-
-    log.info("PDF loaded, pages:", totalPages);
+    // Reset preload state for new PDF
+    pagesLoaded = 0;
+    preloadErrors = [];
+    pageTextCache.clear();
+    pageTextItemsCache.clear();
+    loadingIndicatorEl.classList.remove("error");
+    loadingIndicatorEl.style.opacity = "";
+    loadingIndicatorEl.style.display = "none";
 
     showViewer();
     renderPage();
+    // Start background preloading of all pages for text extraction
+    startPreloading();
   } catch (err) {
     log.error("Error loading PDF:", err);
     showError(err instanceof Error ? err.message : String(err));
   }
 };
 
-app.onerror = (err) => {
+app.onerror = (err: unknown) => {
   log.error("App error:", err);
   showError(err instanceof Error ? err.message : String(err));
 };
 
 function handleHostContextChanged(ctx: McpUiHostContext) {
   log.info("Host context changed:", ctx);
+
+  // Apply theme from host
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+  }
+
+  // Apply host CSS variables
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
 
   // Apply safe area insets
   if (ctx.safeAreaInsets) {
@@ -769,16 +1325,12 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
   if (ctx.displayMode) {
     const wasFullscreen = currentDisplayMode === "fullscreen";
     currentDisplayMode = ctx.displayMode as "inline" | "fullscreen";
-    if (ctx.displayMode === "fullscreen") {
-      mainEl.classList.add("fullscreen");
-      log.info("Fullscreen mode enabled");
-    } else {
-      mainEl.classList.remove("fullscreen");
-      log.info("Inline mode");
-      // When exiting fullscreen, request resize to fit content
-      if (wasFullscreen && pdfDocument) {
-        requestFitToContent();
-      }
+    const isFullscreen = currentDisplayMode === "fullscreen";
+    mainEl.classList.toggle("fullscreen", isFullscreen);
+    log.info(isFullscreen ? "Fullscreen mode enabled" : "Inline mode");
+    // When exiting fullscreen, request resize to fit content
+    if (wasFullscreen && !isFullscreen && pdfDocument) {
+      requestFitToContent();
     }
     updateFullscreenButton();
   }

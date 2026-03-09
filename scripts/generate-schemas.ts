@@ -70,8 +70,10 @@ const JSON_SCHEMA_OUTPUT_FILE = join(GENERATED_DIR, "schema.json");
 const EXTERNAL_TYPE_SCHEMAS = [
   "ContentBlockSchema",
   "CallToolResultSchema",
+  "EmbeddedResourceSchema",
   "ImplementationSchema",
   "RequestIdSchema",
+  "ResourceLinkSchema",
   "ToolSchema",
 ];
 

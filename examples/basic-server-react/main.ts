@@ -12,22 +12,15 @@ import cors from "cors";
 import type { Request, Response } from "express";
 import { createServer } from "./server.js";
 
-export interface ServerOptions {
-  port: number;
-  name?: string;
-}
-
 /**
  * Starts an MCP server with Streamable HTTP transport in stateless mode.
  *
  * @param createServer - Factory function that creates a new McpServer instance per request.
- * @param options - Server configuration options.
  */
-export async function startServer(
+export async function startStreamableHTTPServer(
   createServer: () => McpServer,
-  options: ServerOptions,
 ): Promise<void> {
-  const { port, name = "MCP Server" } = options;
+  const port = parseInt(process.env.PORT ?? "3001", 10);
 
   const app = createMcpExpressApp({ host: "0.0.0.0" });
   app.use(cors());
@@ -63,7 +56,7 @@ export async function startServer(
       console.error("Failed to start server:", err);
       process.exit(1);
     }
-    console.log(`${name} listening on http://localhost:${port}/mcp`);
+    console.log(`MCP server listening on http://localhost:${port}/mcp`);
   });
 
   const shutdown = () => {
@@ -75,12 +68,22 @@ export async function startServer(
   process.on("SIGTERM", shutdown);
 }
 
+/**
+ * Starts an MCP server with stdio transport.
+ *
+ * @param createServer - Factory function that creates a new McpServer instance.
+ */
+export async function startStdioServer(
+  createServer: () => McpServer,
+): Promise<void> {
+  await createServer().connect(new StdioServerTransport());
+}
+
 async function main() {
   if (process.argv.includes("--stdio")) {
-    await createServer().connect(new StdioServerTransport());
+    await startStdioServer(createServer);
   } else {
-    const port = parseInt(process.env.PORT ?? "3001", 10);
-    await startServer(createServer, { port, name: "Basic MCP App Server (React)" });
+    await startStreamableHTTPServer(createServer);
   }
 }
 

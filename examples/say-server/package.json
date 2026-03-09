@@ -1,0 +1,20 @@
+{
+  "name": "@modelcontextprotocol/server-say",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Streaming TTS MCP App Server with karaoke-style text highlighting",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "directory": "examples/say-server"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "uv run --index https://pypi.org/simple server.py",
+    "dev": "uv run --index https://pypi.org/simple server.py",
+    "build": "echo 'No build step needed for Python server'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.0"
+  }
+}

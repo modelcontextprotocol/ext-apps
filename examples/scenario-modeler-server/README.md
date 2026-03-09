@@ -4,11 +4,50 @@ A React-based demo MCP App that lets users adjust SaaS business parameters and s
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/01-compare-to.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/01-compare-to.png" alt="Compare to" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/02-bootstrapped-growth.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/02-bootstrapped-growth.png" alt="Bootstrapped growth" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/03-vc-rocketship.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/03-vc-rocketship.png" alt="VC rocketship" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/01-compare-to.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/01-compare-to.png" alt="Compare to" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/02-bootstrapped-growth.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/02-bootstrapped-growth.png" alt="Bootstrapped growth" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/03-vc-rocketship.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/03-vc-rocketship.png" alt="VC rocketship" width="100%"></a></td>
   </tr>
 </table>
+
+## MCP Client Configuration
+
+Add to your MCP client configuration (stdio transport):
+
+```json
+{
+  "mcpServers": {
+    "scenario-modeler": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--silent",
+        "--registry=https://registry.npmjs.org/",
+        "@modelcontextprotocol/server-scenario-modeler",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
+
+### Local Development
+
+To test local modifications, use this configuration (replace `~/code/ext-apps` with your clone path):
+
+```json
+{
+  "mcpServers": {
+    "scenario-modeler": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd ~/code/ext-apps/examples/scenario-modeler-server && npm run build >&2 && node dist/index.js --stdio"
+      ]
+    }
+  }
+}
+```
 
 ## Features
 

@@ -144,7 +144,7 @@ function GetTimeAppInner({ app, toolResult, hostContext }: GetTimeAppInnerProps)
 
       <div className={styles.action}>
         <p>
-          <strong>Server Time:</strong> <code id="server-time">{serverTime}</code>
+          <strong>Server Time:</strong> <code className={styles.serverTime}>{serverTime}</code>
         </p>
         <button onClick={handleGetTime}>Get Server Time</button>
       </div>

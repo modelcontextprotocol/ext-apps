@@ -6,6 +6,7 @@
  * a navigate-to tool for the host to control navigation.
  */
 import { App } from "@modelcontextprotocol/ext-apps";
+import type { ContentBlock } from "@modelcontextprotocol/sdk/spec.types.js";
 
 // TypeScript declaration for Cesium loaded from CDN
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -13,6 +14,8 @@ declare let Cesium: any;
 
 const CESIUM_VERSION = "1.123";
 const CESIUM_BASE_URL = `https://cesium.com/downloads/cesiumjs/releases/${CESIUM_VERSION}/Build/Cesium`;
+
+const MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION = 768; // Max width/height for screenshots in pixels for updateModelContext
 
 /**
  * Dynamically load CesiumJS from CDN
@@ -71,7 +74,7 @@ let persistViewTimer: ReturnType<typeof setTimeout> | null = null;
 // Track whether tool input has been received (to know if we should restore persisted state)
 let hasReceivedToolInput = false;
 
-let widgetUUID: string | undefined = undefined;
+let viewUUID: string | undefined = undefined;
 
 /**
  * Persisted camera state for localStorage
@@ -122,7 +125,7 @@ function schedulePersistViewState(cesiumViewer: any): void {
  * Persist current view state to localStorage
  */
 function persistViewState(cesiumViewer: any): void {
-  if (!widgetUUID) {
+  if (!viewUUID) {
     log.info("No storage key available, skipping view persistence");
     return;
   }
@@ -132,8 +135,8 @@ function persistViewState(cesiumViewer: any): void {
 
   try {
     const value = JSON.stringify(state);
-    localStorage.setItem(widgetUUID, value);
-    log.info("Persisted view state:", widgetUUID, value);
+    localStorage.setItem(viewUUID, value);
+    log.info("Persisted view state:", viewUUID, value);
   } catch (e) {
     log.warn("Failed to persist view state:", e);
   }
@@ -143,10 +146,10 @@ function persistViewState(cesiumViewer: any): void {
  * Load persisted view state from localStorage
  */
 function loadPersistedViewState(): PersistedCameraState | null {
-  if (!widgetUUID) return null;
+  if (!viewUUID) return null;
 
   try {
-    const stored = localStorage.getItem(widgetUUID);
+    const stored = localStorage.getItem(viewUUID);
     if (!stored) {
       console.info("No persisted view state found");
       return null;
@@ -262,133 +265,6 @@ function getScaleDimensions(extent: BoundingBox): {
   return { widthKm, heightKm };
 }
 
-// Rate limiting for Nominatim (1 request per second per their usage policy)
-let lastNominatimRequest = 0;
-const NOMINATIM_RATE_LIMIT_MS = 1100; // 1.1 seconds to be safe
-
-/**
- * Wait for rate limit before making a Nominatim request
- */
-async function waitForRateLimit(): Promise<void> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastNominatimRequest;
-  if (timeSinceLastRequest < NOMINATIM_RATE_LIMIT_MS) {
-    await new Promise((resolve) =>
-      setTimeout(resolve, NOMINATIM_RATE_LIMIT_MS - timeSinceLastRequest),
-    );
-  }
-  lastNominatimRequest = Date.now();
-}
-
-/**
- * Reverse geocode a single point using Nominatim
- * Returns the place name for that location
- */
-async function reverseGeocode(
-  lat: number,
-  lon: number,
-): Promise<string | null> {
-  try {
-    await waitForRateLimit();
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`;
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "CesiumJS-Globe-MCP-App/1.0",
-      },
-    });
-    if (!response.ok) {
-      log.warn("Reverse geocode failed:", response.status);
-      return null;
-    }
-    const data = await response.json();
-    // Extract short place name from address
-    const addr = data.address;
-    if (!addr) return data.display_name?.split(",")[0] || null;
-    // Prefer city > town > village > county > state
-    return (
-      addr.city ||
-      addr.town ||
-      addr.village ||
-      addr.county ||
-      addr.state ||
-      data.display_name?.split(",")[0] ||
-      null
-    );
-  } catch (error) {
-    log.warn("Reverse geocode error:", error);
-    return null;
-  }
-}
-
-/**
- * Get sample points within an extent based on the visible area size.
- * For small areas (city zoom), just sample center.
- * For larger areas, sample center + corners to discover multiple places.
- */
-function getSamplePoints(
-  extent: BoundingBox,
-  extentSizeKm: number,
-): Array<{ lat: number; lon: number }> {
-  const centerLat = (extent.north + extent.south) / 2;
-  const centerLon = (extent.east + extent.west) / 2;
-
-  // Always include center
-  const points: Array<{ lat: number; lon: number }> = [
-    { lat: centerLat, lon: centerLon },
-  ];
-
-  // For larger extents, add more sample points
-  if (extentSizeKm > 100) {
-    // > 100km: sample 4 quadrant centers
-    const latOffset = (extent.north - extent.south) / 4;
-    const lonOffset = (extent.east - extent.west) / 4;
-    points.push(
-      { lat: centerLat + latOffset, lon: centerLon - lonOffset }, // NW
-      { lat: centerLat + latOffset, lon: centerLon + lonOffset }, // NE
-      { lat: centerLat - latOffset, lon: centerLon - lonOffset }, // SW
-      { lat: centerLat - latOffset, lon: centerLon + lonOffset }, // SE
-    );
-  } else if (extentSizeKm > 30) {
-    // 30-100km: sample 2 opposite corners
-    const latOffset = (extent.north - extent.south) / 4;
-    const lonOffset = (extent.east - extent.west) / 4;
-    points.push(
-      { lat: centerLat + latOffset, lon: centerLon - lonOffset }, // NW
-      { lat: centerLat - latOffset, lon: centerLon + lonOffset }, // SE
-    );
-  }
-  // < 30km: just center (likely same city)
-
-  return points;
-}
-
-/**
- * Get places visible in the extent by sampling multiple points
- * Returns array of unique place names
- */
-async function getVisiblePlaces(extent: BoundingBox): Promise<string[]> {
-  const { widthKm, heightKm } = getScaleDimensions(extent);
-  const extentSizeKm = Math.max(widthKm, heightKm);
-  const samplePoints = getSamplePoints(extent, extentSizeKm);
-
-  log.info(
-    `Sampling ${samplePoints.length} points for extent ${extentSizeKm.toFixed(0)}km`,
-  );
-
-  const places = new Set<string>();
-  for (const point of samplePoints) {
-    const place = await reverseGeocode(point.lat, point.lon);
-    if (place) {
-      places.add(place);
-      log.info(
-        `Found place: ${place} at ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}`,
-      );
-    }
-  }
-
-  return [...places];
-}
-
 /**
  * Debounced location update using multi-point reverse geocoding.
  * Samples multiple points in the visible extent to discover places.
@@ -404,41 +280,59 @@ function scheduleLocationUpdate(cesiumViewer: any): void {
     const center = getCameraCenter(cesiumViewer);
     const extent = getVisibleExtent(cesiumViewer);
 
-    if (!extent) {
-      log.info("No visible extent (camera looking at sky?)");
+    if (!extent || !center) {
+      log.info("No visible extent or center (camera looking at sky?)");
       return;
     }
 
     const { widthKm, heightKm } = getScaleDimensions(extent);
 
-    log.info(`Extent: ${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km`);
+    // Update the model's context with the current map location and screenshot.
+    const text =
+      `The map view of ${app.getHostContext()?.toolInfo?.id} is now ${widthKm.toFixed(1)}km wide × ${heightKm.toFixed(1)}km tall, ` +
+      `centered on lat. / long. [${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}]`;
 
-    // Get places visible in the extent (samples multiple points for large areas)
-    const places = await getVisiblePlaces(extent);
+    // Build content array with text and optional screenshot
+    const content: ContentBlock[] = [{ type: "text", text }];
 
-    // Build structured markdown with YAML frontmatter (like pdf-server)
-    // Note: tool name isn't in the notification protocol, so we hardcode it
-    const frontmatter = [
-      "---",
-      `tool: show-map`,
-      center
-        ? `center: [${center.lat.toFixed(4)}, ${center.lon.toFixed(4)}]`
-        : null,
-      `extent: [${extent.west.toFixed(4)}, ${extent.south.toFixed(4)}, ${extent.east.toFixed(4)}, ${extent.north.toFixed(4)}]`,
-      `extent-size: ${widthKm.toFixed(1)}km × ${heightKm.toFixed(1)}km`,
-      places.length > 0 ? `visible-places: [${places.join(", ")}]` : null,
-      "---",
-    ]
-      .filter(Boolean)
-      .join("\n");
+    // Add screenshot if host supports image content
+    if (app.getHostCapabilities()?.updateModelContext?.image) {
+      try {
+        // Scale down to reduce token usage (tokens depend on dimensions)
+        const sourceCanvas = cesiumViewer.canvas;
+        const scale = Math.min(
+          1,
+          MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION /
+            Math.max(sourceCanvas.width, sourceCanvas.height),
+        );
+        const targetWidth = Math.round(sourceCanvas.width * scale);
+        const targetHeight = Math.round(sourceCanvas.height * scale);
 
-    log.info("Updating model context:", frontmatter);
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = targetWidth;
+        tempCanvas.height = targetHeight;
+        const ctx = tempCanvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
+          const dataUrl = tempCanvas.toDataURL("image/png");
+          const base64Data = dataUrl.split(",")[1];
+          if (base64Data) {
+            content.push({
+              type: "image",
+              data: base64Data,
+              mimeType: "image/png",
+            });
+            log.info(
+              `Added screenshot to model context (${targetWidth}x${targetHeight})`,
+            );
+          }
+        }
+      } catch (err) {
+        log.warn("Failed to capture screenshot:", err);
+      }
+    }
 
-    // Update the model's context with the current map location.
-    // If the host doesn't support this, the request will silently fail.
-    app.updateModelContext({
-      content: [{ type: "text", text: frontmatter }],
-    });
+    app.updateModelContext({ content });
   }, 1500);
 }
 
@@ -938,16 +832,14 @@ app.ontoolinput = async (params) => {
 //   },
 // );
 
-// Handle tool result - extract widgetUUID and restore persisted view if available
+// Handle tool result - extract viewUUID and restore persisted view if available
 app.ontoolresult = async (result) => {
-  widgetUUID = result._meta?.widgetUUID
-    ? String(result._meta.widgetUUID)
-    : undefined;
-  log.info("Tool result received, widgetUUID:", widgetUUID);
+  viewUUID = result._meta?.viewUUID ? String(result._meta.viewUUID) : undefined;
+  log.info("Tool result received, viewUUID:", viewUUID);
 
-  // Now that we have widgetUUID, try to restore persisted view
+  // Now that we have viewUUID, try to restore persisted view
   // This overrides the tool input position if a saved state exists
-  if (viewer && widgetUUID) {
+  if (viewer && viewUUID) {
     const restored = restorePersistedView(viewer);
     if (restored) {
       log.info("Restored persisted view from tool result handler");

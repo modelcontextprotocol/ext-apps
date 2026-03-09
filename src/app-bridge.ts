@@ -69,6 +69,9 @@ import {
   McpUiOpenLinkRequest,
   McpUiOpenLinkRequestSchema,
   McpUiOpenLinkResult,
+  McpUiDownloadFileRequest,
+  McpUiDownloadFileRequestSchema,
+  McpUiDownloadFileResult,
   McpUiResourceTeardownRequest,
   McpUiResourceTeardownResultSchema,
   McpUiSandboxProxyReadyNotification,
@@ -78,6 +81,7 @@ import {
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResult,
   McpUiResourcePermissions,
+  McpUiToolMeta,
 } from "./types";
 export * from "./types";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
@@ -110,7 +114,7 @@ export { PostMessageTransport } from "./message-transport";
  */
 export function getToolUiResourceUri(tool: Partial<Tool>): string | undefined {
   // Try new nested format first: _meta.ui.resourceUri
-  const uiMeta = tool._meta?.ui as { resourceUri?: unknown } | undefined;
+  const uiMeta = tool._meta?.ui as McpUiToolMeta | undefined;
   let uri: unknown = uiMeta?.resourceUri;
 
   // Fall back to deprecated flat format: _meta["ui/resourceUri"]
@@ -124,6 +128,34 @@ export function getToolUiResourceUri(tool: Partial<Tool>): string | undefined {
     throw new Error(`Invalid UI resource URI: ${JSON.stringify(uri)}`);
   }
   return undefined;
+}
+
+/**
+ * Check if a tool is visible to the model only.
+ *
+ * @param tool - Tool object with visibility metadata
+ * @returns True if the tool is visible to the model only, false otherwise
+ */
+export function isToolVisibilityModelOnly(tool: Partial<Tool>): boolean {
+  const uiMeta = tool._meta?.ui as McpUiToolMeta | undefined;
+  const visibility = uiMeta?.visibility;
+  if (!visibility) return false;
+  if (visibility.length === 1 && visibility[0] === "model") return true;
+  return false;
+}
+
+/**
+ * Check if a tool is visible to the app only.
+ *
+ * @param tool - Tool object with visibility metadata
+ * @returns True if the tool is visible to the app only, false otherwise
+ */
+export function isToolVisibilityAppOnly(tool: Partial<Tool>): boolean {
+  const uiMeta = tool._meta?.ui as McpUiToolMeta | undefined;
+  const visibility = uiMeta?.visibility;
+  if (!visibility) return false;
+  if (visibility.length === 1 && visibility[0] === "app") return true;
+  return false;
 }
 
 /**
@@ -157,12 +189,12 @@ export function buildAllowAttribute(
 }
 
 /**
- * Options for configuring {@link AppBridge} behavior.
+ * Options for configuring {@link AppBridge `AppBridge`} behavior.
  *
- * @property hostContext - Optional initial host context to provide to the Guest UI
+ * @property hostContext - Optional initial host context to provide to the view
  *
  * @see `ProtocolOptions` from @modelcontextprotocol/sdk for available options
- * @see {@link McpUiHostContext} for the hostContext structure
+ * @see {@link McpUiHostContext `McpUiHostContext`} for the hostContext structure
  */
 export type HostOptions = ProtocolOptions & {
   hostContext?: McpUiHostContext;
@@ -190,35 +222,32 @@ type RequestHandlerExtra = Parameters<
 >[1];
 
 /**
- * Host-side bridge for communicating with a single Guest UI ({@link app!App}).
+ * Host-side bridge for communicating with a single View ({@link app!App `App`}).
  *
  * `AppBridge` extends the MCP SDK's `Protocol` class and acts as a proxy between
- * the host application and a Guest UI running in an iframe. When an MCP client
+ * the host application and a view running in an iframe. When an MCP client
  * is provided to the constructor, it automatically forwards MCP server capabilities
- * (tools, resources, prompts) to the Guest UI. It also handles the initialization
+ * (tools, resources, prompts) to the view. It also handles the initialization
  * handshake.
  *
  * ## Architecture
  *
- * **Guest UI ↔ AppBridge ↔ Host ↔ MCP Server**
+ * **View ↔ AppBridge ↔ Host ↔ MCP Server**
  *
- * The bridge proxies requests from the Guest UI to the MCP server and forwards
+ * The bridge proxies requests from the view to the MCP server and forwards
  * responses back. It also sends host-initiated notifications like tool input
- * and results to the Guest UI.
+ * and results to the view.
  *
  * ## Lifecycle
  *
  * 1. **Create**: Instantiate `AppBridge` with MCP client and capabilities
  * 2. **Connect**: Call `connect()` with transport to establish communication
- * 3. **Wait for init**: Guest UI sends initialize request, bridge responds
- * 4. **Send data**: Call {@link sendToolInput}, {@link sendToolResult}, etc.
- * 5. **Teardown**: Call {@link teardownResource} before unmounting iframe
+ * 3. **Wait for init**: View sends initialize request, bridge responds
+ * 4. **Send data**: Call {@link sendToolInput `sendToolInput`}, {@link sendToolResult `sendToolResult`}, etc.
+ * 5. **Teardown**: Call {@link teardownResource `teardownResource`} before unmounting iframe
  *
  * @example Basic usage
- * ```typescript
- * import { AppBridge, PostMessageTransport } from '@modelcontextprotocol/ext-apps/app-bridge';
- * import { Client } from '@modelcontextprotocol/sdk/client/index.js';
- *
+ * ```ts source="./app-bridge.examples.ts#AppBridge_basicUsage"
  * // Create MCP client for the server
  * const client = new Client({
  *   name: "MyHost",
@@ -226,22 +255,22 @@ type RequestHandlerExtra = Parameters<
  * });
  * await client.connect(serverTransport);
  *
- * // Create bridge for the Guest UI
+ * // Create bridge for the View
  * const bridge = new AppBridge(
  *   client,
  *   { name: "MyHost", version: "1.0.0" },
- *   { openLinks: {}, serverTools: {}, logging: {} }
+ *   { openLinks: {}, serverTools: {}, logging: {} },
  * );
  *
  * // Set up iframe and connect
- * const iframe = document.getElementById('app') as HTMLIFrameElement;
+ * const iframe = document.getElementById("app") as HTMLIFrameElement;
  * const transport = new PostMessageTransport(
  *   iframe.contentWindow!,
  *   iframe.contentWindow!,
  * );
  *
  * bridge.oninitialized = () => {
- *   console.log("Guest UI initialized");
+ *   console.log("View initialized");
  *   // Now safe to send tool input
  *   bridge.sendToolInput({ arguments: { location: "NYC" } });
  * };
@@ -262,30 +291,33 @@ export class AppBridge extends Protocol<
    * Create a new AppBridge instance.
    *
    * @param _client - MCP client connected to the server, or `null`. When provided,
-   *   {@link connect} will automatically set up forwarding of MCP requests/notifications
-   *   between the Guest UI and the server. When `null`, you must register handlers
-   *   manually using the {@link oncalltool}, {@link onlistresources}, etc. setters.
+   *   {@link connect `connect`} will automatically set up forwarding of MCP requests/notifications
+   *   between the View and the server. When `null`, you must register handlers
+   *   manually using the {@link oncalltool `oncalltool`}, {@link onlistresources `onlistresources`}, etc. setters.
    * @param _hostInfo - Host application identification (name and version)
    * @param _capabilities - Features and capabilities the host supports
    * @param options - Configuration options (inherited from Protocol)
    *
    * @example With MCP client (automatic forwarding)
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_constructor_withMcpClient"
    * const bridge = new AppBridge(
    *   mcpClient,
    *   { name: "MyHost", version: "1.0.0" },
-   *   { openLinks: {}, serverTools: {}, logging: {} }
+   *   { openLinks: {}, serverTools: {}, logging: {} },
    * );
    * ```
    *
    * @example Without MCP client (manual handlers)
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_constructor_withoutMcpClient"
    * const bridge = new AppBridge(
    *   null,
    *   { name: "MyHost", version: "1.0.0" },
-   *   { openLinks: {}, serverTools: {}, logging: {} }
+   *   { openLinks: {}, serverTools: {}, logging: {} },
    * );
-   * bridge.oncalltool = async (params, extra) => { ... };
+   * bridge.oncalltool = async (params, extra) => {
+   *   // Handle tool calls manually
+   *   return { content: [] };
+   * };
    * ```
    */
   constructor(
@@ -316,44 +348,44 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Get the Guest UI's capabilities discovered during initialization.
+   * Get the view's capabilities discovered during initialization.
    *
-   * Returns the capabilities that the Guest UI advertised during its
+   * Returns the capabilities that the view advertised during its
    * initialization request. Returns `undefined` if called before
    * initialization completes.
    *
-   * @returns Guest UI capabilities, or `undefined` if not yet initialized
+   * @returns view capabilities, or `undefined` if not yet initialized
    *
-   * @example Check Guest UI capabilities after initialization
-   * ```typescript
+   * @example Check view capabilities after initialization
+   * ```ts source="./app-bridge.examples.ts#AppBridge_getAppCapabilities_checkAfterInit"
    * bridge.oninitialized = () => {
    *   const caps = bridge.getAppCapabilities();
    *   if (caps?.tools) {
-   *     console.log("Guest UI provides tools");
+   *     console.log("View provides tools");
    *   }
    * };
    * ```
    *
-   * @see {@link McpUiAppCapabilities} for the capabilities structure
+   * @see {@link McpUiAppCapabilities `McpUiAppCapabilities`} for the capabilities structure
    */
   getAppCapabilities(): McpUiAppCapabilities | undefined {
     return this._appCapabilities;
   }
 
   /**
-   * Get the Guest UI's implementation info discovered during initialization.
+   * Get the view's implementation info discovered during initialization.
    *
-   * Returns the Guest UI's name and version as provided in its initialization
+   * Returns the view's name and version as provided in its initialization
    * request. Returns `undefined` if called before initialization completes.
    *
-   * @returns Guest UI implementation info, or `undefined` if not yet initialized
+   * @returns view implementation info, or `undefined` if not yet initialized
    *
-   * @example Log Guest UI information after initialization
-   * ```typescript
+   * @example Log view information after initialization
+   * ```ts source="./app-bridge.examples.ts#AppBridge_getAppVersion_logAfterInit"
    * bridge.oninitialized = () => {
    *   const appInfo = bridge.getAppVersion();
    *   if (appInfo) {
-   *     console.log(`Guest UI: ${appInfo.name} v${appInfo.version}`);
+   *     console.log(`View: ${appInfo.name} v${appInfo.version}`);
    *   }
    * };
    * ```
@@ -363,10 +395,10 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Optional handler for ping requests from the Guest UI.
+   * Optional handler for ping requests from the view.
    *
-   * The Guest UI can send standard MCP `ping` requests to verify the connection
-   * is alive. The {@link AppBridge} automatically responds with an empty object, but this
+   * The View can send standard MCP `ping` requests to verify the connection
+   * is alive. The {@link AppBridge `AppBridge`} automatically responds with an empty object, but this
    * handler allows the host to observe or log ping activity.
    *
    * Unlike the other handlers which use setters, this is a direct property
@@ -376,26 +408,26 @@ export class AppBridge extends Protocol<
    * @param extra - Request metadata (abort signal, session info)
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onping_handleRequest"
    * bridge.onping = (params, extra) => {
-   *   console.log("Received ping from Guest UI");
+   *   console.log("Received ping from view");
    * };
    * ```
    */
   onping?: (params: PingRequest["params"], extra: RequestHandlerExtra) => void;
 
   /**
-   * Register a handler for size change notifications from the Guest UI.
+   * Register a handler for size change notifications from the view.
    *
-   * The Guest UI sends `ui/notifications/size-changed` when its rendered content
+   * The view sends `ui/notifications/size-changed` when its rendered content
    * size changes, typically via `ResizeObserver`. Set this callback to dynamically
-   * adjust the iframe container dimensions based on the Guest UI's content.
+   * adjust the iframe container dimensions based on the view's content.
    *
-   * Note: This is for Guest UI → Host communication. To notify the Guest UI of
-   * host container dimension changes, use {@link setHostContext}.
+   * Note: This is for View → Host communication. To notify the View of
+   * host container dimension changes, use {@link setHostContext `setHostContext`}.
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onsizechange_handleResize"
    * bridge.onsizechange = ({ width, height }) => {
    *   if (width != null) {
    *     iframe.style.width = `${width}px`;
@@ -406,8 +438,8 @@ export class AppBridge extends Protocol<
    * };
    * ```
    *
-   * @see {@link McpUiSizeChangedNotification} for the notification type
-   * @see {@link app!App.sendSizeChanged} - the Guest UI method that sends these notifications
+   * @see {@link McpUiSizeChangedNotification `McpUiSizeChangedNotification`} for the notification type
+   * @see {@link app!App.sendSizeChanged `App.sendSizeChanged`} - the View method that sends these notifications
    */
   set onsizechange(
     callback: (params: McpUiSizeChangedNotification["params"]) => void,
@@ -425,7 +457,7 @@ export class AppBridge extends Protocol<
    * `ui/notifications/sandbox-proxy-ready` after it loads and is ready to receive
    * HTML content.
    *
-   * When this fires, the host should call {@link sendSandboxResourceReady} with
+   * When this fires, the host should call {@link sendSandboxResourceReady `sendSandboxResourceReady`} with
    * the HTML content to load into the inner sandboxed iframe.
    *
    * @example
@@ -444,8 +476,8 @@ export class AppBridge extends Protocol<
    * ```
    *
    * @internal
-   * @see {@link McpUiSandboxProxyReadyNotification} for the notification type
-   * @see {@link sendSandboxResourceReady} for sending content to the sandbox
+   * @see {@link McpUiSandboxProxyReadyNotification `McpUiSandboxProxyReadyNotification`} for the notification type
+   * @see {@link sendSandboxResourceReady `sendSandboxResourceReady`} for sending content to the sandbox
    */
   set onsandboxready(
     callback: (params: McpUiSandboxProxyReadyNotification["params"]) => void,
@@ -456,21 +488,21 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Called when the Guest UI completes initialization.
+   * Called when the view completes initialization.
    *
-   * Set this callback to be notified when the Guest UI has finished its
+   * Set this callback to be notified when the view has finished its
    * initialization handshake and is ready to receive tool input and other data.
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_oninitialized_sendToolInput"
    * bridge.oninitialized = () => {
-   *   console.log("Guest UI ready");
+   *   console.log("View ready");
    *   bridge.sendToolInput({ arguments: toolArgs });
    * };
    * ```
    *
-   * @see {@link McpUiInitializedNotification} for the notification type
-   * @see {@link sendToolInput} for sending tool arguments to the Guest UI
+   * @see {@link McpUiInitializedNotification `McpUiInitializedNotification`} for the notification type
+   * @see {@link sendToolInput `sendToolInput`} for sending tool arguments to the View
    */
   set oninitialized(
     callback: (params: McpUiInitializedNotification["params"]) => void,
@@ -481,9 +513,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for message requests from the Guest UI.
+   * Register a handler for message requests from the view.
    *
-   * The Guest UI sends `ui/message` requests when it wants to add a message to
+   * The view sends `ui/message` requests when it wants to add a message to
    * the host's chat interface. This enables interactive apps to communicate with
    * the user through the conversation thread.
    *
@@ -499,7 +531,7 @@ export class AppBridge extends Protocol<
    *   - Returns: `Promise<McpUiMessageResult>` with optional `isError` flag
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onmessage_logMessage"
    * bridge.onmessage = async ({ role, content }, extra) => {
    *   try {
    *     await chatManager.addMessage({ role, content, source: "app" });
@@ -511,8 +543,8 @@ export class AppBridge extends Protocol<
    * };
    * ```
    *
-   * @see {@link McpUiMessageRequest} for the request type
-   * @see {@link McpUiMessageResult} for the result type
+   * @see {@link McpUiMessageRequest `McpUiMessageRequest`} for the request type
+   * @see {@link McpUiMessageResult `McpUiMessageResult`} for the result type
    */
   set onmessage(
     callback: (
@@ -529,9 +561,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for external link requests from the Guest UI.
+   * Register a handler for external link requests from the view.
    *
-   * The Guest UI sends `ui/open-link` requests when it wants to open an external
+   * The view sends `ui/open-link` requests when it wants to open an external
    * URL in the host's default browser. The handler should validate the URL and
    * open it according to the host's security policy and user preferences.
    *
@@ -547,7 +579,7 @@ export class AppBridge extends Protocol<
    *   - Returns: `Promise<McpUiOpenLinkResult>` with optional `isError` flag
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onopenlink_handleRequest"
    * bridge.onopenlink = async ({ url }, extra) => {
    *   if (!isAllowedDomain(url)) {
    *     console.warn("Blocked external link:", url);
@@ -556,7 +588,7 @@ export class AppBridge extends Protocol<
    *
    *   const confirmed = await showDialog({
    *     message: `Open external link?\n${url}`,
-   *     buttons: ["Open", "Cancel"]
+   *     buttons: ["Open", "Cancel"],
    *   });
    *
    *   if (confirmed) {
@@ -568,8 +600,8 @@ export class AppBridge extends Protocol<
    * };
    * ```
    *
-   * @see {@link McpUiOpenLinkRequest} for the request type
-   * @see {@link McpUiOpenLinkResult} for the result type
+   * @see {@link McpUiOpenLinkRequest `McpUiOpenLinkRequest`} for the request type
+   * @see {@link McpUiOpenLinkResult `McpUiOpenLinkResult`} for the result type
    */
   set onopenlink(
     callback: (
@@ -586,9 +618,65 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for display mode change requests from the Guest UI.
+   * Register a handler for file download requests from the View.
    *
-   * The Guest UI sends `ui/request-display-mode` requests when it wants to change
+   * The View sends `ui/download-file` requests when the user wants to
+   * download a file. The params contain an array of MCP resource content
+   * items — either `EmbeddedResource` (inline data) or `ResourceLink`
+   * (URI the host can fetch). The host should show a confirmation dialog
+   * and then trigger the download.
+   *
+   * @param callback - Handler that receives download params and returns a result
+   *   - `params.contents` - Array of `EmbeddedResource` or `ResourceLink` items
+   *   - `extra` - Request metadata (abort signal, session info)
+   *   - Returns: `Promise<McpUiDownloadFileResult>` with optional `isError` flag
+   *
+   * @example
+   * ```ts
+   * bridge.ondownloadfile = async ({ contents }, extra) => {
+   *   for (const item of contents) {
+   *     if (item.type === "resource") {
+   *       // EmbeddedResource — inline content
+   *       const res = item.resource;
+   *       const blob = res.blob
+   *         ? new Blob([Uint8Array.from(atob(res.blob), c => c.charCodeAt(0))], { type: res.mimeType })
+   *         : new Blob([res.text ?? ""], { type: res.mimeType });
+   *       const url = URL.createObjectURL(blob);
+   *       const link = document.createElement("a");
+   *       link.href = url;
+   *       link.download = res.uri.split("/").pop() ?? "download";
+   *       link.click();
+   *       URL.revokeObjectURL(url);
+   *     } else if (item.type === "resource_link") {
+   *       // ResourceLink — host fetches or opens directly
+   *       window.open(item.uri, "_blank");
+   *     }
+   *   }
+   *   return {};
+   * };
+   * ```
+   *
+   * @see {@link McpUiDownloadFileRequest `McpUiDownloadFileRequest`} for the request type
+   * @see {@link McpUiDownloadFileResult `McpUiDownloadFileResult`} for the result type
+   */
+  set ondownloadfile(
+    callback: (
+      params: McpUiDownloadFileRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<McpUiDownloadFileResult>,
+  ) {
+    this.setRequestHandler(
+      McpUiDownloadFileRequestSchema,
+      async (request, extra) => {
+        return callback(request.params, extra);
+      },
+    );
+  }
+
+  /**
+   * Register a handler for display mode change requests from the view.
+   *
+   * The view sends `ui/request-display-mode` requests when it wants to change
    * its display mode (e.g., from "inline" to "fullscreen"). The handler should
    * check if the requested mode is in `availableDisplayModes` from the host context,
    * update the display mode if supported, and return the actual mode that was set.
@@ -605,22 +693,17 @@ export class AppBridge extends Protocol<
    *   - Returns: `Promise<McpUiRequestDisplayModeResult>` with the actual mode set
    *
    * @example
-   * ```typescript
-   * let currentDisplayMode: McpUiDisplayMode = "inline";
-   *
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onrequestdisplaymode_handleRequest"
    * bridge.onrequestdisplaymode = async ({ mode }, extra) => {
-   *   const availableModes = hostContext.availableDisplayModes ?? ["inline"];
-   *   if (availableModes.includes(mode)) {
+   *   if (availableDisplayModes.includes(mode)) {
    *     currentDisplayMode = mode;
-   *     return { mode };
    *   }
-   *   // Return current mode if requested mode not available
    *   return { mode: currentDisplayMode };
    * };
    * ```
    *
-   * @see {@link McpUiRequestDisplayModeRequest} for the request type
-   * @see {@link McpUiRequestDisplayModeResult} for the result type
+   * @see {@link McpUiRequestDisplayModeRequest `McpUiRequestDisplayModeRequest`} for the request type
+   * @see {@link McpUiRequestDisplayModeResult `McpUiRequestDisplayModeResult`} for the result type
    */
   set onrequestdisplaymode(
     callback: (
@@ -637,9 +720,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for logging messages from the Guest UI.
+   * Register a handler for logging messages from the view.
    *
-   * The Guest UI sends standard MCP `notifications/message` (logging) notifications
+   * The view sends standard MCP `notifications/message` (logging) notifications
    * to report debugging information, errors, warnings, and other telemetry to the
    * host. The host can display these in a console, log them to a file, or send
    * them to a monitoring service.
@@ -653,12 +736,11 @@ export class AppBridge extends Protocol<
    *   - `params.data` - Log message and optional structured data
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onloggingmessage_handleLog"
    * bridge.onloggingmessage = ({ level, logger, data }) => {
-   *   const prefix = logger ? `[${logger}]` : "[Guest UI]";
    *   console[level === "error" ? "error" : "log"](
-   *     `${prefix} ${level.toUpperCase()}:`,
-   *     data
+   *     `[${logger ?? "View"}] ${level.toUpperCase()}:`,
+   *     data,
    *   );
    * };
    * ```
@@ -675,10 +757,10 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for model context updates from the Guest UI.
+   * Register a handler for model context updates from the view.
    *
-   * The Guest UI sends `ui/update-model-context` requests to update the Host's
-   * model context. Each request overwrites the previous context stored by the Guest UI.
+   * The view sends `ui/update-model-context` requests to update the Host's
+   * model context. Each request overwrites the previous context stored by the view.
    * Unlike logging messages, context updates are intended to be available to
    * the model in future turns. Unlike messages, context updates do not trigger follow-ups.
    *
@@ -687,20 +769,18 @@ export class AppBridge extends Protocol<
    * update received.
    *
    * @example
-   * ```typescript
-   * bridge.onupdatemodelcontext = async ({ content, structuredContent }, extra) => {
-   *   // Update the model context with the new snapshot
-   *   modelContext = {
-   *     type: "app_context",
-   *     content,
-   *     structuredContent,
-   *     timestamp: Date.now()
-   *   };
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onupdatemodelcontext_storeContext"
+   * bridge.onupdatemodelcontext = async (
+   *   { content, structuredContent },
+   *   extra,
+   * ) => {
+   *   // Store the context snapshot for inclusion in the next model request
+   *   modelContextManager.update({ content, structuredContent });
    *   return {};
    * };
    * ```
    *
-   * @see {@link McpUiUpdateModelContextRequest} for the request type
+   * @see {@link McpUiUpdateModelContextRequest `McpUiUpdateModelContextRequest`} for the request type
    */
   set onupdatemodelcontext(
     callback: (
@@ -717,9 +797,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for tool call requests from the Guest UI.
+   * Register a handler for tool call requests from the view.
    *
-   * The Guest UI sends `tools/call` requests to execute MCP server tools. This
+   * The view sends `tools/call` requests to execute MCP server tools. This
    * handler allows the host to intercept and process these requests, typically
    * by forwarding them to the MCP server.
    *
@@ -729,12 +809,12 @@ export class AppBridge extends Protocol<
    *   - `extra` - Request metadata (abort signal, session info)
    *
    * @example
-   * ```typescript
-   * bridge.oncalltool = async ({ name, arguments: args }, extra) => {
+   * ```ts source="./app-bridge.examples.ts#AppBridge_oncalltool_forwardToServer"
+   * bridge.oncalltool = async (params, extra) => {
    *   return mcpClient.request(
-   *     { method: "tools/call", params: { name, arguments: args } },
+   *     { method: "tools/call", params },
    *     CallToolResultSchema,
-   *     { signal: extra.signal }
+   *     { signal: extra.signal },
    *   );
    * };
    * ```
@@ -754,10 +834,10 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Notify the Guest UI that the MCP server's tool list has changed.
+   * Notify the view that the MCP server's tool list has changed.
    *
-   * The host sends `notifications/tools/list_changed` to the Guest UI when it
-   * receives this notification from the MCP server. This allows the Guest UI
+   * The host sends `notifications/tools/list_changed` to the view when it
+   * receives this notification from the MCP server. This allows the view
    * to refresh its tool cache or UI accordingly.
    *
    * @param params - Optional notification params (typically empty)
@@ -780,9 +860,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for list resources requests from the Guest UI.
+   * Register a handler for list resources requests from the view.
    *
-   * The Guest UI sends `resources/list` requests to enumerate available MCP
+   * The view sends `resources/list` requests to enumerate available MCP
    * resources. This handler allows the host to intercept and process these
    * requests, typically by forwarding them to the MCP server.
    *
@@ -792,12 +872,12 @@ export class AppBridge extends Protocol<
    *   - `extra` - Request metadata (abort signal, session info)
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onlistresources_returnResources"
    * bridge.onlistresources = async (params, extra) => {
    *   return mcpClient.request(
    *     { method: "resources/list", params },
    *     ListResourcesResultSchema,
-   *     { signal: extra.signal }
+   *     { signal: extra.signal },
    *   );
    * };
    * ```
@@ -820,9 +900,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for list resource templates requests from the Guest UI.
+   * Register a handler for list resource templates requests from the view.
    *
-   * The Guest UI sends `resources/templates/list` requests to enumerate available
+   * The view sends `resources/templates/list` requests to enumerate available
    * MCP resource templates. This handler allows the host to intercept and process
    * these requests, typically by forwarding them to the MCP server.
    *
@@ -860,9 +940,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for read resource requests from the Guest UI.
+   * Register a handler for read resource requests from the view.
    *
-   * The Guest UI sends `resources/read` requests to retrieve the contents of an
+   * The view sends `resources/read` requests to retrieve the contents of an
    * MCP resource. This handler allows the host to intercept and process these
    * requests, typically by forwarding them to the MCP server.
    *
@@ -872,12 +952,12 @@ export class AppBridge extends Protocol<
    *   - `extra` - Request metadata (abort signal, session info)
    *
    * @example
-   * ```typescript
-   * bridge.onreadresource = async ({ uri }, extra) => {
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onreadresource_returnResource"
+   * bridge.onreadresource = async (params, extra) => {
    *   return mcpClient.request(
-   *     { method: "resources/read", params: { uri } },
+   *     { method: "resources/read", params },
    *     ReadResourceResultSchema,
-   *     { signal: extra.signal }
+   *     { signal: extra.signal },
    *   );
    * };
    * ```
@@ -900,10 +980,10 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Notify the Guest UI that the MCP server's resource list has changed.
+   * Notify the view that the MCP server's resource list has changed.
    *
-   * The host sends `notifications/resources/list_changed` to the Guest UI when it
-   * receives this notification from the MCP server. This allows the Guest UI
+   * The host sends `notifications/resources/list_changed` to the view when it
+   * receives this notification from the MCP server. This allows the view
    * to refresh its resource cache or UI accordingly.
    *
    * @param params - Optional notification params (typically empty)
@@ -928,9 +1008,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Register a handler for list prompts requests from the Guest UI.
+   * Register a handler for list prompts requests from the view.
    *
-   * The Guest UI sends `prompts/list` requests to enumerate available MCP
+   * The view sends `prompts/list` requests to enumerate available MCP
    * prompts. This handler allows the host to intercept and process these
    * requests, typically by forwarding them to the MCP server.
    *
@@ -940,12 +1020,12 @@ export class AppBridge extends Protocol<
    *   - `extra` - Request metadata (abort signal, session info)
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onlistprompts_returnPrompts"
    * bridge.onlistprompts = async (params, extra) => {
    *   return mcpClient.request(
    *     { method: "prompts/list", params },
    *     ListPromptsResultSchema,
-   *     { signal: extra.signal }
+   *     { signal: extra.signal },
    *   );
    * };
    * ```
@@ -965,10 +1045,10 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Notify the Guest UI that the MCP server's prompt list has changed.
+   * Notify the view that the MCP server's prompt list has changed.
    *
-   * The host sends `notifications/prompts/list_changed` to the Guest UI when it
-   * receives this notification from the MCP server. This allows the Guest UI
+   * The host sends `notifications/prompts/list_changed` to the view when it
+   * receives this notification from the MCP server. This allows the view
    * to refresh its prompt cache or UI accordingly.
    *
    * @param params - Optional notification params (typically empty)
@@ -1035,7 +1115,7 @@ export class AppBridge extends Protocol<
    *
    * @returns Host capabilities object
    *
-   * @see {@link McpUiHostCapabilities} for the capabilities structure
+   * @see {@link McpUiHostCapabilities `McpUiHostCapabilities`} for the capabilities structure
    */
   getCapabilities(): McpUiHostCapabilities {
     return this._capabilities;
@@ -1068,14 +1148,14 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Update the host context and notify the Guest UI of changes.
+   * Update the host context and notify the view of changes.
    *
    * Compares fields present in the new context with the current context and sends a
    * `ui/notifications/host-context-changed` notification containing only fields
    * that have been added or modified. If no fields have changed, no notification is sent.
    * The new context fully replaces the internal state.
    *
-   * Common use cases include notifying the Guest UI when:
+   * Common use cases include notifying the view when:
    * - Theme changes (light/dark mode toggle)
    * - Viewport size changes (window resize)
    * - Display mode changes (inline/fullscreen)
@@ -1084,20 +1164,20 @@ export class AppBridge extends Protocol<
    * @param hostContext - The complete new host context state
    *
    * @example Update theme when user toggles dark mode
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_setHostContext_updateTheme"
    * bridge.setHostContext({ theme: "dark" });
    * ```
    *
    * @example Update multiple context fields
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_setHostContext_updateMultiple"
    * bridge.setHostContext({
    *   theme: "dark",
-   *   containerDimensions: { maxHeight: 600, width: 800 }
+   *   containerDimensions: { maxHeight: 600, width: 800 },
    * });
    * ```
    *
-   * @see {@link McpUiHostContext} for the context structure
-   * @see {@link McpUiHostContextChangedNotification} for the notification type
+   * @see {@link McpUiHostContext `McpUiHostContext`} for the context structure
+   * @see {@link McpUiHostContextChangedNotification `McpUiHostContextChangedNotification`} for the notification type
    */
   setHostContext(hostContext: McpUiHostContext) {
     const changes: McpUiHostContext = {};
@@ -1120,9 +1200,9 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Low-level method to notify the Guest UI of host context changes.
+   * Low-level method to notify the view of host context changes.
    *
-   * Most hosts should use {@link setHostContext} instead, which automatically
+   * Most hosts should use {@link setHostContext `setHostContext`} instead, which automatically
    * detects changes and calls this method with only the modified fields.
    * Use this directly only when you need fine-grained control over change detection.
    *
@@ -1138,26 +1218,26 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Send complete tool arguments to the Guest UI.
+   * Send complete tool arguments to the view.
    *
-   * The host MUST send this notification after the Guest UI completes initialization
-   * (after {@link oninitialized} callback fires) and complete tool arguments become available.
-   * This notification is sent exactly once and is required before {@link sendToolResult}.
+   * The host MUST send this notification after the View completes initialization
+   * (after {@link oninitialized `oninitialized`} callback fires) and complete tool arguments become available.
+   * This notification is sent exactly once and is required before {@link sendToolResult `sendToolResult`}.
    *
    * @param params - Complete tool call arguments
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_sendToolInput_afterInit"
    * bridge.oninitialized = () => {
    *   bridge.sendToolInput({
-   *     arguments: { location: "New York", units: "metric" }
+   *     arguments: { location: "New York", units: "metric" },
    *   });
    * };
    * ```
    *
-   * @see {@link McpUiToolInputNotification} for the notification type
-   * @see {@link oninitialized} for the initialization callback
-   * @see {@link sendToolResult} for sending results after execution
+   * @see {@link McpUiToolInputNotification `McpUiToolInputNotification`} for the notification type
+   * @see {@link oninitialized `oninitialized`} for the initialization callback
+   * @see {@link sendToolResult `sendToolResult`} for sending results after execution
    */
   sendToolInput(params: McpUiToolInputNotification["params"]) {
     return this.notification({
@@ -1167,31 +1247,33 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Send streaming partial tool arguments to the Guest UI.
+   * Send streaming partial tool arguments to the view.
    *
    * The host MAY send this notification zero or more times while tool arguments
-   * are being streamed, before {@link sendToolInput} is called with complete
+   * are being streamed, before {@link sendToolInput `sendToolInput`} is called with complete
    * arguments. This enables progressive rendering of tool arguments in the
-   * Guest UI.
+   * view.
    *
-   * The arguments represent best-effort recovery of incomplete JSON. Guest UIs
+   * The arguments represent best-effort recovery of incomplete JSON. views
    * SHOULD handle missing or changing fields gracefully between notifications.
    *
    * @param params - Partial tool call arguments (may be incomplete)
    *
    * @example Stream partial arguments as they arrive
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_sendToolInputPartial_streaming"
    * // As streaming progresses...
    * bridge.sendToolInputPartial({ arguments: { loc: "N" } });
    * bridge.sendToolInputPartial({ arguments: { location: "New" } });
    * bridge.sendToolInputPartial({ arguments: { location: "New York" } });
    *
    * // When complete, send final input
-   * bridge.sendToolInput({ arguments: { location: "New York", units: "metric" } });
+   * bridge.sendToolInput({
+   *   arguments: { location: "New York", units: "metric" },
+   * });
    * ```
    *
-   * @see {@link McpUiToolInputPartialNotification} for the notification type
-   * @see {@link sendToolInput} for sending complete arguments
+   * @see {@link McpUiToolInputPartialNotification `McpUiToolInputPartialNotification`} for the notification type
+   * @see {@link sendToolInput `sendToolInput`} for sending complete arguments
    */
   sendToolInputPartial(params: McpUiToolInputPartialNotification["params"]) {
     return this.notification({
@@ -1201,28 +1283,26 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Send tool execution result to the Guest UI.
+   * Send tool execution result to the view.
    *
    * The host MUST send this notification when tool execution completes successfully,
-   * provided the UI is still displayed. If the UI was closed before execution
+   * provided the view is still displayed. If the view was closed before execution
    * completes, the host MAY skip this notification. This must be sent after
-   * {@link sendToolInput}.
+   * {@link sendToolInput `sendToolInput`}.
    *
    * @param params - Standard MCP tool execution result
    *
    * @example
-   * ```typescript
-   * import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-   *
+   * ```ts source="./app-bridge.examples.ts#AppBridge_sendToolResult_afterExecution"
    * const result = await mcpClient.request(
    *   { method: "tools/call", params: { name: "get_weather", arguments: args } },
-   *   CallToolResultSchema
+   *   CallToolResultSchema,
    * );
    * bridge.sendToolResult(result);
    * ```
    *
-   * @see {@link McpUiToolResultNotification} for the notification type
-   * @see {@link sendToolInput} for sending tool arguments before results
+   * @see {@link McpUiToolResultNotification `McpUiToolResultNotification`} for the notification type
+   * @see {@link sendToolInput `sendToolInput`} for sending tool arguments before results
    */
   sendToolResult(params: McpUiToolResultNotification["params"]) {
     return this.notification({
@@ -1232,24 +1312,24 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Notify the Guest UI that tool execution was cancelled.
+   * Notify the view that tool execution was cancelled.
    *
    * The host MUST send this notification if tool execution was cancelled for any
    * reason, including user action, sampling error, classifier intervention, or
-   * any other interruption. This allows the Guest UI to update its state and
+   * any other interruption. This allows the view to update its state and
    * display appropriate feedback to the user.
    *
    * @param params - Cancellation details object
    *   - `reason`: Human-readable explanation for why the tool was cancelled
    *
    * @example User-initiated cancellation
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_sendToolCancelled_userInitiated"
    * // User clicked "Cancel" button
    * bridge.sendToolCancelled({ reason: "User cancelled the operation" });
    * ```
    *
    * @example System-level cancellation
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_sendToolCancelled_systemLevel"
    * // Sampling error or timeout
    * bridge.sendToolCancelled({ reason: "Request timeout after 30 seconds" });
    *
@@ -1257,9 +1337,9 @@ export class AppBridge extends Protocol<
    * bridge.sendToolCancelled({ reason: "Content policy violation detected" });
    * ```
    *
-   * @see {@link McpUiToolCancelledNotification} for the notification type
-   * @see {@link sendToolResult} for sending successful results
-   * @see {@link sendToolInput} for sending tool arguments
+   * @see {@link McpUiToolCancelledNotification `McpUiToolCancelledNotification`} for the notification type
+   * @see {@link sendToolResult `sendToolResult`} for sending successful results
+   * @see {@link sendToolInput `sendToolInput`} for sending tool arguments
    */
   sendToolCancelled(params: McpUiToolCancelledNotification["params"]) {
     return this.notification({
@@ -1281,7 +1361,7 @@ export class AppBridge extends Protocol<
    *   - `sandbox`: Optional sandbox attribute value (e.g., "allow-scripts")
    *
    * @internal
-   * @see {@link onsandboxready} for handling the sandbox proxy ready notification
+   * @see {@link onsandboxready `onsandboxready`} for handling the sandbox proxy ready notification
    */
   sendSandboxResourceReady(
     params: McpUiSandboxResourceReadyNotification["params"],
@@ -1293,23 +1373,23 @@ export class AppBridge extends Protocol<
   }
 
   /**
-   * Request graceful shutdown of the Guest UI.
+   * Request graceful shutdown of the view.
    *
    * The host MUST send this request before tearing down the UI resource (before
-   * unmounting the iframe). This gives the Guest UI an opportunity to save state,
+   * unmounting the iframe). This gives the view an opportunity to save state,
    * cancel pending operations, or show confirmation dialogs.
    *
    * The host SHOULD wait for the response before unmounting to prevent data loss.
    *
    * @param params - Empty params object
    * @param options - Request options (timeout, etc.)
-   * @returns Promise resolving when Guest UI confirms readiness for teardown
+   * @returns Promise resolving when view confirms readiness for teardown
    *
    * @example
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_teardownResource_gracefulShutdown"
    * try {
    *   await bridge.teardownResource({});
-   *   // Guest UI is ready, safe to unmount iframe
+   *   // View is ready, safe to unmount iframe
    *   iframe.remove();
    * } catch (error) {
    *   console.error("Teardown failed:", error);
@@ -1330,27 +1410,27 @@ export class AppBridge extends Protocol<
     );
   }
 
-  /** @deprecated Use {@link teardownResource} instead */
+  /** @deprecated Use {@link teardownResource `teardownResource`} instead */
   sendResourceTeardown: AppBridge["teardownResource"] = this.teardownResource;
 
   /**
-   * Connect to the Guest UI via transport and optionally set up message forwarding.
+   * Connect to the view via transport and optionally set up message forwarding.
    *
    * This method establishes the transport connection. If an MCP client was passed
    * to the constructor, it also automatically sets up request/notification forwarding
-   * based on the MCP server's capabilities, proxying the following to the Guest UI:
+   * based on the MCP server's capabilities, proxying the following to the view:
    * - Tools (tools/call, notifications/tools/list_changed)
    * - Resources (resources/list, resources/read, resources/templates/list, notifications/resources/list_changed)
    * - Prompts (prompts/list, notifications/prompts/list_changed)
    *
    * If no client was passed to the constructor, no automatic forwarding is set up
-   * and you must register handlers manually using the {@link oncalltool}, {@link onlistresources},
+   * and you must register handlers manually using the {@link oncalltool `oncalltool`}, {@link onlistresources `onlistresources`},
    * etc. setters.
    *
-   * After calling connect, wait for the {@link oninitialized} callback before sending
-   * tool input and other data to the Guest UI.
+   * After calling connect, wait for the {@link oninitialized `oninitialized`} callback before sending
+   * tool input and other data to the View.
    *
-   * @param transport - Transport layer (typically {@link PostMessageTransport})
+   * @param transport - Transport layer (typically {@link PostMessageTransport `PostMessageTransport`})
    * @returns Promise resolving when connection is established
    *
    * @throws {Error} If a client was passed but server capabilities are not available.
@@ -1359,7 +1439,7 @@ export class AppBridge extends Protocol<
    *   before calling `bridge.connect()`.
    *
    * @example With MCP client (automatic forwarding)
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_connect_withMcpClient"
    * const bridge = new AppBridge(mcpClient, hostInfo, capabilities);
    * const transport = new PostMessageTransport(
    *   iframe.contentWindow!,
@@ -1367,7 +1447,7 @@ export class AppBridge extends Protocol<
    * );
    *
    * bridge.oninitialized = () => {
-   *   console.log("Guest UI ready");
+   *   console.log("View ready");
    *   bridge.sendToolInput({ arguments: toolArgs });
    * };
    *
@@ -1375,21 +1455,27 @@ export class AppBridge extends Protocol<
    * ```
    *
    * @example Without MCP client (manual handlers)
-   * ```typescript
+   * ```ts source="./app-bridge.examples.ts#AppBridge_connect_withoutMcpClient"
    * const bridge = new AppBridge(null, hostInfo, capabilities);
    *
    * // Register handlers manually
    * bridge.oncalltool = async (params, extra) => {
    *   // Custom tool call handling
+   *   return { content: [] };
    * };
    *
    * await bridge.connect(transport);
    * ```
    */
   async connect(transport: Transport) {
+    if (this.transport) {
+      throw new Error(
+        "AppBridge is already connected. Call close() before connecting again.",
+      );
+    }
     if (this._client) {
       // When a client was passed to the constructor, automatically forward
-      // MCP requests/notifications between the Guest UI and the server
+      // MCP requests/notifications between the view and the server
       const serverCapabilities = this._client.getServerCapabilities();
       if (!serverCapabilities) {
         throw new Error("Client server capabilities not available");

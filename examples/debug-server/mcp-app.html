@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>Debug App</title>
+</head>
+<body>
+  <main class="main">
+    <!-- Section 1: Event Log -->
+    <section class="section">
+      <h2 class="section-header">
+        <span>Event Log</span>
+        <div class="header-actions">
+          <select id="log-filter">
+            <option value="all">All Events</option>
+            <option value="ontoolinput">ontoolinput</option>
+            <option value="ontoolinputpartial">ontoolinputpartial</option>
+            <option value="ontoolresult">ontoolresult</option>
+            <option value="ontoolcancelled">ontoolcancelled</option>
+            <option value="onhostcontextchanged">onhostcontextchanged</option>
+            <option value="onteardown">onteardown</option>
+            <option value="oncalltool">oncalltool</option>
+            <option value="onlisttools">onlisttools</option>
+            <option value="onerror">onerror</option>
+            <option value="connected">connected</option>
+          </select>
+          <button id="clear-log-btn" class="btn-small">Clear</button>
+        </div>
+      </h2>
+      <div id="event-log" class="event-log"></div>
+    </section>
+
+    <!-- Section 2: Host Info -->
+    <section class="section collapsible">
+      <h2 class="section-header" data-toggle="host-info-content">
+        <span>Host Info</span>
+        <span class="toggle-icon">▼</span>
+      </h2>
+      <div id="host-info-content" class="section-content">
+        <div class="info-grid">
+          <div class="info-group">
+            <h3>Context</h3>
+            <dl id="host-context-info"></dl>
+          </div>
+          <div class="info-group">
+            <h3>Capabilities</h3>
+            <dl id="host-capabilities-info"></dl>
+          </div>
+          <div class="info-group">
+            <h3>Container</h3>
+            <dl id="host-container-info"></dl>
+          </div>
+          <div class="info-group">
+            <h3>Styles Sample</h3>
+            <div id="host-styles-sample" class="styles-sample"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Callback Status -->
+    <section class="section collapsible">
+      <h2 class="section-header" data-toggle="callback-status-content">
+        <span>Callback Status</span>
+        <span class="toggle-icon">▼</span>
+      </h2>
+      <div id="callback-status-content" class="section-content">
+        <table class="callback-table">
+          <thead>
+            <tr>
+              <th>Callback</th>
+              <th>Registered</th>
+              <th>Count</th>
+              <th>Last Payload</th>
+            </tr>
+          </thead>
+          <tbody id="callback-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section 4: Action Buttons -->
+    <section class="section collapsible">
+      <h2 class="section-header" data-toggle="actions-content">
+        <span>Actions</span>
+        <span class="toggle-icon">▼</span>
+      </h2>
+      <div id="actions-content" class="section-content">
+        <!-- Messages -->
+        <div class="action-group">
+          <h3>Messages</h3>
+          <div class="action-row">
+            <input type="text" id="message-text" value="Hello from debug app!" placeholder="Message text">
+            <button id="send-message-text-btn">Send Text</button>
+          </div>
+          <div class="action-row">
+            <button id="send-message-image-btn">Send Test Image</button>
+          </div>
+        </div>
+
+        <!-- Logging -->
+        <div class="action-group">
+          <h3>Logging</h3>
+          <div class="action-row">
+            <input type="text" id="log-data" value="Debug log data" placeholder="Log data">
+          </div>
+          <div class="action-row btn-row">
+            <button id="log-debug-btn" class="btn-small">debug</button>
+            <button id="log-info-btn" class="btn-small">info</button>
+            <button id="log-warning-btn" class="btn-small">warning</button>
+            <button id="log-error-btn" class="btn-small">error</button>
+          </div>
+        </div>
+
+        <!-- Model Context -->
+        <div class="action-group">
+          <h3>Model Context</h3>
+          <div class="action-row">
+            <input type="text" id="context-text" value="Current app state info" placeholder="Context text">
+            <button id="update-context-text-btn">Update (Text)</button>
+          </div>
+          <div class="action-row">
+            <button id="update-context-structured-btn">Update (Structured)</button>
+            <button id="update-context-image-btn">Update (Image)</button>
+          </div>
+        </div>
+
+        <!-- Display Mode -->
+        <div class="action-group">
+          <h3>Display Mode</h3>
+          <div class="action-row btn-row">
+            <button id="display-inline-btn" class="btn-small">Inline</button>
+            <button id="display-fullscreen-btn" class="btn-small">Fullscreen</button>
+            <button id="display-pip-btn" class="btn-small">PiP</button>
+          </div>
+        </div>
+
+        <!-- Links -->
+        <div class="action-group">
+          <h3>Links</h3>
+          <div class="action-row">
+            <input type="url" id="link-url" value="https://modelcontextprotocol.io/" placeholder="URL">
+            <button id="open-link-btn">Open Link</button>
+          </div>
+        </div>
+
+        <!-- Size Controls -->
+        <div class="action-group">
+          <h3>Size</h3>
+          <div class="action-row">
+            <label><input type="checkbox" id="auto-resize-toggle" checked> Auto-resize</label>
+          </div>
+          <div class="action-row btn-row">
+            <button id="resize-200x100-btn" class="btn-small">200x100</button>
+            <button id="resize-400x300-btn" class="btn-small">400x300</button>
+            <button id="resize-800x600-btn" class="btn-small">800x600</button>
+          </div>
+          <div class="action-row">
+            <span>Current: <code id="current-size">measuring...</code></span>
+          </div>
+        </div>
+
+        <!-- Server Tools -->
+        <div class="action-group">
+          <h3>Server Tools</h3>
+          <div class="tool-config">
+            <div class="config-row">
+              <label>Content Type:</label>
+              <select id="tool-content-type">
+                <option value="text">text</option>
+                <option value="image">image</option>
+                <option value="audio">audio</option>
+                <option value="resource">resource</option>
+                <option value="resourceLink">resourceLink</option>
+                <option value="mixed">mixed</option>
+              </select>
+            </div>
+            <div class="config-row">
+              <label><input type="checkbox" id="tool-multiple-blocks"> Multiple blocks</label>
+            </div>
+            <div class="config-row">
+              <label><input type="checkbox" id="tool-structured-content" checked> Include structuredContent</label>
+            </div>
+            <div class="config-row">
+              <label><input type="checkbox" id="tool-include-meta"> Include _meta</label>
+            </div>
+            <div class="config-row">
+              <label><input type="checkbox" id="tool-simulate-error"> Simulate error</label>
+            </div>
+            <div class="config-row">
+              <label>Delay (ms):</label>
+              <input type="number" id="tool-delay-ms" value="0" min="0" max="10000" step="100">
+            </div>
+          </div>
+          <div class="action-row">
+            <button id="call-debug-tool-btn">Call debug-tool</button>
+          </div>
+          <div class="action-row">
+            <button id="call-debug-refresh-btn">Call debug-refresh</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/src/mcp-app.ts"></script>
+</body>
+</html>

@@ -137,6 +137,45 @@ function GetTimeAppInner({
     log.info("Open link request", isError ? "rejected" : "accepted");
   }, [app, linkUrl]);
 
+  const canDownload = app.getHostCapabilities()?.downloadFile !== undefined;
+
+  const handleDownloadFile = useCallback(async () => {
+    const sampleContent = JSON.stringify(
+      { time: serverTime, exported: new Date().toISOString() },
+      null,
+      2,
+    );
+    log.info("Requesting file download...");
+    const { isError } = await app.downloadFile({
+      contents: [
+        {
+          type: "resource",
+          resource: {
+            uri: "file:///export.json",
+            mimeType: "application/json",
+            text: sampleContent,
+          },
+        },
+      ],
+    });
+    log.info("Download", isError ? "rejected" : "accepted");
+  }, [app, serverTime]);
+
+  const handleDownloadLink = useCallback(async () => {
+    log.info("Requesting resource link download...");
+    const { isError } = await app.downloadFile({
+      contents: [
+        {
+          type: "resource_link",
+          uri: "resource:///sample-report.txt",
+          name: "sample-report.txt",
+          mimeType: "text/plain",
+        },
+      ],
+    });
+    log.info("Resource link download", isError ? "rejected" : "accepted");
+  }, [app]);
+
   return (
     <main
       className={styles.main}
@@ -152,7 +191,7 @@ function GetTimeAppInner({
       <div className={styles.action}>
         <p>
           <strong>Server Time:</strong>{" "}
-          <code id="server-time">{serverTime}</code>
+          <code className={styles.serverTime}>{serverTime}</code>
         </p>
         <button onClick={handleGetTime}>Get Server Time</button>
       </div>
@@ -182,6 +221,16 @@ function GetTimeAppInner({
         />
         <button onClick={handleOpenLink}>Open Link</button>
       </div>
+
+      {canDownload && (
+        <div className={styles.action}>
+          <p>Download file via EmbeddedResource or ResourceLink</p>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={handleDownloadFile}>Embedded</button>
+            <button onClick={handleDownloadLink}>Link</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

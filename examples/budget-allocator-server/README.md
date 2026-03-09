@@ -4,11 +4,50 @@ An interactive budget allocation tool demonstrating real-time data visualization
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/01-initial.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/01-initial.png" alt="Initial" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/02-over-budget.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/02-over-budget.png" alt="Over budget" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/03-tech-heavy.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/03-tech-heavy.png" alt="Tech-heavy" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/01-initial.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/01-initial.png" alt="Initial" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/02-over-budget.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/02-over-budget.png" alt="Over budget" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/03-tech-heavy.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/03-tech-heavy.png" alt="Tech-heavy" width="100%"></a></td>
   </tr>
 </table>
+
+## MCP Client Configuration
+
+Add to your MCP client configuration (stdio transport):
+
+```json
+{
+  "mcpServers": {
+    "budget-allocator": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--silent",
+        "--registry=https://registry.npmjs.org/",
+        "@modelcontextprotocol/server-budget-allocator",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
+
+### Local Development
+
+To test local modifications, use this configuration (replace `~/code/ext-apps` with your clone path):
+
+```json
+{
+  "mcpServers": {
+    "budget-allocator": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd ~/code/ext-apps/examples/budget-allocator-server && npm run build >&2 && node dist/index.js --stdio"
+      ]
+    }
+  }
+}
+```
 
 ## Features
 

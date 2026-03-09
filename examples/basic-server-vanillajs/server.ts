@@ -33,7 +33,7 @@ export function createServer(): McpServer {
       outputSchema: z.object({
         time: z.string(),
       }),
-      _meta: { ui: { resourceUri } },
+      _meta: { ui: { resourceUri } }, // Links this tool to its UI resource
     },
     async (): Promise<CallToolResult> => {
       const time = new Date().toISOString();

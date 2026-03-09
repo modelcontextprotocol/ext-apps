@@ -5,7 +5,7 @@
   "author": {
     "name": "MCP Apps"
   },
-  "repository": "https://github.com/anthropics/mcp-ext-apps",
+  "repository": "https://github.com/modelcontextprotocol/ext-apps",
   "license": "MIT",
   "keywords": ["mcp", "mcp-apps", "model-context-protocol", "ui", "interactive"]
 }

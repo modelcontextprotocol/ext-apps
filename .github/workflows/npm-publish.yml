@@ -14,11 +14,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -31,11 +31,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -53,11 +53,11 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -107,6 +107,7 @@ jobs:
           - budget-allocator-server
           - cohort-heatmap-server
           - customer-segmentation-server
+          - debug-server
           - map-server
           - pdf-server
           - scenario-modeler-server
@@ -119,11 +120,11 @@ jobs:
           - wiki-explorer-server
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -137,3 +138,35 @@ jobs:
         run: npm publish --workspace examples/${{ matrix.example }} --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
+
+  publish-mcpb:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    environment: Release
+    needs: [publish-examples]
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Build pdf-server
+        run: npm run build --workspace examples/pdf-server
+
+      - name: Pack MCPB bundle
+        run: npx -y @anthropic-ai/mcpb pack
+        working-directory: examples/pdf-server
+
+      - name: Upload MCPB to release
+        run: gh release upload "${{ github.event.release.tag_name }}" examples/pdf-server/*.mcpb --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

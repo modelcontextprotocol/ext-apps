@@ -1,0 +1,24 @@
+# Source files (built output in dist/ is what we need)
+*.ts
+tsconfig*.json
+vite.config.ts
+src/
+
+# Tests
+*.test.*
+
+# Debug logs
+*.jsonl
+
+# Development assets
+screenshot.png
+grid-cell.png
+pdf-icon.svg
+
+# Plugin directory (separate distribution path)
+plugin/
+
+# Git and CI
+.git/
+.github/
+.gitignore

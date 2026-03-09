@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Checks that example package.json files reference the same version
+ * Checks that example package.json files reference a compatible version
  * of @modelcontextprotocol/ext-apps as the root package.json.
  *
  * This ensures examples stay in sync with the library version.
@@ -13,7 +13,38 @@ const rootPkg = JSON.parse(readFileSync("package.json", "utf-8"));
 const rootVersion = rootPkg.version;
 const pkgName = rootPkg.name;
 
-const expectedDep = `^${rootVersion}`;
+// Parse semver major.minor.patch
+const [major, minor] = rootVersion.split(".").map(Number);
+
+/**
+ * Check if a dependency range is compatible with the root version.
+ * Allows:
+ * - "../.." (local dev)
+ * - "^X.Y.Z" where X.Y matches root major.minor (e.g., ^1.0.0 is compatible with 1.0.1)
+ * - Exact match like "1.0.1"
+ */
+function isCompatible(dep) {
+  if (dep === "../..") return true;
+
+  // Handle caret ranges like ^1.0.0
+  if (dep.startsWith("^")) {
+    const version = dep.slice(1);
+    const [depMajor, depMinor] = version.split(".").map(Number);
+    // For major version 0, minor must match; for major > 0, only major must match
+    if (major === 0) {
+      return depMajor === major && depMinor === minor;
+    }
+    return depMajor === major;
+  }
+
+  // Handle exact version
+  if (/^\d+\.\d+\.\d+$/.test(dep)) {
+    const [depMajor] = dep.split(".").map(Number);
+    return depMajor === major;
+  }
+
+  return false;
+}
 
 let hasError = false;
 
@@ -28,22 +59,22 @@ for (const example of examples) {
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
 
   const dep = pkg.dependencies?.[pkgName];
-  // Allow "../.." (local dev) or the correct versioned dependency
-  if (dep && dep !== expectedDep && dep !== "../..") {
+  if (dep && !isCompatible(dep)) {
     console.error(
-      `❌ ${pkgPath}: expected "${pkgName}": "${expectedDep}" (or "../.."), got "${dep}"`,
+      `❌ ${pkgPath}: "${pkgName}": "${dep}" is not compatible with root version ${rootVersion}`,
     );
     hasError = true;
   }
 }
 
 if (hasError) {
+  const expectedDep = `^${major}.${minor}.0`;
   console.error(
     `\nRun the following to fix:\n  npm pkg set dependencies.${pkgName}=${expectedDep} --workspaces`,
   );
   process.exit(1);
 } else {
   console.log(
-    `✅ All examples reference ${pkgName}@${expectedDep} (root version: ${rootVersion})`,
+    `✅ All examples reference compatible ${pkgName} versions (root version: ${rootVersion})`,
   );
 }
