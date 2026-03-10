@@ -4,6 +4,9 @@
  * - Moves custom.css to load last so overrides win the cascade
  * - Replaces breadcrumbs with the document group name (e.g. "Security")
  * - Marks the current sidebar nav link for CSS highlighting
+ * - Rewrites the README <picture> logo to a pair of theme-tagged <img>s so
+ *   the logo follows the TypeDoc theme switcher (data-theme), not just the
+ *   OS prefers-color-scheme media query
  */
 
 import { Renderer } from "typedoc";
@@ -37,6 +40,17 @@ export function load(app) {
         `<ul class="tsd-breadcrumb" aria-label="Breadcrumb"><li><span>${group}</span></li></ul>`,
       );
     }
+
+    // The README logo uses <picture> with prefers-color-scheme, which follows
+    // the OS setting and ignores the TypeDoc theme switcher (data-theme attr).
+    // Rewrite it as two <img> tags — CSS in mcp-theme.css picks the correct
+    // one based on both data-theme and prefers-color-scheme (for "OS" mode).
+    page.contents = page.contents.replace(
+      /<picture>\s*<source media="\(prefers-color-scheme: dark\)" srcset="([^"]+)">\s*<source media="\(prefers-color-scheme: light\)" srcset="([^"]+)">\s*<img src="[^"]+"([^>]*)>\s*<\/picture>/,
+      (_, darkSrc, lightSrc, imgAttrs) =>
+        `<img src="${lightSrc}"${imgAttrs} class="mcp-logo-light">` +
+        `<img src="${darkSrc}"${imgAttrs} class="mcp-logo-dark">`,
+    );
 
     // Inject script to mark the current sidebar nav link with a "current" class.
     // TypeDoc does not natively add this class for document pages.
