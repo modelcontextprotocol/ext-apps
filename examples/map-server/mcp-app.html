@@ -7,6 +7,17 @@
     <!-- CesiumJS is loaded dynamically from CDN in mcp-app.ts because static
          <script src=""> tags don't work in srcdoc iframes -->
     <style>
+        :root {
+            color-scheme: light dark;
+            --bg000: light-dark(#ffffff, #1a1a1a);
+            --bg100: light-dark(#f5f5f5, #252525);
+            --bg200: light-dark(#e0e0e0, #333333);
+            --text000: light-dark(#1a1a1a, #f0f0f0);
+            --text100: light-dark(#666666, #aaaaaa);
+            --text200: light-dark(#999999, #888888);
+            --accent: light-dark(#2563eb, #60a5fa);
+            --shadow: light-dark(0 4px 16px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.5));
+        }
         html, body {
             width: 100%;
             height: 100%;
@@ -16,14 +27,12 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: transparent;
         }
-        #cesiumContainer {
-            width: 100%;
-            height: 100%;
-        }
-        #fullscreen-btn {
+        #cesiumContainer { width: 100%; height: 100%; }
+
+        /* --- Toolbar Buttons (top-right) --- */
+        .toolbar-btn {
             position: absolute;
             top: 10px;
-            right: 10px;
             width: 36px;
             height: 36px;
             background: rgba(0, 0, 0, 0.7);
@@ -35,19 +44,36 @@
             align-items: center;
             justify-content: center;
             transition: background 0.2s;
+            color: white;
         }
-        #fullscreen-btn:hover {
-            background: rgba(0, 0, 0, 0.85);
+        .toolbar-btn:hover { background: rgba(0, 0, 0, 0.85); }
+        .toolbar-btn svg { width: 20px; height: 20px; fill: currentColor; }
+        #fullscreen-btn { right: 10px; }
+        #download-btn { right: 52px; }
+        #copy-btn { right: 94px; }
+        #copy-btn.copied svg { fill: #4ade80; }
+        #panel-btn { right: 136px; }
+        #panel-btn.active { background: var(--accent); }
+
+        #panel-badge {
+            position: absolute;
+            top: -4px; right: -4px;
+            min-width: 16px; height: 16px;
+            padding: 0 4px;
+            border-radius: 8px;
+            background: #e74c3c;
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
         }
-        #fullscreen-btn svg {
-            width: 20px;
-            height: 20px;
-            fill: white;
-        }
+
         #loading {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.8);
             color: white;
@@ -56,16 +82,224 @@
             font-size: 16px;
             z-index: 1001;
         }
+
+        /* --- Annotation Panel (floating, draggable) --- */
+        .ann-panel {
+            position: absolute;
+            top: 56px; right: 10px;
+            width: 260px;
+            min-width: 180px;
+            max-width: 50vw;
+            max-height: calc(100% - 70px);
+            background: var(--bg000);
+            color: var(--text000);
+            border: 1px solid var(--bg200);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            z-index: 999;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            transition: top 0.15s ease, left 0.15s ease, right 0.15s ease, bottom 0.15s ease;
+        }
+        .ann-panel.dragging { transition: none; }
+
+        .ann-panel-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--bg200);
+            cursor: grab;
+            user-select: none;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .ann-panel.dragging .ann-panel-header { cursor: grabbing; }
+        .ann-panel-title { flex: 1; }
+
+        .ann-icon-btn {
+            width: 22px; height: 22px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: var(--text100);
+            cursor: pointer;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .ann-icon-btn:hover { background: var(--bg100); color: var(--text000); }
+        .ann-icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .ann-icon-btn:disabled { opacity: 0.3; cursor: default; }
+        .ann-icon-btn:disabled:hover { background: transparent; color: var(--text100); }
+
+        .ann-panel-list { flex: 1; overflow-y: auto; padding: 4px 0; outline: none; }
+
+        /* --- Annotation Cards --- */
+        .ann-card {
+            display: flex;
+            flex-direction: column;
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: background 0.1s ease;
+            border-left: 3px solid transparent;
+            user-select: none;
+        }
+        .ann-card:hover { background: var(--bg100); }
+        .ann-card.selected {
+            background: color-mix(in srgb, var(--accent) 15%, transparent);
+            border-left-color: var(--accent);
+        }
+        .ann-card.hidden-ann { opacity: 0.45; }
+
+        .ann-card-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 22px;
+        }
+
+        .ann-eye {
+            width: 20px; height: 20px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: var(--text200);
+            cursor: pointer;
+            border-radius: 3px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            opacity: 0.3;
+            transition: opacity 0.1s ease, color 0.1s ease;
+        }
+        .ann-card:hover .ann-eye { opacity: 1; }
+        .ann-card.hidden-ann .ann-eye { opacity: 1; color: var(--text100); }
+        .ann-eye:hover { color: var(--text000); background: var(--bg100); }
+        .ann-eye svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+
+        .ann-swatch {
+            width: 10px; height: 10px;
+            border-radius: 2px;
+            flex-shrink: 0;
+            border: 1px solid color-mix(in srgb, var(--text000) 20%, transparent);
+        }
+
+        .ann-label {
+            flex: 1;
+            min-width: 0;
+            font-size: 12px;
+            color: var(--text000);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .ann-delete {
+            width: 20px; height: 20px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: var(--text200);
+            cursor: pointer;
+            border-radius: 3px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            opacity: 0;
+            transition: opacity 0.1s ease, color 0.1s ease;
+        }
+        .ann-card:hover .ann-delete { opacity: 1; }
+        .ann-delete:hover { color: #e74c3c; background: var(--bg100); }
+        .ann-delete svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+
+        /* Details expansion */
+        .ann-details {
+            display: none;
+            font-size: 11px;
+            color: var(--text100);
+            padding: 4px 0 2px 30px; /* indent past eye + swatch */
+            line-height: 1.4;
+        }
+        .ann-card.expanded .ann-details { display: block; }
+        .ann-desc p { margin: 0 0 4px 0; }
+        .ann-desc p:last-child { margin-bottom: 0; }
+        .ann-desc strong { color: var(--text000); }
+        .ann-desc em { color: var(--text000); font-style: italic; }
+        .ann-desc code {
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            background: var(--bg100);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+        .ann-desc a { color: var(--accent); cursor: pointer; }
+        .ann-desc ul, .ann-desc ol { margin: 2px 0; padding-left: 18px; }
+        .ann-desc li { margin: 0; }
+
+        /* Footer nav */
+        .ann-panel-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-top: 1px solid var(--bg200);
+            font-size: 11px;
+            color: var(--text200);
+        }
+        .ann-panel-footer-nav { display: flex; gap: 2px; }
     </style>
 </head>
 <body>
     <div id="cesiumContainer"></div>
-    <button id="fullscreen-btn" title="Toggle fullscreen">
-        <!-- Expand icon (shown when inline) -->
+
+    <button id="panel-btn" class="toolbar-btn" title="Toggle annotations panel" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h12v2H3zm0 6h18v2H3z"/></svg>
+        <span id="panel-badge"></span>
+    </button>
+    <button id="copy-btn" class="toolbar-btn" title="Copy annotations as Markdown + GeoJSON" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+    </button>
+    <button id="download-btn" class="toolbar-btn" title="Download annotations as Markdown + GeoJSON" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+    </button>
+    <button id="fullscreen-btn" class="toolbar-btn" title="Toggle fullscreen">
         <svg id="expand-icon" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-        <!-- Compress icon (shown when fullscreen) -->
         <svg id="compress-icon" style="display:none" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
     </button>
+
+    <!-- Floating Annotation Panel -->
+    <div id="ann-panel" class="ann-panel">
+        <div class="ann-panel-header" id="ann-panel-header">
+            <button id="ann-master-eye" class="ann-icon-btn" title="Hide all / Show all">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <span class="ann-panel-title">Annotations (<span id="ann-count">0</span>)</span>
+            <button id="ann-clear" class="ann-icon-btn" title="Clear all">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+            </button>
+            <button id="ann-close" class="ann-icon-btn" title="Close panel">
+                <svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div id="ann-list" class="ann-panel-list" tabindex="0"></div>
+        <div class="ann-panel-footer">
+            <span id="ann-footer-info"></span>
+            <div class="ann-panel-footer-nav">
+                <button id="ann-prev" class="ann-icon-btn" title="Previous (↑)">
+                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <button id="ann-next" class="ann-icon-btn" title="Next (↓)">
+                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="loading">Loading globe...</div>
     <script type="module" src="/src/mcp-app.ts"></script>
 </body>
