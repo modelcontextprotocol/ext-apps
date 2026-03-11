@@ -29,6 +29,11 @@ const config = {
   excludePrivate: true,
   excludeInternal: false,
   intentionallyNotExported: ["AppOptions"],
+  externalSymbolLinkMappings: {
+    "@modelcontextprotocol/sdk": {
+      Client: "#",
+    },
+  },
   blockTags: [...OptionDefaults.blockTags, "@description"],
   jsDocCompatibility: {
     exampleTag: false,

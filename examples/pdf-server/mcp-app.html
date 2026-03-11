@@ -19,6 +19,22 @@
         <p id="error-message">An error occurred</p>
       </div>
 
+      <!-- Elicitation State: app asks user for input on behalf of the server -->
+      <div id="elicitation" class="elicitation" style="display: none">
+        <p id="elicitation-message" class="elicitation-message"></p>
+        <input
+          id="elicitation-url"
+          type="url"
+          class="elicitation-input"
+          placeholder="https://arxiv.org/pdf/1706.03762"
+          autocomplete="url"
+        />
+        <div class="elicitation-actions">
+          <button id="elicitation-submit" class="elicitation-btn elicitation-btn-primary">Open PDF</button>
+          <button id="elicitation-cancel" class="elicitation-btn elicitation-btn-secondary">Cancel</button>
+        </div>
+      </div>
+
       <!-- PDF Viewer -->
       <div id="viewer" class="viewer" style="display: none">
         <!-- Toolbar -->

@@ -9,6 +9,9 @@ import {
   CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
+  ElicitRequest,
+  ElicitRequestSchema,
+  ElicitResult,
   EmptyResultSchema,
   Implementation,
   ListResourcesRequest,
@@ -661,6 +664,40 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
   }
 
   /**
+   * Handle an `elicitation/create` request forwarded from the host.
+   *
+   * The host's MCP server can pause a tool call and ask the app for structured
+   * user input via `server.request({ method: "elicitation/create", ... })`. The
+   * bridge forwards that request here, and this handler must return an
+   * `ElicitResult` — either `{ action: "accept", content: {...} }` when the user
+   * submits the form, or `{ action: "cancel" }` / `{ action: "decline" }` when
+   * they dismiss it.
+   *
+   * @example
+   * ```ts
+   * app.onelicitation = (params) => {
+   *   return new Promise((resolve) => {
+   *     renderForm(params.message, params.requestedSchema, (values) => {
+   *       resolve(values
+   *         ? { action: "accept", content: values }
+   *         : { action: "cancel" });
+   *     });
+   *   });
+   * };
+   * ```
+   */
+  set onelicitation(
+    callback: (
+      params: ElicitRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<ElicitResult>,
+  ) {
+    this.setRequestHandler(ElicitRequestSchema, (request, extra) =>
+      callback(request.params, extra),
+    );
+  }
+
+  /**
    * Verify that the host supports the capability required for the given request method.
    * @internal
    */
@@ -684,6 +721,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
         return;
       case "ping":
       case "ui/resource-teardown":
+      case "elicitation/create":
         return;
       default:
         throw new Error(`No handler for method ${method} registered`);

@@ -143,6 +143,8 @@ import {
   ListResourcesResult,
   ListResourceTemplatesRequest,
   ListResourceTemplatesResult,
+  ElicitRequest,
+  ElicitResult,
   ListToolsRequest,
   ListToolsResult,
   LoggingMessageNotification,
@@ -177,6 +179,7 @@ export type AppRequest =
   | ListResourceTemplatesRequest
   | ReadResourceRequest
   | ListPromptsRequest
+  | ElicitRequest
   | PingRequest;
 
 /**
@@ -225,4 +228,5 @@ export type AppResult =
   | ListResourceTemplatesResult
   | ReadResourceResult
   | ListPromptsResult
+  | ElicitResult
   | EmptyResult;

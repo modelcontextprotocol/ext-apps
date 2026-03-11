@@ -105,6 +105,17 @@ const loadingIndicatorEl = document.getElementById("loading-indicator")!;
 const loadingIndicatorArc = loadingIndicatorEl.querySelector(
   ".loading-indicator-arc",
 ) as SVGCircleElement;
+const elicitationEl = document.getElementById("elicitation")!;
+const elicitationMessageEl = document.getElementById("elicitation-message")!;
+const elicitationUrlEl = document.getElementById(
+  "elicitation-url",
+) as HTMLInputElement;
+const elicitationSubmitBtn = document.getElementById(
+  "elicitation-submit",
+) as HTMLButtonElement;
+const elicitationCancelBtn = document.getElementById(
+  "elicitation-cancel",
+) as HTMLButtonElement;
 
 // Track current display mode
 let currentDisplayMode: "inline" | "fullscreen" = "inline";
@@ -386,19 +397,33 @@ function showLoading(text: string) {
   loadingTextEl.textContent = text;
   loadingEl.style.display = "flex";
   errorEl.style.display = "none";
+  elicitationEl.style.display = "none";
   viewerEl.style.display = "none";
 }
 
 function showError(message: string) {
   errorMessageEl.textContent = message;
   loadingEl.style.display = "none";
-  errorEl.style.display = "block";
+  errorEl.style.display = "flex";
+  elicitationEl.style.display = "none";
   viewerEl.style.display = "none";
+}
+
+function showElicitation(message: string) {
+  elicitationMessageEl.textContent = message;
+  elicitationUrlEl.value = "";
+  loadingEl.style.display = "none";
+  errorEl.style.display = "none";
+  elicitationEl.style.display = "flex";
+  viewerEl.style.display = "none";
+  // Focus the input so the user can type immediately
+  setTimeout(() => elicitationUrlEl.focus(), 50);
 }
 
 function showViewer() {
   loadingEl.style.display = "none";
   errorEl.style.display = "none";
+  elicitationEl.style.display = "none";
   viewerEl.style.display = "flex";
 }
 
@@ -1288,6 +1313,43 @@ app.ontoolresult = async (result: CallToolResult) => {
     log.error("Error loading PDF:", err);
     showError(err instanceof Error ? err.message : String(err));
   }
+};
+
+app.onelicitation = (params) => {
+  showElicitation(params.message);
+
+  return new Promise((resolve) => {
+    function submit() {
+      const url = elicitationUrlEl.value.trim();
+      if (!url) {
+        elicitationUrlEl.focus();
+        return;
+      }
+      cleanup();
+      resolve({ action: "accept", content: { url } });
+    }
+
+    function cancel() {
+      cleanup();
+      showLoading("Waiting for PDF...");
+      resolve({ action: "cancel" });
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Enter") submit();
+      if (e.key === "Escape") cancel();
+    }
+
+    function cleanup() {
+      elicitationSubmitBtn.removeEventListener("click", submit);
+      elicitationCancelBtn.removeEventListener("click", cancel);
+      elicitationUrlEl.removeEventListener("keydown", onKeyDown);
+    }
+
+    elicitationSubmitBtn.addEventListener("click", submit);
+    elicitationCancelBtn.addEventListener("click", cancel);
+    elicitationUrlEl.addEventListener("keydown", onKeyDown);
+  });
 };
 
 app.onerror = (err: unknown) => {

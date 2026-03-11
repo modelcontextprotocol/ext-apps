@@ -74,7 +74,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
   gap: 1rem;
   padding: 2rem;
   text-align: center;
@@ -87,6 +87,7 @@ body {
 #error-message {
   color: var(--text200);
   max-width: 400px;
+  text-align: center;
 }
 
 /* Viewer Container */
@@ -467,4 +468,66 @@ body {
 }
 .loading-indicator.error .loading-indicator-arc {
   stroke: #e74c3c;
+}
+
+/* Elicitation State: shown when the server asks the app for user input */
+.elicitation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.elicitation-message {
+  color: var(--text100);
+  text-align: center;
+  max-width: 360px;
+}
+
+.elicitation-input {
+  width: 100%;
+  max-width: 360px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--bg200);
+  border-radius: 6px;
+  background: var(--bg100);
+  color: var(--text100);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.elicitation-input:focus {
+  border-color: var(--text200);
+}
+
+.elicitation-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.elicitation-btn {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s;
+}
+
+.elicitation-btn:hover {
+  opacity: 0.85;
+}
+
+.elicitation-btn-primary {
+  background: var(--text100);
+  color: var(--bg100);
+}
+
+.elicitation-btn-secondary {
+  background: transparent;
+  color: var(--text200);
+  border-color: var(--bg200);
 }

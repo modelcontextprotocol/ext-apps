@@ -24,6 +24,9 @@ export interface ServerInfo {
   tools: Map<string, Tool>;
   resources: Map<string, Resource>;
   appHtmlCache: Map<string, string>;
+  /** Resolve this with the active AppBridge once one is created, so the
+   *  early-registered elicitation handler can forward requests to it. */
+  setBridge: (bridge: AppBridge) => void;
 }
 
 
@@ -42,13 +45,20 @@ export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
   const resources = new Map(resourcesList.resources.map((r) => [r.uri, r]));
   log.info("Server resources:", Array.from(resources.keys()));
 
-  return { name, client, tools, resources, appHtmlCache: new Map() };
+  const setBridge = AppBridge.setupElicitationForwarding(client);
+
+  return { name, client, tools, resources, appHtmlCache: new Map(), setBridge };
 }
 
 async function connectWithFallback(serverUrl: URL): Promise<Client> {
+  const clientOptions = { capabilities: { elicitation: {} } };
+
   // Try Streamable HTTP first (modern transport)
   try {
-    const client = new Client(IMPLEMENTATION);
+    const client = new Client(IMPLEMENTATION, clientOptions);
+    client.fallbackRequestHandler = async (request) => {
+      throw new Error(`Unhandled request: ${request.method}`);
+    };
     await client.connect(new StreamableHTTPClientTransport(serverUrl));
     log.info("Connected via Streamable HTTP transport");
     return client;
@@ -58,7 +68,10 @@ async function connectWithFallback(serverUrl: URL): Promise<Client> {
 
   // Fall back to SSE (deprecated but needed for older servers)
   try {
-    const client = new Client(IMPLEMENTATION);
+    const client = new Client(IMPLEMENTATION, clientOptions);
+    client.fallbackRequestHandler = async (request) => {
+      throw new Error(`Unhandled request: ${request.method}`);
+    };
     await client.connect(new SSEClientTransport(serverUrl));
     log.info("Connected via SSE transport");
     return client;
@@ -202,7 +215,7 @@ export function loadSandboxProxy(
 export async function initializeApp(
   iframe: HTMLIFrameElement,
   appBridge: AppBridge,
-  { input, resultPromise, appResourcePromise }: Required<ToolCallInfo>,
+  { input, resultPromise, appResourcePromise, serverInfo }: Required<ToolCallInfo>,
 ): Promise<void> {
   const appInitializedPromise = hookInitializedCallback(appBridge);
 
@@ -223,6 +236,8 @@ export async function initializeApp(
   log.info("Waiting for MCP App to initialize...");
   await appInitializedPromise;
   log.info("MCP App initialized");
+
+  serverInfo.setBridge(appBridge);
 
   // Send tool call input to iframe
   log.info("Sending tool call input to MCP App:", input);

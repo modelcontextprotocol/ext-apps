@@ -6,6 +6,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -33,22 +34,66 @@ export async function startStreamableHTTPServer(
   const port = parseInt(process.env.PORT ?? "3001", 10);
 
   const app = createMcpExpressApp({ host: "0.0.0.0" });
-  app.use(cors());
+  app.use(
+    cors({
+      exposedHeaders: ["mcp-session-id"],
+    }),
+  );
+
+  // Stateful mode: one server + transport per session.
+  // Required for server-initiated requests (e.g. elicitation/create) which
+  // need the client's response to arrive on the same transport instance.
+  const sessions = new Map<
+    string,
+    { server: McpServer; transport: StreamableHTTPServerTransport }
+  >();
 
   app.all("/mcp", async (req: Request, res: Response) => {
-    const server = createServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-    });
+    // Check for existing session
+    const sessionId = req.headers["mcp-session-id"] as string | undefined;
+    let entry = sessionId ? sessions.get(sessionId) : undefined;
 
-    res.on("close", () => {
-      transport.close().catch(() => {});
-      server.close().catch(() => {});
-    });
+    if (!entry) {
+      // Only create a new session for initialize requests.
+      // Non-initialize requests without a session are invalid.
+      const body = req.body;
+      const isInitialize =
+        body && typeof body === "object" && body.method === "initialize";
+
+      if (!isInitialize) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message: "Bad Request: No valid session. Send initialize first.",
+          },
+          id: null,
+        });
+        return;
+      }
+      // New session — create server + transport.
+      // Pre-generate the session ID and store immediately so that the
+      // follow-up `notifications/initialized` POST (which arrives while
+      // the initialize handleRequest is still streaming) finds it.
+      const sid = randomUUID();
+      const server = createServer();
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => sid,
+      });
+
+      await server.connect(transport);
+
+      transport.onclose = () => {
+        sessions.delete(sid);
+        server.close().catch(() => {});
+      };
+
+      entry = { server, transport };
+      sessions.set(sid, entry);
+    }
 
     try {
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
+      await entry.transport.handleRequest(req, res, req.body);
     } catch (error) {
       console.error("MCP error:", error);
       if (!res.headersSent) {

@@ -5,6 +5,8 @@ import {
   CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
+  ElicitRequestSchema,
+  ElicitResultSchema,
   EmptyResult,
   Implementation,
   ListPromptsRequest,
@@ -1547,6 +1549,51 @@ export class AppBridge extends Protocol<
     // (via oninitialized callback set in constructor) handles the ready signal.
 
     return super.connect(transport);
+  }
+
+  /**
+   * Set up automatic forwarding of `elicitation/create` requests from the MCP
+   * server through a bridge to the app.
+   *
+   * Registers a handler on the given {@link Client} that buffers incoming
+   * elicitation requests until a bridge is available, then forwards them.
+   * The returned callback must be called with the active {@link AppBridge}
+   * once it is initialized (typically right after `ui/initialize` completes).
+   * It can be called multiple times for sequential tool invocations.
+   *
+   * @returns A `setBridge` callback to resolve the current buffered request
+   *          and prepare for the next one.
+   *
+   * @example
+   * ```ts
+   * const setBridge = AppBridge.setupElicitationForwarding(client);
+   * // ... later, after the bridge + app are initialized:
+   * setBridge(appBridge);
+   * ```
+   */
+  static setupElicitationForwarding(
+    client: Client,
+  ): (bridge: AppBridge) => void {
+    let resolveBridge!: (bridge: AppBridge) => void;
+    let bridgePromise = new Promise<AppBridge>((resolve) => {
+      resolveBridge = resolve;
+    });
+
+    client.setRequestHandler(ElicitRequestSchema, async (request, extra) => {
+      const bridge = await bridgePromise;
+      return bridge.request(
+        { method: "elicitation/create", params: request.params },
+        ElicitResultSchema,
+        { signal: extra.signal },
+      );
+    });
+
+    return (bridge: AppBridge) => {
+      resolveBridge(bridge);
+      bridgePromise = new Promise<AppBridge>((resolve) => {
+        resolveBridge = resolve;
+      });
+    };
   }
 }
 

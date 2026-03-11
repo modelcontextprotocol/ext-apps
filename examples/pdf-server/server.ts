@@ -21,6 +21,7 @@ import {
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import {
+  ElicitResultSchema,
   RootsListChangedNotificationSchema,
   type CallToolResult,
   type ReadResourceResult,
@@ -613,17 +614,14 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     "display_pdf",
     {
       title: "Display PDF",
-      description: `Display an interactive PDF viewer.
+      description: `Display an interactive PDF viewer. If no URL is provided, the viewer will ask the user to enter one.
 
 Accepts:
 - Local files explicitly added to the server (use list_pdfs to see available files)
 - Local files under directories provided by the client as MCP roots
 - Any remote PDF accessible via HTTPS`,
       inputSchema: {
-        url: z
-          .string()
-          .default(DEFAULT_PDF)
-          .describe("PDF URL or local file path"),
+        url: z.string().optional().describe("PDF URL or local file path"),
         page: z.number().min(1).default(1).describe("Initial page"),
       },
       outputSchema: z.object({
@@ -633,8 +631,64 @@ Accepts:
       }),
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
-    async ({ url, page }): Promise<CallToolResult> => {
-      const normalized = isArxivUrl(url) ? normalizeArxivUrl(url) : url;
+    async ({ url, page }, extra): Promise<CallToolResult> => {
+      let resolvedUrl = url;
+
+      if (!resolvedUrl) {
+        // Use extra.sendRequest() (session-scoped) so elicitation is routed to
+        // the correct transport in stateful multi-session mode.
+        let elicitResult;
+        try {
+          elicitResult = await extra.sendRequest(
+            {
+              method: "elicitation/create",
+              params: {
+                message: "Enter the URL of the PDF you want to view",
+                requestedSchema: {
+                  type: "object" as const,
+                  properties: {
+                    url: {
+                      type: "string" as const,
+                      title: "PDF URL",
+                      description:
+                        "Any remote PDF accessible via HTTPS, or a local file path",
+                    },
+                  },
+                  required: ["url"],
+                },
+              },
+            },
+            ElicitResultSchema,
+          );
+        } catch (err) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Could not request URL from app: ${err instanceof Error ? err.message : String(err)}\n\nPlease provide a URL directly.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        if (elicitResult.action !== "accept" || !elicitResult.content?.url) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "No PDF URL provided. Please try again with a URL.",
+              },
+            ],
+          };
+        }
+
+        resolvedUrl = String(elicitResult.content.url);
+      }
+
+      const normalized = isArxivUrl(resolvedUrl)
+        ? normalizeArxivUrl(resolvedUrl)
+        : resolvedUrl;
       const validation = validateUrl(normalized);
 
       if (!validation.valid) {
