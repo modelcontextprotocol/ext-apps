@@ -98,15 +98,17 @@ export function createServer(): McpServer {
   const cspMeta = {
     ui: {
       csp: {
-        // Allow fetching tiles from OSM (tiles + geocoding) and Cesium assets
+        // Allow fetching tiles from Carto, OSM, and Cesium assets
         connectDomains: [
+          "https://*.basemaps.cartocdn.com", // Carto basemap tiles (retina support)
           "https://*.openstreetmap.org", // OSM tiles + Nominatim geocoding
           "https://cesium.com",
           "https://*.cesium.com",
         ],
         // Allow loading tile images, scripts, and Cesium CDN resources
         resourceDomains: [
-          "https://*.openstreetmap.org", // OSM map tiles (covers tile.openstreetmap.org)
+          "https://*.basemaps.cartocdn.com", // Carto basemap tiles (retina support)
+          "https://*.openstreetmap.org", // OSM map tiles
           "https://cesium.com",
           "https://*.cesium.com",
         ],
@@ -173,14 +175,28 @@ export function createServer(): McpServer {
           .string()
           .optional()
           .describe("Optional label to display on the map"),
+        style: z
+          .enum(["carto", "osm"])
+          .optional()
+          .default("carto")
+          .describe(
+            "Map tile style: 'carto' for smooth Carto Voyager tiles with retina support (default), 'osm' for classic OpenStreetMap tiles with more detail",
+          ),
       },
       _meta: { ui: { resourceUri } },
     },
-    async ({ west, south, east, north, label }): Promise<CallToolResult> => ({
+    async ({
+      west,
+      south,
+      east,
+      north,
+      label,
+      style,
+    }): Promise<CallToolResult> => ({
       content: [
         {
           type: "text",
-          text: `Displaying globe at: W:${west.toFixed(4)}, S:${south.toFixed(4)}, E:${east.toFixed(4)}, N:${north.toFixed(4)}${label ? ` (${label})` : ""}`,
+          text: `Displaying globe at: W:${west.toFixed(4)}, S:${south.toFixed(4)}, E:${east.toFixed(4)}, N:${north.toFixed(4)}${label ? ` (${label})` : ""} [style: ${style}]`,
         },
       ],
       _meta: {

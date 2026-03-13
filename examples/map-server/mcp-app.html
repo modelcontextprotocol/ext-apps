@@ -20,10 +20,9 @@
             width: 100%;
             height: 100%;
         }
-        #fullscreen-btn {
+        .map-btn {
             position: absolute;
             top: 10px;
-            right: 10px;
             width: 36px;
             height: 36px;
             background: rgba(0, 0, 0, 0.7);
@@ -36,13 +35,19 @@
             justify-content: center;
             transition: background 0.2s;
         }
-        #fullscreen-btn:hover {
+        .map-btn:hover {
             background: rgba(0, 0, 0, 0.85);
         }
-        #fullscreen-btn svg {
+        .map-btn svg {
             width: 20px;
             height: 20px;
             fill: white;
+        }
+        #home-btn {
+            left: 10px;
+        }
+        #fullscreen-btn {
+            right: 10px;
         }
         #loading {
             position: absolute;
@@ -60,7 +65,11 @@
 </head>
 <body>
     <div id="cesiumContainer"></div>
-    <button id="fullscreen-btn" title="Toggle fullscreen">
+    <button id="home-btn" class="map-btn" title="Return to initial view">
+        <!-- Home icon -->
+        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+    </button>
+    <button id="fullscreen-btn" class="map-btn" title="Toggle fullscreen">
         <!-- Expand icon (shown when inline) -->
         <svg id="expand-icon" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
         <!-- Compress icon (shown when fullscreen) -->

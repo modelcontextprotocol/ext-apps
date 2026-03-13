@@ -61,6 +61,15 @@ interface BoundingBox {
   north: number;
 }
 
+// Map tile style: 'carto' for smooth retina tiles, 'osm' for classic detailed tiles
+type MapStyle = "carto" | "osm";
+
+// Current map style (set from tool input, defaults to 'carto')
+let currentMapStyle: MapStyle = "carto";
+
+// Initial bounding box from tool input (for home button)
+let initialBoundingBox: BoundingBox | null = null;
+
 // CesiumJS viewer instance
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let viewer: any = null;
@@ -138,7 +147,7 @@ function persistViewState(cesiumViewer: any): void {
     localStorage.setItem(viewUUID, value);
     log.info("Persisted view state:", viewUUID, value);
   } catch (e) {
-    log.warn("Failed to persist view state:", e);
+    log.warn("[localStorage] save failed:", e);
   }
 }
 
@@ -162,13 +171,13 @@ function loadPersistedViewState(): PersistedCameraState | null {
       typeof state.latitude !== "number" ||
       typeof state.height !== "number"
     ) {
-      log.warn("Invalid persisted view state, ignoring");
+      log.warn("Invalid persisted view state, ignoring:", state);
       return null;
     }
     log.info("Loaded persisted view state:", state);
     return state;
   } catch (e) {
-    log.warn("Failed to load persisted view state:", e);
+    log.warn("[localStorage] load failed:", e);
     return null;
   }
 }
@@ -393,54 +402,84 @@ async function initCesium(): Promise<any> {
   // Disable request render mode - helps with initial rendering
   cesiumViewer.scene.requestRenderMode = false;
 
-  // Fix pixelated rendering on high-DPI displays
-  // CesiumJS sets image-rendering: pixelated by default which looks bad on scaled displays
-  // Setting to "auto" allows the browser to apply smooth interpolation
+  // Log resolution info for debugging
+  log.info(
+    `Canvas: ${cesiumViewer.canvas.width}x${cesiumViewer.canvas.height}, ` +
+      `CSS: ${cesiumViewer.canvas.offsetWidth}x${cesiumViewer.canvas.offsetHeight}, ` +
+      `DPR: ${window.devicePixelRatio}, ` +
+      `resolutionScale: ${cesiumViewer.resolutionScale}`,
+  );
+
+  // Note: useBrowserRecommendedResolution: false (set above) should render at device
+  // pixel resolution. DO NOT set resolutionScale = devicePixelRatio as that would
+  // double the scaling.
+
+  // Allow browser to apply smooth interpolation when scaling down from device resolution
   cesiumViewer.canvas.style.imageRendering = "auto";
-  // Note: DO NOT set resolutionScale = devicePixelRatio here!
-  // When useBrowserRecommendedResolution: false, Cesium already uses devicePixelRatio.
-  // Setting resolutionScale = devicePixelRatio would double the scaling (e.g., 2x2=4x on Retina)
-  // which causes blurriness when scaled back down. Leave resolutionScale at default (1.0).
 
   // Disable FXAA anti-aliasing which can cause blurriness on high-DPI displays
   cesiumViewer.scene.postProcessStages.fxaa.enabled = false;
 
   log.info("Globe configured");
 
-  // Create and add map imagery layer
-  // Use standard OSM tiles - they render sharply with Cesium's settings
-  log.info("Creating OpenStreetMap imagery provider...");
+  // Create and add map imagery layer based on current style
+  log.info(`Creating imagery provider for style: ${currentMapStyle}`);
   try {
-    // Use standard OpenStreetMap tile server
-    // While these are 256x256 tiles, Cesium handles the rendering well
-    // with useBrowserRecommendedResolution: false
-    const osmProvider = new Cesium.UrlTemplateImageryProvider({
-      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      minimumLevel: 0,
-      maximumLevel: 19,
-      credit: new Cesium.Credit(
-        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        true,
-      ),
-    });
-    log.info("OSM provider created (256x256 tiles)");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let imageryProvider: any;
+
+    if (currentMapStyle === "osm") {
+      // Classic OpenStreetMap tiles - more detailed but 256px only
+      imageryProvider = new Cesium.UrlTemplateImageryProvider({
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        minimumLevel: 0,
+        maximumLevel: 19,
+        credit: new Cesium.Credit(
+          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          true,
+        ),
+      });
+      log.info("OSM provider created (256px tiles)");
+    } else {
+      // Carto Voyager tiles - smoother style with @2x retina support
+      const isHighDPI = window.devicePixelRatio >= 1.5;
+      const retinaModifier = isHighDPI ? "@2x" : "";
+      const tileUrl = `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${retinaModifier}.png`;
+
+      log.info(
+        `Using Carto ${isHighDPI ? "retina" : "standard"} tiles, devicePixelRatio: ${window.devicePixelRatio}`,
+      );
+
+      imageryProvider = new Cesium.UrlTemplateImageryProvider({
+        url: tileUrl,
+        minimumLevel: 0,
+        maximumLevel: 19,
+        credit: new Cesium.Credit(
+          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attribution">CARTO</a>',
+          true,
+        ),
+      });
+      log.info(
+        `Carto provider created (${isHighDPI ? "@2x" : "standard"} tiles)`,
+      );
+    }
 
     // Log any imagery provider errors
-    osmProvider.errorEvent.addEventListener((error: any) => {
-      log.error("OSM imagery provider error:", error);
+    imageryProvider.errorEvent.addEventListener((error: any) => {
+      log.error("Imagery provider error:", error);
     });
 
     // Wait for provider to be ready
-    if (osmProvider.ready !== undefined && !osmProvider.ready) {
-      log.info("Waiting for OSM provider to be ready...");
-      await osmProvider.readyPromise;
-      log.info("OSM provider ready");
+    if (imageryProvider.ready !== undefined && !imageryProvider.ready) {
+      log.info("Waiting for imagery provider to be ready...");
+      await imageryProvider.readyPromise;
+      log.info("Imagery provider ready");
     }
 
     // Add the imagery layer to the viewer
-    cesiumViewer.imageryLayers.addImageryProvider(osmProvider);
+    cesiumViewer.imageryLayers.addImageryProvider(imageryProvider);
     log.info(
-      "OSM imagery layer added, layer count:",
+      "Imagery layer added, layer count:",
       cesiumViewer.imageryLayers.length,
     );
 
@@ -457,7 +496,7 @@ async function initCesium(): Promise<any> {
     cesiumViewer.scene.requestRender();
     log.info("Render requested");
   } catch (error) {
-    log.error("Failed to create OSM provider:", error);
+    log.error("Failed to create imagery provider:", error);
   }
 
   // Fly to default USA view - using Rectangle is most reliable
@@ -492,6 +531,64 @@ async function initCesium(): Promise<any> {
   log.info("Camera move listener registered");
 
   return cesiumViewer;
+}
+
+/**
+ * Switch the map tile style by replacing the imagery layer
+ */
+async function switchMapStyle(
+  cesiumViewer: any,
+  newStyle: MapStyle,
+): Promise<void> {
+  if (newStyle === currentMapStyle) {
+    log.info(`Style already set to ${newStyle}, skipping`);
+    return;
+  }
+
+  log.info(`Switching map style from ${currentMapStyle} to ${newStyle}`);
+  currentMapStyle = newStyle;
+
+  // Remove all existing imagery layers
+  cesiumViewer.imageryLayers.removeAll();
+
+  // Create new imagery provider based on style
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let imageryProvider: any;
+
+  if (newStyle === "osm") {
+    imageryProvider = new Cesium.UrlTemplateImageryProvider({
+      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      minimumLevel: 0,
+      maximumLevel: 19,
+      credit: new Cesium.Credit(
+        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        true,
+      ),
+    });
+    log.info("Switched to OSM tiles (256px)");
+  } else {
+    const isHighDPI = window.devicePixelRatio >= 1.5;
+    const retinaModifier = isHighDPI ? "@2x" : "";
+    imageryProvider = new Cesium.UrlTemplateImageryProvider({
+      url: `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${retinaModifier}.png`,
+      minimumLevel: 0,
+      maximumLevel: 19,
+      credit: new Cesium.Credit(
+        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attribution">CARTO</a>',
+        true,
+      ),
+    });
+    log.info(`Switched to Carto tiles (${isHighDPI ? "@2x" : "standard"})`);
+  }
+
+  // Wait for provider to be ready
+  if (imageryProvider.ready !== undefined && !imageryProvider.ready) {
+    await imageryProvider.readyPromise;
+  }
+
+  // Add the new imagery layer
+  cesiumViewer.imageryLayers.addImageryProvider(imageryProvider);
+  cesiumViewer.scene.requestRender();
 }
 
 /**
@@ -605,6 +702,54 @@ const app = new App(
   { tools: { listChanged: true } },
   { autoResize: false },
 );
+
+// Default bounding box (USA) for home button fallback
+const DEFAULT_BOUNDING_BOX: BoundingBox = {
+  west: -130,
+  south: 20,
+  east: -60,
+  north: 55,
+};
+
+/**
+ * Show home button and set up click handler
+ */
+function setupHomeButton(cesiumViewer: any): void {
+  const btn = document.getElementById("home-btn");
+  if (!btn) {
+    log.warn("Home button element not found");
+    return;
+  }
+
+  log.info("Setting up home button");
+  btn.style.display = "flex";
+  btn.addEventListener("click", () => {
+    // Use initial bbox from tool input, or default to USA view
+    const targetBbox = initialBoundingBox || DEFAULT_BOUNDING_BOX;
+    log.info("Flying to home view:", targetBbox);
+    flyToBoundingBox(cesiumViewer, targetBbox);
+  });
+}
+
+/**
+ * Fly camera to view a bounding box with animation
+ */
+function flyToBoundingBox(cesiumViewer: any, bbox: BoundingBox): void {
+  const { destination, centerLon, centerLat, height } =
+    calculateDestination(bbox);
+
+  log.info("flyTo destination:", centerLon, centerLat, "height:", height);
+
+  cesiumViewer.camera.flyTo({
+    destination,
+    orientation: {
+      heading: 0,
+      pitch: Cesium.Math.toRadians(-90),
+      roll: 0,
+    },
+    duration: 1.5,
+  });
+}
 
 /**
  * Update fullscreen button visibility and icon based on current state
@@ -735,10 +880,17 @@ app.ontoolinput = async (params) => {
         east?: number;
         north?: number;
         label?: string;
+        style?: MapStyle;
       }
     | undefined;
 
   if (args && viewer) {
+    // Apply map style if specified (defaults to 'carto')
+    const requestedStyle = args.style || "carto";
+    if (requestedStyle !== currentMapStyle) {
+      await switchMapStyle(viewer, requestedStyle);
+    }
+
     // Handle both nested boundingBox and flat format
     let bbox: BoundingBox | null = null;
 
@@ -759,12 +911,22 @@ app.ontoolinput = async (params) => {
     }
 
     if (bbox) {
-      // Mark that we received explicit tool input (overrides persisted state)
       hasReceivedToolInput = true;
-      log.info("Positioning camera to bbox:", bbox);
 
-      // Position camera instantly (no animation)
-      setViewToBoundingBox(viewer, bbox);
+      // Store tool input bbox for home button (first tool input becomes the "home" view)
+      if (!initialBoundingBox) {
+        initialBoundingBox = bbox;
+      }
+
+      // Check if we have a persisted view state - if so, use it instead of tool input
+      const persistedState = loadPersistedViewState();
+      if (persistedState) {
+        log.info("[localStorage] using persisted view instead of tool input");
+        restorePersistedView(viewer);
+      } else {
+        log.info("Positioning camera to tool input bbox:", bbox);
+        setViewToBoundingBox(viewer, bbox);
+      }
 
       // Wait for tiles to load at this location
       await waitForTilesLoaded(viewer);
@@ -885,6 +1047,9 @@ async function initialize() {
     if (fullscreenBtn) {
       fullscreenBtn.addEventListener("click", toggleFullscreen);
     }
+
+    // Set up home button
+    setupHomeButton(viewer);
 
     // Set up keyboard shortcuts for fullscreen (Escape to exit, Ctrl/Cmd+Enter to toggle)
     document.addEventListener("keydown", handleFullscreenKeyboard);

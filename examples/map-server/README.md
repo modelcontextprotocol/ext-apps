@@ -2,7 +2,7 @@
 
 ![Screenshot](screenshot.png)
 
-Interactive 3D globe viewer using CesiumJS with OpenStreetMap tiles. Demonstrates geocoding integration and full MCP App capabilities.
+Interactive 3D globe viewer using CesiumJS with multiple tile provider options. Demonstrates geocoding integration and full MCP App capabilities.
 
 ## MCP Client Configuration
 
@@ -47,7 +47,8 @@ To test local modifications, use this configuration (replace `~/code/ext-apps` w
 
 - **3D Globe Rendering**: Interactive CesiumJS globe with rotation, zoom, and 3D perspective
 - **Geocoding**: Search for places using OpenStreetMap Nominatim (no API key required)
-- **OpenStreetMap Tiles**: Uses free OSM tile server (no Cesium Ion token needed)
+- **Multiple Tile Styles**: Choose between Carto Voyager (smooth, with retina support) or classic OpenStreetMap tiles
+- **Retina Support**: Automatic @2x tile loading on high-DPI displays for sharper rendering
 - **Dynamic Loading**: CesiumJS loaded from CDN at runtime for smaller bundle size
 
 ## Running
@@ -92,11 +93,15 @@ Display the 3D globe zoomed to a bounding box.
   "south": 48.85,
   "east": 2.3,
   "north": 48.86,
-  "label": "Eiffel Tower"
+  "label": "Eiffel Tower",
+  "style": "carto"
 }
 ```
 
-Defaults to London if no coordinates provided.
+Parameters:
+- `west`, `south`, `east`, `north`: Bounding box coordinates (defaults to London)
+- `label`: Optional label to display
+- `style`: Tile style - `"carto"` (default, smooth with retina) or `"osm"` (classic, more detailed)
 
 ## Architecture
 
@@ -105,18 +110,19 @@ Defaults to London if no coordinates provided.
 Exposes two tools:
 
 - `geocode` - Queries OpenStreetMap Nominatim API with rate limiting
-- `show-map` - Renders the CesiumJS globe UI at a specified location
+- `show-map` - Renders the CesiumJS globe UI at a specified location with configurable tile style
 
-Configures Content Security Policy to allow fetching tiles from OSM and Cesium CDN.
+Configures Content Security Policy to allow fetching tiles from Carto, OSM, and Cesium CDN.
 
 ### App (`src/mcp-app.ts`)
 
 Vanilla TypeScript app that:
 
 - Dynamically loads CesiumJS from CDN
-- Initializes globe with OpenStreetMap imagery (no Ion token)
+- Supports multiple tile providers (Carto Voyager with @2x retina, classic OSM)
 - Receives tool inputs via the MCP App SDK
 - Handles camera navigation to specified bounding boxes
+- Switches tile styles at runtime based on tool input
 
 ## Key Files
 
