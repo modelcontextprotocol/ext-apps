@@ -58,6 +58,27 @@ import {
 } from "./types";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
+/**
+ * Map of notification event names to their parameter types, for use with
+ * {@link App.subscribe `App.subscribe`} and {@link App.unsubscribe `App.unsubscribe`}.
+ */
+export type NotificationEventMap = {
+  toolinput: McpUiToolInputNotification["params"];
+  toolinputpartial: McpUiToolInputPartialNotification["params"];
+  toolresult: McpUiToolResultNotification["params"];
+  toolcancelled: McpUiToolCancelledNotification["params"];
+  hostcontextchanged: McpUiHostContextChangedNotification["params"];
+};
+
+/** @internal Event name constants — single source of truth for setter keys and dispatchers. */
+const EVENT = {
+  toolinput: "toolinput",
+  toolinputpartial: "toolinputpartial",
+  toolresult: "toolresult",
+  toolcancelled: "toolcancelled",
+  hostcontextchanged: "hostcontextchanged",
+} as const satisfies Record<keyof NotificationEventMap, string>;
+
 export { PostMessageTransport } from "./message-transport";
 export * from "./types";
 export {
@@ -197,8 +218,8 @@ type RequestHandlerExtra = Parameters<
  * - `ontoolcancelled` - Tool execution was cancelled by user or host
  * - `onhostcontextchanged` - Host context changes (theme, locale, etc.)
  *
- * These setters are convenience wrappers around `setNotificationHandler()`.
- * Both patterns work; use whichever fits your coding style better.
+ * These setters register a single callback per event. For multiple concurrent
+ * handlers, use {@link App.subscribe `subscribe`} instead.
  *
  * @example Basic usage with PostMessageTransport
  * ```ts source="./app.examples.ts#App_basicUsage"
@@ -219,6 +240,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
+  private _setterCallbacks = new Map<string, (params: unknown) => void>();
+  private _subscribers = new Map<string, Set<(params: unknown) => void>>();
 
   /**
    * Create a new MCP App instance.
@@ -248,9 +271,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
       return {};
     });
 
-    // Set up default handler to update _hostContext when notifications arrive.
-    // Users can override this by setting onhostcontextchanged.
-    this.onhostcontextchanged = () => {};
+    this._initNotificationDispatchers();
   }
 
   /**
@@ -338,8 +359,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * sends a tool's complete arguments. This is sent after a tool call begins
    * and before the tool result is available.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * This setter registers a single callback. For multiple concurrent handlers,
+   * use {@link subscribe `subscribe`} instead.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
@@ -355,14 +376,15 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * await app.connect();
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link subscribe `subscribe`} for adding multiple concurrent handlers
    * @see {@link McpUiToolInputNotification `McpUiToolInputNotification`} for the notification structure
    */
   set ontoolinput(
     callback: (params: McpUiToolInputNotification["params"]) => void,
   ) {
-    this.setNotificationHandler(McpUiToolInputNotificationSchema, (n) =>
-      callback(n.params),
+    this._setterCallbacks.set(
+      EVENT.toolinput,
+      callback as (params: unknown) => void,
     );
   }
 
@@ -378,8 +400,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * (e.g., the last item in an array may be truncated). Use partial data only
    * for preview UI, not for critical operations.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * This setter registers a single callback. For multiple concurrent handlers,
+   * use {@link subscribe `subscribe`} instead.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
@@ -403,15 +425,16 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link subscribe `subscribe`} for adding multiple concurrent handlers
    * @see {@link McpUiToolInputPartialNotification `McpUiToolInputPartialNotification`} for the notification structure
    * @see {@link ontoolinput `ontoolinput`} for the complete tool input handler
    */
   set ontoolinputpartial(
     callback: (params: McpUiToolInputPartialNotification["params"]) => void,
   ) {
-    this.setNotificationHandler(McpUiToolInputPartialNotificationSchema, (n) =>
-      callback(n.params),
+    this._setterCallbacks.set(
+      EVENT.toolinputpartial,
+      callback as (params: unknown) => void,
     );
   }
 
@@ -422,8 +445,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * sends the result of a tool execution. This is sent after the tool completes
    * on the MCP server, allowing your app to display the results or update its state.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * This setter registers a single callback. For multiple concurrent handlers,
+   * use {@link subscribe `subscribe`} instead.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
@@ -440,15 +463,16 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link subscribe `subscribe`} for adding multiple concurrent handlers
    * @see {@link McpUiToolResultNotification `McpUiToolResultNotification`} for the notification structure
    * @see {@link ontoolinput `ontoolinput`} for the initial tool input handler
    */
   set ontoolresult(
     callback: (params: McpUiToolResultNotification["params"]) => void,
   ) {
-    this.setNotificationHandler(McpUiToolResultNotificationSchema, (n) =>
-      callback(n.params),
+    this._setterCallbacks.set(
+      EVENT.toolresult,
+      callback as (params: unknown) => void,
     );
   }
 
@@ -460,8 +484,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * including user action, sampling error, classifier intervention, or other
    * interruptions. Apps should update their state and display appropriate feedback.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * This setter registers a single callback. For multiple concurrent handlers,
+   * use {@link subscribe `subscribe`} instead.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
@@ -475,15 +499,16 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link subscribe `subscribe`} for adding multiple concurrent handlers
    * @see {@link McpUiToolCancelledNotification `McpUiToolCancelledNotification`} for the notification structure
    * @see {@link ontoolresult `ontoolresult`} for successful tool completion
    */
   set ontoolcancelled(
     callback: (params: McpUiToolCancelledNotification["params"]) => void,
   ) {
-    this.setNotificationHandler(McpUiToolCancelledNotificationSchema, (n) =>
-      callback(n.params),
+    this._setterCallbacks.set(
+      EVENT.toolcancelled,
+      callback as (params: unknown) => void,
     );
   }
 
@@ -495,8 +520,8 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * other environmental updates. Apps should respond by updating their UI
    * accordingly.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * This setter registers a single callback. For multiple concurrent handlers,
+   * use {@link subscribe `subscribe`} instead.
    *
    * Notification params are automatically merged into the internal host context
    * before the callback is invoked. This means {@link getHostContext `getHostContext`} will
@@ -517,21 +542,168 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @see {@link subscribe `subscribe`} for adding multiple concurrent handlers
    * @see {@link McpUiHostContextChangedNotification `McpUiHostContextChangedNotification`} for the notification structure
    * @see {@link McpUiHostContext `McpUiHostContext`} for the full context structure
    */
   set onhostcontextchanged(
     callback: (params: McpUiHostContextChangedNotification["params"]) => void,
   ) {
+    this._setterCallbacks.set(
+      EVENT.hostcontextchanged,
+      callback as (params: unknown) => void,
+    );
+  }
+
+  /**
+   * @internal
+   * Initialize Protocol-level notification handlers that dispatch to both setter
+   * callbacks and any subscribers added via {@link subscribe `subscribe`}.
+   * Called once from the constructor.
+   */
+  private _initNotificationDispatchers(): void {
+    this.setNotificationHandler(McpUiToolInputNotificationSchema, (n) =>
+      this._dispatch(EVENT.toolinput, n.params),
+    );
+    this.setNotificationHandler(McpUiToolInputPartialNotificationSchema, (n) =>
+      this._dispatch(EVENT.toolinputpartial, n.params),
+    );
+    this.setNotificationHandler(McpUiToolResultNotificationSchema, (n) =>
+      this._dispatch(EVENT.toolresult, n.params),
+    );
+    this.setNotificationHandler(McpUiToolCancelledNotificationSchema, (n) =>
+      this._dispatch(EVENT.toolcancelled, n.params),
+    );
     this.setNotificationHandler(
       McpUiHostContextChangedNotificationSchema,
       (n) => {
-        // Merge the partial update into the stored context
+        // Always merge the partial update into the stored context first
         this._hostContext = { ...this._hostContext, ...n.params };
-        callback(n.params);
+        this._dispatch(EVENT.hostcontextchanged, n.params);
       },
     );
+  }
+
+  /**
+   * @internal
+   * Dispatch a notification to the setter callback (if any) and all subscribers.
+   * Each callback is isolated — a throw or rejected promise in one does not
+   * prevent others from running.
+   */
+  private _dispatch(event: string, params: unknown): void {
+    const setter = this._setterCallbacks.get(event);
+    if (setter) this._safeCall(setter, params);
+    const subs = this._subscribers.get(event);
+    if (subs) {
+      for (const cb of subs) this._safeCall(cb, params);
+    }
+  }
+
+  /**
+   * @internal
+   * Call a callback, catching both sync throws and async rejections so that
+   * one failing handler never prevents siblings from running.
+   */
+  private _safeCall(cb: (params: unknown) => void, params: unknown): void {
+    try {
+      // Cast to unknown to inspect for thenable — the typed signature is `void`
+      // but callers may return a Promise in practice.
+      const result: unknown = cb(params);
+      if (result && typeof (result as Promise<void>).catch === "function") {
+        (result as Promise<void>).catch((err) =>
+          console.error("Uncaught error in notification subscriber:", err),
+        );
+      }
+    } catch (err) {
+      console.error("Uncaught error in notification subscriber:", err);
+    }
+  }
+
+  /**
+   * Subscribe to a notification event with support for multiple concurrent handlers.
+   *
+   * Unlike the setter properties (e.g. {@link onhostcontextchanged `onhostcontextchanged`}),
+   * `subscribe` allows multiple independent listeners per event — each `subscribe` call
+   * adds to the existing listeners without replacing them. This is particularly useful
+   * when composing multiple hooks or modules that each need to react to the same event
+   * (e.g. `useHostStyleVariables` and `useHostFonts` both listening to `"hostcontextchanged"`).
+   *
+   * Setter callbacks and subscribers are independent — setting `app.onhostcontextchanged`
+   * does not affect subscribers, and calling `subscribe("hostcontextchanged", cb)` does
+   * not affect the setter callback. Both fire when the notification arrives.
+   *
+   * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
+   *
+   * @param event - Notification event name
+   * @param callback - Function to call when the event fires
+   * @returns An unsubscribe function that removes this specific callback
+   *
+   * @example Subscribe to host context changes from multiple places
+   * ```ts source="./app.examples.ts#App_subscribe_multipleHandlers"
+   * // Both handlers receive every notification — neither overrides the other
+   * app.subscribe("hostcontextchanged", (ctx) => {
+   *   if (ctx.theme) applyTheme(ctx.theme);
+   * });
+   * app.subscribe("hostcontextchanged", (ctx) => {
+   *   if (ctx.styles?.css?.fonts) applyFonts(ctx.styles.css.fonts);
+   * });
+   * await app.connect();
+   * ```
+   *
+   * @example Cleanup with returned unsubscribe function
+   * ```ts source="./app.examples.ts#App_subscribe_cleanup"
+   * const unsubscribe = app.subscribe("toolinput", (params) => {
+   *   console.log("Tool input received:", params.arguments);
+   * });
+   *
+   * // Later, when cleanup is needed:
+   * unsubscribe();
+   * ```
+   *
+   * @see {@link unsubscribe `unsubscribe`} for explicit removal by reference
+   * @see {@link onhostcontextchanged `onhostcontextchanged`} for the single-handler setter alternative
+   */
+  subscribe<K extends keyof NotificationEventMap>(
+    event: K,
+    callback: (params: NotificationEventMap[K]) => void,
+  ): () => void {
+    let subs = this._subscribers.get(event);
+    if (!subs) {
+      subs = new Set();
+      this._subscribers.set(event, subs);
+    }
+    subs.add(callback as (params: unknown) => void);
+    return () => this.unsubscribe(event, callback);
+  }
+
+  /**
+   * Remove a previously subscribed notification handler.
+   *
+   * Removes the specific callback reference added via {@link subscribe `subscribe`}.
+   * Only that exact function reference is removed; other subscribers for the same
+   * event and the setter callback are unaffected.
+   *
+   * @param event - Notification event name
+   * @param callback - The exact function reference passed to {@link subscribe `subscribe`}
+   *
+   * @example Remove a specific handler
+   * ```ts source="./app.examples.ts#App_unsubscribe_explicit"
+   * const handler = (ctx: McpUiHostContextChangedNotification["params"]) => {
+   *   applyTheme(ctx.theme);
+   * };
+   * app.subscribe("hostcontextchanged", handler);
+   *
+   * // Later, remove only this handler:
+   * app.unsubscribe("hostcontextchanged", handler);
+   * ```
+   *
+   * @see {@link subscribe `subscribe`} which also returns a convenience unsubscribe function
+   */
+  unsubscribe<K extends keyof NotificationEventMap>(
+    event: K,
+    callback: (params: NotificationEventMap[K]) => void,
+  ): void {
+    this._subscribers.get(event)?.delete(callback as (params: unknown) => void);
   }
 
   /**

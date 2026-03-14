@@ -18,6 +18,7 @@ import {
   RESOURCE_URI_META_KEY,
   McpUiToolMeta,
 } from "./app.js";
+import type { McpUiHostContextChangedNotification } from "./types.js";
 import { registerAppTool } from "./server/index.js";
 
 /**
@@ -262,6 +263,55 @@ function App_onhostcontextchanged_respondToDisplayMode(app: App) {
   };
   //#endregion App_onhostcontextchanged_respondToDisplayMode
 }
+
+/**
+ * Example: Subscribe to the same event from multiple places without conflict.
+ */
+async function App_subscribe_multipleHandlers(app: App) {
+  //#region App_subscribe_multipleHandlers
+  // Both handlers receive every notification — neither overrides the other
+  app.subscribe("hostcontextchanged", (ctx) => {
+    if (ctx.theme) applyTheme(ctx.theme);
+  });
+  app.subscribe("hostcontextchanged", (ctx) => {
+    if (ctx.styles?.css?.fonts) applyFonts(ctx.styles.css.fonts);
+  });
+  await app.connect();
+  //#endregion App_subscribe_multipleHandlers
+}
+
+/**
+ * Example: Unsubscribe using the function returned by subscribe.
+ */
+function App_subscribe_cleanup(app: App) {
+  //#region App_subscribe_cleanup
+  const unsubscribe = app.subscribe("toolinput", (params) => {
+    console.log("Tool input received:", params.arguments);
+  });
+
+  // Later, when cleanup is needed:
+  unsubscribe();
+  //#endregion App_subscribe_cleanup
+}
+
+/**
+ * Example: Unsubscribe by passing the original handler reference.
+ */
+function App_unsubscribe_explicit(app: App) {
+  //#region App_unsubscribe_explicit
+  const handler = (ctx: McpUiHostContextChangedNotification["params"]) => {
+    applyTheme(ctx.theme);
+  };
+  app.subscribe("hostcontextchanged", handler);
+
+  // Later, remove only this handler:
+  app.unsubscribe("hostcontextchanged", handler);
+  //#endregion App_unsubscribe_explicit
+}
+
+// Stubs for subscribe examples
+declare function applyTheme(theme: string | undefined): void;
+declare function applyFonts(fonts: string): void;
 
 /**
  * Example: Perform cleanup before teardown.

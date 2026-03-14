@@ -77,14 +77,16 @@ export function useHostStyleVariables(
       return;
     }
 
-    app.onhostcontextchanged = (params) => {
+    const unsubscribe = app.subscribe("hostcontextchanged", (params) => {
       if (params.theme) {
         applyDocumentTheme(params.theme);
       }
       if (params.styles?.variables) {
         applyHostStyleVariables(params.styles.variables);
       }
-    };
+    });
+
+    return unsubscribe;
   }, [app]);
 }
 
@@ -145,11 +147,13 @@ export function useHostFonts(
       return;
     }
 
-    app.onhostcontextchanged = (params) => {
+    const unsubscribe = app.subscribe("hostcontextchanged", (params) => {
       if (params.styles?.css?.fonts) {
         applyHostFonts(params.styles.css.fonts);
       }
-    };
+    });
+
+    return unsubscribe;
   }, [app]);
 }
 

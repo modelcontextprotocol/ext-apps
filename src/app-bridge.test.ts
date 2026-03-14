@@ -13,7 +13,7 @@ import {
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { App } from "./app";
+import { App, type NotificationEventMap } from "./app";
 import {
   AppBridge,
   getToolUiResourceUri,
@@ -940,6 +940,144 @@ describe("App <-> AppBridge integration", () => {
       await flush();
 
       expect(receivedNotifications).toHaveLength(1);
+    });
+  });
+
+  describe("App.subscribe and App.unsubscribe", () => {
+    it("multiple subscribers all receive the same notification", async () => {
+      const received1: unknown[] = [];
+      const received2: unknown[] = [];
+
+      app.subscribe("hostcontextchanged", (params) => received1.push(params));
+      app.subscribe("hostcontextchanged", (params) => received2.push(params));
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      expect(received1).toEqual([{ theme: "dark" }]);
+      expect(received2).toEqual([{ theme: "dark" }]);
+    });
+
+    it("unsubscribe removes only the targeted subscriber", async () => {
+      const received1: unknown[] = [];
+      const received2: unknown[] = [];
+
+      const handler1 = (params: NotificationEventMap["hostcontextchanged"]) =>
+        received1.push(params);
+      const handler2 = (params: NotificationEventMap["hostcontextchanged"]) =>
+        received2.push(params);
+
+      app.subscribe("hostcontextchanged", handler1);
+      app.subscribe("hostcontextchanged", handler2);
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      // Both fired
+      expect(received1).toHaveLength(1);
+      expect(received2).toHaveLength(1);
+
+      app.unsubscribe("hostcontextchanged", handler1);
+
+      bridge.setHostContext({ theme: "light" });
+      await flush();
+
+      // Only handler2 fired for the second update
+      expect(received1).toHaveLength(1);
+      expect(received2).toHaveLength(2);
+    });
+
+    it("subscribe returns an unsubscribe function that works correctly", async () => {
+      const received: unknown[] = [];
+
+      const unsubscribe = app.subscribe("toolinput", (params) =>
+        received.push(params),
+      );
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.sendToolInput({ arguments: { x: 1 } });
+      await flush();
+      expect(received).toHaveLength(1);
+
+      unsubscribe();
+
+      bridge.sendToolInput({ arguments: { x: 2 } });
+      await flush();
+      // No new events after unsubscribing
+      expect(received).toHaveLength(1);
+    });
+
+    it("setter and subscribers fire independently", async () => {
+      const setterReceived: unknown[] = [];
+      const subscriberReceived: unknown[] = [];
+
+      app.onhostcontextchanged = (params) => setterReceived.push(params);
+      app.subscribe("hostcontextchanged", (params) =>
+        subscriberReceived.push(params),
+      );
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      expect(setterReceived).toEqual([{ theme: "dark" }]);
+      expect(subscriberReceived).toEqual([{ theme: "dark" }]);
+    });
+
+    it("context merge runs before setter and subscriber callbacks", async () => {
+      let contextInSetter: unknown;
+      let contextInSubscriber: unknown;
+
+      app.onhostcontextchanged = () => {
+        contextInSetter = app.getHostContext();
+      };
+      app.subscribe("hostcontextchanged", () => {
+        contextInSubscriber = app.getHostContext();
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      expect((contextInSetter as { theme: string })?.theme).toBe("dark");
+      expect((contextInSubscriber as { theme: string })?.theme).toBe("dark");
+    });
+
+    it("unsubscribing all subscribers does not affect the setter callback", async () => {
+      const setterReceived: unknown[] = [];
+      const subscriberReceived: unknown[] = [];
+
+      app.onhostcontextchanged = (params) => setterReceived.push(params);
+      const unsub = app.subscribe("hostcontextchanged", (params) =>
+        subscriberReceived.push(params),
+      );
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      unsub();
+
+      bridge.setHostContext({ theme: "light" });
+      await flush();
+
+      // Setter still fires after subscriber is removed
+      expect(setterReceived).toHaveLength(2);
+      expect(subscriberReceived).toHaveLength(1);
     });
   });
 });
