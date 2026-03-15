@@ -63,6 +63,7 @@ export {
   type McpUiRequestDisplayModeRequest,
   type McpUiRequestDisplayModeResult,
   type McpUiToolVisibility,
+  type McpUiRenderTiming,
   type McpUiToolMeta,
   type McpUiClientCapabilities,
 } from "./spec.types.js";
@@ -129,6 +130,7 @@ export {
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResultSchema,
   McpUiToolVisibilitySchema,
+  McpUiRenderTimingSchema,
   McpUiToolMetaSchema,
 } from "./generated/schema.js";
 

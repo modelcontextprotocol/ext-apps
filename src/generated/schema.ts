@@ -675,6 +675,15 @@ export const McpUiToolVisibilitySchema = z
   .describe("Tool visibility scope - who can access the tool.");
 
 /**
+ * @description When the host should render the View relative to the agent's turn.
+ */
+export const McpUiRenderTimingSchema = z
+  .union([z.literal("inline"), z.literal("end-of-turn")])
+  .describe(
+    "When the host should render the View relative to the agent's turn.",
+  );
+
+/**
  * @description UI-related metadata for tools.
  */
 export const McpUiToolMetaSchema = z.object({
@@ -699,6 +708,14 @@ export const McpUiToolMetaSchema = z.object({
     .describe(
       'Who can access this tool. Default: ["model", "app"]\n- "model": Tool visible to and callable by the agent\n- "app": Tool callable by the app from this server only',
     ),
+  /**
+   * @description When the host should render the View in the conversation. Default: "inline"
+   * - "inline": Render the View as soon as the tool returns
+   * - "end-of-turn": Defer rendering until the agent's turn is complete (no more tool calls)
+   */
+  renderTiming: McpUiRenderTimingSchema.optional().describe(
+    'When the host should render the View in the conversation. Default: "inline"\n- "inline": Render the View as soon as the tool returns\n- "end-of-turn": Defer rendering until the agent\'s turn is complete (no more tool calls)',
+  ),
 });
 
 /**
