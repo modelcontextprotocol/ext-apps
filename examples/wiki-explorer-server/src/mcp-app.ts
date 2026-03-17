@@ -117,11 +117,9 @@ const graph = new ForceGraph<NodeData, LinkData>(container)
 const graphCanvas = container.querySelector("canvas");
 if (graphCanvas) {
   for (const eventName of ["touchstart", "touchmove"] as const) {
-    graphCanvas.addEventListener(
-      eventName,
-      (e) => e.preventDefault(),
-      { passive: false },
-    );
+    graphCanvas.addEventListener(eventName, (e) => e.preventDefault(), {
+      passive: false,
+    });
   }
 }
 
