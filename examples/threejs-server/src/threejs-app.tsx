@@ -85,6 +85,7 @@ function LoadingShimmer({ height, code }: { height: number; code?: string }) {
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        touchAction: "none",
         background:
           "linear-gradient(135deg, var(--color-background-secondary, light-dark(#f0f0f5, #2a2a3c)) 0%, var(--color-background-tertiary, light-dark(#e5e5ed, #1e1e2e)) 100%)",
       }}
@@ -275,6 +276,14 @@ export default function ThreeJSApp({
   useEffect(() => {
     if (!code || !canvasRef.current || !containerRef.current) return;
 
+    // Prevent touch events from propagating to the parent scroll view.
+    // Three.js OrbitControls uses pointer events, which don't suppress native
+    // scroll gesture recognition on touch devices.
+    const canvas = canvasRef.current;
+    const preventDefault = (e: TouchEvent) => e.preventDefault();
+    canvas.addEventListener("touchstart", preventDefault, { passive: false });
+    canvas.addEventListener("touchmove", preventDefault, { passive: false });
+
     // Cleanup previous animation
     animControllerRef.current?.cleanup();
     animControllerRef.current = createAnimationController();
@@ -289,7 +298,11 @@ export default function ThreeJSApp({
       animControllerRef.current.visibilityAwareRAF,
     ).catch((e) => setError(e instanceof Error ? e.message : "Unknown error"));
 
-    return () => animControllerRef.current?.cleanup();
+    return () => {
+      canvas.removeEventListener("touchstart", preventDefault);
+      canvas.removeEventListener("touchmove", preventDefault);
+      animControllerRef.current?.cleanup();
+    };
   }, [code, height]);
 
   if (isStreaming || !code) {
@@ -314,6 +327,7 @@ export default function ThreeJSApp({
           height,
           borderRadius: "var(--border-radius-lg, 8px)",
           display: "block",
+          touchAction: "none",
         }}
       />
       {error && <div className="error-overlay">Error: {error}</div>}
