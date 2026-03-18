@@ -103,13 +103,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.5rem;
   background: var(--bg000);
   border-bottom: 1px solid var(--bg200);
   flex-shrink: 0;
-  gap: 0.5rem;
-  height: 48px;
+  gap: 0.25rem 0.5rem;
+  min-height: 48px;
   box-sizing: border-box;
+  flex-wrap: wrap;
 }
 
 .toolbar-left {
@@ -261,7 +262,6 @@ body {
   --min-font-size-inv: calc(1 / var(--min-font-size, 1));
 }
 
-
 .text-layer :is(span, br) {
   color: transparent;
   position: absolute;
@@ -306,7 +306,13 @@ body {
   overflow: hidden; /* No scrolling on main - only canvas-container scrolls */
   border-radius: 0;
   border: none;
-  padding: 0 !important; /* Ignore safe area insets in fullscreen */
+  padding: 0 !important; /* Background extends edge-to-edge */
+}
+
+.main.fullscreen .toolbar {
+  padding-top: calc(0.5rem + var(--safe-top, 0px));
+  padding-left: calc(0.5rem + var(--safe-left, 0px));
+  padding-right: calc(0.5rem + var(--safe-right, 0px));
 }
 
 .main.fullscreen .viewer {
@@ -467,4 +473,36 @@ body {
 }
 .loading-indicator.error .loading-indicator-arc {
   stroke: #e74c3c;
+}
+
+/* Compact toolbar on narrow screens */
+@media (max-width: 480px) {
+  .toolbar-left {
+    display: none;
+  }
+  .toolbar {
+    justify-content: center;
+  }
+  .nav-btn,
+  .zoom-btn,
+  .search-btn,
+  .fullscreen-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+  .page-input {
+    width: 40px;
+    padding: 0.2rem 0.3rem;
+    font-size: 0.8rem;
+  }
+  .total-pages,
+  .zoom-level {
+    font-size: 0.75rem;
+    min-width: 36px;
+  }
+  .toolbar-center,
+  .toolbar-right {
+    gap: 0.2rem;
+  }
 }

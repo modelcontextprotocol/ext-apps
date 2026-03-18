@@ -623,6 +623,16 @@ function updateFullscreenButton(): void {
   // Show button only if fullscreen is available
   btn.style.display = canFullscreen ? "flex" : "none";
 
+  // Position button respecting safe area insets
+  const insets = context?.safeAreaInsets;
+  btn.style.top = `${10 + (insets?.top ?? 0)}px`;
+  btn.style.right = `${10 + (insets?.right ?? 0)}px`;
+
+  // Always show button on touch devices (hover doesn't work on mobile)
+  if (context?.deviceCapabilities?.touch) {
+    btn.style.opacity = canFullscreen ? "0.7" : "0";
+  }
+
   // Toggle icons based on current mode
   const isFullscreen = currentDisplayMode === "fullscreen";
   expandIcon.style.display = isFullscreen ? "none" : "block";
@@ -718,8 +728,8 @@ app.onhostcontextchanged = (params) => {
     );
   }
 
-  // Update button if available modes changed
-  if (params.availableDisplayModes) {
+  // Update button if available modes or safe area changed
+  if (params.availableDisplayModes || params.safeAreaInsets) {
     updateFullscreenButton();
   }
 };

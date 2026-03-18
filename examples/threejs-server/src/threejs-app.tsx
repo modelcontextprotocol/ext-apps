@@ -226,6 +226,8 @@ export default function ThreeJSApp({
   const canFullscreen =
     hostContext?.availableDisplayModes?.includes("fullscreen") ?? false;
   const isFullscreen = currentDisplayMode === "fullscreen";
+  const dims = hostContext?.containerDimensions;
+  const hostHeight = dims && "height" in dims ? dims.height : 0;
 
   // Sync display mode from host context
   useEffect(() => {
@@ -272,6 +274,19 @@ export default function ThreeJSApp({
     return () => observer.disconnect();
   }, []);
 
+  // Track container width for resize handling
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (w > 0) setContainerWidth(w);
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!code || !canvasRef.current || !containerRef.current) return;
 
@@ -280,17 +295,18 @@ export default function ThreeJSApp({
     animControllerRef.current = createAnimationController();
 
     setError(null);
-    const width = containerRef.current.offsetWidth || 800;
+    const w = containerWidth || containerRef.current.offsetWidth || 800;
+    const h = isFullscreen && hostHeight > 0 ? hostHeight : height;
     executeThreeCode(
       code,
       canvasRef.current,
-      width,
-      height,
+      w,
+      h,
       animControllerRef.current.visibilityAwareRAF,
     ).catch((e) => setError(e instanceof Error ? e.message : "Unknown error"));
 
     return () => animControllerRef.current?.cleanup();
-  }, [code, height]);
+  }, [code, height, containerWidth, isFullscreen, hostHeight]);
 
   if (isStreaming || !code) {
     return (
@@ -303,7 +319,7 @@ export default function ThreeJSApp({
   return (
     <div
       ref={containerRef}
-      className={`threejs-container${isFullscreen ? " fullscreen" : ""}`}
+      className={`threejs-container${isFullscreen ? " fullscreen" : ""}${hostContext?.deviceCapabilities?.touch ? " touch-device" : ""}`}
       style={containerStyle}
     >
       <canvas
@@ -311,8 +327,8 @@ export default function ThreeJSApp({
         ref={canvasRef}
         style={{
           width: "100%",
-          height,
-          borderRadius: "var(--border-radius-lg, 8px)",
+          height: isFullscreen && hostHeight > 0 ? hostHeight : height,
+          borderRadius: isFullscreen ? 0 : "var(--border-radius-lg, 8px)",
           display: "block",
         }}
       />
@@ -321,6 +337,10 @@ export default function ThreeJSApp({
         className={`fullscreen-btn${canFullscreen ? " available" : ""}`}
         title={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
         onClick={toggleFullscreen}
+        style={{
+          top: 10 + (safeAreaInsets?.top ?? 0),
+          right: 10 + (safeAreaInsets?.right ?? 0),
+        }}
       >
         <svg
           className="expand-icon"

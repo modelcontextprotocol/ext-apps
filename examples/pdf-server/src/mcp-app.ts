@@ -109,6 +109,36 @@ const loadingIndicatorArc = loadingIndicatorEl.querySelector(
 // Track current display mode
 let currentDisplayMode: "inline" | "fullscreen" = "inline";
 
+// Whether the user has manually zoomed (disables auto fit-to-width)
+let userHasZoomed = false;
+
+/**
+ * Compute a scale that fits the PDF page width to the available container width.
+ * Returns null if the container isn't visible or the page width is unavailable.
+ */
+async function computeFitToWidthScale(): Promise<number | null> {
+  if (!pdfDocument) return null;
+
+  try {
+    const page = await pdfDocument.getPage(currentPage);
+    const naturalViewport = page.getViewport({ scale: 1.0 });
+    const pageWidth = naturalViewport.width;
+
+    const container = canvasContainerEl as HTMLElement;
+    const containerStyle = getComputedStyle(container);
+    const paddingLeft = parseFloat(containerStyle.paddingLeft);
+    const paddingRight = parseFloat(containerStyle.paddingRight);
+    const availableWidth = container.clientWidth - paddingLeft - paddingRight;
+
+    if (availableWidth <= 0 || pageWidth <= 0) return null;
+    if (availableWidth >= pageWidth) return null; // Already fits
+
+    return availableWidth / pageWidth;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Request the host to resize the app to fit the current PDF page.
  * Only applies in inline mode - fullscreen mode uses scrolling.
@@ -783,16 +813,19 @@ function nextPage() {
 }
 
 function zoomIn() {
+  userHasZoomed = true;
   scale = Math.min(scale + 0.25, 3.0);
   renderPage();
 }
 
 function zoomOut() {
+  userHasZoomed = true;
   scale = Math.max(scale - 0.25, 0.5);
   renderPage();
 }
 
 function resetZoom() {
+  userHasZoomed = false;
   scale = 1.0;
   renderPage();
 }
@@ -1281,6 +1314,14 @@ app.ontoolresult = async (result: CallToolResult) => {
     loadingIndicatorEl.style.display = "none";
 
     showViewer();
+
+    // Compute fit-to-width scale for narrow containers (e.g. mobile)
+    const fitScale = await computeFitToWidthScale();
+    if (fitScale !== null) {
+      scale = fitScale;
+      log.info("Fit-to-width scale:", scale);
+    }
+
     renderPage();
     // Start background preloading of all pages for text extraction
     startPreloading();
@@ -1308,17 +1349,30 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
     applyHostStyleVariables(ctx.styles.variables);
   }
 
-  // Apply safe area insets
+  // Apply safe area insets — set CSS custom properties for use in both
+  // inline mode (padding on .main) and fullscreen mode (padding on .toolbar)
   if (ctx.safeAreaInsets) {
-    mainEl.style.paddingTop = `${ctx.safeAreaInsets.top}px`;
-    mainEl.style.paddingRight = `${ctx.safeAreaInsets.right}px`;
-    mainEl.style.paddingBottom = `${ctx.safeAreaInsets.bottom}px`;
-    mainEl.style.paddingLeft = `${ctx.safeAreaInsets.left}px`;
+    const { top, right, bottom, left } = ctx.safeAreaInsets;
+    mainEl.style.setProperty("--safe-top", `${top}px`);
+    mainEl.style.setProperty("--safe-right", `${right}px`);
+    mainEl.style.setProperty("--safe-bottom", `${bottom}px`);
+    mainEl.style.setProperty("--safe-left", `${left}px`);
+    mainEl.style.paddingTop = `${top}px`;
+    mainEl.style.paddingRight = `${right}px`;
+    mainEl.style.paddingBottom = `${bottom}px`;
+    mainEl.style.paddingLeft = `${left}px`;
   }
 
-  // Log containerDimensions for debugging
-  if (ctx.containerDimensions) {
-    log.info("Container dimensions:", ctx.containerDimensions);
+  // Recompute fit-to-width when container dimensions change
+  if (ctx.containerDimensions && pdfDocument && !userHasZoomed) {
+    log.info("Container dimensions changed:", ctx.containerDimensions);
+    computeFitToWidthScale().then((fitScale) => {
+      if (fitScale !== null && Math.abs(fitScale - scale) > 0.01) {
+        scale = fitScale;
+        log.info("Recomputed fit-to-width scale:", scale);
+        renderPage();
+      }
+    });
   }
 
   // Handle display mode changes

@@ -92,6 +92,16 @@ body {
   opacity: 0.7;
 }
 
+/* Always show button on touch devices */
+.threejs-container.touch-device .fullscreen-btn.available {
+  opacity: 0.7;
+}
+
+/* In fullscreen, canvas goes edge-to-edge; only the button respects safe area */
+.threejs-container.fullscreen {
+  padding: 0 !important;
+}
+
 /* Fullscreen mode: swap icons and remove border radius */
 .threejs-container.fullscreen .fullscreen-btn .expand-icon {
   display: none;
