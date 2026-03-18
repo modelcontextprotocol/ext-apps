@@ -397,6 +397,17 @@ async function initCesium(): Promise<any> {
   // CesiumJS sets image-rendering: pixelated by default which looks bad on scaled displays
   // Setting to "auto" allows the browser to apply smooth interpolation
   cesiumViewer.canvas.style.imageRendering = "auto";
+  // Prevent touch events from propagating to the parent scroll view.
+  // CesiumJS uses pointer events internally, which don't suppress native
+  // scroll gesture recognition on touch devices. Explicit non-passive touch
+  // listeners with preventDefault() are needed.
+  for (const eventName of ["touchstart", "touchmove"] as const) {
+    cesiumViewer.canvas.addEventListener(
+      eventName,
+      (e: TouchEvent) => e.preventDefault(),
+      { passive: false },
+    );
+  }
   // Note: DO NOT set resolutionScale = devicePixelRatio here!
   // When useBrowserRecommendedResolution: false, Cesium already uses devicePixelRatio.
   // Setting resolutionScale = devicePixelRatio would double the scaling (e.g., 2x2=4x on Retina)
