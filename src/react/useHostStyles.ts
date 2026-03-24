@@ -48,6 +48,8 @@ import { McpUiHostContext } from "../types";
  * @see {@link applyDocumentTheme `applyDocumentTheme`} for the underlying theme function
  * @see {@link useHostFonts `useHostFonts`} for applying host fonts
  * @see {@link McpUiStyles `McpUiStyles`} for available CSS variables
+ *
+ * @deprecated Use {@link useHostStyles `useHostStyles`} instead.
  */
 export function useHostStyleVariables(
   app: App | null,
@@ -121,6 +123,8 @@ export function useHostStyleVariables(
  *
  * @see {@link applyHostFonts `applyHostFonts`} for the underlying fonts function
  * @see {@link useHostStyleVariables `useHostStyleVariables`} for applying style variables and theme
+ *
+ * @deprecated Use {@link useHostStyles `useHostStyles`} instead.
  */
 export function useHostFonts(
   app: App | null,
@@ -156,8 +160,10 @@ export function useHostFonts(
 /**
  * Applies all host styling (CSS variables, theme, and fonts) to match the host application.
  *
- * This is a convenience hook that combines {@link useHostStyleVariables `useHostStyleVariables`} and
- * {@link useHostFonts `useHostFonts`}. Use the individual hooks if you need more control.
+ * This hook listens to host context changes and automatically applies:
+ * - `styles.variables` CSS variables to `document.documentElement`
+ * - `theme` via `color-scheme` CSS property, enabling `light-dark()` CSS function support
+ * - `styles.css.fonts` as a `<style>` tag for custom fonts
  *
  * @param app - The connected {@link App `App`} instance, or null during initialization
  * @param initialContext - Initial host context from the connection (optional).
@@ -182,13 +188,52 @@ export function useHostFonts(
  * }
  * ```
  *
- * @see {@link useHostStyleVariables `useHostStyleVariables`} for style variables and theme only
- * @see {@link useHostFonts `useHostFonts`} for fonts only
  */
 export function useHostStyles(
   app: App | null,
   initialContext?: McpUiHostContext | null,
 ): void {
-  useHostStyleVariables(app, initialContext);
-  useHostFonts(app, initialContext);
+  const initialApplied = useRef(false);
+
+  // Apply initial styles, theme, and fonts once on mount
+  useEffect(() => {
+    if (initialApplied.current) {
+      return;
+    }
+    if (initialContext?.theme) {
+      applyDocumentTheme(initialContext.theme);
+    }
+    if (initialContext?.styles?.variables) {
+      applyHostStyleVariables(initialContext.styles.variables);
+    }
+    if (initialContext?.styles?.css?.fonts) {
+      applyHostFonts(initialContext.styles.css.fonts);
+    }
+    if (
+      initialContext?.theme ||
+      initialContext?.styles?.variables ||
+      initialContext?.styles?.css?.fonts
+    ) {
+      initialApplied.current = true;
+    }
+  }, [initialContext]);
+
+  // Listen for host context changes and apply all style updates in a single handler
+  useEffect(() => {
+    if (!app) {
+      return;
+    }
+
+    app.onhostcontextchanged = (params) => {
+      if (params.theme) {
+        applyDocumentTheme(params.theme);
+      }
+      if (params.styles?.variables) {
+        applyHostStyleVariables(params.styles.variables);
+      }
+      if (params.styles?.css?.fonts) {
+        applyHostFonts(params.styles.css.fonts);
+      }
+    };
+  }, [app]);
 }
