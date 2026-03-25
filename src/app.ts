@@ -1289,24 +1289,22 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
         scheduled = false;
         const html = document.documentElement;
 
-        // Measure actual content size by temporarily overriding html sizing.
-        // Width uses fit-content so content wraps at the host-provided width.
+        // Measure actual content height by temporarily overriding html sizing.
         // Height uses max-content because fit-content would clamp to the viewport
         // height when content is taller than the iframe, causing internal scrolling.
-        const originalWidth = html.style.width;
+        //
+        // Width uses window.innerWidth instead of measuring via fit-content.
+        // Setting html.style.width to fit-content forces a synchronous reflow at
+        // 0px width for responsive apps (whose content derives width from the
+        // container rather than having intrinsic width). This causes the browser
+        // to clamp scrollLeft on any horizontal scroll containers to 0, permanently
+        // destroying their scroll positions.
         const originalHeight = html.style.height;
-        html.style.width = "fit-content";
         html.style.height = "max-content";
-        const rect = html.getBoundingClientRect();
-        html.style.width = originalWidth;
+        const height = Math.ceil(html.getBoundingClientRect().height);
         html.style.height = originalHeight;
 
-        // Compensate for scrollbar width on Linux/Windows where scrollbars consume space.
-        // On systems with overlay scrollbars (macOS), this will be 0.
-        const scrollbarWidth = window.innerWidth - html.clientWidth;
-
-        const width = Math.ceil(rect.width + scrollbarWidth);
-        const height = Math.ceil(rect.height);
+        const width = Math.ceil(window.innerWidth);
 
         // Only send if size actually changed (prevents feedback loops from style changes)
         if (width !== lastWidth || height !== lastHeight) {
