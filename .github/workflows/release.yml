@@ -9,7 +9,8 @@ on:
         default: patch
       preid:
         description: "Prerelease identifier (only used with bump=prerelease)"
-        required: false
+        type: choice
+        options: [beta]
         default: beta
   pull_request:
     types: [closed]
@@ -30,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: main
 
       - uses: actions/setup-node@v6
         with:
@@ -50,12 +53,13 @@ jobs:
           git checkout -b "$BRANCH"
           git add -u
           git commit -m "chore: release v$VERSION"
-          git push -f -u origin "$BRANCH"
+          git push -u origin "$BRANCH"
+          gh label create release --color B60205 --description "Release PR" 2>/dev/null || true
           gh pr create \
             --title "chore: release v$VERSION" \
             --body "Bumps all packages to \`$VERSION\`. Add release notes to \`RELEASES.md\` before merging. Merging this PR will automatically tag and create the GitHub Release, which triggers npm-publish." \
             --label release \
-            --base main || gh pr edit "$BRANCH" --title "chore: release v$VERSION"
+            --base main
 
   # When a release PR is merged, tag the commit and create the GitHub Release.
   # This triggers the npm-publish workflow.
@@ -68,9 +72,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Create tag and release
+        env:
+          # PAT so the `release: published` event triggers npm-publish
+          # (events from GITHUB_TOKEN don't cascade to other workflows)
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="v$VERSION"
@@ -79,7 +87,7 @@ jobs:
             exit 0
           fi
           git tag "$TAG"
-          git push origin "$TAG"
+          git push origin "$TAG" || echo "tag already on remote"
           PRERELEASE=""
           [[ "$VERSION" == *-* ]] && PRERELEASE="--prerelease"
           gh release create "$TAG" --title "$TAG" --generate-notes $PRERELEASE

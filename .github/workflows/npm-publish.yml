@@ -138,8 +138,21 @@ jobs:
       - name: Build example
         run: npm run build --workspace examples/${{ matrix.example }}
 
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *"-beta"* ]]; then
+            echo "tag=--tag beta" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.release.target_commitish }}" != "main" ]]; then
+            MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+            echo "tag=--tag release-${MAJOR_MINOR}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish example
-        run: npm publish --workspace examples/${{ matrix.example }} --provenance --access public
+        run: npm publish --workspace examples/${{ matrix.example }} --provenance --access public ${{ steps.npm-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
 

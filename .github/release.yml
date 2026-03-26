@@ -4,8 +4,8 @@ changelog:
       - ignore-for-release
       - release
     authors:
-      - github-actions
-      - dependabot
+      - github-actions[bot]
+      - dependabot[bot]
   categories:
     - title: Breaking Changes
       labels:
