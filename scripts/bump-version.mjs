@@ -38,9 +38,7 @@ exec(`npm pkg set version=${newVersion} --workspaces`);
 
 // Keep workspace dependency ranges compatible (needed on major bumps)
 const [major, minor] = newVersion.split(".");
-exec(
-  `npm pkg set "dependencies.${pkgName}=^${major}.${minor}.0" --workspaces`,
-);
+exec(`npm pkg set "dependencies.${pkgName}=^${major}.${minor}.0" --workspaces`);
 
 // Sync package-lock.json so `npm ci` doesn't reject the release PR
 exec("npm install --package-lock-only --ignore-scripts");
