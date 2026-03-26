@@ -549,11 +549,11 @@ Releases are automated via the [Release workflow](https://github.com/modelcontex
    - Click "Run workflow"
 
 2. **Review the release PR**:
-   - The workflow bumps the version across all packages, generates release notes, and opens a PR labeled `release`
-   - Edit `RELEASES.md` in the PR if you want to adjust the generated notes
+   - The workflow bumps the version across all packages and opens a PR labeled `release`
+   - Add release notes to `RELEASES.md` in the PR
    - Approve and merge the PR
 
-3. **Done** — merging the PR automatically tags the commit, creates the GitHub Release, and triggers the [npm-publish workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/npm-publish.yml) to publish to npm.
+3. **Done** — merging the PR automatically tags the commit and creates the GitHub Release (with auto-generated notes), which triggers the [npm-publish workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/npm-publish.yml). Approve the deployment once when prompted.
 
 #### Manual alternative
 

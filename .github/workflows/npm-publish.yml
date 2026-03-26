@@ -42,6 +42,10 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  # All publish jobs depend directly on [build, test] (not on each other) so
+  # they all enter "waiting for approval" together and can be approved in a
+  # single "Review deployments" click.
+
   publish:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
@@ -88,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     environment: Release
-    needs: [publish]
+    needs: [build, test]
 
     permissions:
       contents: read
@@ -142,8 +146,7 @@ jobs:
   publish-mcpb:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
-    environment: Release
-    needs: [publish-examples]
+    needs: [build, test]
 
     permissions:
       contents: write

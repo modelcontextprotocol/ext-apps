@@ -23,6 +23,8 @@ env:
   GH_TOKEN: ${{ github.token }}
 
 jobs:
+  # Opens a PR that bumps all package versions. Add release notes to
+  # RELEASES.md in the PR before merging.
   prepare:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -39,28 +41,6 @@ jobs:
           VERSION=$(node scripts/bump-version.mjs "${{ inputs.bump }}" --preid="${{ inputs.preid }}")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Generate release notes and prepend to RELEASES.md
-        run: |
-          VERSION="${{ steps.bump.outputs.version }}"
-          PREV_TAG=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName -q '.[0].tagName // ""')
-          gh api repos/${{ github.repository }}/releases/generate-notes \
-            -f tag_name="v$VERSION" \
-            -f target_commitish="${{ github.ref_name }}" \
-            ${PREV_TAG:+-f previous_tag_name="$PREV_TAG"} \
-            --jq .body > /tmp/notes.md
-          {
-            echo "# Release Notes"
-            echo ""
-            echo "## $VERSION"
-            echo ""
-            cat /tmp/notes.md
-            echo ""
-            echo "---"
-            echo ""
-            tail -n +2 RELEASES.md
-          } > RELEASES.md.new
-          mv RELEASES.md.new RELEASES.md
-
       - name: Create release PR
         run: |
           VERSION="${{ steps.bump.outputs.version }}"
@@ -73,10 +53,12 @@ jobs:
           git push -f -u origin "$BRANCH"
           gh pr create \
             --title "chore: release v$VERSION" \
-            --body "Bumps all packages to \`$VERSION\` and updates RELEASES.md. Merging this PR will automatically tag and publish the release." \
+            --body "Bumps all packages to \`$VERSION\`. Add release notes to \`RELEASES.md\` before merging. Merging this PR will automatically tag and create the GitHub Release, which triggers npm-publish." \
             --label release \
             --base main || gh pr edit "$BRANCH" --title "chore: release v$VERSION"
 
+  # When a release PR is merged, tag the commit and create the GitHub Release.
+  # This triggers the npm-publish workflow.
   tag:
     if: >
       github.event_name == 'pull_request' &&
@@ -96,9 +78,8 @@ jobs:
             echo "Release $TAG already exists, skipping"
             exit 0
           fi
-          awk '/^## /{if(seen++) exit} seen' RELEASES.md | tail -n +2 | sed '/^---$/,$d' > /tmp/notes.md
           git tag "$TAG"
           git push origin "$TAG"
           PRERELEASE=""
           [[ "$VERSION" == *-* ]] && PRERELEASE="--prerelease"
-          gh release create "$TAG" --title "$TAG" --notes-file /tmp/notes.md $PRERELEASE
+          gh release create "$TAG" --title "$TAG" --generate-notes $PRERELEASE
