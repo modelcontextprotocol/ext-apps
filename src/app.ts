@@ -1287,13 +1287,6 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
       scheduled = true;
       requestAnimationFrame(() => {
         scheduled = false;
-
-        // Hosts determine the container size in fullscreen, so size-changed
-        // notifications are not needed.
-        if (this._hostContext?.displayMode === "fullscreen") {
-          return;
-        }
-
         const html = document.documentElement;
 
         // Measure actual content height by temporarily overriding html sizing.
