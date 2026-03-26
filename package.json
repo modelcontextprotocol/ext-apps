@@ -71,6 +71,7 @@
     "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
     "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write",
     "check:versions": "node scripts/check-versions.mjs",
+    "bump": "node scripts/bump-version.mjs",
     "update-lock:docker": "rm -rf node_modules package-lock.json examples/*/node_modules && docker run --rm --platform linux/amd64 -v $(pwd):/work -w /work -e HOME=/tmp node:latest npm i --registry=https://registry.npmjs.org/ --ignore-scripts && rm -rf node_modules examples/*/node_modules && npm i --registry=https://registry.npmjs.org/"
   },
   "author": "Olivier Chafik",

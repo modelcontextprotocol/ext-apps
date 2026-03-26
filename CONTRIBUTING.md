@@ -539,40 +539,31 @@ Before publishing releases, ensure the following are configured:
 
 ### Publishing a Release
 
-Releases are published automatically via GitHub Actions when a GitHub Release is created.
+Releases are automated via the [Release workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/release.yml).
 
 #### Steps to publish:
 
-1. **Update the version** in `package.json`:
+1. **Trigger the Release workflow**:
+   - Go to Actions → [Release](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/release.yml) → "Run workflow"
+   - Select the bump type (`patch`, `minor`, `major`, or `prerelease`)
+   - Click "Run workflow"
 
-   ```bash
-   # For a regular release
-   npm version patch  # or minor, or major
+2. **Review the release PR**:
+   - The workflow bumps the version across all packages, generates release notes, and opens a PR labeled `release`
+   - Edit `RELEASES.md` in the PR if you want to adjust the generated notes
+   - Approve and merge the PR
 
-   # For a beta release
-   npm version prerelease --preid=beta
-   ```
+3. **Done** — merging the PR automatically tags the commit, creates the GitHub Release, and triggers the [npm-publish workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/npm-publish.yml) to publish to npm.
 
-2. **Commit the version bump** (if not done by `npm version`):
+#### Manual alternative
 
-   ```bash
-   git add package.json
-   git commit -m "Bump version to X.Y.Z"
-   git push origin main
-   ```
+You can also bump versions locally:
 
-3. **Create a GitHub Release**:
-   - Go to [Releases](https://github.com/modelcontextprotocol/ext-apps/releases)
-   - Click "Draft a new release"
-   - Create a new tag matching the version (e.g., `v0.1.0`)
-   - Set the target branch (usually `main`)
-   - Write release notes describing the changes
-   - Click "Publish release"
+```bash
+npm run bump patch   # or minor, major, prerelease --preid=beta
+```
 
-4. **Monitor the workflow**:
-   - The [npm-publish workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/npm-publish.yml) will trigger automatically
-   - It runs build and test jobs before publishing
-   - On success, the package is published to npm with provenance
+Then commit, push, and create a GitHub Release manually — the npm-publish workflow triggers on release creation.
 
 #### npm Tags
 

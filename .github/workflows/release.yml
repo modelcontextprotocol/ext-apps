@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "patch | minor | major | prerelease | explicit version (e.g. 1.4.0)"
+        required: true
+        default: patch
+      preid:
+        description: "Prerelease identifier (only used with bump=prerelease)"
+        required: false
+        default: beta
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  prepare:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Bump versions
+        id: bump
+        run: |
+          VERSION=$(node scripts/bump-version.mjs "${{ inputs.bump }}" --preid="${{ inputs.preid }}")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes and prepend to RELEASES.md
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          PREV_TAG=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName -q '.[0].tagName // ""')
+          gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="v$VERSION" \
+            -f target_commitish="${{ github.ref_name }}" \
+            ${PREV_TAG:+-f previous_tag_name="$PREV_TAG"} \
+            --jq .body > /tmp/notes.md
+          {
+            echo "# Release Notes"
+            echo ""
+            echo "## $VERSION"
+            echo ""
+            cat /tmp/notes.md
+            echo ""
+            echo "---"
+            echo ""
+            tail -n +2 RELEASES.md
+          } > RELEASES.md.new
+          mv RELEASES.md.new RELEASES.md
+
+      - name: Create release PR
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          BRANCH="release/v$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -u
+          git commit -m "chore: release v$VERSION"
+          git push -f -u origin "$BRANCH"
+          gh pr create \
+            --title "chore: release v$VERSION" \
+            --body "Bumps all packages to \`$VERSION\` and updates RELEASES.md. Merging this PR will automatically tag and publish the release." \
+            --label release \
+            --base main || gh pr edit "$BRANCH" --title "chore: release v$VERSION"
+
+  tag:
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'release')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Create tag and release
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          if gh release view "$TAG" --repo ${{ github.repository }} >/dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping"
+            exit 0
+          fi
+          awk '/^## /{if(seen++) exit} seen' RELEASES.md | tail -n +2 | sed '/^---$/,$d' > /tmp/notes.md
+          git tag "$TAG"
+          git push origin "$TAG"
+          PRERELEASE=""
+          [[ "$VERSION" == *-* ]] && PRERELEASE="--prerelease"
+          gh release create "$TAG" --title "$TAG" --notes-file /tmp/notes.md $PRERELEASE
