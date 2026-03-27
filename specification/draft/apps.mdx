@@ -683,6 +683,25 @@ interface HostCapabilities {
       baseUriDomains?: string[];
     };
   };
+  /** Supported content block modalities for ui/message requests. */
+  message?: SupportedContentBlockModalities;
+  /** Supported content block modalities for ui/update-model-context requests. */
+  updateModelContext?: SupportedContentBlockModalities;
+}
+
+interface SupportedContentBlockModalities {
+  /** Host supports text content blocks. */
+  text?: {};
+  /** Host supports image content blocks. */
+  image?: {};
+  /** Host supports audio content blocks. */
+  audio?: {};
+  /** Host supports resource content blocks. */
+  resource?: {};
+  /** Host supports resource link content blocks. */
+  resourceLink?: {};
+  /** Host supports structured content (updateModelContext only). */
+  structuredContent?: {};
 }
 ```
 
@@ -1092,10 +1111,8 @@ Host behavior:
   method: "ui/message",
   params: {
     role: "user",
-    content: {
-      type: "text",
-      text: string
-    }
+    content: ContentBlock[]  // text, image, audio, resource, resource_link
+                             // (subject to hostCapabilities.message modalities)
   }
 }
 
@@ -1119,6 +1136,8 @@ Host behavior:
 Host behavior:
 * Host SHOULD add the message to the conversation context, preserving the specified role.
 * Host MAY request user consent.
+* Host SHOULD declare a `message` capability with supported modalities during initialization.
+* Host MUST respond with a JSON-RPC error if any content block type in the request is not in the declared `hostCapabilities.message`. 
 
 `ui/request-display-mode` - Request host to change display mode
 
@@ -1187,6 +1206,8 @@ Host behavior:
 - MAY dedupe identical `ui/update-model-context` calls
 - If multiple updates are received before the next user message, Host SHOULD only send the last update to the model
 - MAY display context updates to the user
+- SHOULD declare an `updateModelContext` capability with supported modalities during initialization
+- MUST respond with a JSON-RPC error if any content block type or `structuredContent` in the request is not declared in `hostCapabilities.updateModelContext`
 
 #### Notifications (Host → View)
 

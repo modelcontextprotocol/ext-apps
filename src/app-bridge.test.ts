@@ -969,6 +969,83 @@ describe("App <-> AppBridge integration", () => {
   });
 });
 
+describe("Content block modality validation", () => {
+  let app: App;
+  let bridge: AppBridge;
+  let appTransport: InMemoryTransport;
+  let bridgeTransport: InMemoryTransport;
+
+  afterEach(async () => {
+    await appTransport.close();
+    await bridgeTransport.close();
+  });
+
+  describe("Host-side validation", () => {
+    it("host rejects unsupported content in onmessage", async () => {
+      [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+      const capabilities: McpUiHostCapabilities = {
+        ...testHostCapabilities,
+        message: { text: {} },
+      };
+      bridge = new AppBridge(null, testHostInfo, capabilities);
+      bridge.onmessage = async () => ({});
+      app = new App(testAppInfo, {}, { autoResize: false });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      await expect(
+        app.sendMessage({
+          role: "user",
+          content: [
+            { type: "image", data: "base64data", mimeType: "image/png" },
+          ],
+        }),
+      ).rejects.toThrow("unsupported content type(s): image");
+    });
+
+    it("host rejects unsupported content in onupdatemodelcontext", async () => {
+      [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+      const capabilities: McpUiHostCapabilities = {
+        ...testHostCapabilities,
+        updateModelContext: { text: {} },
+      };
+      bridge = new AppBridge(null, testHostInfo, capabilities);
+      bridge.onupdatemodelcontext = async () => ({});
+      app = new App(testAppInfo, {}, { autoResize: false });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      await expect(
+        app.updateModelContext({
+          content: [{ type: "audio", data: "base64", mimeType: "audio/mp3" }],
+        }),
+      ).rejects.toThrow("unsupported content type(s): audio");
+    });
+
+    it("host rejects structuredContent when not declared", async () => {
+      [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+      const capabilities: McpUiHostCapabilities = {
+        ...testHostCapabilities,
+        updateModelContext: { text: {} },
+      };
+      bridge = new AppBridge(null, testHostInfo, capabilities);
+      bridge.onupdatemodelcontext = async () => ({});
+      app = new App(testAppInfo, {}, { autoResize: false });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      await expect(
+        app.updateModelContext({
+          structuredContent: { key: "value" },
+        }),
+      ).rejects.toThrow("structuredContent is not supported");
+    });
+  });
+});
+
 describe("getToolUiResourceUri", () => {
   describe("new nested format (_meta.ui.resourceUri)", () => {
     it("extracts resourceUri from _meta.ui.resourceUri", () => {

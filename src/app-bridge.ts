@@ -85,6 +85,10 @@ import {
   McpUiResourcePermissions,
   McpUiToolMeta,
 } from "./types";
+import {
+  validateContentModalities,
+  buildValidationErrorMessage,
+} from "./content-validation";
 export * from "./types";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
 import { RESOURCE_URI_META_KEY } from "./app";
@@ -557,6 +561,18 @@ export class AppBridge extends Protocol<
     this.setRequestHandler(
       McpUiMessageRequestSchema,
       async (request, extra) => {
+        const modalities = this._capabilities.message;
+        if (modalities !== undefined) {
+          const validation = validateContentModalities(
+            request.params.content,
+            modalities,
+          );
+          if (!validation.valid) {
+            throw new Error(
+              buildValidationErrorMessage(validation, "ui/message"),
+            );
+          }
+        }
         return callback(request.params, extra);
       },
     );
@@ -828,6 +844,22 @@ export class AppBridge extends Protocol<
     this.setRequestHandler(
       McpUiUpdateModelContextRequestSchema,
       async (request, extra) => {
+        const modalities = this._capabilities.updateModelContext;
+        if (modalities !== undefined) {
+          const validation = validateContentModalities(
+            request.params.content,
+            modalities,
+            request.params.structuredContent !== undefined,
+          );
+          if (!validation.valid) {
+            throw new Error(
+              buildValidationErrorMessage(
+                validation,
+                "ui/update-model-context",
+              ),
+            );
+          }
+        }
         return callback(request.params, extra);
       },
     );
