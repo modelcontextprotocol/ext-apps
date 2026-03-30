@@ -20,6 +20,8 @@ import {
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
+import { CommandQueue, RedisCommandStore } from "./src/command-queue.js";
+import type { PdfCommand } from "./src/commands.js";
 import {
   RootsListChangedNotificationSchema,
   type CallToolResult,
@@ -146,18 +148,26 @@ const DIST_DIR = import.meta.filename.endsWith(".ts")
   : import.meta.dirname;
 
 // =============================================================================
-// Command Queue (shared across stateless server instances)
+// Command Queue (backed by CommandQueue from ext-apps/server)
 // =============================================================================
 
-/** Commands expire after this many ms if never polled */
-const COMMAND_TTL_MS = 60_000; // 60 seconds
+const redisUrl =
+  process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const redisToken =
+  process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
 
-/** Periodic sweep interval to drop stale queues */
-const SWEEP_INTERVAL_MS = 30_000; // 30 seconds
+const commandQueue = new CommandQueue<PdfCommand>(
+  redisUrl
+    ? {
+        store: new RedisCommandStore({
+          url: redisUrl,
+          token: redisToken!,
+        }),
+      }
+    : undefined,
+);
 
-/** Fixed batch window: when commands are present, wait this long before returning to let more accumulate */
-const POLL_BATCH_WAIT_MS = 200;
-const LONG_POLL_TIMEOUT_MS = 30_000; // Max time to hold a long-poll request open
+export type { PdfCommand };
 
 // =============================================================================
 // Interact Tool Input Schemas (runtime validators)
@@ -177,16 +187,6 @@ const PageInterval = z.object({
   start: z.number().min(1).optional(),
   end: z.number().min(1).optional(),
 });
-
-// =============================================================================
-// Command Queue — wire protocol shared with the viewer
-// =============================================================================
-
-// PdfCommand is the single source of truth for what flows through the
-// poll queue. Defined once in src/commands.ts; both sides import it.
-// (`import type` → no pdf-lib bundled into the server.)
-import type { PdfCommand } from "./src/commands.js";
-export type { PdfCommand };
 
 // =============================================================================
 // Pending get_pages Requests (request-response bridge via client)
@@ -232,17 +232,6 @@ function waitForPageData(
   });
 }
 
-interface QueueEntry {
-  commands: PdfCommand[];
-  /** Timestamp of the most recent enqueue or dequeue */
-  lastActivity: number;
-}
-
-const commandQueues = new Map<string, QueueEntry>();
-
-/** Waiters for long-poll: resolve callback wakes up a blocked poll_pdf_commands */
-const pollWaiters = new Map<string, () => void>();
-
 /** Valid form field names per viewer UUID (populated during display_pdf) */
 const viewFieldNames = new Map<string, Set<string>>();
 
@@ -262,68 +251,14 @@ interface ViewFileWatch {
 }
 const viewFileWatches = new Map<string, ViewFileWatch>();
 
-/**
- * Per-view heartbeat. THIS is what the sweep iterates — not commandQueues.
- *
- * Why not commandQueues: display_pdf populates viewFieldNames/viewFieldInfo/
- * viewFileWatches but never touches commandQueues (only enqueueCommand does,
- * and it's triply gated). And dequeueCommands deletes the entry on every poll,
- * so even when it exists the sweep's TTL window is ~200ms wide. Net effect:
- * the sweep found nothing and the aux maps leaked every display_pdf call.
- * viewFileWatches entries hold an fs.StatWatcher (FD + timer) — slow FD
- * exhaustion on HTTP --enable-interact.
- */
-const viewLastActivity = new Map<string, number>();
-
-/** Register or refresh the heartbeat for a view. */
-function touchView(uuid: string): void {
-  viewLastActivity.set(uuid, Date.now());
-}
-
-function pruneStaleQueues(): void {
-  const now = Date.now();
-  for (const [uuid, lastActivity] of viewLastActivity) {
-    if (now - lastActivity > COMMAND_TTL_MS) {
-      viewLastActivity.delete(uuid);
-      commandQueues.delete(uuid);
-      viewFieldNames.delete(uuid);
-      viewFieldInfo.delete(uuid);
-      stopFileWatch(uuid);
-    }
+// Clean up per-view auxiliary state when the command queue prunes a view.
+commandQueue.onPrune((ids) => {
+  for (const uuid of ids) {
+    viewFieldNames.delete(uuid);
+    viewFieldInfo.delete(uuid);
+    stopFileWatch(uuid);
   }
-}
-
-// Periodic sweep so abandoned views don't leak
-setInterval(pruneStaleQueues, SWEEP_INTERVAL_MS).unref();
-
-function enqueueCommand(viewUUID: string, command: PdfCommand): void {
-  let entry = commandQueues.get(viewUUID);
-  if (!entry) {
-    entry = { commands: [], lastActivity: Date.now() };
-    commandQueues.set(viewUUID, entry);
-  }
-  entry.commands.push(command);
-  entry.lastActivity = Date.now();
-  touchView(viewUUID);
-
-  // Wake up any long-polling request waiting for this viewUUID
-  const waiter = pollWaiters.get(viewUUID);
-  if (waiter) {
-    pollWaiters.delete(viewUUID);
-    waiter();
-  }
-}
-
-function dequeueCommands(viewUUID: string): PdfCommand[] {
-  // Poll is activity — keep the view alive even when the queue is empty
-  // (the common case: viewer polls every ~30s with nothing to receive).
-  touchView(viewUUID);
-  const entry = commandQueues.get(viewUUID);
-  if (!entry) return [];
-  const commands = entry.commands;
-  commandQueues.delete(viewUUID);
-  return commands;
-}
+});
 
 // =============================================================================
 // File Watching (local files, stdio only)
@@ -362,7 +297,10 @@ export function startFileWatch(viewUUID: string, filePath: string): void {
       }
       if (s.mtimeMs === entry.lastMtimeMs) return; // spurious / already sent
       entry.lastMtimeMs = s.mtimeMs;
-      enqueueCommand(viewUUID, { type: "file_changed", mtimeMs: s.mtimeMs });
+      void commandQueue.enqueue(viewUUID, {
+        type: "file_changed",
+        mtimeMs: s.mtimeMs,
+      });
     }, FILE_WATCH_DEBOUNCE_MS);
 
     // Atomic saves replace the inode — old watcher stops firing. Re-attach.
@@ -375,7 +313,7 @@ export function startFileWatch(viewUUID: string, filePath: string): void {
       try {
         entry.watcher = fs.watch(resolved, onEvent);
       } catch {
-        // File removed, not replaced. Leave closed; pruneStaleQueues cleans up.
+        // File removed, not replaced. Leave closed; commandQueue.sweep() cleans up.
       }
     }
   };
@@ -838,10 +776,11 @@ async function extractFormFieldInfo(
     verbosity: VerbosityLevel.ERRORS,
   });
   const pdfDoc = await loadingTask.promise;
+  const pageCount = pdfDoc.numPages;
 
   const fields: FormFieldInfo[] = [];
   try {
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
+    for (let i = 1; i <= pageCount; i++) {
       const page = await pdfDoc.getPage(i);
       const pageHeight = page.getViewport({ scale: 1.0 }).height;
       const annotations = await page.getAnnotations();
@@ -1005,8 +944,12 @@ async function extractFormSchema(
 export interface CreateServerOptions {
   /**
    * Enable the `interact` tool and related command-queue infrastructure
-   * (in-memory command queue, `poll_pdf_commands`, `submit_page_data`).
-   * Only suitable for single-instance deployments (e.g. stdio transport).
+   * (`poll_pdf_commands`, `submit_page_data`).
+   *
+   * Safe for: stdio transport, single-instance HTTP, or stateless HTTP
+   * with Redis configured (UPSTASH_REDIS_REST_URL / KV_REST_API_URL).
+   * Without Redis on stateless HTTP, commands are lost between requests.
+   *
    * Defaults to false — server exposes only `list_pdfs` and `display_pdf` (read-only).
    */
   enableInteract?: boolean;
@@ -1238,6 +1181,8 @@ Returns a viewUUID in structuredContent. Pass it to \`interact\`:
 - navigate, search, find, search_navigate, zoom
 - get_text, get_screenshot (extract content)
 
+The viewer's widget context automatically updates with the current page number, total page count, any text selection, search results, and annotation details — check it before deciding what to do next.
+
 Accepts local files (use list_pdfs), client MCP root directories, or any HTTPS URL.
 Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before display.`,
       inputSchema: {
@@ -1307,7 +1252,7 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
       const uuid = randomUUID();
       // Start the heartbeat now so the sweep can clean up viewFieldNames/
       // viewFieldInfo/viewFileWatches even if no interact calls ever happen.
-      if (!disableInteract) touchView(uuid);
+      if (!disableInteract) void commandQueue.touch(uuid);
 
       // Check writability (governs save button; see isWritablePath doc).
       // Also requires OS-level W_OK so we don't lie on read-only mounts.
@@ -1350,7 +1295,6 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
         fieldInfo = await extractFormFieldInfo(normalized, readPdfRange);
         if (fieldInfo.length > 0) {
           viewFieldInfo.set(uuid, fieldInfo);
-          // Also populate viewFieldNames from field info if not already set
           if (!viewFieldNames.has(uuid)) {
             viewFieldNames.set(
               uuid,
@@ -1381,7 +1325,7 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
                 }
               }
               // Queue fill_form command so the viewer picks it up
-              enqueueCommand(uuid, {
+              await commandQueue.enqueue(uuid, {
                 type: "fill_form",
                 fields: Object.entries(formFieldValues).map(
                   ([name, value]) => ({ name, value }),
@@ -1724,7 +1668,7 @@ URL: ${normalized}`,
               content: [{ type: "text", text: "navigate requires `page`" }],
               isError: true,
             };
-          enqueueCommand(uuid, { type: "navigate", page });
+          await commandQueue.enqueue(uuid, { type: "navigate", page });
           description = `navigate to page ${page}`;
           break;
         case "search":
@@ -1733,7 +1677,7 @@ URL: ${normalized}`,
               content: [{ type: "text", text: "search requires `query`" }],
               isError: true,
             };
-          enqueueCommand(uuid, { type: "search", query });
+          await commandQueue.enqueue(uuid, { type: "search", query });
           description = `search for "${query}"`;
           break;
         case "find":
@@ -1742,7 +1686,7 @@ URL: ${normalized}`,
               content: [{ type: "text", text: "find requires `query`" }],
               isError: true,
             };
-          enqueueCommand(uuid, { type: "find", query });
+          await commandQueue.enqueue(uuid, { type: "find", query });
           description = `find "${query}" (silent)`;
           break;
         case "search_navigate":
@@ -1756,7 +1700,10 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
-          enqueueCommand(uuid, { type: "search_navigate", matchIndex });
+          await commandQueue.enqueue(uuid, {
+            type: "search_navigate",
+            matchIndex,
+          });
           description = `go to match #${matchIndex}`;
           break;
         case "zoom":
@@ -1765,7 +1712,7 @@ URL: ${normalized}`,
               content: [{ type: "text", text: "zoom requires `scale`" }],
               isError: true,
             };
-          enqueueCommand(uuid, { type: "zoom", scale });
+          await commandQueue.enqueue(uuid, { type: "zoom", scale });
           description = `zoom to ${Math.round(scale * 100)}%`;
           break;
         case "add_annotations":
@@ -1799,7 +1746,7 @@ URL: ${normalized}`,
               isError: true,
             };
           }
-          enqueueCommand(uuid, {
+          await commandQueue.enqueue(uuid, {
             type: "add_annotations",
             // resolveImageAnnotation populates optional x/y/width/height;
             // input is validated as Record<string,any>[] so this cast is
@@ -1822,7 +1769,7 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
-          enqueueCommand(uuid, {
+          await commandQueue.enqueue(uuid, {
             type: "update_annotations",
             annotations: annotations as Extract<
               PdfCommand,
@@ -1842,7 +1789,7 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
-          enqueueCommand(uuid, { type: "remove_annotations", ids });
+          await commandQueue.enqueue(uuid, { type: "remove_annotations", ids });
           description = `remove ${ids.length} annotation(s)`;
           break;
         case "highlight_text": {
@@ -1854,7 +1801,7 @@ URL: ${normalized}`,
               isError: true,
             };
           const id = `ht_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-          enqueueCommand(uuid, {
+          await commandQueue.enqueue(uuid, {
             type: "highlight_text",
             id,
             query,
@@ -1884,7 +1831,10 @@ URL: ${normalized}`,
             }
           }
           if (validFields.length > 0) {
-            enqueueCommand(uuid, { type: "fill_form", fields: validFields });
+            await commandQueue.enqueue(uuid, {
+              type: "fill_form",
+              fields: validFields,
+            });
           }
           const parts: string[] = [];
           if (validFields.length > 0) {
@@ -1915,7 +1865,7 @@ URL: ${normalized}`,
 
           const requestId = randomUUID();
 
-          enqueueCommand(uuid, {
+          await commandQueue.enqueue(uuid, {
             type: "get_pages",
             requestId,
             intervals: resolvedIntervals,
@@ -1963,7 +1913,7 @@ URL: ${normalized}`,
 
           const requestId = randomUUID();
 
-          enqueueCommand(uuid, {
+          await commandQueue.enqueue(uuid, {
             type: "get_pages",
             requestId,
             intervals: [{ start: page, end: page }],
@@ -2280,30 +2230,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ viewUUID: uuid }): Promise<CallToolResult> => {
-        // If commands are already queued, wait briefly to let more accumulate
-        if (commandQueues.has(uuid)) {
-          await new Promise((r) => setTimeout(r, POLL_BATCH_WAIT_MS));
-        } else {
-          // Long-poll: wait for commands to arrive or timeout
-          await new Promise<void>((resolve) => {
-            const timer = setTimeout(() => {
-              pollWaiters.delete(uuid);
-              resolve();
-            }, LONG_POLL_TIMEOUT_MS);
-            // Cancel any existing waiter for this uuid
-            const prev = pollWaiters.get(uuid);
-            if (prev) prev();
-            pollWaiters.set(uuid, () => {
-              clearTimeout(timer);
-              resolve();
-            });
-          });
-          // After waking, wait briefly for batching
-          if (commandQueues.has(uuid)) {
-            await new Promise((r) => setTimeout(r, POLL_BATCH_WAIT_MS));
-          }
-        }
-        const commands = dequeueCommands(uuid);
+        const commands = await commandQueue.poll(uuid);
         return {
           content: [{ type: "text", text: `${commands.length} command(s)` }],
           structuredContent: { commands },

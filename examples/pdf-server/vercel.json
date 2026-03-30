@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "buildCommand": "echo 'Using pre-built dist/'",
+  "functions": {
+    "api/mcp.mjs": {
+      "maxDuration": 60,
+      "includeFiles": "dist/**"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/mcp" }]
+}

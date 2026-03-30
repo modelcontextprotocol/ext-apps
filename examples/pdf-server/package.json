@@ -14,7 +14,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node --external pdfjs-dist && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --external pdfjs-dist --banner \"#!/usr/bin/env node\"",
+    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node --external pdfjs-dist && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --external pdfjs-dist --banner \"#!/usr/bin/env node\" && bun build http.ts --outfile dist/http.js --target node --external pdfjs-dist",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
     "serve": "bun --watch main.ts --enable-interact",
     "serve:stdio": "bun main.ts --stdio",
