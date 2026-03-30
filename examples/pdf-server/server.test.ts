@@ -1054,4 +1054,142 @@ describe("interact tool", () => {
       await server.close();
     });
   });
+
+  describe("viewer liveness", () => {
+    // get_screenshot/get_text fail fast when the iframe never polled, instead
+    // of waiting 45s for a viewer that isn't there. Reproduces the case where
+    // the host goes idle before the iframe reaches startPolling().
+
+    it("get_screenshot fails fast when viewer never polled", async () => {
+      const { server, client } = await connect();
+      const uuid = "never-polled-screenshot";
+
+      const started = Date.now();
+      const r = await client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "get_screenshot", page: 1 },
+      });
+      const elapsed = Date.now() - started;
+
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("never connected");
+      expect(firstText(r)).toContain(uuid);
+      expect(firstText(r)).toContain("display_pdf again"); // recovery hint
+      // Fast-fail bound (~8s grace), well under the 45s page-data timeout.
+      // 15s upper bound leaves slack for CI scheduling.
+      expect(elapsed).toBeLessThan(15_000);
+
+      await client.close();
+      await server.close();
+    }, 20_000);
+
+    it("get_screenshot waits full timeout when viewer polled then went silent", async () => {
+      // Viewer polled once (proving it mounted) then hung on a heavy render.
+      // The grace check passes, so we fall through to the 45s page-data wait —
+      // verified here by racing against a 12s deadline that should NOT win.
+      const { server, client } = await connect();
+      const uuid = "polled-then-silent";
+
+      // Viewer's first poll: drain whatever's there so it returns fast.
+      // Enqueue a trivial command first so poll returns via the batch-wait
+      // path (~200ms) instead of blocking on the 30s long-poll.
+      await client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "navigate", page: 1 },
+      });
+      await poll(client, uuid);
+
+      // Now get_screenshot — viewer has polled, so no fast-fail. But viewer
+      // never calls submit_page_data → should wait beyond the grace period.
+      const outcome = await Promise.race([
+        client
+          .callTool({
+            name: "interact",
+            arguments: { viewUUID: uuid, action: "get_screenshot", page: 1 },
+          })
+          .then(() => "completed" as const),
+        new Promise<"still-waiting">((r) =>
+          setTimeout(() => r("still-waiting"), 12_000),
+        ),
+      ]);
+
+      expect(outcome).toBe("still-waiting");
+
+      await client.close();
+      await server.close();
+    }, 20_000);
+
+    it("get_screenshot succeeds when viewer polls during grace window", async () => {
+      // Model calls interact before the viewer has polled — but the viewer
+      // shows up within the grace period and completes the roundtrip.
+      const { server, client } = await connect();
+      const uuid = "late-arriving-viewer";
+
+      const interactPromise = client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "get_screenshot", page: 1 },
+      });
+
+      // Viewer connects 500ms late — well inside the grace window.
+      await new Promise((r) => setTimeout(r, 500));
+      const cmds = await poll(client, uuid);
+      const getPages = cmds.find((c) => c.type === "get_pages");
+      expect(getPages).toBeDefined();
+
+      // Viewer responds with the page data.
+      await client.callTool({
+        name: "submit_page_data",
+        arguments: {
+          requestId: getPages!.requestId as string,
+          pages: [
+            { page: 1, image: Buffer.from("fake-jpeg").toString("base64") },
+          ],
+        },
+      });
+
+      const r = await interactPromise;
+      expect(r.isError).toBeFalsy();
+      expect((r.content as Array<{ type: string }>)[0].type).toBe("image");
+
+      await client.close();
+      await server.close();
+    }, 15_000);
+
+    it("batch failure puts error message first", async () => {
+      // When [fill_form, get_screenshot] runs and get_screenshot times out,
+      // content[0] must describe the failure — not the earlier success. Some
+      // hosts flatten isError results to content[0].text only, which previously
+      // showed "Queued: Filled N fields" with isError:true and dropped the
+      // actual timeout entirely.
+      const { server, client } = await connect();
+      const uuid = "batch-error-ordering";
+
+      const r = await client.callTool({
+        name: "interact",
+        arguments: {
+          viewUUID: uuid,
+          commands: [
+            { action: "navigate", page: 3 }, // succeeds → "Queued: ..."
+            { action: "get_screenshot", page: 1 }, // never-polled → fast-fail
+          ],
+        },
+      });
+
+      expect(r.isError).toBe(true);
+      const texts = (r.content as Array<{ type: string; text: string }>).map(
+        (c) => c.text,
+      );
+      // content[0]: batch-failed summary naming the culprit
+      expect(texts[0]).toContain("failed");
+      expect(texts[0]).toContain("2/2");
+      expect(texts[0]).toContain("get_screenshot");
+      // content[1]: the actual error
+      expect(texts[1]).toContain("never connected");
+      // content[2]: the earlier success, pushed to the back
+      expect(texts[2]).toContain("Queued");
+
+      await client.close();
+      await server.close();
+    }, 15_000);
+  });
 });

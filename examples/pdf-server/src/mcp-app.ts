@@ -4093,6 +4093,15 @@ app.ontoolresult = async (result: CallToolResult) => {
   } catch (err) {
     log.error("Error loading PDF:", err);
     showError(err instanceof Error ? err.message : String(err));
+    // Poll anyway. The server's interact tool has no way to know we choked —
+    // without a poll it waits 45s on every get_screenshot against this
+    // viewUUID. handleGetPages already null-guards pdfDocument, so a failed
+    // load just means empty page data → server returns "No screenshot
+    // returned" (fast, actionable) instead of "Timeout waiting for page data
+    // from viewer" (slow, opaque).
+    if (viewUUID && interactEnabled) {
+      startPolling();
+    }
   }
 };
 
@@ -4440,16 +4449,27 @@ app.onteardown = async () => {
 app.onhostcontextchanged = handleHostContextChanged;
 
 // Connect to host
-app.connect().then(() => {
-  log.info("Connected to host");
-  const ctx = app.getHostContext();
-  if (ctx) {
-    handleHostContextChanged(ctx);
-  }
-  // Restore annotations early using toolInfo.id (available before tool result)
-  restoreAnnotations();
-  updateAnnotationsBadge();
-});
+app
+  .connect()
+  .then(() => {
+    log.info("Connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+    // Restore annotations early using toolInfo.id (available before tool result)
+    restoreAnnotations();
+    updateAnnotationsBadge();
+  })
+  .catch((err: unknown) => {
+    // ui/initialize failed or transport rejected. Without a catch this is an
+    // unhandled rejection — iframe shows blank, server times out on every
+    // interact call with no clue why.
+    log.error("Failed to connect to host:", err);
+    showError(
+      `Failed to connect to host: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
 
 // Debug helper: dump all annotation state. Run in DevTools console as
 // `__pdfDebug()` to diagnose ghost annotations (visible on canvas but not
