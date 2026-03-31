@@ -31,6 +31,37 @@ function extractTitleFromUrl(url: string): string {
   }
 }
 
+/**
+ * Validate that a URL points to a Wikipedia wiki page.
+ * Uses parsed URL components (not raw string matching) to prevent
+ * path-traversal bypasses such as `/wiki/../../w/api.php`.
+ */
+function isValidWikipediaUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  // Protocol must be HTTPS (or HTTP for dev, matching prior behaviour)
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    return false;
+  }
+
+  // Hostname must be <lang>.wikipedia.org — language codes are lowercase ASCII
+  if (!/^[a-z]+\.wikipedia\.org$/.test(parsed.hostname)) {
+    return false;
+  }
+
+  // After URL resolution, the pathname must still start with /wiki/
+  if (!parsed.pathname.startsWith("/wiki/")) {
+    return false;
+  }
+
+  return true;
+}
+
 // Wikipedia namespace prefixes to exclude from link extraction
 const EXCLUDED_PREFIXES = [
   "Wikipedia:",
@@ -113,13 +144,13 @@ export function createServer(): McpServer {
       let title = url;
 
       try {
-        if (!url.match(/^https?:\/\/[a-z]+\.wikipedia\.org\/wiki\//)) {
+        if (!isValidWikipediaUrl(url)) {
           throw new Error("Not a valid Wikipedia URL");
         }
 
         title = extractTitleFromUrl(url);
 
-        const response = await fetch(url);
+        const response = await fetch(url, { redirect: "error" });
 
         if (!response.ok) {
           throw new Error(
