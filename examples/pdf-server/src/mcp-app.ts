@@ -4229,42 +4229,64 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
         }
         break;
       case "add_annotations":
+        // Per-def isolation. If convertFromModelCoords or addAnnotation throws
+        // for one def (bad shape, NaN coords), the rest still apply — and
+        // critically, a get_pages later in this batch still runs. Without
+        // this, a single bad annotation makes the whole batch throw out of
+        // processCommands, the iframe never reaches submit_page_data, and the
+        // server's interact() waits the full 45s for a reply that never comes.
         for (const def of cmd.annotations) {
-          const pageHeight = await getPageHeight(def.page);
-          addAnnotation(convertFromModelCoords(def, pageHeight));
+          try {
+            const pageHeight = await getPageHeight(def.page);
+            addAnnotation(convertFromModelCoords(def, pageHeight));
+          } catch (err) {
+            log.error(`add_annotations: failed for id=${def.id}:`, err);
+          }
         }
         break;
       case "update_annotations":
         for (const update of cmd.annotations) {
           const existing = annotationMap.get(update.id);
-          if (!existing) continue;
-          // The model sends model coords (y-down, y = top-left). existing.def
-          // is internal coords (y-up, y = bottom-left). For rect/circle/image
-          // the converted internal y = pageHeight - modelY - height — a function
-          // of BOTH y AND height. If the model patches only {height}, we must
-          // still rewrite internal y to keep the top fixed; otherwise the
-          // bottom stays fixed and the top shifts. Same coupling applies to
-          // {page} changes across differently-sized pages.
-          //
-          // Fix: round-trip through model space. Convert existing to model
-          // coords, spread the patch on top (all-model now), convert back.
-          // convertToModelCoords is self-inverse (pdf-annotations.ts:192) so
-          // unchanged fields pass through unmolested.
-          const srcPageH = await getPageHeight(existing.def.page);
-          const existingModel = convertToModelCoords(existing.def, srcPageH);
-          const mergedModel = {
-            ...existingModel,
-            ...update,
-          } as PdfAnnotationDef;
-          const dstPageH =
-            update.page != null && update.page !== existing.def.page
-              ? await getPageHeight(update.page)
-              : srcPageH;
-          const mergedInternal = convertFromModelCoords(mergedModel, dstPageH);
-          // Pass the FULL merged def. updateAnnotation() already merges over
-          // the tracked def, so passing everything is correct and avoids the
-          // "only copy back Object.keys(update)" loop that caused the bug.
-          updateAnnotation(mergedInternal);
+          if (!existing) {
+            log.error(
+              `update_annotations: id=${update.id} not found — skipping`,
+            );
+            continue;
+          }
+          try {
+            // The model sends model coords (y-down, y = top-left). existing.def
+            // is internal coords (y-up, y = bottom-left). For rect/circle/image
+            // the converted internal y = pageHeight - modelY - height — a function
+            // of BOTH y AND height. If the model patches only {height}, we must
+            // still rewrite internal y to keep the top fixed; otherwise the
+            // bottom stays fixed and the top shifts. Same coupling applies to
+            // {page} changes across differently-sized pages.
+            //
+            // Fix: round-trip through model space. Convert existing to model
+            // coords, spread the patch on top (all-model now), convert back.
+            // convertToModelCoords is self-inverse (pdf-annotations.ts:192) so
+            // unchanged fields pass through unmolested.
+            const srcPageH = await getPageHeight(existing.def.page);
+            const existingModel = convertToModelCoords(existing.def, srcPageH);
+            const mergedModel = {
+              ...existingModel,
+              ...update,
+            } as PdfAnnotationDef;
+            const dstPageH =
+              update.page != null && update.page !== existing.def.page
+                ? await getPageHeight(update.page)
+                : srcPageH;
+            const mergedInternal = convertFromModelCoords(
+              mergedModel,
+              dstPageH,
+            );
+            // Pass the FULL merged def. updateAnnotation() already merges over
+            // the tracked def, so passing everything is correct and avoids the
+            // "only copy back Object.keys(update)" loop that caused the bug.
+            updateAnnotation(mergedInternal);
+          } catch (err) {
+            log.error(`update_annotations: failed for id=${update.id}:`, err);
+          }
         }
         break;
       case "remove_annotations":

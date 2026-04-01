@@ -334,6 +334,14 @@ export const viewSourcePaths = new Map<string, string>();
 /** Valid form field names per viewer UUID (populated during display_pdf) */
 const viewFieldNames = new Map<string, Set<string>>();
 
+/**
+ * Annotation ids the model has added per view, used to warn when
+ * update_annotations targets an id we never saw add_annotations for.
+ * Best-effort: doesn't see manual edits in the iframe, so the warning
+ * is "did you mean…" not a hard error.
+ */
+const viewAnnotationIds = new Map<string, Set<string>>();
+
 /** Detailed form field info per viewer UUID (populated during display_pdf) */
 const viewFieldInfo = new Map<string, FormFieldInfo[]>();
 
@@ -376,6 +384,7 @@ function pruneStaleQueues(): void {
       commandQueues.delete(uuid);
       viewFieldNames.delete(uuid);
       viewFieldInfo.delete(uuid);
+      viewAnnotationIds.delete(uuid);
       viewsPolled.delete(uuid);
       viewSourcePaths.delete(uuid);
       stopFileWatch(uuid);
@@ -1948,9 +1957,17 @@ URL: ${normalized}`,
               { type: "add_annotations" }
             >["annotations"],
           });
+          if (!viewAnnotationIds.has(uuid)) {
+            viewAnnotationIds.set(uuid, new Set());
+          }
+          for (const a of annotations) {
+            // Schema is Record<string, any> so id is `any` — coerce, but skip
+            // nullish so we don't store "undefined"/"null" as known ids.
+            if (a.id != null) viewAnnotationIds.get(uuid)!.add(String(a.id));
+          }
           description = `add ${annotations.length} annotation(s)`;
           break;
-        case "update_annotations":
+        case "update_annotations": {
           if (!annotations || annotations.length === 0)
             return {
               content: [
@@ -1961,6 +1978,16 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
+          // The viewer silently skips updates for unknown ids (mcp-app.ts:
+          // `if (!existing) continue`). If a prior add_annotations batch
+          // failed mid-way, the model gets a happy "Queued" here while
+          // nothing renders. Surface what we can — but only as a warning,
+          // since the user may have drawn the annotation manually.
+          const known = viewAnnotationIds.get(uuid);
+          const unknown = annotations
+            .filter((a) => a.id != null)
+            .map((a) => String(a.id))
+            .filter((id) => !known?.has(id));
           enqueueCommand(uuid, {
             type: "update_annotations",
             annotations: annotations as Extract<
@@ -1969,7 +1996,11 @@ URL: ${normalized}`,
             >["annotations"],
           });
           description = `update ${annotations.length} annotation(s)`;
+          if (unknown.length > 0) {
+            description += ` — WARNING: id(s) [${unknown.join(", ")}] not seen in any add_annotations call for this view; viewer may silently no-op`;
+          }
           break;
+        }
         case "remove_annotations":
           if (!ids || ids.length === 0)
             return {
@@ -2452,6 +2483,8 @@ Example — add a signature image and a stamp, then screenshot to verify:
         // Process commands sequentially, collecting all content parts
         const allContent: ContentPart[] = [];
         let failedAt = -1;
+        let errorContent: ContentPart[] = [];
+        const t0 = Date.now();
 
         for (let i = 0; i < commandList.length; i++) {
           const result = await processInteractCommand(
@@ -2460,28 +2493,50 @@ Example — add a signature image and a stamp, then screenshot to verify:
             extra.signal,
           );
           if (result.isError) {
-            // Error content first. Some hosts flatten isError results to
-            // content[0].text — if we push the error after prior successes,
-            // the user sees "Queued: Filled 7 fields" with isError:true and
-            // the actual failure is silently dropped.
-            allContent.unshift(...result.content);
+            errorContent = result.content;
             failedAt = i;
             break;
           }
           allContent.push(...result.content);
         }
 
-        if (failedAt >= 0 && commandList.length > 1) {
-          allContent.unshift({
-            type: "text",
-            text: `Batch failed at step ${failedAt + 1}/${commandList.length} (${commandList[failedAt].action}):`,
-          });
+        if (failedAt >= 0) {
+          // Hosts that flatten isError results to content[0].text will drop
+          // everything after the first item — observed in LocalAgentMode SDK
+          // 2.1.87 where a 3-item content array became just the prefix string.
+          // Squash all text into one block so the model sees the actual error
+          // *and* what succeeded before it. Images survive after the text.
+          const textOf = (c: ContentPart) =>
+            c.type === "text" ? c.text : null;
+          const errorTexts = errorContent.map(textOf).filter((t) => t != null);
+          const priorTexts = allContent.map(textOf).filter((t) => t != null);
+          const priorImages = allContent.filter((c) => c.type === "image");
+
+          const lines = [
+            commandList.length > 1
+              ? `Batch failed at step ${failedAt + 1}/${commandList.length} (${commandList[failedAt].action}):`
+              : null,
+            ...errorTexts,
+            priorTexts.length > 0
+              ? `(prior steps succeeded: ${priorTexts.join(" | ")})`
+              : null,
+          ].filter((l) => l != null);
+
+          // stderr → mcp-server-*.log via the host. Only log on failure;
+          // chatty per-call traces would flood agent sessions.
+          console.error(
+            `[interact] uuid=${uuid} FAILED at step ${failedAt + 1}/${commandList.length} ` +
+              `(${commandList[failedAt].action}) after ${Date.now() - t0}ms: ` +
+              errorTexts.join(" | "),
+          );
+
+          return {
+            content: [{ type: "text", text: lines.join("\n") }, ...priorImages],
+            isError: true,
+          };
         }
 
-        return {
-          content: allContent,
-          ...(failedAt >= 0 ? { isError: true } : {}),
-        };
+        return { content: allContent };
       },
     );
 

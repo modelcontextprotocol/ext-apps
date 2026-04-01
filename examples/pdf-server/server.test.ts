@@ -1444,12 +1444,13 @@ describe("interact tool", () => {
       await server.close();
     }, 15_000);
 
-    it("batch failure puts error message first", async () => {
-      // When [fill_form, get_screenshot] runs and get_screenshot times out,
-      // content[0] must describe the failure — not the earlier success. Some
-      // hosts flatten isError results to content[0].text only, which previously
-      // showed "Queued: Filled N fields" with isError:true and dropped the
-      // actual timeout entirely.
+    it("batch failure squashes everything into content[0].text", async () => {
+      // LocalAgentMode SDK 2.1.87 flattens isError results to content[0].text
+      // and silently drops the rest. The earlier multi-item ordering fix
+      // (prefix unshifted before the error unshifted before successes) still
+      // lost the actual error — the model just saw "Batch failed at step 2/2
+      // (get_screenshot):" with nothing after the colon. Now everything goes
+      // into one block.
       const { server, client } = await connect();
       const uuid = "batch-error-ordering";
 
@@ -1465,17 +1466,71 @@ describe("interact tool", () => {
       });
 
       expect(r.isError).toBe(true);
-      const texts = (r.content as Array<{ type: string; text: string }>).map(
-        (c) => c.text,
-      );
-      // content[0]: batch-failed summary naming the culprit
-      expect(texts[0]).toContain("failed");
-      expect(texts[0]).toContain("2/2");
-      expect(texts[0]).toContain("get_screenshot");
-      // content[1]: the actual error
-      expect(texts[1]).toContain("never connected");
-      // content[2]: the earlier success, pushed to the back
-      expect(texts[2]).toContain("Queued");
+      const content = r.content as Array<{ type: string; text?: string }>;
+      // Exactly one text item — survives content[0]-only flattening
+      const textItems = content.filter((c) => c.type === "text");
+      expect(textItems).toHaveLength(1);
+      const text = textItems[0].text!;
+      // Batch summary naming the culprit
+      expect(text).toContain("failed");
+      expect(text).toContain("2/2");
+      expect(text).toContain("get_screenshot");
+      // The actual error from ensureViewerIsPolling
+      expect(text).toContain("never connected");
+      // What succeeded before the failure, so the model knows what stuck
+      expect(text).toContain("Queued");
+
+      await client.close();
+      await server.close();
+    }, 15_000);
+
+    it("update_annotations warns about ids never seen by add_annotations", async () => {
+      // The viewer's processCommands does `if (!existing) continue` for
+      // unknown ids — silent no-op. After a failed add_annotations batch the
+      // model would update_annotations with confidence and get "Queued" back
+      // while nothing rendered. Track ids server-side to surface the gap.
+      const { server, client } = await connect();
+      const uuid = "update-unknown-id";
+
+      // add_annotations / update_annotations don't gate on viewsPolled
+      // (only get_screenshot/get_text do) — they just enqueue and return.
+      const add = await client.callTool({
+        name: "interact",
+        arguments: {
+          viewUUID: uuid,
+          action: "add_annotations",
+          annotations: [
+            {
+              id: "stamp-a",
+              type: "stamp",
+              page: 1,
+              x: 100,
+              y: 100,
+              label: "A",
+            },
+          ],
+        },
+      });
+      expect(add.isError).toBeFalsy();
+
+      const upd = await client.callTool({
+        name: "interact",
+        arguments: {
+          viewUUID: uuid,
+          action: "update_annotations",
+          annotations: [
+            { id: "stamp-a", x: 200 },
+            { id: "stamp-b", x: 200 },
+          ],
+        },
+      });
+      // Not an error — user might have drawn stamp-b manually in the iframe.
+      // But the model needs to know it might be shouting into the void.
+      expect(upd.isError).toBeFalsy();
+      const updText = (upd.content as Array<{ text: string }>)[0].text;
+      expect(updText).toContain("WARNING");
+      expect(updText).toContain("stamp-b");
+      expect(updText).not.toContain("stamp-a");
 
       await client.close();
       await server.close();
