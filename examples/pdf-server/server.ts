@@ -2539,8 +2539,12 @@ Example — add a signature image and a stamp, then screenshot to verify:
 
         return {
           content: allContent,
-          // Only safe to set when there's nothing before content[0] to lose.
-          ...(failedAt === 0 ? { isError: true } : {}),
+          // isError flattens to a string in some SDKs, losing the array
+          // shape. Only set it when there was never going to be an array
+          // — single command, no positional contract to break.
+          ...(failedAt >= 0 && commandList.length === 1
+            ? { isError: true }
+            : {}),
         };
       },
     );
