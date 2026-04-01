@@ -2536,13 +2536,6 @@ Example — add a signature image and a stamp, then screenshot to verify:
           };
         }
 
-        // Same content[0] flattening hits successes too: [add_annotations,
-        // get_screenshot] → content = [text, image] → host shows the text and
-        // drops the image. Stable-sort images first; the model still gets the
-        // "Queued: ..." trail but now actually sees what it asked for.
-        allContent.sort(
-          (a, b) => +(b.type === "image") - +(a.type === "image"),
-        );
         return { content: allContent };
       },
     );
