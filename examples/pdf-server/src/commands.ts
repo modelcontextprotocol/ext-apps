@@ -65,4 +65,5 @@ export type PdfCommand =
       getText: boolean;
       getScreenshots: boolean;
     }
+  | { type: "save_as"; requestId: string }
   | { type: "file_changed"; mtimeMs: number };

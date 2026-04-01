@@ -18,6 +18,10 @@ import {
   PDFString,
   PDFHexString,
   StandardFonts,
+  PDFTextField,
+  PDFCheckBox,
+  PDFDropdown,
+  PDFRadioGroup,
 } from "pdf-lib";
 
 // =============================================================================
@@ -810,26 +814,45 @@ export async function buildAnnotatedPdfBytes(
   // Add proper PDF annotation objects
   await addAnnotationDicts(pdfDoc, annotations);
 
-  // Apply form fills
+  // Apply form fills. Dispatch on actual field type — getTextField(name) throws
+  // for dropdowns/radios, so the old try/catch silently dropped those on save.
   if (formFields.size > 0) {
     try {
       const form = pdfDoc.getForm();
       for (const [name, value] of formFields) {
-        try {
-          if (typeof value === "boolean") {
-            const checkbox = form.getCheckBox(name);
-            if (value) checkbox.check();
-            else checkbox.uncheck();
+        const field = form.getFieldMaybe(name);
+        if (!field) continue;
+
+        if (field instanceof PDFCheckBox) {
+          if (value) field.check();
+          else field.uncheck();
+        } else if (field instanceof PDFRadioGroup) {
+          // The viewer stores pdf.js's buttonValue, which for PDFs with an
+          // /Opt array is a numeric index ("0","1","2") rather than the
+          // option label pdf-lib's select() expects. Try the label first,
+          // then fall back to indexing into getOptions().
+          const opts = field.getOptions();
+          const s = String(value);
+          if (opts.includes(s)) {
+            field.select(s);
           } else {
-            const textField = form.getTextField(name);
-            textField.setText(value);
+            const idx = Number(s);
+            if (Number.isInteger(idx) && idx >= 0 && idx < opts.length) {
+              field.select(opts[idx]);
+            }
+            // else: value is neither label nor index — leave unset
           }
-        } catch {
-          // Field not found or wrong type — skip
+        } else if (field instanceof PDFDropdown) {
+          // select() auto-enables edit mode for values outside getOptions(),
+          // so this works for both enumerated and free-text combos.
+          field.select(String(value));
+        } else if (field instanceof PDFTextField) {
+          field.setText(String(value));
         }
+        // PDFButton, PDFOptionList, PDFSignature: no fill_form support yet
       }
     } catch {
-      // Form not available — skip
+      // pdfDoc.getForm() throws if the PDF has no AcroForm
     }
   }
 

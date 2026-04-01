@@ -1031,6 +1031,81 @@ describe("buildAnnotatedPdfBytes", () => {
     const bytes2 = await doc.save();
     expect(bytes2.length).toBeGreaterThan(0);
   });
+
+  describe("form field persistence", () => {
+    // One fixture with every field type we support. pdf-lib's addOptionToPage
+    // writes radio buttonValues as numeric index strings ("0","1","2"), which
+    // is the stress case — the viewer stores those, but .select() wants labels.
+    let formPdfBytes: Uint8Array;
+    beforeAll(async () => {
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([612, 792]);
+      const form = doc.getForm();
+      form.createTextField("name").addToPage(page, { x: 10, y: 700 });
+      form.createCheckBox("agree").addToPage(page, { x: 10, y: 660 });
+      const dd = form.createDropdown("country");
+      dd.addOptions(["USA", "UK", "Canada"]);
+      dd.addToPage(page, { x: 10, y: 620 });
+      const rg = form.createRadioGroup("size");
+      rg.addOptionToPage("small", page, { x: 10, y: 580 });
+      rg.addOptionToPage("medium", page, { x: 50, y: 580 });
+      rg.addOptionToPage("large", page, { x: 90, y: 580 });
+      formPdfBytes = await doc.save();
+    });
+
+    it("writes text, checkbox, dropdown, and radio (by label) in one pass", async () => {
+      const out = await buildAnnotatedPdfBytes(
+        formPdfBytes,
+        [],
+        new Map<string, string | boolean>([
+          ["name", "Alice"],
+          ["agree", true],
+          ["country", "Canada"],
+          ["size", "medium"],
+        ]),
+      );
+      const form = (await PDFDocument.load(out)).getForm();
+      expect(form.getTextField("name").getText()).toBe("Alice");
+      expect(form.getCheckBox("agree").isChecked()).toBe(true);
+      expect(form.getDropdown("country").getSelected()).toEqual(["Canada"]);
+      expect(form.getRadioGroup("size").getSelected()).toBe("medium");
+    });
+
+    it("maps numeric radio buttonValue to option label by index", async () => {
+      // The viewer stores what pdf.js reports as buttonValue ("2"), not the
+      // label. Save must translate or the radio is silently dropped.
+      const out = await buildAnnotatedPdfBytes(
+        formPdfBytes,
+        [],
+        new Map<string, string | boolean>([["size", "2"]]),
+      );
+      const form = (await PDFDocument.load(out)).getForm();
+      expect(form.getRadioGroup("size").getSelected()).toBe("large");
+    });
+
+    it("leaves radio unset when value is neither label nor valid index", async () => {
+      const out = await buildAnnotatedPdfBytes(
+        formPdfBytes,
+        [],
+        new Map<string, string | boolean>([["size", "bogus"]]),
+      );
+      const form = (await PDFDocument.load(out)).getForm();
+      expect(form.getRadioGroup("size").getSelected()).toBeUndefined();
+    });
+
+    it("skips unknown field names without throwing", async () => {
+      const out = await buildAnnotatedPdfBytes(
+        formPdfBytes,
+        [],
+        new Map<string, string | boolean>([
+          ["nonexistent", "x"],
+          ["name", "kept"],
+        ]),
+      );
+      const form = (await PDFDocument.load(out)).getForm();
+      expect(form.getTextField("name").getText()).toBe("kept");
+    });
+  });
 });
 
 // =============================================================================

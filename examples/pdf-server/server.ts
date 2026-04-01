@@ -243,9 +243,9 @@ function waitForPageData(
 /**
  * Wait for the viewer's first poll_pdf_commands call.
  *
- * Called before waitForPageData() so a viewer that never mounted fails in ~8s
- * with a specific message instead of a generic 45s "Timeout waiting for page
- * data" that gives no hint why.
+ * Called before waitForPageData() / waitForSaveData() so a viewer that never
+ * mounted fails in ~8s with a specific message instead of a generic 45s
+ * "Timeout waiting for ..." that gives no hint why.
  *
  * Intentionally does NOT touch pollWaiters: piggybacking on that single-slot
  * Map races with poll_pdf_commands' batch-wait branch (which never cancels the
@@ -267,6 +267,41 @@ async function ensureViewerIsPolling(uuid: string): Promise<void> {
   }
 }
 
+// =============================================================================
+// Pending save_as Requests (request-response bridge via client)
+// =============================================================================
+//
+// Same shape as get_pages: model's interact call blocks while the viewer
+// builds annotated bytes and posts them back. Reuses GET_PAGES_TIMEOUT_MS
+// (45s) — generous because pdf-lib reflow on a large doc can take seconds.
+
+const pendingSaveRequests = new Map<string, (v: string | Error) => void>();
+
+/**
+ * Wait for the viewer to build annotated PDF bytes and submit them as base64.
+ * Rejects on timeout, abort, or when the viewer reports an error.
+ */
+function waitForSaveData(
+  requestId: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const settle = (v: string | Error) => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      pendingSaveRequests.delete(requestId);
+      v instanceof Error ? reject(v) : resolve(v);
+    };
+    const onAbort = () => settle(new Error("interact request cancelled"));
+    const timer = setTimeout(
+      () => settle(new Error("Timeout waiting for PDF bytes from viewer")),
+      GET_PAGES_TIMEOUT_MS,
+    );
+    signal?.addEventListener("abort", onAbort);
+    pendingSaveRequests.set(requestId, settle);
+  });
+}
+
 interface QueueEntry {
   commands: PdfCommand[];
   /** Timestamp of the most recent enqueue or dequeue */
@@ -286,6 +321,15 @@ const pollWaiters = new Map<string, () => void>();
  * a viewer that was never there.
  */
 const viewsPolled = new Set<string>();
+
+/**
+ * Resolved local file path per viewer UUID, for save_as without an explicit
+ * target. Only set for local files (remote PDFs have nothing to overwrite).
+ * Populated during display_pdf, cleared by the heartbeat sweep.
+ *
+ * Exported for tests.
+ */
+export const viewSourcePaths = new Map<string, string>();
 
 /** Valid form field names per viewer UUID (populated during display_pdf) */
 const viewFieldNames = new Map<string, Set<string>>();
@@ -333,6 +377,7 @@ function pruneStaleQueues(): void {
       viewFieldNames.delete(uuid);
       viewFieldInfo.delete(uuid);
       viewsPolled.delete(uuid);
+      viewSourcePaths.delete(uuid);
       stopFileWatch(uuid);
     }
   }
@@ -857,6 +902,10 @@ interface FormFieldInfo {
   y: number;
   width: number;
   height: number;
+  /** Radio button export value (buttonValue) — distinguishes widgets that share a field name. */
+  exportValue?: string;
+  /** Dropdown/listbox option values, as seen in the widget's `options` array. */
+  options?: string[];
 }
 
 /**
@@ -909,6 +958,16 @@ async function extractFormFieldInfo(
         // Convert to model coords (top-left origin): modelY = pageHeight - pdfY - height
         const modelY = pageHeight - y2;
 
+        // Choice widgets (combo/listbox) carry `options` as
+        // [{exportValue, displayValue}]. Expose export values — that's
+        // what fill_form needs.
+        let options: string[] | undefined;
+        if (Array.isArray(ann.options) && ann.options.length > 0) {
+          options = ann.options
+            .map((o: { exportValue?: string }) => o?.exportValue)
+            .filter((v: unknown): v is string => typeof v === "string");
+        }
+
         fields.push({
           name: fieldName,
           type: fieldType,
@@ -918,6 +977,12 @@ async function extractFormFieldInfo(
           width: Math.round(width),
           height: Math.round(height),
           ...(ann.alternativeText ? { label: ann.alternativeText } : undefined),
+          // Radio: buttonValue is the per-widget export value — the only
+          // thing distinguishing three `size [Btn]` lines from each other.
+          ...(ann.radioButton && ann.buttonValue != null
+            ? { exportValue: String(ann.buttonValue) }
+            : undefined),
+          ...(options?.length ? { options } : undefined),
         });
       }
     }
@@ -1189,7 +1254,8 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     "read_pdf_bytes",
     {
       title: "Read PDF Bytes",
-      description: "Read a range of bytes from a PDF (max 512KB per request)",
+      description:
+        "Read a range of bytes from a PDF (max 512KB per request). The model should NOT call this tool directly.",
       inputSchema: {
         url: z.string().describe("PDF URL or local file path"),
         offset: z.number().min(0).default(0).describe("Byte offset"),
@@ -1327,6 +1393,14 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
               y: z.number(),
               width: z.number(),
               height: z.number(),
+              exportValue: z
+                .string()
+                .optional()
+                .describe("Radio button value — pass this to fill_form"),
+              options: z
+                .array(z.string())
+                .optional()
+                .describe("Dropdown/listbox option values"),
             }),
           )
           .optional()
@@ -1364,6 +1438,7 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
           : decodeURIComponent(normalized);
         const resolved = path.resolve(localPath);
         debugResolved = resolved;
+        if (!disableInteract) viewSourcePaths.set(uuid, resolved);
         if (isWritablePath(resolved)) {
           try {
             await fs.promises.access(resolved, fs.constants.W_OK);
@@ -1447,7 +1522,7 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
             ? `Displaying PDF: ${normalized}`
             : `PDF opened. viewUUID: ${uuid}
 
-→ To annotate, sign, stamp, fill forms, navigate, or extract: call \`interact\` with this viewUUID.
+→ To annotate, sign, stamp, fill forms, navigate, extract, or save to a file: call \`interact\` with this viewUUID.
 → DO NOT call display_pdf again — that spawns a separate viewer with a different viewUUID; your interact calls would target the new empty one, not the one the user is looking at.
 
 URL: ${normalized}`,
@@ -1498,8 +1573,14 @@ URL: ${normalized}`,
           for (const f of fields) {
             const label = f.label ? ` "${f.label}"` : "";
             const nameStr = f.name || "(unnamed)";
+            // Radio: =<exportValue> tells the model what value to pass.
+            // Dropdown: options:[...] lists valid choices.
+            const exportSuffix = f.exportValue ? `=${f.exportValue}` : "";
+            const optsSuffix = f.options
+              ? ` options:[${f.options.join(", ")}]`
+              : "";
             lines.push(
-              `    ${nameStr}${label} [${f.type}] at (${f.x},${f.y}) ${f.width}×${f.height}`,
+              `    ${nameStr}${exportSuffix}${label} [${f.type}] at (${f.x},${f.y}) ${f.width}×${f.height}${optsSuffix}`,
             );
           }
         }
@@ -1566,6 +1647,7 @@ URL: ${normalized}`,
           "fill_form",
           "get_text",
           "get_screenshot",
+          "save_as",
         ])
         .describe("Action to perform"),
       page: z
@@ -1620,6 +1702,16 @@ URL: ${normalized}`,
         .describe(
           "Page ranges for get_text. Each has optional start/end. [{start:1,end:5}], [{}] = all pages. Max 20 pages.",
         ),
+      path: z
+        .string()
+        .optional()
+        .describe(
+          "Target file path for save_as. Absolute path or file:// URL. Omit to overwrite the original file (requires overwrite: true).",
+        ),
+      overwrite: z
+        .boolean()
+        .optional()
+        .describe("Overwrite if file exists (for save_as). Default false."),
     });
 
     type InteractCommand = z.infer<typeof InteractCommandSchema>;
@@ -1759,6 +1851,8 @@ URL: ${normalized}`,
         content,
         fields,
         intervals,
+        path: savePath,
+        overwrite,
       } = cmd;
 
       let description: string;
@@ -2050,6 +2144,97 @@ URL: ${normalized}`,
             isError: true,
           };
         }
+        case "save_as": {
+          const saveErr = (text: string) => ({
+            content: [{ type: "text" as const, text }],
+            isError: true as const,
+          });
+
+          let resolved: string;
+          if (savePath) {
+            // Explicit target. Same path normalisation as save_pdf — but NOT
+            // validateUrl(), which fails on non-existent files.
+            const filePath = isFileUrl(savePath)
+              ? fileUrlToPath(savePath)
+              : isLocalPath(savePath)
+                ? decodeURIComponent(savePath)
+                : null;
+            if (!filePath)
+              return saveErr(
+                "save_as: path must be an absolute local path or file:// URL",
+              );
+            resolved = path.resolve(filePath);
+            if (!isWritablePath(resolved))
+              return saveErr(
+                `save_as refused: ${resolved} is not under a mounted ` +
+                  `directory root. Only paths under directory roots ` +
+                  `(or files passed as CLI args) are writable.`,
+              );
+            if (!overwrite && fs.existsSync(resolved))
+              return saveErr(
+                `File already exists: ${resolved}. ` +
+                  `Set overwrite: true to replace it, or choose a different path.`,
+              );
+          } else {
+            // No target → overwrite the original. Same gate as the viewer's
+            // save button: isWritablePath + OS-level W_OK (so we don't try
+            // on read-only mounts). Remote PDFs have no source path stored.
+            const source = viewSourcePaths.get(uuid);
+            if (!source)
+              return saveErr(
+                "save_as: no `path` given and this viewer has no local source " +
+                  "file to overwrite (it's a remote URL, or the viewUUID is " +
+                  "stale/unknown). Provide an explicit `path`.",
+              );
+            if (!overwrite)
+              return saveErr(
+                `save_as: omitting \`path\` overwrites the original ` +
+                  `(${source}). Set overwrite: true to confirm.`,
+              );
+            if (!isWritablePath(source))
+              return saveErr(
+                `save_as refused: ${source} is not writable (the viewer's ` +
+                  `save button is hidden for the same reason).`,
+              );
+            try {
+              await fs.promises.access(source, fs.constants.W_OK);
+            } catch {
+              return saveErr(
+                `save_as refused: ${source} is not writable at the OS level ` +
+                  `(read-only mount or insufficient permissions).`,
+              );
+            }
+            resolved = source;
+          }
+
+          const requestId = randomUUID();
+          enqueueCommand(uuid, { type: "save_as", requestId });
+          let data: string;
+          try {
+            await ensureViewerIsPolling(uuid);
+            data = await waitForSaveData(requestId, signal);
+          } catch (err) {
+            return saveErr(
+              `save_as failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+          try {
+            const bytes = Buffer.from(data, "base64");
+            await fs.promises.writeFile(resolved, bytes);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Saved annotated PDF to ${resolved} (${bytes.length} bytes)`,
+                },
+              ],
+            };
+          } catch (err) {
+            return saveErr(
+              `save_as: failed to write ${resolved}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
         default:
           return {
             content: [{ type: "text", text: `Unknown action: ${action}` }],
@@ -2108,7 +2293,9 @@ Example — add a signature image and a stamp, then screenshot to verify:
 • get_text: extract text from pages. Optional \`page\` for single page, or \`intervals\` for ranges [{start?,end?}]. Max 20 pages.
 • get_screenshot: capture a single page as PNG image. Requires \`page\`.
 
-**FORMS** — fill_form: fill fields with \`fields\` array of {name, value}.`,
+**FORMS** — fill_form: fill fields with \`fields\` array of {name, value}.
+
+**SAVE** — save_as: write the annotated PDF (annotations + form values) to a file. Pass \`path\` (absolute path or file://) for a new location, or omit \`path\` to overwrite the original. Set \`overwrite: true\` to replace an existing file (always required when omitting \`path\`).`,
         inputSchema: {
           viewUUID: z
             .string()
@@ -2130,6 +2317,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
               "fill_form",
               "get_text",
               "get_screenshot",
+              "save_as",
             ])
             .optional()
             .describe(
@@ -2187,6 +2375,16 @@ Example — add a signature image and a stamp, then screenshot to verify:
             .describe(
               "Page ranges for get_text. Each has optional start/end. [{start:1,end:5}], [{}] = all pages. Max 20 pages.",
             ),
+          path: z
+            .string()
+            .optional()
+            .describe(
+              "Target file path for save_as. Absolute path or file:// URL. Omit to overwrite the original file (requires overwrite: true).",
+            ),
+          overwrite: z
+            .boolean()
+            .optional()
+            .describe("Overwrite if file exists (for save_as). Default false."),
           // Batch mode
           commands: z
             .array(InteractCommandSchema)
@@ -2210,6 +2408,8 @@ Example — add a signature image and a stamp, then screenshot to verify:
           content,
           fields,
           intervals,
+          path: savePath,
+          overwrite,
           commands,
         },
         extra,
@@ -2231,6 +2431,8 @@ Example — add a signature image and a stamp, then screenshot to verify:
                   content,
                   fields,
                   intervals,
+                  path: savePath,
+                  overwrite,
                 },
               ]
             : [];
@@ -2290,7 +2492,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
       {
         title: "Submit Page Data",
         description:
-          "Submit rendered page data for a get_pages request (used by viewer)",
+          "Submit rendered page data for a get_pages request (used by viewer). The model should NOT call this tool directly.",
         inputSchema: {
           requestId: z
             .string()
@@ -2326,13 +2528,53 @@ Example — add a signature image and a stamp, then screenshot to verify:
       },
     );
 
+    // Tool: submit_save_data (app-only) - Viewer submits annotated PDF bytes
+    registerAppTool(
+      server,
+      "submit_save_data",
+      {
+        title: "Submit Save Data",
+        description:
+          "Submit annotated PDF bytes for a save_as request (used by viewer). The model should NOT call this tool directly.",
+        inputSchema: {
+          requestId: z
+            .string()
+            .describe("The request ID from the save_as command"),
+          data: z.string().optional().describe("Base64-encoded PDF bytes"),
+          error: z
+            .string()
+            .optional()
+            .describe("Error message if the viewer failed to build bytes"),
+        },
+        _meta: { ui: { visibility: ["app"] } },
+      },
+      async ({ requestId, data, error }): Promise<CallToolResult> => {
+        const settle = pendingSaveRequests.get(requestId);
+        if (!settle) {
+          return {
+            content: [
+              { type: "text", text: `No pending request for ${requestId}` },
+            ],
+            isError: true,
+          };
+        }
+        if (error || !data) {
+          settle(new Error(error || "Viewer returned no data"));
+        } else {
+          settle(data);
+        }
+        return { content: [{ type: "text", text: "Submitted" }] };
+      },
+    );
+
     // Tool: poll_pdf_commands (app-only) - Poll for pending commands
     registerAppTool(
       server,
       "poll_pdf_commands",
       {
         title: "Poll PDF Commands",
-        description: "Poll for pending commands for a PDF viewer",
+        description:
+          "Poll for pending commands for a PDF viewer. The model should NOT call this tool directly.",
         inputSchema: {
           viewUUID: z.string().describe("The viewUUID of the PDF viewer"),
         },
@@ -2378,7 +2620,8 @@ Example — add a signature image and a stamp, then screenshot to verify:
     "save_pdf",
     {
       title: "Save PDF",
-      description: "Save annotated PDF bytes back to a local file",
+      description:
+        "Save annotated PDF bytes back to a local file. The model should NOT call this tool directly — use interact with action: save_as instead.",
       inputSchema: {
         url: z.string().describe("Original PDF URL or local file path"),
         data: z.string().describe("Base64-encoded PDF bytes"),
