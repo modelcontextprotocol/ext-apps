@@ -1444,13 +1444,12 @@ describe("interact tool", () => {
       await server.close();
     }, 15_000);
 
-    it("batch failure squashes everything into content[0].text", async () => {
-      // LocalAgentMode SDK 2.1.87 flattens isError results to content[0].text
-      // and silently drops the rest. The earlier multi-item ordering fix
-      // (prefix unshifted before the error unshifted before successes) still
-      // lost the actual error — the model just saw "Batch failed at step 2/2
-      // (get_screenshot):" with nothing after the colon. Now everything goes
-      // into one block.
+    it("batch step failure: 1:1 content, no isError, ERROR-prefixed slot", async () => {
+      // LocalAgentMode SDK 2.1.87 collapses isError:true results to a bare
+      // string of content[0].text — drops images from earlier successful
+      // steps. So we don't set isError on a step failure: each command gets
+      // one content slot, the failed one starts with "ERROR", and the batch
+      // stops there. content.length tells the model how far it got.
       const { server, client } = await connect();
       const uuid = "batch-error-ordering";
 
@@ -1461,24 +1460,24 @@ describe("interact tool", () => {
           commands: [
             { action: "navigate", page: 3 }, // succeeds → "Queued: ..."
             { action: "get_screenshot", page: 1 }, // never-polled → fast-fail
+            { action: "navigate", page: 5 }, // never reached
           ],
         },
       });
 
-      expect(r.isError).toBe(true);
+      // Not isError — that would trigger the SDK flatten
+      expect(r.isError).toBeFalsy();
       const content = r.content as Array<{ type: string; text?: string }>;
-      // Exactly one text item — survives content[0]-only flattening
-      const textItems = content.filter((c) => c.type === "text");
-      expect(textItems).toHaveLength(1);
-      const text = textItems[0].text!;
-      // Batch summary naming the culprit
-      expect(text).toContain("failed");
-      expect(text).toContain("2/2");
-      expect(text).toContain("get_screenshot");
-      // The actual error from ensureViewerIsPolling
-      expect(text).toContain("never connected");
-      // What succeeded before the failure, so the model knows what stuck
-      expect(text).toContain("Queued");
+      // Stopped at step 2; step 3 never ran
+      expect(content).toHaveLength(2);
+      // Slot 0: step 1's success, untouched
+      expect(content[0].text).toContain("Queued");
+      expect(content[0].text).not.toMatch(/^ERROR/);
+      // Slot 1: step 2's failure, ERROR-prefixed with the actual message
+      expect(content[1].text).toMatch(/^ERROR/);
+      expect(content[1].text).toContain("2/3");
+      expect(content[1].text).toContain("get_screenshot");
+      expect(content[1].text).toContain("never connected");
 
       await client.close();
       await server.close();

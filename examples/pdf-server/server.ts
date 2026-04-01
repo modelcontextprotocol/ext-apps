@@ -2285,7 +2285,7 @@ URL: ${normalized}`,
         description: `Interact with a PDF viewer: annotate, navigate, search, extract text/screenshots, fill forms.
 IMPORTANT: viewUUID must be the exact UUID returned by display_pdf (e.g. "a1b2c3d4-..."). Do NOT use arbitrary strings.
 
-**BATCHING**: Send multiple commands in one call via \`commands\` array. Commands run sequentially. TIP: End with \`get_screenshot\` to verify your changes.
+**BATCHING**: Send multiple commands in one call via \`commands\` array. Commands run sequentially; results are returned in the same order, one content item per command. If a command fails, the batch stops there and that command's slot contains text starting with \`ERROR\` — content.length tells you how far it got. TIP: End with \`get_screenshot\` to verify your changes.
 
 **ANNOTATION** — add_annotations with array of annotation objects. Each needs: id (unique string), type, page (1-indexed).
 
@@ -2480,10 +2480,20 @@ Example — add a signature image and a stamp, then screenshot to verify:
           };
         }
 
-        // Process commands sequentially, collecting all content parts
+        // 1:1 content array — content[i] is the result of commands[i].
+        //
+        // For multi-step batches we do NOT set isError on a step failure:
+        // LocalAgentMode SDK 2.1.87 collapses isError:true results to a
+        // bare string of content[0].text, which would drop any images
+        // from earlier successful steps. Instead, the failed step's slot
+        // is text starting with "ERROR", and the batch stops there — the
+        // model reads content.length to see how far it got.
+        //
+        // Single-command calls have no prior results to lose, so they
+        // keep isError:true. The SDK's flatten-to-content[0].text is
+        // exactly the ERROR text we want it to see.
         const allContent: ContentPart[] = [];
         let failedAt = -1;
-        let errorContent: ContentPart[] = [];
         const t0 = Date.now();
 
         for (let i = 0; i < commandList.length; i++) {
@@ -2493,50 +2503,45 @@ Example — add a signature image and a stamp, then screenshot to verify:
             extra.signal,
           );
           if (result.isError) {
-            errorContent = result.content;
+            const errText = result.content
+              .map((c) => (c.type === "text" ? c.text : null))
+              .filter((t) => t != null)
+              .join(" — ");
+            // Normalize the prefix — processInteractCommand's catch blocks
+            // are inconsistent ("Error: ...", "add_annotations: ...", etc.)
+            const stripped = errText.replace(/^error:\s*/i, "");
+            allContent.push({
+              type: "text",
+              text:
+                commandList.length > 1
+                  ? `ERROR at step ${i + 1}/${commandList.length} (${commandList[i].action}): ${stripped}`
+                  : `ERROR: ${stripped}`,
+            });
             failedAt = i;
+            console.error(
+              `[interact] uuid=${uuid} step ${i + 1}/${commandList.length} ` +
+                `(${commandList[i].action}) failed after ${Date.now() - t0}ms: ${stripped}`,
+            );
             break;
           }
-          allContent.push(...result.content);
+          // Squash multi-part successes (e.g. get_text returning multiple
+          // text blocks) into one slot so 1:1 indexing holds. Preserve a
+          // lone image as-is — that's the screenshot the model wants.
+          if (result.content.length === 1) {
+            allContent.push(result.content[0]);
+          } else {
+            const texts = result.content
+              .map((c) => (c.type === "text" ? c.text : null))
+              .filter((t) => t != null);
+            allContent.push({ type: "text", text: texts.join("\n") });
+          }
         }
 
-        if (failedAt >= 0) {
-          // Hosts that flatten isError results to content[0].text will drop
-          // everything after the first item — observed in LocalAgentMode SDK
-          // 2.1.87 where a 3-item content array became just the prefix string.
-          // Squash all text into one block so the model sees the actual error
-          // *and* what succeeded before it. Images survive after the text.
-          const textOf = (c: ContentPart) =>
-            c.type === "text" ? c.text : null;
-          const errorTexts = errorContent.map(textOf).filter((t) => t != null);
-          const priorTexts = allContent.map(textOf).filter((t) => t != null);
-          const priorImages = allContent.filter((c) => c.type === "image");
-
-          const lines = [
-            commandList.length > 1
-              ? `Batch failed at step ${failedAt + 1}/${commandList.length} (${commandList[failedAt].action}):`
-              : null,
-            ...errorTexts,
-            priorTexts.length > 0
-              ? `(prior steps succeeded: ${priorTexts.join(" | ")})`
-              : null,
-          ].filter((l) => l != null);
-
-          // stderr → mcp-server-*.log via the host. Only log on failure;
-          // chatty per-call traces would flood agent sessions.
-          console.error(
-            `[interact] uuid=${uuid} FAILED at step ${failedAt + 1}/${commandList.length} ` +
-              `(${commandList[failedAt].action}) after ${Date.now() - t0}ms: ` +
-              errorTexts.join(" | "),
-          );
-
-          return {
-            content: [{ type: "text", text: lines.join("\n") }, ...priorImages],
-            isError: true,
-          };
-        }
-
-        return { content: allContent };
+        return {
+          content: allContent,
+          // Only safe to set when there's nothing before content[0] to lose.
+          ...(failedAt === 0 ? { isError: true } : {}),
+        };
       },
     );
 
