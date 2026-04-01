@@ -334,14 +334,6 @@ export const viewSourcePaths = new Map<string, string>();
 /** Valid form field names per viewer UUID (populated during display_pdf) */
 const viewFieldNames = new Map<string, Set<string>>();
 
-/**
- * Annotation ids the model has added per view, used to warn when
- * update_annotations targets an id we never saw add_annotations for.
- * Best-effort: doesn't see manual edits in the iframe, so the warning
- * is "did you mean…" not a hard error.
- */
-const viewAnnotationIds = new Map<string, Set<string>>();
-
 /** Detailed form field info per viewer UUID (populated during display_pdf) */
 const viewFieldInfo = new Map<string, FormFieldInfo[]>();
 
@@ -384,7 +376,6 @@ function pruneStaleQueues(): void {
       commandQueues.delete(uuid);
       viewFieldNames.delete(uuid);
       viewFieldInfo.delete(uuid);
-      viewAnnotationIds.delete(uuid);
       viewsPolled.delete(uuid);
       viewSourcePaths.delete(uuid);
       stopFileWatch(uuid);
@@ -1957,17 +1948,9 @@ URL: ${normalized}`,
               { type: "add_annotations" }
             >["annotations"],
           });
-          if (!viewAnnotationIds.has(uuid)) {
-            viewAnnotationIds.set(uuid, new Set());
-          }
-          for (const a of annotations) {
-            // Schema is Record<string, any> so id is `any` — coerce, but skip
-            // nullish so we don't store "undefined"/"null" as known ids.
-            if (a.id != null) viewAnnotationIds.get(uuid)!.add(String(a.id));
-          }
           description = `add ${annotations.length} annotation(s)`;
           break;
-        case "update_annotations": {
+        case "update_annotations":
           if (!annotations || annotations.length === 0)
             return {
               content: [
@@ -1978,16 +1961,6 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
-          // The viewer silently skips updates for unknown ids (mcp-app.ts:
-          // `if (!existing) continue`). If a prior add_annotations batch
-          // failed mid-way, the model gets a happy "Queued" here while
-          // nothing renders. Surface what we can — but only as a warning,
-          // since the user may have drawn the annotation manually.
-          const known = viewAnnotationIds.get(uuid);
-          const unknown = annotations
-            .filter((a) => a.id != null)
-            .map((a) => String(a.id))
-            .filter((id) => !known?.has(id));
           enqueueCommand(uuid, {
             type: "update_annotations",
             annotations: annotations as Extract<
@@ -1996,11 +1969,7 @@ URL: ${normalized}`,
             >["annotations"],
           });
           description = `update ${annotations.length} annotation(s)`;
-          if (unknown.length > 0) {
-            description += ` — WARNING: id(s) [${unknown.join(", ")}] not seen in any add_annotations call for this view; viewer may silently no-op`;
-          }
           break;
-        }
         case "remove_annotations":
           if (!ids || ids.length === 0)
             return {

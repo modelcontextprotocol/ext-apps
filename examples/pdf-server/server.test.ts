@@ -1482,57 +1482,5 @@ describe("interact tool", () => {
       await client.close();
       await server.close();
     }, 15_000);
-
-    it("update_annotations warns about ids never seen by add_annotations", async () => {
-      // The viewer's processCommands does `if (!existing) continue` for
-      // unknown ids — silent no-op. After a failed add_annotations batch the
-      // model would update_annotations with confidence and get "Queued" back
-      // while nothing rendered. Track ids server-side to surface the gap.
-      const { server, client } = await connect();
-      const uuid = "update-unknown-id";
-
-      // add_annotations / update_annotations don't gate on viewsPolled
-      // (only get_screenshot/get_text do) — they just enqueue and return.
-      const add = await client.callTool({
-        name: "interact",
-        arguments: {
-          viewUUID: uuid,
-          action: "add_annotations",
-          annotations: [
-            {
-              id: "stamp-a",
-              type: "stamp",
-              page: 1,
-              x: 100,
-              y: 100,
-              label: "A",
-            },
-          ],
-        },
-      });
-      expect(add.isError).toBeFalsy();
-
-      const upd = await client.callTool({
-        name: "interact",
-        arguments: {
-          viewUUID: uuid,
-          action: "update_annotations",
-          annotations: [
-            { id: "stamp-a", x: 200 },
-            { id: "stamp-b", x: 200 },
-          ],
-        },
-      });
-      // Not an error — user might have drawn stamp-b manually in the iframe.
-      // But the model needs to know it might be shouting into the void.
-      expect(upd.isError).toBeFalsy();
-      const updText = (upd.content as Array<{ text: string }>)[0].text;
-      expect(updText).toContain("WARNING");
-      expect(updText).toContain("stamp-b");
-      expect(updText).not.toContain("stamp-a");
-
-      await client.close();
-      await server.close();
-    }, 15_000);
   });
 });
