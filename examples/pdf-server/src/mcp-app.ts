@@ -287,8 +287,14 @@ async function computeFitToWidthScale(): Promise<number | null> {
  * Only applies in inline mode - fullscreen mode uses scrolling.
  */
 function requestFitToContent() {
-  if (currentDisplayMode === "fullscreen") {
-    return; // Fullscreen uses scrolling
+  // Read the host's current state, not our cached currentDisplayMode.
+  // currentDisplayMode defaults to "inline" and handleHostContextChanged
+  // only updates it `if (ctx.displayMode)` — if the host omits the field
+  // or the update lands one tick late, the cached value lies. We've seen
+  // this measure a near-empty pageWrapper (~85px = toolbar + padding) and
+  // shrink a fullscreen iframe to a sliver.
+  if (app.getHostContext()?.displayMode === "fullscreen") {
+    return;
   }
 
   const canvasHeight = canvasEl.height;
@@ -323,6 +329,16 @@ function requestFitToContent() {
 
   // In inline mode (this function early-returns for fullscreen) the side panel is hidden
   const totalWidth = pageWrapperEl.offsetWidth + BUFFER;
+
+  // pageWrapper measuring ≈ 0 means the canvas hasn't laid out yet (early
+  // render, hidden ancestor, etc). Sending toolbar-height-only would shrink
+  // the iframe to a sliver. The next renderPage() will measure correctly.
+  if (pageWrapperHeight < toolbarHeight) {
+    log.info(
+      `requestFitToContent: pageWrapper ${pageWrapperHeight}px < toolbar ${toolbarHeight}px — skipping`,
+    );
+    return;
+  }
 
   app.sendSizeChanged({ width: totalWidth, height: totalHeight });
 }
