@@ -771,6 +771,13 @@ export const McpUiMessageRequestSchema = z.object({
     content: z
       .array(ContentBlockSchema)
       .describe("Message content blocks (text, image, etc.)."),
+    /** @description If true, bypass the user input box and trigger AI processing directly. */
+    immediate: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, bypass the user input box and trigger AI processing directly.",
+      ),
   }),
 });
 

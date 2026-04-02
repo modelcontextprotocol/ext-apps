@@ -212,6 +212,13 @@ export interface McpUiMessageRequest {
     role: "user";
     /** @description Message content blocks (text, image, etc.). */
     content: ContentBlock[];
+    /**
+     * @description If true, the host should submit the message directly to the
+     * AI without placing it in the user's input box. The host may require
+     * capability negotiation before honouring this flag and may downgrade to
+     * the default input-box behaviour.
+     */
+    immediate?: boolean;
   };
 }
 

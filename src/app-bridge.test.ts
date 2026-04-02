@@ -587,6 +587,29 @@ describe("App <-> AppBridge integration", () => {
       expect(result.isError).toBe(true);
     });
 
+    it("app.sendMessage passes immediate flag to bridge.onmessage handler", async () => {
+      const receivedParams: unknown[] = [];
+      bridge.onmessage = async (params) => {
+        receivedParams.push(params);
+        return {};
+      };
+
+      await app.connect(appTransport);
+      const result = await app.sendMessage({
+        role: "user",
+        content: [{ type: "text", text: "Fix the syntax error automatically" }],
+        immediate: true,
+      });
+
+      expect(receivedParams).toHaveLength(1);
+      expect(receivedParams[0]).toMatchObject({
+        role: "user",
+        content: [{ type: "text", text: "Fix the syntax error automatically" }],
+        immediate: true,
+      });
+      expect(result).toEqual({});
+    });
+
     it("app.openLink triggers bridge.onopenlink and returns result", async () => {
       const receivedLinks: string[] = [];
       bridge.onopenlink = async (params) => {
