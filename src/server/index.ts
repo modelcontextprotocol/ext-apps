@@ -94,7 +94,7 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  *   description: "Get current weather for a location",
  *   inputSchema: { location: z.string() },
  *   _meta: {
- *     [RESOURCE_URI_META_KEY]: "ui://weather/widget.html",
+ *     ui: { resourceUri: "ui://weather/widget.html" },
  *   },
  * }, async (args) => {
  *   const weather = await fetchWeather(args.location);

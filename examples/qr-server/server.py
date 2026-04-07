@@ -20,7 +20,7 @@ PORT = int(os.environ.get("PORT", "3108"))
 mcp = FastMCP("QR Server", port=PORT, stateless_http=True)
 
 
-@mcp.tool(meta={"ui/resourceUri": WIDGET_URI})
+@mcp.tool(meta={"ui": {"resourceUri": WIDGET_URI}})
 def generate_qr(
     text: str,
     box_size: int = 10,
