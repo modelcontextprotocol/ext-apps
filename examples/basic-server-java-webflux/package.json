@@ -1,0 +1,13 @@
+{
+  "name": "@modelcontextprotocol/server-basic-java-webflux",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "./mvnw -q spring-boot:run",
+    "dev": "./mvnw -q spring-boot:run",
+    "build": "./mvnw -q package -DskipTests"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.0"
+  }
+}
