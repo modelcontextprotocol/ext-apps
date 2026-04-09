@@ -6,10 +6,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/server";
+import { createMcpExpressApp } from "@modelcontextprotocol/express";
+import type { McpServer } from "@modelcontextprotocol/server";
+import { NodeStreamableHTTPServerTransport as StreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import cors from "cors";
 import type { Request, Response } from "express";
 import {

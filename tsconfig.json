@@ -33,9 +33,6 @@
     "node_modules",
     "src/**/*.examples.ts",
     "src/**/*.examples.tsx",
-    "src/app-bridge.test.ts",
-    "src/generated/schema.test.ts",
-    "src/server/index.examples.ts",
-    "src/server/index.test.ts"
+    "src/server/index.examples.ts"
   ]
 }

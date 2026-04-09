@@ -25,11 +25,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.0.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "vue": "^3.5.0",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "@modelcontextprotocol/server": "file:/tmp/modelcontextprotocol-server-2.0.0-alpha.2.tgz",
+    "@modelcontextprotocol/express": "file:/tmp/modelcontextprotocol-express-2.0.0-alpha.2.tgz",
+    "@modelcontextprotocol/node": "file:/tmp/modelcontextprotocol-node-2.0.0-alpha.2.tgz"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

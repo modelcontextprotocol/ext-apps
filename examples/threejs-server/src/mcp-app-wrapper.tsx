@@ -6,7 +6,7 @@
  */
 import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import ThreeJSApp from "./threejs-app.tsx";

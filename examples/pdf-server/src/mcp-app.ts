@@ -12,7 +12,7 @@ import {
   applyDocumentTheme,
   applyHostStyleVariables,
 } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { ContentBlock } from "@modelcontextprotocol/sdk/spec.types.js";
 import * as pdfjsLib from "pdfjs-dist";
 import { AnnotationLayer, AnnotationMode, TextLayer } from "pdfjs-dist";

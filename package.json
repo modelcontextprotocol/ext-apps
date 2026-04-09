@@ -105,7 +105,9 @@
     "typescript": "^5.9.3",
     "zod": "^4.1.13",
     "@modelcontextprotocol/client": "file:/tmp/modelcontextprotocol-client-2.0.0-alpha.2.tgz",
-    "@modelcontextprotocol/server": "file:/tmp/modelcontextprotocol-server-2.0.0-alpha.2.tgz"
+    "@modelcontextprotocol/server": "file:/tmp/modelcontextprotocol-server-2.0.0-alpha.2.tgz",
+    "@modelcontextprotocol/express": "file:/tmp/modelcontextprotocol-express-2.0.0-alpha.2.tgz",
+    "@modelcontextprotocol/node": "file:/tmp/modelcontextprotocol-node-2.0.0-alpha.2.tgz"
   },
   "peerDependencies": {
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0",

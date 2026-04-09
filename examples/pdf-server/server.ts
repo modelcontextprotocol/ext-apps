@@ -13,7 +13,7 @@
 import { randomUUID } from "crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   registerAppResource,
@@ -24,7 +24,7 @@ import {
   RootsListChangedNotificationSchema,
   type CallToolResult,
   type ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 // Stub DOMMatrix/ImageData/Path2D before pdfjs-dist loads — its legacy
 // build instantiates DOMMatrix at module scope and the @napi-rs/canvas
 // polyfill is unreliable under npx. See ./pdfjs-polyfill.ts for details.
@@ -63,7 +63,7 @@ class FetchStandardFontDataFactory {
 import type {
   PrimitiveSchemaDefinition,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 // =============================================================================
