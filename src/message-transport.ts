@@ -1,12 +1,9 @@
 import {
-  JSONRPCMessage,
-  JSONRPCMessageSchema,
-  MessageExtraInfo,
-} from "@modelcontextprotocol/sdk/types.js";
-import {
-  Transport,
-  TransportSendOptions,
-} from "@modelcontextprotocol/sdk/shared/transport.js";
+  type JSONRPCMessage,
+  parseJSONRPCMessage,
+  type Transport,
+  type TransportSendOptions,
+} from "@modelcontextprotocol/client";
 import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types";
 
 /**
@@ -79,28 +76,29 @@ export class PostMessageTransport implements Transport {
         console.debug("Ignoring message from unknown source", event);
         return;
       }
-      const parsed = JSONRPCMessageSchema.safeParse(event.data);
-      if (parsed.success) {
-        console.debug("Parsed message", parsed.data);
-        this.onmessage?.(parsed.data);
-      } else if (event.data?.jsonrpc !== "2.0") {
-        // Not a JSON-RPC message at all (e.g. internal frames injected by
-        // the host environment). Ignore silently so the transport stays alive.
-        console.debug(
-          "Ignoring non-JSON-RPC message",
-          parsed.error.message,
-          event,
-        );
-      } else {
-        // Has jsonrpc: "2.0" but is otherwise malformed — surface as a real
-        // protocol error.
-        console.error("Failed to parse message", parsed.error.message, event);
-        this.onerror?.(
-          new Error(
-            "Invalid JSON-RPC message received: " + parsed.error.message,
-          ),
-        );
+      let parsed: JSONRPCMessage;
+      try {
+        parsed = parseJSONRPCMessage(event.data);
+      } catch (err) {
+        if (event.data?.jsonrpc !== "2.0") {
+          // Not a JSON-RPC message at all (e.g. internal frames injected by
+          // the host environment). Ignore silently so the transport stays alive.
+          console.debug("Ignoring non-JSON-RPC message", err, event);
+        } else {
+          // Has jsonrpc: "2.0" but is otherwise malformed — surface as a real
+          // protocol error.
+          console.error("Failed to parse message", err, event);
+          this.onerror?.(
+            new Error(
+              "Invalid JSON-RPC message received: " +
+                (err instanceof Error ? err.message : String(err)),
+            ),
+          );
+        }
+        return;
       }
+      console.debug("Parsed message", parsed);
+      this.onmessage?.(parsed);
     };
   }
 
@@ -166,9 +164,8 @@ export class PostMessageTransport implements Transport {
    * method must be called before messages will be received.
    *
    * @param message - The validated JSON-RPC message
-   * @param extra - Optional metadata about the message (unused in this transport)
    */
-  onmessage?: (message: JSONRPCMessage, extra?: MessageExtraInfo) => void;
+  onmessage?: (message: JSONRPCMessage) => void;
 
   /**
    * Optional session identifier for this transport connection.
