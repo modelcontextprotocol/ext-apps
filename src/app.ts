@@ -172,7 +172,7 @@ export class App extends EventDispatcher<AppEventMap> {
   /** SEP-2133 extension handle for `ui/*` methods. */
   readonly ui: ExtensionHandle<McpUiAppCapabilities, McpUiHostCapabilities, ClientContext>;
 
-  private _hostContext: McpUiHostContext = {};
+  private _hostContext?: McpUiHostContext;
   private _hostInfo?: Implementation;
   private _resizeObserver?: ResizeObserver;
 

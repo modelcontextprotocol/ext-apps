@@ -196,3 +196,18 @@ export function clientSupportsMcpApps(
 }
 
 export type { McpUiResourceCsp, McpUiResourceMeta, McpUiToolMeta };
+
+/** SEP-2133 extension identifier for MCP Apps. Same value as MCP_APPS_EXTENSION_ID. */
+export const EXTENSION_ID = "io.modelcontextprotocol/ui";
+
+/**
+ * Returns the MCP Apps capability blob from ClientCapabilities.extensions, or
+ * undefined if the client does not declare MCP Apps support.
+ */
+export function getUiCapability(
+  clientCapabilities: ClientCapabilities | undefined | null,
+): McpUiClientCapabilities | undefined {
+  return clientCapabilities?.extensions?.[EXTENSION_ID] as
+    | McpUiClientCapabilities
+    | undefined;
+}

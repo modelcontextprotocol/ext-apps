@@ -7,7 +7,7 @@ import {
   getUiCapability,
   EXTENSION_ID,
 } from "./index";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 
 describe("registerAppTool", () => {
   it("should pass through config to server.registerTool", () => {
@@ -31,7 +31,7 @@ describe("registerAppTool", () => {
     });
 
     registerAppTool(
-      mockServer as unknown as Pick<McpServer, "registerTool">,
+      mockServer as unknown as McpServer,
       "my-tool",
       {
         title: "My Tool",
@@ -72,7 +72,7 @@ describe("registerAppTool", () => {
       };
 
       registerAppTool(
-        mockServer as unknown as Pick<McpServer, "registerTool">,
+        mockServer as unknown as McpServer,
         "my-tool",
         {
           _meta: {
@@ -107,7 +107,7 @@ describe("registerAppTool", () => {
       };
 
       registerAppTool(
-        mockServer as unknown as Pick<McpServer, "registerTool">,
+        mockServer as unknown as McpServer,
         "my-tool",
         {
           _meta: {
@@ -142,7 +142,7 @@ describe("registerAppTool", () => {
       };
 
       registerAppTool(
-        mockServer as unknown as Pick<McpServer, "registerTool">,
+        mockServer as unknown as McpServer,
         "my-tool",
         {
           _meta: {
@@ -176,7 +176,7 @@ describe("registerAppTool", () => {
       };
 
       registerAppTool(
-        mockServer as unknown as Pick<McpServer, "registerTool">,
+        mockServer as unknown as McpServer,
         "my-tool",
         {
           _meta: {
