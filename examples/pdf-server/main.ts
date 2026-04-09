@@ -6,7 +6,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { StdioServerTransport } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { createMcpExpressApp } from "@modelcontextprotocol/express";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport as StreamableHTTPServerTransport } from "@modelcontextprotocol/node";
