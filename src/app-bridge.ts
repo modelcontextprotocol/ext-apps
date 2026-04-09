@@ -250,7 +250,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
     this.ui.setRequestHandler(
       McpUiInitializeRequestSchema.shape.method.value,
       McpUiInitializeRequestSchema.shape.params,
-      (params) => this._oninitialize(params),
+      (params) => this._oninitialize(params as McpUiInitializeRequest["params"]),
     );
 
     this.ui.setRequestHandler(

@@ -10,22 +10,105 @@ import {
   RequestIdSchema,
   ResourceLinkSchema,
   ToolSchema,
-} from "../src/sdk-compat.js";
+} from "../sdk-compat.js";
 
 /**
  * @description Color theme preference for the host environment.
  */
-export const McpUiThemeSchema = z.union([z.literal("light"), z.literal("dark")]).describe("Color theme preference for the host environment.");
+export const McpUiThemeSchema = z
+  .union([z.literal("light"), z.literal("dark")])
+  .describe("Color theme preference for the host environment.");
 
 /**
  * @description Display mode for UI presentation.
  */
-export const McpUiDisplayModeSchema = z.union([z.literal("inline"), z.literal("fullscreen"), z.literal("pip")]).describe("Display mode for UI presentation.");
+export const McpUiDisplayModeSchema = z
+  .union([z.literal("inline"), z.literal("fullscreen"), z.literal("pip")])
+  .describe("Display mode for UI presentation.");
 
 /**
  * @description CSS variable keys available to MCP apps for theming.
  */
-export const McpUiStyleVariableKeySchema = z.union([z.literal("--color-background-primary"), z.literal("--color-background-secondary"), z.literal("--color-background-tertiary"), z.literal("--color-background-inverse"), z.literal("--color-background-ghost"), z.literal("--color-background-info"), z.literal("--color-background-danger"), z.literal("--color-background-success"), z.literal("--color-background-warning"), z.literal("--color-background-disabled"), z.literal("--color-text-primary"), z.literal("--color-text-secondary"), z.literal("--color-text-tertiary"), z.literal("--color-text-inverse"), z.literal("--color-text-ghost"), z.literal("--color-text-info"), z.literal("--color-text-danger"), z.literal("--color-text-success"), z.literal("--color-text-warning"), z.literal("--color-text-disabled"), z.literal("--color-border-primary"), z.literal("--color-border-secondary"), z.literal("--color-border-tertiary"), z.literal("--color-border-inverse"), z.literal("--color-border-ghost"), z.literal("--color-border-info"), z.literal("--color-border-danger"), z.literal("--color-border-success"), z.literal("--color-border-warning"), z.literal("--color-border-disabled"), z.literal("--color-ring-primary"), z.literal("--color-ring-secondary"), z.literal("--color-ring-inverse"), z.literal("--color-ring-info"), z.literal("--color-ring-danger"), z.literal("--color-ring-success"), z.literal("--color-ring-warning"), z.literal("--font-sans"), z.literal("--font-mono"), z.literal("--font-weight-normal"), z.literal("--font-weight-medium"), z.literal("--font-weight-semibold"), z.literal("--font-weight-bold"), z.literal("--font-text-xs-size"), z.literal("--font-text-sm-size"), z.literal("--font-text-md-size"), z.literal("--font-text-lg-size"), z.literal("--font-heading-xs-size"), z.literal("--font-heading-sm-size"), z.literal("--font-heading-md-size"), z.literal("--font-heading-lg-size"), z.literal("--font-heading-xl-size"), z.literal("--font-heading-2xl-size"), z.literal("--font-heading-3xl-size"), z.literal("--font-text-xs-line-height"), z.literal("--font-text-sm-line-height"), z.literal("--font-text-md-line-height"), z.literal("--font-text-lg-line-height"), z.literal("--font-heading-xs-line-height"), z.literal("--font-heading-sm-line-height"), z.literal("--font-heading-md-line-height"), z.literal("--font-heading-lg-line-height"), z.literal("--font-heading-xl-line-height"), z.literal("--font-heading-2xl-line-height"), z.literal("--font-heading-3xl-line-height"), z.literal("--border-radius-xs"), z.literal("--border-radius-sm"), z.literal("--border-radius-md"), z.literal("--border-radius-lg"), z.literal("--border-radius-xl"), z.literal("--border-radius-full"), z.literal("--border-width-regular"), z.literal("--shadow-hairline"), z.literal("--shadow-sm"), z.literal("--shadow-md"), z.literal("--shadow-lg")]).describe("CSS variable keys available to MCP apps for theming.");
+export const McpUiStyleVariableKeySchema = z
+  .union([
+    z.literal("--color-background-primary"),
+    z.literal("--color-background-secondary"),
+    z.literal("--color-background-tertiary"),
+    z.literal("--color-background-inverse"),
+    z.literal("--color-background-ghost"),
+    z.literal("--color-background-info"),
+    z.literal("--color-background-danger"),
+    z.literal("--color-background-success"),
+    z.literal("--color-background-warning"),
+    z.literal("--color-background-disabled"),
+    z.literal("--color-text-primary"),
+    z.literal("--color-text-secondary"),
+    z.literal("--color-text-tertiary"),
+    z.literal("--color-text-inverse"),
+    z.literal("--color-text-ghost"),
+    z.literal("--color-text-info"),
+    z.literal("--color-text-danger"),
+    z.literal("--color-text-success"),
+    z.literal("--color-text-warning"),
+    z.literal("--color-text-disabled"),
+    z.literal("--color-border-primary"),
+    z.literal("--color-border-secondary"),
+    z.literal("--color-border-tertiary"),
+    z.literal("--color-border-inverse"),
+    z.literal("--color-border-ghost"),
+    z.literal("--color-border-info"),
+    z.literal("--color-border-danger"),
+    z.literal("--color-border-success"),
+    z.literal("--color-border-warning"),
+    z.literal("--color-border-disabled"),
+    z.literal("--color-ring-primary"),
+    z.literal("--color-ring-secondary"),
+    z.literal("--color-ring-inverse"),
+    z.literal("--color-ring-info"),
+    z.literal("--color-ring-danger"),
+    z.literal("--color-ring-success"),
+    z.literal("--color-ring-warning"),
+    z.literal("--font-sans"),
+    z.literal("--font-mono"),
+    z.literal("--font-weight-normal"),
+    z.literal("--font-weight-medium"),
+    z.literal("--font-weight-semibold"),
+    z.literal("--font-weight-bold"),
+    z.literal("--font-text-xs-size"),
+    z.literal("--font-text-sm-size"),
+    z.literal("--font-text-md-size"),
+    z.literal("--font-text-lg-size"),
+    z.literal("--font-heading-xs-size"),
+    z.literal("--font-heading-sm-size"),
+    z.literal("--font-heading-md-size"),
+    z.literal("--font-heading-lg-size"),
+    z.literal("--font-heading-xl-size"),
+    z.literal("--font-heading-2xl-size"),
+    z.literal("--font-heading-3xl-size"),
+    z.literal("--font-text-xs-line-height"),
+    z.literal("--font-text-sm-line-height"),
+    z.literal("--font-text-md-line-height"),
+    z.literal("--font-text-lg-line-height"),
+    z.literal("--font-heading-xs-line-height"),
+    z.literal("--font-heading-sm-line-height"),
+    z.literal("--font-heading-md-line-height"),
+    z.literal("--font-heading-lg-line-height"),
+    z.literal("--font-heading-xl-line-height"),
+    z.literal("--font-heading-2xl-line-height"),
+    z.literal("--font-heading-3xl-line-height"),
+    z.literal("--border-radius-xs"),
+    z.literal("--border-radius-sm"),
+    z.literal("--border-radius-md"),
+    z.literal("--border-radius-lg"),
+    z.literal("--border-radius-xl"),
+    z.literal("--border-radius-full"),
+    z.literal("--border-width-regular"),
+    z.literal("--shadow-hairline"),
+    z.literal("--shadow-sm"),
+    z.literal("--shadow-md"),
+    z.literal("--shadow-lg"),
+  ])
+  .describe("CSS variable keys available to MCP apps for theming.");
 
 /**
  * @description Style variables for theming MCP apps.
@@ -36,46 +119,78 @@ export const McpUiStyleVariableKeySchema = z.union([z.literal("--color-backgroun
  * Note: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`
  * for compatibility with Zod schema generation. Both are functionally equivalent for validation.
  */
-export const McpUiStylesSchema = z.record(McpUiStyleVariableKeySchema.describe("Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation."), z.union([z.string(), z.undefined()]).describe("Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.")).describe("Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.");
+export const McpUiStylesSchema = z
+  .record(
+    McpUiStyleVariableKeySchema.describe(
+      "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
+    ),
+    z
+      .union([z.string(), z.undefined()])
+      .describe(
+        "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
+      ),
+  )
+  .describe(
+    "Style variables for theming MCP apps.\n\nIndividual style keys are optional - hosts may provide any subset of these values.\nValues are strings containing CSS values (colors, sizes, font stacks, etc.).\n\nNote: This type uses `Record<K, string | undefined>` rather than `Partial<Record<K, string>>`\nfor compatibility with Zod schema generation. Both are functionally equivalent for validation.",
+  );
 
 /**
  * @description Request to open an external URL in the host's default browser.
  * @see {@link app!App.openLink `App.openLink`} for the method that sends this request
  */
 export const McpUiOpenLinkRequestSchema = z.object({
-    method: z.literal("ui/open-link"),
-    params: z.object({
-        /** @description URL to open in the host's browser */
-        url: z.string().describe("URL to open in the host's browser")
-    })
+  method: z.literal("ui/open-link"),
+  params: z.object({
+    /** @description URL to open in the host's browser */
+    url: z.string().describe("URL to open in the host's browser"),
+  }),
 });
 
 /**
  * @description Result from opening a URL.
  * @see {@link McpUiOpenLinkRequest `McpUiOpenLinkRequest`}
  */
-export const McpUiOpenLinkResultSchema = z.object({
+export const McpUiOpenLinkResultSchema = z
+  .object({
     /** @description True if the host failed to open the URL (e.g., due to security policy). */
-    isError: z.boolean().optional().describe("True if the host failed to open the URL (e.g., due to security policy).")
-}).passthrough();
+    isError: z
+      .boolean()
+      .optional()
+      .describe(
+        "True if the host failed to open the URL (e.g., due to security policy).",
+      ),
+  })
+  .passthrough();
 
 /**
  * @description Result from a file download request.
  * @see {@link McpUiDownloadFileRequest `McpUiDownloadFileRequest`}
  */
-export const McpUiDownloadFileResultSchema = z.object({
+export const McpUiDownloadFileResultSchema = z
+  .object({
     /** @description True if the download failed (e.g., user cancelled or host denied). */
-    isError: z.boolean().optional().describe("True if the download failed (e.g., user cancelled or host denied).")
-}).passthrough();
+    isError: z
+      .boolean()
+      .optional()
+      .describe(
+        "True if the download failed (e.g., user cancelled or host denied).",
+      ),
+  })
+  .passthrough();
 
 /**
  * @description Result from sending a message.
  * @see {@link McpUiMessageRequest `McpUiMessageRequest`}
  */
-export const McpUiMessageResultSchema = z.object({
+export const McpUiMessageResultSchema = z
+  .object({
     /** @description True if the host rejected or failed to deliver the message. */
-    isError: z.boolean().optional().describe("True if the host rejected or failed to deliver the message.")
-}).passthrough();
+    isError: z
+      .boolean()
+      .optional()
+      .describe("True if the host rejected or failed to deliver the message."),
+  })
+  .passthrough();
 
 /**
  * @description Notification that the sandbox proxy iframe is ready to receive content.
@@ -83,8 +198,8 @@ export const McpUiMessageResultSchema = z.object({
  * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#sandbox-proxy
  */
 export const McpUiSandboxProxyReadyNotificationSchema = z.object({
-    method: z.literal("ui/notifications/sandbox-proxy-ready"),
-    params: z.object({})
+  method: z.literal("ui/notifications/sandbox-proxy-ready"),
+  params: z.object({}),
 });
 
 /**
@@ -97,7 +212,8 @@ export const McpUiSandboxProxyReadyNotificationSchema = z.object({
  * > **All** origins must be declared—including where your bundled JS/CSS is
  * > served from (`localhost` in dev, your CDN in production).
  */
-export const McpUiResourceCspSchema = z.object({
+export const McpUiResourceCspSchema = z
+  .object({
     /**
      * @description Origins for network requests (fetch/XHR/WebSocket).
      *
@@ -109,7 +225,12 @@ export const McpUiResourceCspSchema = z.object({
      * ["https://api.weather.com", "wss://realtime.service.com"]
      * ```
      */
-    connectDomains: z.array(z.string()).optional().describe("Origins for network requests (fetch/XHR/WebSocket).\n\n- Maps to CSP `connect-src` directive\n- Empty or omitted \u2192 no network connections (secure default)"),
+    connectDomains: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Origins for network requests (fetch/XHR/WebSocket).\n\n- Maps to CSP `connect-src` directive\n- Empty or omitted \u2192 no network connections (secure default)",
+      ),
     /**
      * @description Origins for static resources (images, scripts, stylesheets, fonts, media).
      *
@@ -122,7 +243,12 @@ export const McpUiResourceCspSchema = z.object({
      * ["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]
      * ```
      */
-    resourceDomains: z.array(z.string()).optional().describe("Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted \u2192 no network resources (secure default)"),
+    resourceDomains: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted \u2192 no network resources (secure default)",
+      ),
     /**
      * @description Origins for nested iframes.
      *
@@ -134,7 +260,12 @@ export const McpUiResourceCspSchema = z.object({
      * ["https://www.youtube.com", "https://player.vimeo.com"]
      * ```
      */
-    frameDomains: z.array(z.string()).optional().describe("Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted \u2192 no nested iframes allowed (`frame-src 'none'`)"),
+    frameDomains: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted \u2192 no nested iframes allowed (`frame-src 'none'`)",
+      ),
     /**
      * @description Allowed base URIs for the document.
      *
@@ -146,8 +277,16 @@ export const McpUiResourceCspSchema = z.object({
      * ["https://cdn.example.com"]
      * ```
      */
-    baseUriDomains: z.array(z.string()).optional().describe("Allowed base URIs for the document.\n\n- Maps to CSP `base-uri` directive\n- Empty or omitted \u2192 only same origin allowed (`base-uri 'self'`)")
-});
+    baseUriDomains: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Allowed base URIs for the document.\n\n- Maps to CSP `base-uri` directive\n- Empty or omitted \u2192 only same origin allowed (`base-uri 'self'`)",
+      ),
+  })
+  .describe(
+    "Content Security Policy configuration for UI resources.\n\nServers declare which origins their UI requires. Hosts use this to enforce appropriate CSP headers.\n\n> [!IMPORTANT]\n> MCP App HTML runs in a sandboxed iframe with no same-origin server.\n> **All** origins must be declared\u2014including where your bundled JS/CSS is\n> served from (`localhost` in dev, your CDN in production).",
+  );
 
 /**
  * @description Sandbox permissions requested by the UI resource.
@@ -156,67 +295,107 @@ export const McpUiResourceCspSchema = z.object({
  * Hosts MAY honor these by setting appropriate iframe `allow` attributes.
  * Apps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.
  */
-export const McpUiResourcePermissionsSchema = z.object({
+export const McpUiResourcePermissionsSchema = z
+  .object({
     /**
      * @description Request camera access.
      *
      * Maps to Permission Policy `camera` feature.
      */
-    camera: z.object({}).optional().describe("Request camera access.\n\nMaps to Permission Policy `camera` feature."),
+    camera: z
+      .object({})
+      .optional()
+      .describe(
+        "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
+      ),
     /**
      * @description Request microphone access.
      *
      * Maps to Permission Policy `microphone` feature.
      */
-    microphone: z.object({}).optional().describe("Request microphone access.\n\nMaps to Permission Policy `microphone` feature."),
+    microphone: z
+      .object({})
+      .optional()
+      .describe(
+        "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
+      ),
     /**
      * @description Request geolocation access.
      *
      * Maps to Permission Policy `geolocation` feature.
      */
-    geolocation: z.object({}).optional().describe("Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature."),
+    geolocation: z
+      .object({})
+      .optional()
+      .describe(
+        "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
+      ),
     /**
      * @description Request clipboard write access.
      *
      * Maps to Permission Policy `clipboard-write` feature.
      */
-    clipboardWrite: z.object({}).optional().describe("Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.")
-});
+    clipboardWrite: z
+      .object({})
+      .optional()
+      .describe(
+        "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+      ),
+  })
+  .describe(
+    "Sandbox permissions requested by the UI resource.\n\nServers declare which browser capabilities their UI needs.\nHosts MAY honor these by setting appropriate iframe `allow` attributes.\nApps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.",
+  );
 
 /**
  * @description Notification of UI size changes (View -> Host).
  * @see {@link app!App.sendSizeChanged `App.sendSizeChanged`} for the method to send this from View
  */
 export const McpUiSizeChangedNotificationSchema = z.object({
-    method: z.literal("ui/notifications/size-changed"),
-    params: z.object({
-        /** @description New width in pixels. */
-        width: z.number().optional().describe("New width in pixels."),
-        /** @description New height in pixels. */
-        height: z.number().optional().describe("New height in pixels.")
-    })
+  method: z.literal("ui/notifications/size-changed"),
+  params: z.object({
+    /** @description New width in pixels. */
+    width: z.number().optional().describe("New width in pixels."),
+    /** @description New height in pixels. */
+    height: z.number().optional().describe("New height in pixels."),
+  }),
 });
 
 /**
  * @description Notification containing complete tool arguments (Host -> View).
  */
 export const McpUiToolInputNotificationSchema = z.object({
-    method: z.literal("ui/notifications/tool-input"),
-    params: z.object({
-        /** @description Complete tool call arguments as key-value pairs. */
-        arguments: z.record(z.string(), z.unknown().describe("Complete tool call arguments as key-value pairs.")).optional().describe("Complete tool call arguments as key-value pairs.")
-    })
+  method: z.literal("ui/notifications/tool-input"),
+  params: z.object({
+    /** @description Complete tool call arguments as key-value pairs. */
+    arguments: z
+      .record(
+        z.string(),
+        z
+          .unknown()
+          .describe("Complete tool call arguments as key-value pairs."),
+      )
+      .optional()
+      .describe("Complete tool call arguments as key-value pairs."),
+  }),
 });
 
 /**
  * @description Notification containing partial/streaming tool arguments (Host -> View).
  */
 export const McpUiToolInputPartialNotificationSchema = z.object({
-    method: z.literal("ui/notifications/tool-input-partial"),
-    params: z.object({
-        /** @description Partial tool call arguments (incomplete, may change). */
-        arguments: z.record(z.string(), z.unknown().describe("Partial tool call arguments (incomplete, may change).")).optional().describe("Partial tool call arguments (incomplete, may change).")
-    })
+  method: z.literal("ui/notifications/tool-input-partial"),
+  params: z.object({
+    /** @description Partial tool call arguments (incomplete, may change). */
+    arguments: z
+      .record(
+        z.string(),
+        z
+          .unknown()
+          .describe("Partial tool call arguments (incomplete, may change)."),
+      )
+      .optional()
+      .describe("Partial tool call arguments (incomplete, may change)."),
+  }),
 });
 
 /**
@@ -225,29 +404,38 @@ export const McpUiToolInputPartialNotificationSchema = z.object({
  * sampling error, classifier intervention, etc.).
  */
 export const McpUiToolCancelledNotificationSchema = z.object({
-    method: z.literal("ui/notifications/tool-cancelled"),
-    params: z.object({
-        /** @description Optional reason for the cancellation (e.g., "user action", "timeout"). */
-        reason: z.string().optional().describe("Optional reason for the cancellation (e.g., \"user action\", \"timeout\").")
-    })
+  method: z.literal("ui/notifications/tool-cancelled"),
+  params: z.object({
+    /** @description Optional reason for the cancellation (e.g., "user action", "timeout"). */
+    reason: z
+      .string()
+      .optional()
+      .describe(
+        'Optional reason for the cancellation (e.g., "user action", "timeout").',
+      ),
+  }),
 });
 
 /**
  * @description CSS blocks that can be injected by apps.
  */
 export const McpUiHostCssSchema = z.object({
-    /** @description CSS for font loading (`@font-face` rules or `@import` statements). Apps must apply using {@link applyHostFonts `applyHostFonts`}. */
-    fonts: z.string().optional()
+  /** @description CSS for font loading (`@font-face` rules or `@import` statements). Apps must apply using {@link applyHostFonts `applyHostFonts`}. */
+  fonts: z.string().optional(),
 });
 
 /**
  * @description Style configuration for theming MCP apps.
  */
 export const McpUiHostStylesSchema = z.object({
-    /** @description CSS variables for theming the app. */
-    variables: McpUiStylesSchema.optional().describe("CSS variables for theming the app."),
-    /** @description CSS blocks that apps can inject. */
-    css: McpUiHostCssSchema.optional().describe("CSS blocks that apps can inject.")
+  /** @description CSS variables for theming the app. */
+  variables: McpUiStylesSchema.optional().describe(
+    "CSS variables for theming the app.",
+  ),
+  /** @description CSS blocks that apps can inject. */
+  css: McpUiHostCssSchema.optional().describe(
+    "CSS blocks that apps can inject.",
+  ),
 });
 
 /**
@@ -255,29 +443,47 @@ export const McpUiHostStylesSchema = z.object({
  * @see {@link app-bridge!AppBridge.teardownResource `AppBridge.teardownResource`} for the host method that sends this
  */
 export const McpUiResourceTeardownRequestSchema = z.object({
-    method: z.literal("ui/resource-teardown"),
-    params: z.object({})
+  method: z.literal("ui/resource-teardown"),
+  params: z.object({}),
 });
 
 /**
  * @description Result from graceful shutdown request.
  * @see {@link McpUiResourceTeardownRequest `McpUiResourceTeardownRequest`}
  */
-export const McpUiResourceTeardownResultSchema = z.record(z.string(), z.unknown());
+export const McpUiResourceTeardownResultSchema = z.record(
+  z.string(),
+  z.unknown(),
+);
 
 export const McpUiSupportedContentBlockModalitiesSchema = z.object({
-    /** @description Host supports text content blocks. */
-    text: z.object({}).optional().describe("Host supports text content blocks."),
-    /** @description Host supports image content blocks. */
-    image: z.object({}).optional().describe("Host supports image content blocks."),
-    /** @description Host supports audio content blocks. */
-    audio: z.object({}).optional().describe("Host supports audio content blocks."),
-    /** @description Host supports resource content blocks. */
-    resource: z.object({}).optional().describe("Host supports resource content blocks."),
-    /** @description Host supports resource link content blocks. */
-    resourceLink: z.object({}).optional().describe("Host supports resource link content blocks."),
-    /** @description Host supports structured content. */
-    structuredContent: z.object({}).optional().describe("Host supports structured content.")
+  /** @description Host supports text content blocks. */
+  text: z.object({}).optional().describe("Host supports text content blocks."),
+  /** @description Host supports image content blocks. */
+  image: z
+    .object({})
+    .optional()
+    .describe("Host supports image content blocks."),
+  /** @description Host supports audio content blocks. */
+  audio: z
+    .object({})
+    .optional()
+    .describe("Host supports audio content blocks."),
+  /** @description Host supports resource content blocks. */
+  resource: z
+    .object({})
+    .optional()
+    .describe("Host supports resource content blocks."),
+  /** @description Host supports resource link content blocks. */
+  resourceLink: z
+    .object({})
+    .optional()
+    .describe("Host supports resource link content blocks."),
+  /** @description Host supports structured content. */
+  structuredContent: z
+    .object({})
+    .optional()
+    .describe("Host supports structured content."),
 });
 
 /**
@@ -289,60 +495,107 @@ export const McpUiSupportedContentBlockModalitiesSchema = z.object({
  * @see {@link app.App.requestTeardown} for the app method that sends this
  */
 export const McpUiRequestTeardownNotificationSchema = z.object({
-    method: z.literal("ui/notifications/request-teardown"),
-    params: z.object({}).optional()
+  method: z.literal("ui/notifications/request-teardown"),
+  params: z.object({}).optional(),
 });
 
 /**
  * @description Capabilities supported by the host application.
  * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
-export const McpUiHostCapabilitiesSchema = z.object({
+export const McpUiHostCapabilitiesSchema = z
+  .object({
     /** @description Experimental features (structure TBD). */
-    experimental: z.object({}).optional().describe("Experimental features (structure TBD)."),
+    experimental: z
+      .object({})
+      .optional()
+      .describe("Experimental features (structure TBD)."),
     /** @description Host supports opening external URLs. */
-    openLinks: z.object({}).optional().describe("Host supports opening external URLs."),
+    openLinks: z
+      .object({})
+      .optional()
+      .describe("Host supports opening external URLs."),
     /** @description Host supports file downloads via ui/download-file. */
-    downloadFile: z.object({}).optional().describe("Host supports file downloads via ui/download-file."),
+    downloadFile: z
+      .object({})
+      .optional()
+      .describe("Host supports file downloads via ui/download-file."),
     /** @description Host can proxy tool calls to the MCP server. */
-    serverTools: z.object({
+    serverTools: z
+      .object({
         /** @description Host supports tools/list_changed notifications. */
-        listChanged: z.boolean().optional().describe("Host supports tools/list_changed notifications.")
-    }).optional().describe("Host can proxy tool calls to the MCP server."),
+        listChanged: z
+          .boolean()
+          .optional()
+          .describe("Host supports tools/list_changed notifications."),
+      })
+      .optional()
+      .describe("Host can proxy tool calls to the MCP server."),
     /** @description Host can proxy resource reads to the MCP server. */
-    serverResources: z.object({
+    serverResources: z
+      .object({
         /** @description Host supports resources/list_changed notifications. */
-        listChanged: z.boolean().optional().describe("Host supports resources/list_changed notifications.")
-    }).optional().describe("Host can proxy resource reads to the MCP server."),
+        listChanged: z
+          .boolean()
+          .optional()
+          .describe("Host supports resources/list_changed notifications."),
+      })
+      .optional()
+      .describe("Host can proxy resource reads to the MCP server."),
     /** @description Host accepts log messages. */
     logging: z.object({}).optional().describe("Host accepts log messages."),
     /** @description Sandbox configuration applied by the host. */
-    sandbox: z.object({
+    sandbox: z
+      .object({
         /** @description Permissions granted by the host (camera, microphone, geolocation). */
-        permissions: McpUiResourcePermissionsSchema.optional().describe("Permissions granted by the host (camera, microphone, geolocation)."),
+        permissions: McpUiResourcePermissionsSchema.optional().describe(
+          "Permissions granted by the host (camera, microphone, geolocation).",
+        ),
         /** @description CSP domains approved by the host. */
-        csp: McpUiResourceCspSchema.optional().describe("CSP domains approved by the host.")
-    }).optional().describe("Sandbox configuration applied by the host."),
+        csp: McpUiResourceCspSchema.optional().describe(
+          "CSP domains approved by the host.",
+        ),
+      })
+      .optional()
+      .describe("Sandbox configuration applied by the host."),
     /** @description Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns. */
-    updateModelContext: McpUiSupportedContentBlockModalitiesSchema.optional().describe("Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns."),
+    updateModelContext:
+      McpUiSupportedContentBlockModalitiesSchema.optional().describe(
+        "Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns.",
+      ),
     /** @description Host supports receiving content messages (ui/message) from the view. */
-    message: McpUiSupportedContentBlockModalitiesSchema.optional().describe("Host supports receiving content messages (ui/message) from the view.")
-}).describe("Capabilities supported by the host application.");
+    message: McpUiSupportedContentBlockModalitiesSchema.optional().describe(
+      "Host supports receiving content messages (ui/message) from the view.",
+    ),
+  })
+  .describe("Capabilities supported by the host application.");
 
 /**
  * @description Capabilities provided by the View ({@link app!App `App`}).
  * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`} for the initialization request that includes these capabilities
  */
 export const McpUiAppCapabilitiesSchema = z.object({
-    /** @description Experimental features (structure TBD). */
-    experimental: z.object({}).optional().describe("Experimental features (structure TBD)."),
-    /** @description App exposes MCP-style tools that the host can call. */
-    tools: z.object({
-        /** @description App supports tools/list_changed notifications. */
-        listChanged: z.boolean().optional().describe("App supports tools/list_changed notifications.")
-    }).optional().describe("App exposes MCP-style tools that the host can call."),
-    /** @description Display modes the app supports. */
-    availableDisplayModes: z.array(McpUiDisplayModeSchema).optional().describe("Display modes the app supports.")
+  /** @description Experimental features (structure TBD). */
+  experimental: z
+    .object({})
+    .optional()
+    .describe("Experimental features (structure TBD)."),
+  /** @description App exposes MCP-style tools that the host can call. */
+  tools: z
+    .object({
+      /** @description App supports tools/list_changed notifications. */
+      listChanged: z
+        .boolean()
+        .optional()
+        .describe("App supports tools/list_changed notifications."),
+    })
+    .optional()
+    .describe("App exposes MCP-style tools that the host can call."),
+  /** @description Display modes the app supports. */
+  availableDisplayModes: z
+    .array(McpUiDisplayModeSchema)
+    .optional()
+    .describe("Display modes the app supports."),
 });
 
 /**
@@ -350,50 +603,64 @@ export const McpUiAppCapabilitiesSchema = z.object({
  * @see {@link app!App.connect `App.connect`} for the method that sends this notification
  */
 export const McpUiInitializedNotificationSchema = z.object({
-    method: z.literal("ui/notifications/initialized"),
-    params: z.object({}).optional()
+  method: z.literal("ui/notifications/initialized"),
+  params: z.object({}).optional(),
 });
 
 /**
  * @description UI Resource metadata for security and rendering configuration.
  */
 export const McpUiResourceMetaSchema = z.object({
-    /** @description Content Security Policy configuration for UI resources. */
-    csp: McpUiResourceCspSchema.optional().describe("Content Security Policy configuration for UI resources."),
-    /** @description Sandbox permissions requested by the UI resource. */
-    permissions: McpUiResourcePermissionsSchema.optional().describe("Sandbox permissions requested by the UI resource."),
-    /**
-     * @description Dedicated origin for view sandbox.
-     *
-     * Useful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.
-     *
-     * **Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:
-     * - Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)
-     * - URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)
-     *
-     * If omitted, host uses default sandbox origin (typically per-conversation).
-     *
-     * @example
-     * ```ts
-     * "a904794854a047f6.claudemcpcontent.com"
-     * ```
-     *
-     * @example
-     * ```ts
-     * "www-example-com.oaiusercontent.com"
-     * ```
-     */
-    domain: z.string().optional().describe("Dedicated origin for view sandbox.\n\nUseful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.\n\n**Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:\n- Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)\n- URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)\n\nIf omitted, host uses default sandbox origin (typically per-conversation)."),
-    /**
-     * @description Visual boundary preference - true if view prefers a visible border.
-     *
-     * Boolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.
-     *
-     * - `true`: request visible border + background
-     * - `false`: request no visible border + background
-     * - omitted: host decides border
-     */
-    prefersBorder: z.boolean().optional().describe("Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border")
+  /** @description Content Security Policy configuration for UI resources. */
+  csp: McpUiResourceCspSchema.optional().describe(
+    "Content Security Policy configuration for UI resources.",
+  ),
+  /** @description Sandbox permissions requested by the UI resource. */
+  permissions: McpUiResourcePermissionsSchema.optional().describe(
+    "Sandbox permissions requested by the UI resource.",
+  ),
+  /**
+   * @description Dedicated origin for view sandbox.
+   *
+   * Useful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.
+   *
+   * **Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:
+   * - Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)
+   * - URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)
+   *
+   * If omitted, host uses default sandbox origin (typically per-conversation).
+   *
+   * @example
+   * ```ts
+   * "a904794854a047f6.claudemcpcontent.com"
+   * ```
+   *
+   * @example
+   * ```ts
+   * "www-example-com.oaiusercontent.com"
+   * ```
+   */
+  domain: z
+    .string()
+    .optional()
+    .describe(
+      "Dedicated origin for view sandbox.\n\nUseful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.\n\n**Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:\n- Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)\n- URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)\n\nIf omitted, host uses default sandbox origin (typically per-conversation).",
+    ),
+  /**
+   * @description Visual boundary preference - true if view prefers a visible border.
+   *
+   * Boolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.
+   *
+   * - `true`: request visible border + background
+   * - `false`: request no visible border + background
+   * - omitted: host decides border
+   */
+  prefersBorder: z
+    .boolean()
+    .optional()
+    .describe(
+      "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
+    ),
 });
 
 /**
@@ -403,47 +670,58 @@ export const McpUiResourceMetaSchema = z.object({
  * @see {@link app!App.requestDisplayMode `App.requestDisplayMode`} for the method that sends this request
  */
 export const McpUiRequestDisplayModeRequestSchema = z.object({
-    method: z.literal("ui/request-display-mode"),
-    params: z.object({
-        /** @description The display mode being requested. */
-        mode: McpUiDisplayModeSchema.describe("The display mode being requested.")
-    })
+  method: z.literal("ui/request-display-mode"),
+  params: z.object({
+    /** @description The display mode being requested. */
+    mode: McpUiDisplayModeSchema.describe("The display mode being requested."),
+  }),
 });
 
 /**
  * @description Result from requesting a display mode change.
  * @see {@link McpUiRequestDisplayModeRequest `McpUiRequestDisplayModeRequest`}
  */
-export const McpUiRequestDisplayModeResultSchema = z.object({
+export const McpUiRequestDisplayModeResultSchema = z
+  .object({
     /** @description The display mode that was actually set. May differ from requested if not supported. */
-    mode: McpUiDisplayModeSchema.describe("The display mode that was actually set. May differ from requested if not supported.")
-}).passthrough();
+    mode: McpUiDisplayModeSchema.describe(
+      "The display mode that was actually set. May differ from requested if not supported.",
+    ),
+  })
+  .passthrough();
 
 /**
  * @description Tool visibility scope - who can access the tool.
  */
-export const McpUiToolVisibilitySchema = z.union([z.literal("model"), z.literal("app")]).describe("Tool visibility scope - who can access the tool.");
+export const McpUiToolVisibilitySchema = z
+  .union([z.literal("model"), z.literal("app")])
+  .describe("Tool visibility scope - who can access the tool.");
 
 /**
  * @description UI-related metadata for tools.
  */
 export const McpUiToolMetaSchema = z.object({
-    /**
-     * URI of the UI resource to display for this tool, if any.
-     * This is converted to `_meta["ui/resourceUri"]`.
-     *
-     * @example
-     * ```ts
-     * "ui://weather/view.html"
-     * ```
-     */
-    resourceUri: z.string().optional(),
-    /**
-     * @description Who can access this tool. Default: ["model", "app"]
-     * - "model": Tool visible to and callable by the agent
-     * - "app": Tool callable by the app from this server only
-     */
-    visibility: z.array(McpUiToolVisibilitySchema).optional().describe("Who can access this tool. Default: [\"model\", \"app\"]\n- \"model\": Tool visible to and callable by the agent\n- \"app\": Tool callable by the app from this server only")
+  /**
+   * URI of the UI resource to display for this tool, if any.
+   * This is converted to `_meta["ui/resourceUri"]`.
+   *
+   * @example
+   * ```ts
+   * "ui://weather/view.html"
+   * ```
+   */
+  resourceUri: z.string().optional(),
+  /**
+   * @description Who can access this tool. Default: ["model", "app"]
+   * - "model": Tool visible to and callable by the agent
+   * - "app": Tool callable by the app from this server only
+   */
+  visibility: z
+    .array(McpUiToolVisibilitySchema)
+    .optional()
+    .describe(
+      'Who can access this tool. Default: ["model", "app"]\n- "model": Tool visible to and callable by the agent\n- "app": Tool callable by the app from this server only',
+    ),
 });
 
 /**
@@ -454,19 +732,17 @@ export const McpUiToolMetaSchema = z.object({
  * support using {@link server-helpers!getUiCapability}.
  */
 export const McpUiClientCapabilitiesSchema = z.object({
-    /**
-     * @description Array of supported MIME types for UI resources.
-     * Must include `"text/html;profile=mcp-app"` for MCP Apps support.
-     */
-    mimeTypes: z.array(z.string()).optional().describe("Array of supported MIME types for UI resources.\nMust include `\"text/html;profile=mcp-app\"` for MCP Apps support.")
+  /**
+   * @description Array of supported MIME types for UI resources.
+   * Must include `"text/html;profile=mcp-app"` for MCP Apps support.
+   */
+  mimeTypes: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Array of supported MIME types for UI resources.\nMust include `"text/html;profile=mcp-app"` for MCP Apps support.',
+    ),
 });
-
-
-
-
-
-
-
 
 /**
  * @description Request to download a file through the host.
@@ -479,11 +755,15 @@ export const McpUiClientCapabilitiesSchema = z.object({
  * @see {@link app!App.downloadFile `App.downloadFile`} for the method that sends this request
  */
 export const McpUiDownloadFileRequestSchema = z.object({
-    method: z.literal("ui/download-file"),
-    params: z.object({
-        /** @description Resource contents to download — embedded (inline data) or linked (host fetches). Uses standard MCP resource types. */
-        contents: z.array(z.union([EmbeddedResourceSchema, ResourceLinkSchema])).describe("Resource contents to download \u2014 embedded (inline data) or linked (host fetches). Uses standard MCP resource types.")
-    })
+  method: z.literal("ui/download-file"),
+  params: z.object({
+    /** @description Resource contents to download — embedded (inline data) or linked (host fetches). Uses standard MCP resource types. */
+    contents: z
+      .array(z.union([EmbeddedResourceSchema, ResourceLinkSchema]))
+      .describe(
+        "Resource contents to download \u2014 embedded (inline data) or linked (host fetches). Uses standard MCP resource types.",
+      ),
+  }),
 });
 
 /**
@@ -491,13 +771,17 @@ export const McpUiDownloadFileRequestSchema = z.object({
  * @see {@link app!App.sendMessage `App.sendMessage`} for the method that sends this request
  */
 export const McpUiMessageRequestSchema = z.object({
-    method: z.literal("ui/message"),
-    params: z.object({
-        /** @description Message role, currently only "user" is supported. */
-        role: z.literal("user").describe("Message role, currently only \"user\" is supported."),
-        /** @description Message content blocks (text, image, etc.). */
-        content: z.array(ContentBlockSchema).describe("Message content blocks (text, image, etc.).")
-    })
+  method: z.literal("ui/message"),
+  params: z.object({
+    /** @description Message role, currently only "user" is supported. */
+    role: z
+      .literal("user")
+      .describe('Message role, currently only "user" is supported.'),
+    /** @description Message content blocks (text, image, etc.). */
+    content: z
+      .array(ContentBlockSchema)
+      .describe("Message content blocks (text, image, etc.)."),
+  }),
 });
 
 /**
@@ -506,81 +790,141 @@ export const McpUiMessageRequestSchema = z.object({
  * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#sandbox-proxy
  */
 export const McpUiSandboxResourceReadyNotificationSchema = z.object({
-    method: z.literal("ui/notifications/sandbox-resource-ready"),
-    params: z.object({
-        /** @description HTML content to load into the inner iframe. */
-        html: z.string().describe("HTML content to load into the inner iframe."),
-        /** @description Optional override for the inner iframe's sandbox attribute. */
-        sandbox: z.string().optional().describe("Optional override for the inner iframe's sandbox attribute."),
-        /** @description CSP configuration from resource metadata. */
-        csp: McpUiResourceCspSchema.optional().describe("CSP configuration from resource metadata."),
-        /** @description Sandbox permissions from resource metadata. */
-        permissions: McpUiResourcePermissionsSchema.optional().describe("Sandbox permissions from resource metadata.")
-    })
+  method: z.literal("ui/notifications/sandbox-resource-ready"),
+  params: z.object({
+    /** @description HTML content to load into the inner iframe. */
+    html: z.string().describe("HTML content to load into the inner iframe."),
+    /** @description Optional override for the inner iframe's sandbox attribute. */
+    sandbox: z
+      .string()
+      .optional()
+      .describe("Optional override for the inner iframe's sandbox attribute."),
+    /** @description CSP configuration from resource metadata. */
+    csp: McpUiResourceCspSchema.optional().describe(
+      "CSP configuration from resource metadata.",
+    ),
+    /** @description Sandbox permissions from resource metadata. */
+    permissions: McpUiResourcePermissionsSchema.optional().describe(
+      "Sandbox permissions from resource metadata.",
+    ),
+  }),
 });
 
 /**
  * @description Notification containing tool execution result (Host -> View).
  */
 export const McpUiToolResultNotificationSchema = z.object({
-    method: z.literal("ui/notifications/tool-result"),
-    /** @description Standard MCP tool execution result. */
-    params: CallToolResultSchema.describe("Standard MCP tool execution result.")
+  method: z.literal("ui/notifications/tool-result"),
+  /** @description Standard MCP tool execution result. */
+  params: CallToolResultSchema.describe("Standard MCP tool execution result."),
 });
 
 /**
  * @description Rich context about the host environment provided to views.
  */
-export const McpUiHostContextSchema = z.object({
+export const McpUiHostContextSchema = z
+  .object({
     /** @description Metadata of the tool call that instantiated this App. */
-    toolInfo: z.object({
+    toolInfo: z
+      .object({
         /** @description JSON-RPC id of the tools/call request. */
-        id: RequestIdSchema.optional().describe("JSON-RPC id of the tools/call request."),
+        id: RequestIdSchema.optional().describe(
+          "JSON-RPC id of the tools/call request.",
+        ),
         /** @description Tool definition including name, inputSchema, etc. */
-        tool: ToolSchema.describe("Tool definition including name, inputSchema, etc.")
-    }).optional().describe("Metadata of the tool call that instantiated this App."),
+        tool: ToolSchema.describe(
+          "Tool definition including name, inputSchema, etc.",
+        ),
+      })
+      .optional()
+      .describe("Metadata of the tool call that instantiated this App."),
     /** @description Current color theme preference. */
-    theme: McpUiThemeSchema.optional().describe("Current color theme preference."),
+    theme: McpUiThemeSchema.optional().describe(
+      "Current color theme preference.",
+    ),
     /** @description Style configuration for theming the app. */
-    styles: McpUiHostStylesSchema.optional().describe("Style configuration for theming the app."),
+    styles: McpUiHostStylesSchema.optional().describe(
+      "Style configuration for theming the app.",
+    ),
     /** @description How the UI is currently displayed. */
-    displayMode: McpUiDisplayModeSchema.optional().describe("How the UI is currently displayed."),
+    displayMode: McpUiDisplayModeSchema.optional().describe(
+      "How the UI is currently displayed.",
+    ),
     /** @description Display modes the host supports. */
-    availableDisplayModes: z.array(McpUiDisplayModeSchema).optional().describe("Display modes the host supports."),
+    availableDisplayModes: z
+      .array(McpUiDisplayModeSchema)
+      .optional()
+      .describe("Display modes the host supports."),
     /**
      * @description Container dimensions. Represents the dimensions of the iframe or other
      * container holding the app. Specify either width or maxWidth, and either height or maxHeight.
      */
-    containerDimensions: z.union([z.object({
-            /** @description Fixed container height in pixels. */
-            height: z.number().describe("Fixed container height in pixels.")
-        }), z.object({
-            /** @description Maximum container height in pixels. */
-            maxHeight: z.union([z.number(), z.undefined()]).optional().describe("Maximum container height in pixels.")
-        })]).and(z.union([z.object({
+    containerDimensions: z
+      .union([
+        z.object({
+          /** @description Fixed container height in pixels. */
+          height: z.number().describe("Fixed container height in pixels."),
+        }),
+        z.object({
+          /** @description Maximum container height in pixels. */
+          maxHeight: z
+            .union([z.number(), z.undefined()])
+            .optional()
+            .describe("Maximum container height in pixels."),
+        }),
+      ])
+      .and(
+        z.union([
+          z.object({
             /** @description Fixed container width in pixels. */
-            width: z.number().describe("Fixed container width in pixels.")
-        }), z.object({
+            width: z.number().describe("Fixed container width in pixels."),
+          }),
+          z.object({
             /** @description Maximum container width in pixels. */
-            maxWidth: z.union([z.number(), z.undefined()]).optional().describe("Maximum container width in pixels.")
-        })])).optional().describe("Container dimensions. Represents the dimensions of the iframe or other\ncontainer holding the app. Specify either width or maxWidth, and either height or maxHeight."),
+            maxWidth: z
+              .union([z.number(), z.undefined()])
+              .optional()
+              .describe("Maximum container width in pixels."),
+          }),
+        ]),
+      )
+      .optional()
+      .describe(
+        "Container dimensions. Represents the dimensions of the iframe or other\ncontainer holding the app. Specify either width or maxWidth, and either height or maxHeight.",
+      ),
     /** @description User's language and region preference in BCP 47 format. */
-    locale: z.string().optional().describe("User's language and region preference in BCP 47 format."),
+    locale: z
+      .string()
+      .optional()
+      .describe("User's language and region preference in BCP 47 format."),
     /** @description User's timezone in IANA format. */
     timeZone: z.string().optional().describe("User's timezone in IANA format."),
     /** @description Host application identifier. */
     userAgent: z.string().optional().describe("Host application identifier."),
     /** @description Platform type for responsive design decisions. */
-    platform: z.union([z.literal("web"), z.literal("desktop"), z.literal("mobile")]).optional().describe("Platform type for responsive design decisions."),
+    platform: z
+      .union([z.literal("web"), z.literal("desktop"), z.literal("mobile")])
+      .optional()
+      .describe("Platform type for responsive design decisions."),
     /** @description Device input capabilities. */
-    deviceCapabilities: z.object({
+    deviceCapabilities: z
+      .object({
         /** @description Whether the device supports touch input. */
-        touch: z.boolean().optional().describe("Whether the device supports touch input."),
+        touch: z
+          .boolean()
+          .optional()
+          .describe("Whether the device supports touch input."),
         /** @description Whether the device supports hover interactions. */
-        hover: z.boolean().optional().describe("Whether the device supports hover interactions.")
-    }).optional().describe("Device input capabilities."),
+        hover: z
+          .boolean()
+          .optional()
+          .describe("Whether the device supports hover interactions."),
+      })
+      .optional()
+      .describe("Device input capabilities."),
     /** @description Mobile safe area boundaries in pixels. */
-    safeAreaInsets: z.object({
+    safeAreaInsets: z
+      .object({
         /** @description Top safe area inset in pixels. */
         top: z.number().describe("Top safe area inset in pixels."),
         /** @description Right safe area inset in pixels. */
@@ -588,18 +932,23 @@ export const McpUiHostContextSchema = z.object({
         /** @description Bottom safe area inset in pixels. */
         bottom: z.number().describe("Bottom safe area inset in pixels."),
         /** @description Left safe area inset in pixels. */
-        left: z.number().describe("Left safe area inset in pixels.")
-    }).optional().describe("Mobile safe area boundaries in pixels.")
-}).passthrough();
+        left: z.number().describe("Left safe area inset in pixels."),
+      })
+      .optional()
+      .describe("Mobile safe area boundaries in pixels."),
+  })
+  .passthrough();
 
 /**
  * @description Notification that host context has changed (Host -> View).
  * @see {@link McpUiHostContext `McpUiHostContext`} for the full context structure
  */
 export const McpUiHostContextChangedNotificationSchema = z.object({
-    method: z.literal("ui/notifications/host-context-changed"),
-    /** @description Partial context update containing only changed fields. */
-    params: McpUiHostContextSchema.describe("Partial context update containing only changed fields.")
+  method: z.literal("ui/notifications/host-context-changed"),
+  /** @description Partial context update containing only changed fields. */
+  params: McpUiHostContextSchema.describe(
+    "Partial context update containing only changed fields.",
+  ),
 });
 
 /**
@@ -615,13 +964,24 @@ export const McpUiHostContextChangedNotificationSchema = z.object({
  * @see {@link app.App.updateModelContext `App.updateModelContext`} for the method that sends this request
  */
 export const McpUiUpdateModelContextRequestSchema = z.object({
-    method: z.literal("ui/update-model-context"),
-    params: z.object({
-        /** @description Context content blocks (text, image, etc.). */
-        content: z.array(ContentBlockSchema).optional().describe("Context content blocks (text, image, etc.)."),
-        /** @description Structured content for machine-readable context data. */
-        structuredContent: z.record(z.string(), z.unknown().describe("Structured content for machine-readable context data.")).optional().describe("Structured content for machine-readable context data.")
-    })
+  method: z.literal("ui/update-model-context"),
+  params: z.object({
+    /** @description Context content blocks (text, image, etc.). */
+    content: z
+      .array(ContentBlockSchema)
+      .optional()
+      .describe("Context content blocks (text, image, etc.)."),
+    /** @description Structured content for machine-readable context data. */
+    structuredContent: z
+      .record(
+        z.string(),
+        z
+          .unknown()
+          .describe("Structured content for machine-readable context data."),
+      )
+      .optional()
+      .describe("Structured content for machine-readable context data."),
+  }),
 });
 
 /**
@@ -629,31 +989,45 @@ export const McpUiUpdateModelContextRequestSchema = z.object({
  * @see {@link app!App.connect `App.connect`} for the method that sends this request
  */
 export const McpUiInitializeRequestSchema = z.object({
-    method: z.literal("ui/initialize"),
-    params: z.object({
-        /** @description App identification (name and version). */
-        appInfo: ImplementationSchema.describe("App identification (name and version)."),
-        /** @description Features and capabilities this app provides. */
-        appCapabilities: McpUiAppCapabilitiesSchema.describe("Features and capabilities this app provides."),
-        /** @description Protocol version this app supports. */
-        protocolVersion: z.string().describe("Protocol version this app supports.")
-    })
+  method: z.literal("ui/initialize"),
+  params: z.object({
+    /** @description App identification (name and version). */
+    appInfo: ImplementationSchema.describe(
+      "App identification (name and version).",
+    ),
+    /** @description Features and capabilities this app provides. */
+    appCapabilities: McpUiAppCapabilitiesSchema.describe(
+      "Features and capabilities this app provides.",
+    ),
+    /** @description Protocol version this app supports. */
+    protocolVersion: z.string().describe("Protocol version this app supports."),
+  }),
 });
 
 /**
  * @description Initialization result returned from Host to View.
  * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`}
  */
-export const McpUiInitializeResultSchema = z.object({
+export const McpUiInitializeResultSchema = z
+  .object({
     /** @description Negotiated protocol version string (e.g., "2025-11-21"). */
-    protocolVersion: z.string().describe("Negotiated protocol version string (e.g., \"2025-11-21\")."),
+    protocolVersion: z
+      .string()
+      .describe('Negotiated protocol version string (e.g., "2025-11-21").'),
     /** @description Host application identification and version. */
-    hostInfo: ImplementationSchema.describe("Host application identification and version."),
+    hostInfo: ImplementationSchema.describe(
+      "Host application identification and version.",
+    ),
     /** @description Features and capabilities provided by the host. */
-    hostCapabilities: McpUiHostCapabilitiesSchema.describe("Features and capabilities provided by the host."),
+    hostCapabilities: McpUiHostCapabilitiesSchema.describe(
+      "Features and capabilities provided by the host.",
+    ),
     /** @description Rich context about the host environment. */
-    hostContext: McpUiHostContextSchema.describe("Rich context about the host environment.")
-}).passthrough();
+    hostContext: McpUiHostContextSchema.describe(
+      "Rich context about the host environment.",
+    ),
+  })
+  .passthrough();
 
 /** Content block for ui/update-model-context. */
 export const McpUiContentBlockSchema = ContentBlockSchema;

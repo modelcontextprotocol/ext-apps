@@ -539,8 +539,8 @@ export class App extends EventDispatcher<AppEventMap> {
       if (result === undefined) {
         throw new Error(`Host sent invalid ui/initialize result: ${result}`);
       }
-      this._hostInfo = result.hostInfo;
-      this._hostContext = result.hostContext ?? {};
+      this._hostInfo = result.hostInfo as Implementation;
+      this._hostContext = (result.hostContext ?? {}) as McpUiHostContext;
 
       await this.ui.sendNotification("ui/notifications/initialized", undefined);
 
