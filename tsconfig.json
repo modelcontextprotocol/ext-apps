@@ -2,7 +2,10 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
-    "lib": ["ES2020", "DOM"],
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
     "jsx": "react-jsx",
     "declaration": true,
     "emitDeclarationOnly": true,
@@ -15,6 +18,22 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "docs/**/*.ts", "docs/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "examples/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "docs/**/*.ts",
+    "docs/**/*.tsx"
+  ],
+  "exclude": [
+    "dist",
+    "examples",
+    "examples/**/*.ts",
+    "node_modules",
+    "src/**/*.examples.ts",
+    "src/**/*.examples.tsx",
+    "src/app-bridge.test.ts",
+    "src/generated/schema.test.ts",
+    "src/server/index.examples.ts",
+    "src/server/index.test.ts"
+  ]
 }

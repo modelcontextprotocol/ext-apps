@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
+import { InMemoryTransport } from "@modelcontextprotocol/server";
+import type { Client } from "@modelcontextprotocol/client";
+import type { ServerCapabilities } from "@modelcontextprotocol/client";
 import {
   EmptyResultSchema,
   ListPromptsResultSchema,
@@ -11,7 +11,7 @@ import {
   ReadResourceResultSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 import { App } from "./app";
 import {
