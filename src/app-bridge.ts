@@ -161,7 +161,7 @@ export function isToolVisibilityModelOnly(tool: {
   _meta?: Record<string, unknown>;
 }): boolean {
   const v = (tool._meta?.ui as McpUiToolMeta | undefined)?.visibility;
-  return Array.isArray(v) && !v.includes("app");
+  return Array.isArray(v) && v.length > 0 && !v.includes("app");
 }
 
 /**
@@ -171,7 +171,7 @@ export function isToolVisibilityAppOnly(tool: {
   _meta?: Record<string, unknown>;
 }): boolean {
   const v = (tool._meta?.ui as McpUiToolMeta | undefined)?.visibility;
-  return Array.isArray(v) && !v.includes("model");
+  return Array.isArray(v) && v.length > 0 && !v.includes("model");
 }
 
 /**
@@ -616,8 +616,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
     );
   }
   /** @deprecated Use {@link teardownResource `teardownResource`}. */
-  sendResourceTeardown: AppBridge["teardownResource"] = (p, o) =>
-    this.teardownResource(p, o);
+  get sendResourceTeardown() { return this.teardownResource; }
 
   /**
    * Call a tool the **view** exposes (see {@link app!App.oncalltool}).

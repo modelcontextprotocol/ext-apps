@@ -99,10 +99,15 @@ export function getToolUiResourceUri(tool: {
 }): string | undefined {
   const meta = tool._meta;
   if (!meta) return undefined;
-  const nested = (meta.ui as { resourceUri?: string } | undefined)?.resourceUri;
-  if (typeof nested === "string") return nested;
-  const flat = meta[RESOURCE_URI_META_KEY];
-  return typeof flat === "string" ? flat : undefined;
+  const ui = meta.ui as { resourceUri?: unknown } | undefined;
+  const candidate = ui && "resourceUri" in ui ? ui.resourceUri : meta[RESOURCE_URI_META_KEY];
+  if (candidate === undefined) return undefined;
+  if (typeof candidate !== "string" || !candidate.startsWith("ui://")) {
+    throw new Error(
+      "Tool _meta.ui.resourceUri must be a string starting with ui://, got: " + JSON.stringify(candidate),
+    );
+  }
+  return candidate;
 }
 
 /**
@@ -242,7 +247,7 @@ export class App extends EventDispatcher<AppEventMap> {
     event: K,
     params: AppEventMap[K],
   ): void {
-    if (event === "hostcontextchanged") {
+    if (event === "hostcontextchanged" && this._hostContext !== undefined) {
       this._hostContext = { ...this._hostContext, ...(params as McpUiHostContext) };
     }
   }
@@ -270,7 +275,7 @@ export class App extends EventDispatcher<AppEventMap> {
    * Current host context (theme, locale, displayMode, hostStyles, …). Updated
    * automatically by `ui/notifications/host-context-changed`.
    */
-  getHostContext(): McpUiHostContext {
+  getHostContext(): McpUiHostContext | undefined {
     return this._hostContext;
   }
 
@@ -439,7 +444,7 @@ export class App extends EventDispatcher<AppEventMap> {
     );
   }
   /** @deprecated Use {@link openLink `openLink`}. */
-  sendOpenLink: App["openLink"] = (p, o) => this.openLink(p, o);
+  get sendOpenLink() { return this.openLink; }
 
   /** Ask the host to download a file to the user's machine. */
   downloadFile(
@@ -481,7 +486,7 @@ export class App extends EventDispatcher<AppEventMap> {
     return this.ui.sendNotification("ui/notifications/size-changed", params);
   }
   /** @deprecated Use {@link sendSizeChanged `sendSizeChanged`}. */
-  notifySizeChanged: App["sendSizeChanged"] = (p) => this.sendSizeChanged(p);
+  get notifySizeChanged() { return this.sendSizeChanged; }
 
   /**
    * Start observing document size and emitting size-changed notifications.
