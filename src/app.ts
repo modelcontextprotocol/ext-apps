@@ -100,11 +100,13 @@ export function getToolUiResourceUri(tool: {
   const meta = tool._meta;
   if (!meta) return undefined;
   const ui = meta.ui as { resourceUri?: unknown } | undefined;
-  const candidate = ui && "resourceUri" in ui ? ui.resourceUri : meta[RESOURCE_URI_META_KEY];
-  if (candidate === undefined) return undefined;
+  const hasNested = ui != null && "resourceUri" in ui;
+  const candidate = hasNested ? ui.resourceUri : meta[RESOURCE_URI_META_KEY];
+  if (candidate === undefined && !hasNested) return undefined;
   if (typeof candidate !== "string" || !candidate.startsWith("ui://")) {
     throw new Error(
-      "Tool _meta.ui.resourceUri must be a string starting with ui://, got: " + JSON.stringify(candidate),
+      'Invalid UI resource URI (must be a string starting with "ui://"): ' +
+        JSON.stringify(candidate),
     );
   }
   return candidate;
@@ -186,6 +188,8 @@ export class App extends EventDispatcher<AppEventMap> {
    * error. Mirrors the v1 `Protocol.onerror` slot.
    */
   onerror?: (error: Error) => void;
+  /** Called when the underlying transport closes. Mirrors v1 Protocol.onclose. */
+  onclose?: () => void;
 
   constructor(
     private _appInfo: Implementation,
@@ -198,6 +202,7 @@ export class App extends EventDispatcher<AppEventMap> {
       capabilities: { roots: undefined },
     });
     this.client.onerror = (err) => this.onerror?.(err);
+    this.client.onclose = () => this.onclose?.();
     this.ui = this.client.extension(MCP_APPS_EXTENSION_ID, _capabilities, {
       peerSchema: McpUiHostCapabilitiesSchema,
     });
@@ -247,8 +252,8 @@ export class App extends EventDispatcher<AppEventMap> {
     event: K,
     params: AppEventMap[K],
   ): void {
-    if (event === "hostcontextchanged" && this._hostContext !== undefined) {
-      this._hostContext = { ...this._hostContext, ...(params as McpUiHostContext) };
+    if (event === "hostcontextchanged") {
+      this._hostContext = { ...(this._hostContext ?? {}), ...(params as McpUiHostContext) };
     }
   }
 

@@ -159,6 +159,7 @@ const BRIDGE_EVENT_NOTIFICATION_SCHEMAS: Record<
  */
 export function isToolVisibilityModelOnly(tool: {
   _meta?: Record<string, unknown>;
+  [key: string]: unknown;
 }): boolean {
   const v = (tool._meta?.ui as McpUiToolMeta | undefined)?.visibility;
   return Array.isArray(v) && v.length > 0 && !v.includes("app");
@@ -169,6 +170,7 @@ export function isToolVisibilityModelOnly(tool: {
  */
 export function isToolVisibilityAppOnly(tool: {
   _meta?: Record<string, unknown>;
+  [key: string]: unknown;
 }): boolean {
   const v = (tool._meta?.ui as McpUiToolMeta | undefined)?.visibility;
   return Array.isArray(v) && v.length > 0 && !v.includes("model");
@@ -219,6 +221,8 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
 
   /** Optional error handler. Mirrors the v1 `Protocol.onerror` slot. */
   onerror?: (error: Error) => void;
+  /** Called when the underlying transport closes. Mirrors v1 Protocol.onclose. */
+  onclose?: () => void;
 
   constructor(
     private _client: Client | null,
@@ -239,6 +243,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
       },
     });
     this.server.onerror = (err) => this.onerror?.(err);
+    this.server.onclose = () => this.onclose?.();
     this.ui = this.server.extension(MCP_APPS_EXTENSION_ID, _capabilities, {
       peerSchema: McpUiAppCapabilitiesSchema,
     });
@@ -447,7 +452,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
   private _onupdatemodelcontext?: (
     params: McpUiUpdateModelContextRequest["params"],
     extra: RequestHandlerExtra,
-  ) => Promise<void> | void;
+  ) => Promise<void | object> | void | object;
   get onupdatemodelcontext() { return this._onupdatemodelcontext; }
   set onupdatemodelcontext(cb) {
     this.warnIfRequestHandlerReplaced(
@@ -552,8 +557,13 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
    * Call this when theme, locale, displayMode, etc. change.
    */
   setHostContext(context: Partial<McpUiHostContext>) {
+    const changed: Partial<McpUiHostContext> = {};
+    for (const [k, v] of Object.entries(context) as [keyof McpUiHostContext, unknown][]) {
+      if (this._hostContext[k] !== v) (changed as Record<string, unknown>)[k] = v;
+    }
     this._hostContext = { ...this._hostContext, ...context };
-    return this.sendHostContextChanged(context);
+    if (Object.keys(changed).length === 0) return Promise.resolve();
+    return this.sendHostContextChanged(changed);
   }
 
   /** Low-level: send a host-context-changed notification with the given diff. */
