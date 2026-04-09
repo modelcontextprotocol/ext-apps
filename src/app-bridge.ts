@@ -205,7 +205,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
   /** Underlying MCP Server (host ← iframe wire). */
   readonly server: Server;
   /** SEP-2133 extension handle for `ui/*` methods. */
-  readonly ui: ExtensionHandle<McpUiHostCapabilities, McpUiAppCapabilities>;
+  readonly ui: ExtensionHandle<McpUiHostCapabilities, McpUiAppCapabilities, ServerContext>;
 
   private _hostContext: McpUiHostContext;
   private _appCapabilities?: McpUiAppCapabilities;
@@ -241,7 +241,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
     this.server.onerror = (err) => this.onerror?.(err);
     this.ui = this.server.extension(MCP_APPS_EXTENSION_ID, _capabilities, {
       peerSchema: McpUiAppCapabilitiesSchema,
-    }) as ExtensionHandle<McpUiHostCapabilities, McpUiAppCapabilities>;
+    });
 
     // ── ui/* request handlers ──────────────────────────────────────────────
 

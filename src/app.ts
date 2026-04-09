@@ -1,6 +1,7 @@
 import {
   Client,
   type CallToolRequest,
+  type ClientContext,
   type CallToolResult,
   type ExtensionHandle,
   type Implementation,
@@ -169,7 +170,7 @@ export class App extends EventDispatcher<AppEventMap> {
   /** Underlying MCP Client (iframe → host wire). */
   readonly client: Client;
   /** SEP-2133 extension handle for `ui/*` methods. */
-  readonly ui: ExtensionHandle<McpUiAppCapabilities, McpUiHostCapabilities>;
+  readonly ui: ExtensionHandle<McpUiAppCapabilities, McpUiHostCapabilities, ClientContext>;
 
   private _hostContext: McpUiHostContext = {};
   private _hostInfo?: Implementation;
@@ -194,7 +195,7 @@ export class App extends EventDispatcher<AppEventMap> {
     this.client.onerror = (err) => this.onerror?.(err);
     this.ui = this.client.extension(MCP_APPS_EXTENSION_ID, _capabilities, {
       peerSchema: McpUiHostCapabilitiesSchema,
-    }) as ExtensionHandle<McpUiAppCapabilities, McpUiHostCapabilities>;
+    });
 
     // Wire incoming ui/* notifications to the DOM-style event system.
     for (const [event, schema] of Object.entries(

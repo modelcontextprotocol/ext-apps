@@ -26,6 +26,8 @@
   ],
   "exclude": [
     "dist",
+    "docs/**/*.ts",
+    "docs/**/*.tsx",
     "examples",
     "examples/**/*.ts",
     "node_modules",

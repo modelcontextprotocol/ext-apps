@@ -459,7 +459,7 @@ export interface McpUiResourceTeardownResult {
   [key: string]: unknown;
 }
 
-export interface McpUiSupportedContentBlockModalities {
+export type McpUiSupportedContentBlockModalities = {
   /** @description Host supports text content blocks. */
   text?: {};
   /** @description Host supports image content blocks. */
@@ -594,7 +594,7 @@ export interface McpUiInitializedNotification {
  * > **All** origins must be declared—including where your bundled JS/CSS is
  * > served from (`localhost` in dev, your CDN in production).
  */
-export interface McpUiResourceCsp {
+export type McpUiResourceCsp = {
   /**
    * @description Origins for network requests (fetch/XHR/WebSocket).
    *
@@ -653,7 +653,7 @@ export interface McpUiResourceCsp {
  * Hosts MAY honor these by setting appropriate iframe `allow` attributes.
  * Apps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.
  */
-export interface McpUiResourcePermissions {
+export type McpUiResourcePermissions = {
   /**
    * @description Request camera access.
    *
@@ -831,7 +831,7 @@ export const REQUEST_DISPLAY_MODE_METHOD: McpUiRequestDisplayModeRequest["method
  * capabilities during MCP initialization. Servers can check for MCP Apps
  * support using {@link server-helpers!getUiCapability}.
  */
-export interface McpUiClientCapabilities {
+export type McpUiClientCapabilities = {
   /**
    * @description Array of supported MIME types for UI resources.
    * Must include `"text/html;profile=mcp-app"` for MCP Apps support.
