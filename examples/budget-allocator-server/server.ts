@@ -270,7 +270,7 @@ export function createServer(): McpServer {
       title: "Get Budget Data",
       description:
         "Returns budget configuration with 24 months of historical allocations and industry benchmarks by company stage",
-      inputSchema: {},
+      
       outputSchema: BudgetDataResponseSchema,
       _meta: { ui: { resourceUri } },
     },

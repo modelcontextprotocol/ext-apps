@@ -192,7 +192,7 @@ export function createServer(): McpServer {
     {
       title: "Learn Three.js",
       description: "Get documentation and examples for using the Three.js View",
-      inputSchema: {},
+      
     },
     async () => {
       return {

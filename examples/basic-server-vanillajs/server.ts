@@ -29,7 +29,7 @@ export function createServer(): McpServer {
     {
       title: "Get Time",
       description: "Returns the current server time as an ISO 8601 string.",
-      inputSchema: {},
+      
       outputSchema: z.object({
         time: z.string(),
       }),

@@ -30,7 +30,7 @@ export function createServer(): McpServer {
     {
       title: "Get Time",
       description: "Returns the current server time.",
-      inputSchema: {},
+      
       _meta: { ui: { resourceUri } }, // Links this tool to its UI resource
     },
     async () => {

@@ -33,7 +33,7 @@ export function createServer(): McpServer {
     {
       title: "Get Time",
       description: "Returns the current server time.",
-      inputSchema: {},
+      
       outputSchema: z.object({
         time: z.string(),
       }),

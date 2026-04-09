@@ -33,7 +33,7 @@ export function createServer(): McpServer {
       title: "Transcribe Speech",
       description:
         "Opens a live speech transcription interface using the Web Speech API.",
-      inputSchema: {},
+      
       _meta: { ui: { resourceUri } },
     },
     async (): Promise<CallToolResult> => {

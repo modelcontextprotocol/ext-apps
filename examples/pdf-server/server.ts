@@ -21,7 +21,6 @@ import {
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import {
-  RootsListChangedNotificationSchema,
   type CallToolResult,
   type ReadResourceResult,
 } from "@modelcontextprotocol/server";
@@ -1190,7 +1189,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       refreshRoots(server.server);
     };
     server.server.setNotificationHandler(
-      RootsListChangedNotificationSchema,
+      "notifications/roots/list_changed",
       async () => {
         await refreshRoots(server.server);
       },

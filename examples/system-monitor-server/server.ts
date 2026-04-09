@@ -135,7 +135,7 @@ export function createServer(): McpServer {
       title: "Get System Info",
       description:
         "Returns system information, including hostname, platform, CPU info, and memory.",
-      inputSchema: {},
+      
       outputSchema: SystemInfoSchema.shape,
       _meta: { ui: { resourceUri } },
     },
@@ -156,7 +156,7 @@ export function createServer(): McpServer {
       title: "Poll System Stats",
       description:
         "Returns dynamic system metrics for polling: per-core CPU timing, memory usage, and uptime. App-only.",
-      inputSchema: {},
+      
       outputSchema: PollStatsSchema.shape,
       _meta: { ui: { visibility: ["app"] } },
     },

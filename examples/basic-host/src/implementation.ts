@@ -1,6 +1,6 @@
 import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { Client } from "@modelcontextprotocol/client";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { SSEClientTransport } from "@modelcontextprotocol/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import type { CallToolResult, Resource, Tool } from "@modelcontextprotocol/server";
 import { getTheme, onThemeChange } from "./theme";
@@ -303,7 +303,7 @@ export function newAppBridge(
   // Listen for theme changes (from toggle or system) and notify the app
   onThemeChange((newTheme) => {
     log.info("Theme changed:", newTheme);
-    appBridge.sendHostContextChange({ theme: newTheme });
+    appBridge.sendHostContextChanged({ theme: newTheme });
   });
 
   // Per spec, the host SHOULD notify the view when container dimensions
@@ -315,7 +315,7 @@ export function newAppBridge(
   const iframeResizeObserver = new ResizeObserver(([entry]) => {
     const width = Math.round(entry.contentRect.width);
     if (width > 0) {
-      appBridge.sendHostContextChange({
+      appBridge.sendHostContextChanged({
         containerDimensions: { width, maxHeight: 6000 },
       });
     }
@@ -397,7 +397,7 @@ export function newAppBridge(
     log.info("Display mode request from MCP App:", params);
     const newMode = params.mode === "fullscreen" ? "fullscreen" : "inline";
     // Update host context and notify the app
-    appBridge.sendHostContextChange({
+    appBridge.sendHostContextChanged({
       displayMode: newMode,
     });
     // Notify the host UI (via callback)
