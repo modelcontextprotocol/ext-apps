@@ -654,7 +654,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
    *
    * If an `mcpClient` was passed to the constructor, automatically wires the
    * standard-MCP proxy handlers (`oncalltool`, `onreadresource`, …) to forward
-   * to that client, and relays `*/list_changed` notifications.
+   * to that client, and relays `list_changed` notifications.
    */
   async connect(transport: Transport): Promise<void> {
     if (this.server.transport) {
