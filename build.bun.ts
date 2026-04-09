@@ -33,7 +33,7 @@ function buildJs(
 
 // zod is a peerDependency — keep it external so consumers share a single
 // zod instance (instanceof ZodError / schema.extend() break with duplicate copies).
-const PEER_EXTERNALS = ["@modelcontextprotocol/sdk", "zod"];
+const PEER_EXTERNALS = ["@modelcontextprotocol/client", "@modelcontextprotocol/server", "zod"];
 
 await Promise.all([
   buildJs("src/app.ts", {
