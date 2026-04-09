@@ -7,11 +7,11 @@
  * @module
  */
 
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/client";
 import type {
   McpServer,
   ToolCallback,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+} from "@modelcontextprotocol/server";
 import {
   App,
   PostMessageTransport,

@@ -17,8 +17,8 @@ import { randomUUID } from "node:crypto";
 import type {
   CallToolResult,
   ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
+
 import type { McpUiHostContext } from "../src/types.js";
 import { useEffect, useState } from "react";
 import { useApp } from "../src/react/index.js";
@@ -26,7 +26,7 @@ import { registerAppTool } from "../src/server/index.js";
 import {
   McpServer,
   ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+} from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 /**

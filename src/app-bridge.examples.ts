@@ -7,7 +7,7 @@
  * @module
  */
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { Client } from "@modelcontextprotocol/client";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   CallToolResult,
@@ -15,7 +15,7 @@ import {
   ListResourcesResultSchema,
   ReadResourceResultSchema,
   ListPromptsResultSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import { AppBridge, PostMessageTransport } from "./app-bridge.js";
 import type { McpUiDisplayMode } from "./types.js";
 

@@ -13,7 +13,7 @@ import type {
   McpServer,
   ToolCallback,
   ReadResourceCallback,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+} from "@modelcontextprotocol/server";
 import { z } from "zod";
 import {
   registerAppTool,
