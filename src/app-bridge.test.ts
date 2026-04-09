@@ -235,7 +235,7 @@ describe("App <-> AppBridge integration", () => {
       expect(receivedContexts).toEqual([{ theme: "dark" }]);
     });
 
-    it.skip("setHostContext only sends changed values" /* TODO: v2 setHostContext does not diff (send full patch) */, async () => {
+    it("setHostContext only sends changed values", async () => {
       const receivedContexts: unknown[] = [];
       app.onhostcontextchanged = (params) => {
         receivedContexts.push(params);
@@ -336,7 +336,7 @@ describe("App <-> AppBridge integration", () => {
       await newBridgeTransport.close();
     });
 
-    it.skip("getHostContext accumulates multiple partial updates" /* TODO: investigate accumulate behavior */, async () => {
+    it("getHostContext accumulates multiple partial updates", async () => {
       // Need fresh transports for new bridge
       const [newAppTransport, newBridgeTransport] =
         InMemoryTransport.createLinkedPair();
@@ -358,11 +358,11 @@ describe("App <-> AppBridge integration", () => {
       await newApp.connect(newAppTransport);
 
       // Send partial update: only theme changes
-      newBridge.sendHostContextChange({ theme: "dark" });
+      newBridge.sendHostContextChanged({ theme: "dark" });
       await flush();
 
       // Send another partial update: only containerDimensions change
-      newBridge.sendHostContextChange({
+      newBridge.sendHostContextChanged({
         containerDimensions: { width: 1024, maxHeight: 768 },
       });
       await flush();
@@ -774,7 +774,7 @@ describe("App <-> AppBridge integration", () => {
       );
     });
 
-    it.skip("onlistresources setter registers handler for resources/list requests" /* covered by listServerResources test below */, async () => {
+    it("onlistresources setter registers handler for resources/list requests", async () => {
       const requestParams = {};
       const resources = [{ uri: "test://resource", name: "Test" }];
       const receivedRequests: unknown[] = [];
@@ -791,7 +791,7 @@ describe("App <-> AppBridge integration", () => {
       const result = await app.listServerResources();
 
       expect(receivedRequests).toHaveLength(1);
-      expect(receivedRequests[0]).toMatchObject(requestParams);
+      // v2: list* methods send undefined params when called with no args
       expect(result.resources).toEqual(resources);
     });
 
@@ -862,7 +862,7 @@ describe("App <-> AppBridge integration", () => {
       expect(result.contents).toEqual(contents);
     });
 
-    it.skip("onlistresourcetemplates setter registers handler /* TODO: v2 client.listResourceTemplates result shape */ for resources/templates/list requests", async () => {
+    it("onlistresourcetemplates setter registers handler", async () => {
       const requestParams = {};
       const resourceTemplates = [
         { uriTemplate: "test://{id}", name: "Test Template" },
@@ -880,11 +880,11 @@ describe("App <-> AppBridge integration", () => {
       const result = await app.client.listResourceTemplates();
 
       expect(receivedRequests).toHaveLength(1);
-      expect(receivedRequests[0]).toMatchObject(requestParams);
+      // v2: list* methods send undefined params when called with no args
       expect(result.resourceTemplates).toEqual(resourceTemplates);
     });
 
-    it.skip("onlistprompts setter registers handler /* TODO: v2 client.listPrompts result shape */ for prompts/list requests", async () => {
+    it("onlistprompts setter registers handler", async () => {
       const requestParams = {};
       const prompts = [{ name: "test-prompt" }];
       const receivedRequests: unknown[] = [];
@@ -900,7 +900,7 @@ describe("App <-> AppBridge integration", () => {
       const result = await app.client.listPrompts();
 
       expect(receivedRequests).toHaveLength(1);
-      expect(receivedRequests[0]).toMatchObject(requestParams);
+      // v2: list* methods send undefined params when called with no args
       expect(result.prompts).toEqual(prompts);
     });
 
@@ -1345,38 +1345,6 @@ describe("isToolVisibilityAppOnly", () => {
       expect(app.onteardown).toBe(handler);
     });
 
-    it.skip("direct setRequestHandler throws when called twice" /* v2: double-set protection removed (BREAKING.md) */, () => {
-      const bridge2 = new AppBridge(
-        createMockClient() as Client,
-        testHostInfo,
-        testHostCapabilities,
-      );
-      bridge2.setRequestHandler(
-        // @ts-expect-error — exercising throw path with raw schema
-        { shape: { method: { value: "test/method" } } },
-        () => ({}),
-      );
-      expect(() => {
-        bridge2.setRequestHandler(
-          // @ts-expect-error — exercising throw path with raw schema
-          { shape: { method: { value: "test/method" } } },
-          () => ({}),
-        );
-      }).toThrow(/already registered/);
-    });
 
-    it.skip("direct setNotificationHandler throws for event-mapped methods" /* v2: double-set protection removed */, () => {
-      const app2 = new App(testAppInfo, {}, { autoResize: false });
-      app2.addEventListener("toolinput", () => {});
-      expect(() => {
-        app2.setNotificationHandler(
-          // @ts-expect-error — exercising throw path with raw schema
-          {
-            shape: { method: { value: "ui/notifications/tool-input" } },
-          },
-          () => {},
-        );
-      }).toThrow(/already registered/);
-    });
   });
 });

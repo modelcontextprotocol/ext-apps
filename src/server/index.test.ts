@@ -225,7 +225,7 @@ describe("registerAppResource", () => {
     });
 
     registerAppResource(
-      mockServer as unknown as Pick<McpServer, "registerResource">,
+      mockServer as unknown as McpServer,
       "My Resource",
       "ui://test/view.html",
       {
@@ -255,7 +255,7 @@ describe("registerAppResource", () => {
     };
 
     registerAppResource(
-      mockServer as unknown as Pick<McpServer, "registerResource">,
+      mockServer as unknown as McpServer,
       "My Resource",
       "ui://test/view.html",
       {
@@ -306,7 +306,7 @@ describe("registerAppResource", () => {
     const callback = mock(async () => expectedResult);
 
     registerAppResource(
-      mockServer as unknown as Pick<McpServer, "registerResource">,
+      mockServer as unknown as McpServer,
       "My Resource",
       "ui://test/view.html",
       { _meta: { ui: {} } },
