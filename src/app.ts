@@ -160,7 +160,7 @@ const APP_EVENT_NOTIFICATION_SCHEMAS = {
  * the host to the real MCP server via the underlying `Client`.
  *
  * @example
- * ```ts source="./app.examples.ts#App_basicUsage"
+ * ```ts
  * const app = new App({ name: "MyApp", version: "1.0.0" }, {});
  * app.ontoolresult = (r) => render(r);
  * await app.connect();
@@ -346,7 +346,7 @@ export class App extends EventDispatcher<AppEventMap> {
    * Call a tool on the originating MCP server (proxied through the host).
    *
    * @example
-   * ```ts source="./app.examples.ts#App_callServerTool_basic"
+   * ```ts
    * const result = await app.callServerTool({
    *   name: "search",
    *   arguments: { query: "weather" },
