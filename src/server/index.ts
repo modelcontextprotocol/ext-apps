@@ -107,11 +107,15 @@ function normalizeAppToolMeta(
   meta: McpUiAppToolConfig["_meta"],
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { ...meta };
-  // Promote nested form to flat key for hosts that only check the legacy key.
-  const nested = (meta as { ui?: McpUiToolMeta }).ui;
-  if (nested?.resourceUri && !(RESOURCE_URI_META_KEY in out)) {
-    out[RESOURCE_URI_META_KEY] = nested.resourceUri;
+  const ui = { ...((meta as { ui?: McpUiToolMeta }).ui ?? {}) } as McpUiToolMeta;
+  const flat = out[RESOURCE_URI_META_KEY];
+  // Sync both directions so hosts checking either format see the resource URI.
+  if (ui.resourceUri && !(RESOURCE_URI_META_KEY in out)) {
+    out[RESOURCE_URI_META_KEY] = ui.resourceUri;
+  } else if (typeof flat === "string" && !ui.resourceUri) {
+    ui.resourceUri = flat;
   }
+  out.ui = ui;
   return out;
 }
 
