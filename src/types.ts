@@ -67,6 +67,7 @@ export {
   type McpUiToolVisibility,
   type McpUiToolMeta,
   type McpUiClientCapabilities,
+  type McpUiContentBlock,
 } from "./spec.types.js";
 
 // Import types needed for protocol type unions (not re-exported, just used internally)
@@ -156,7 +157,7 @@ import {
   ReadResourceResult,
   ResourceListChangedNotification,
   ToolListChangedNotification,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 /**
  * All request types in the MCP Apps protocol.

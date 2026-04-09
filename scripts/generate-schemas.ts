@@ -193,7 +193,7 @@ function postProcess(content: string): string {
     `import { z } from "zod/v4";
 import {
   ${mcpImports},
-} from "@modelcontextprotocol/sdk/types.js";`,
+} from "../src/sdk-compat.js";`,
   );
 
   // 2. Remove z.any() placeholders for external types (now imported from MCP SDK)

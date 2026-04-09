@@ -10,15 +10,15 @@
  * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx
  */
 
+import type { RequestId } from "./sdk-compat.js";
 import type {
   CallToolResult,
   ContentBlock,
   EmbeddedResource,
   Implementation,
-  RequestId,
   ResourceLink,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 /**
  * Current protocol version supported by this SDK.
@@ -491,7 +491,7 @@ export interface McpUiRequestTeardownNotification {
  * @description Capabilities supported by the host application.
  * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
-export interface McpUiHostCapabilities {
+export type McpUiHostCapabilities = {
   /** @description Experimental features (structure TBD). */
   experimental?: {};
   /** @description Host supports opening external URLs. */
@@ -527,7 +527,7 @@ export interface McpUiHostCapabilities {
  * @description Capabilities provided by the View ({@link app!App `App`}).
  * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`} for the initialization request that includes these capabilities
  */
-export interface McpUiAppCapabilities {
+export type McpUiAppCapabilities = {
   /** @description Experimental features (structure TBD). */
   experimental?: {};
   /** @description App exposes MCP-style tools that the host can call. */
@@ -838,3 +838,6 @@ export interface McpUiClientCapabilities {
    */
   mimeTypes?: string[];
 }
+
+/** Content block for ui/update-model-context. */
+export type McpUiContentBlock = ContentBlock;
