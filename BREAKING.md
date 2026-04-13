@@ -48,9 +48,19 @@ These affect custom hosts/iframes that bypass the SDK and speak raw JSON-RPC:
 The TypeScript API names (`app.sendLog`, `bridge.callTool`, `app.oncalltool`)
 are **unchanged** — only the wire-level method strings moved.
 
-A v2 `AppBridge` still handles `ui/initialize` so v1 `App` iframes work, but a
-v2 `AppBridge` will **not** receive `notifications/message` from v1 iframes
-(it listens on `ui/log` only).
+### v1↔v2 interop
+
+Hosts and iframes upgrade independently. The wire renames are shimmed where the
+v2 SDK's direction enforcement allows it; where it doesn't, you get a clear
+error instead of silent failure.
+
+| Scenario | What works | What doesn't |
+|---|---|---|
+| **v2 host (`AppBridge`) + v1 iframe** | ✅ handshake (`ui/initialize`), all `ui/*` requests, **logging** (host dual-listens on both `ui/log` and legacy `notifications/message`), proxied `tools/call`/`resources/*` | ⚠️ `bridge.callTool()`/`bridge.listTools()` throw a descriptive error — host→iframe tool calls require the iframe on v2 |
+| **v1 host + v2 iframe** | ✅ handshake (v2 `App` still sends `ui/initialize`), all `ui/*` requests, proxied standard MCP | ❌ `app.sendLog()` (sends `ui/log`; v1 host listens on `notifications/message` only — silently dropped). ❌ host-initiated `tools/call` (v2 iframe handles `ui/call-view-tool` only — MethodNotFound) |
+
+**Recommended upgrade order:** host first, then iframes. A v2 host accepts logs
+from either generation; a v2 iframe's logs reach only a v2 host.
 
 ## Capability negotiation via SEP-2133
 

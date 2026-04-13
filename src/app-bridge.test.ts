@@ -680,7 +680,63 @@ describe("App <-> AppBridge integration", () => {
   });
 
   describe("ping", () => {
-    it.skip("App responds to ping from bridge — v1 inherited Protocol surface; bridge.server has no public outbound ping", async () => {});
+    it("App responds to ping from bridge via bridge.server.ping()", async () => {
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      await expect(bridge.server.ping()).resolves.toEqual({});
+    });
+  });
+
+  describe("v1↔v2 wire compat", () => {
+    it("AppBridge dual-listens: legacy notifications/message fires onloggingmessage", async () => {
+      let received: unknown;
+      bridge.onloggingmessage = (p) => {
+        received = p;
+      };
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      // Simulate a v1 iframe by injecting the legacy wire method directly.
+      await appTransport.send({
+        jsonrpc: "2.0",
+        method: "notifications/message",
+        params: { level: "info", data: "from v1 iframe" },
+      });
+      await flush();
+      expect(received).toEqual({ level: "info", data: "from v1 iframe" });
+    });
+
+    it("bridge.callTool() reaches a v2 iframe via ui/call-view-tool", async () => {
+      app.oncalltool = async (p) => ({
+        content: [{ type: "text", text: `called ${p.name}` }],
+      });
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      const result = await bridge.callTool({ name: "view-tool", arguments: {} });
+      expect(result.content?.[0]).toEqual({
+        type: "text",
+        text: "called view-tool",
+      });
+    });
+  });
+
+  describe("on* setter replace semantics", () => {
+    it("reassigning a request-style on* setter replaces (warns, does not throw)", async () => {
+      const calls: string[] = [];
+      bridge.onmessage = async () => {
+        calls.push("first");
+        return { ok: true };
+      };
+      expect(() => {
+        bridge.onmessage = async () => {
+          calls.push("second");
+          return { ok: true };
+        };
+      }).not.toThrow();
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      await app.sendMessage({ role: "user", content: [{ type: "text", text: "x" }] });
+      expect(calls).toEqual(["second"]);
+    });
   });
 
   describe("AppBridge without MCP client (manual handlers)", () => {

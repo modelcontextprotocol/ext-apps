@@ -311,6 +311,12 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
       );
     }
 
+    // v1-compat: also accept legacy `notifications/message` from v1 iframes
+    // (v2 iframes send `ui/log`). See BREAKING.md § v1↔v2 interop.
+    this.server.setNotificationHandler("notifications/message", (n) =>
+      this.dispatchEvent("loggingmessage", n.params),
+    );
+
     // ── Standard MCP requests from iframe (proxy to real server) ───────────
 
     this.server.setRequestHandler("tools/call", async (req, ctx) => {
@@ -365,6 +371,17 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
   /** App capabilities advertised by the view. */
   get appCapabilities(): McpUiAppCapabilities | undefined {
     return this.ui.getPeerSettings() ?? this._appCapabilities;
+  }
+
+  /**
+   * `true` if the connected iframe advertised via `capabilities.extensions`
+   * (ext-apps v2). `false` if capabilities came only via `ui/initialize`
+   * (ext-apps v1). `undefined` before any handshake.
+   */
+  private get _isV2Iframe(): boolean | undefined {
+    if (this.ui.getPeerSettings() !== undefined) return true;
+    if (this._appCapabilities !== undefined) return false;
+    return undefined;
   }
   /** @deprecated Use {@link appCapabilities `appCapabilities`}. */
   getAppCapabilities(): McpUiAppCapabilities | undefined {
@@ -629,6 +646,12 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
    * Wire method: `ui/call-view-tool` (renamed from `tools/call` in v2).
    */
   callTool(params: CallToolRequest["params"], options?: RequestOptions) {
+    if (this._isV2Iframe === false) {
+      throw new Error(
+        "bridge.callTool(): connected iframe is ext-apps v1 (capabilities arrived via ui/initialize only). " +
+          "Host→iframe tool calls use the v2-only 'ui/call-view-tool' wire method; upgrade the iframe to ext-apps@2.",
+      );
+    }
     return this.ui.sendRequest(
       "ui/call-view-tool",
       params,
@@ -643,6 +666,12 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
    * Wire method: `ui/list-view-tools` (renamed from `tools/list` in v2).
    */
   listTools(params?: ListToolsRequest["params"], options?: RequestOptions) {
+    if (this._isV2Iframe === false) {
+      throw new Error(
+        "bridge.listTools(): connected iframe is ext-apps v1 (capabilities arrived via ui/initialize only). " +
+          "Host→iframe tool listing uses the v2-only 'ui/list-view-tools' wire method; upgrade the iframe to ext-apps@2.",
+      );
+    }
     return this.ui.sendRequest(
       "ui/list-view-tools",
       params,
