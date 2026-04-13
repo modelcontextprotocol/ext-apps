@@ -148,7 +148,7 @@ export function createServer(): McpServer {
       title: "Show Map",
       description:
         "Display an interactive world map zoomed to a specific bounding box. Use the GeoCode tool to find the bounding box of a location.",
-      inputSchema: {
+      inputSchema: z.object({
         west: z
           .number()
           .optional()
@@ -173,7 +173,7 @@ export function createServer(): McpServer {
           .string()
           .optional()
           .describe("Optional label to display on the map"),
-      },
+      }),
       _meta: { ui: { resourceUri } },
     },
     async ({ west, south, east, north, label }): Promise<CallToolResult> => ({
@@ -196,13 +196,13 @@ export function createServer(): McpServer {
       title: "Geocode",
       description:
         "Search for places using OpenStreetMap. Returns coordinates and bounding boxes for up to 5 matches.",
-      inputSchema: {
+      inputSchema: z.object({
         query: z
           .string()
           .describe(
             "Place name or address to search for (e.g., 'Paris', 'Golden Gate Bridge', '1600 Pennsylvania Ave')",
           ),
-      },
+      }),
     },
     async ({ query }): Promise<CallToolResult> => {
       try {

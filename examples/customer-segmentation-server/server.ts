@@ -100,8 +100,8 @@ export function createServer(): McpServer {
         title: "Get Customer Data",
         description:
           "Returns customer data with segment information for visualization. Optionally filter by segment.",
-        inputSchema: GetCustomerDataInputSchema.shape,
-        outputSchema: GetCustomerDataOutputSchema.shape,
+        inputSchema: GetCustomerDataInputSchema,
+        outputSchema: GetCustomerDataOutputSchema,
         _meta: { ui: { resourceUri } },
       },
       async ({ segment }): Promise<CallToolResult> => {

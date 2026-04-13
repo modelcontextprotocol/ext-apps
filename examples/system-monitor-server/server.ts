@@ -136,7 +136,7 @@ export function createServer(): McpServer {
       description:
         "Returns system information, including hostname, platform, CPU info, and memory.",
       
-      outputSchema: SystemInfoSchema.shape,
+      outputSchema: SystemInfoSchema,
       _meta: { ui: { resourceUri } },
     },
     (): CallToolResult => {
@@ -157,7 +157,7 @@ export function createServer(): McpServer {
       description:
         "Returns dynamic system metrics for polling: per-core CPU timing, memory usage, and uptime. App-only.",
       
-      outputSchema: PollStatsSchema.shape,
+      outputSchema: PollStatsSchema,
       _meta: { ui: { visibility: ["app"] } },
     },
     async (): Promise<CallToolResult> => {

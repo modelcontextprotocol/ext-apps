@@ -551,10 +551,7 @@ async function App_setupAutoResize_manual(transport: PostMessageTransport) {
   await app.connect(transport);
 
   // Later, enable auto-resize manually
-  const cleanup = app.setupSizeChangedNotifications();
-
-  // Clean up when done
-  cleanup();
+  app.setupSizeChangedNotifications();
   //#endregion App_setupAutoResize_manual
 }
 

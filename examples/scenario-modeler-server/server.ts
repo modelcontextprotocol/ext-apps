@@ -305,8 +305,8 @@ export function createServer(): McpServer {
         title: "Get Scenario Data",
         description:
           "Returns SaaS scenario templates and optionally computes custom projections for given inputs",
-        inputSchema: GetScenarioDataInputSchema.shape,
-        outputSchema: GetScenarioDataOutputSchema.shape,
+        inputSchema: GetScenarioDataInputSchema,
+        outputSchema: GetScenarioDataOutputSchema,
         _meta: { ui: { resourceUri } },
       },
       async (args: {

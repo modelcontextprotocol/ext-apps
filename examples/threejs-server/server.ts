@@ -161,7 +161,7 @@ export function createServer(): McpServer {
       title: "Show Three.js Scene",
       description:
         "Render an interactive 3D scene with custom Three.js code. Supports transparent backgrounds (alpha: true) for seamless host UI integration. Available globals: THREE, OrbitControls, EffectComposer, RenderPass, UnrealBloomPass, canvas, width, height.",
-      inputSchema: {
+      inputSchema: z.object({
         code: z
           .string()
           .default(DEFAULT_THREEJS_CODE)
@@ -172,7 +172,7 @@ export function createServer(): McpServer {
           .positive()
           .default(400)
           .describe("Height in pixels"),
-      },
+      }),
       outputSchema: z.object({
         success: z.boolean(),
       }),

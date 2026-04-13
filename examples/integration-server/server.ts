@@ -72,7 +72,7 @@ export function createServer(): McpServer {
   );
 
   // Sample downloadable resource — used to demo ResourceLink in ui/download-file
-  server.resource(
+  server.registerResource(
     SAMPLE_DOWNLOAD_URI,
     SAMPLE_DOWNLOAD_URI,
     {

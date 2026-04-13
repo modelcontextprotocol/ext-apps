@@ -7,14 +7,10 @@
  * @module
  */
 
-import { Client } from "@modelcontextprotocol/client";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
-  CallToolResult,
-  CallToolResultSchema,
-  ListResourcesResultSchema,
-  ReadResourceResultSchema,
-  ListPromptsResultSchema,
+  Client,
+  type CallToolResult,
+  type Transport,
 } from "@modelcontextprotocol/client";
 import { AppBridge, PostMessageTransport } from "./app-bridge.js";
 import type { McpUiDisplayMode } from "./types.js";
@@ -219,11 +215,9 @@ function AppBridge_oncalltool_forwardToServer(
 ) {
   //#region AppBridge_oncalltool_forwardToServer
   bridge.oncalltool = async (params, extra) => {
-    return mcpClient.request(
-      { method: "tools/call", params },
-      CallToolResultSchema,
-      { signal: extra.signal },
-    );
+    return mcpClient.callTool(params, {
+      signal: extra.signal,
+    }) as Promise<CallToolResult>;
   };
   //#endregion AppBridge_oncalltool_forwardToServer
 }
@@ -237,11 +231,7 @@ function AppBridge_onlistresources_returnResources(
 ) {
   //#region AppBridge_onlistresources_returnResources
   bridge.onlistresources = async (params, extra) => {
-    return mcpClient.request(
-      { method: "resources/list", params },
-      ListResourcesResultSchema,
-      { signal: extra.signal },
-    );
+    return mcpClient.listResources(params, { signal: extra.signal });
   };
   //#endregion AppBridge_onlistresources_returnResources
 }
@@ -255,11 +245,7 @@ function AppBridge_onreadresource_returnResource(
 ) {
   //#region AppBridge_onreadresource_returnResource
   bridge.onreadresource = async (params, extra) => {
-    return mcpClient.request(
-      { method: "resources/read", params },
-      ReadResourceResultSchema,
-      { signal: extra.signal },
-    );
+    return mcpClient.readResource(params, { signal: extra.signal });
   };
   //#endregion AppBridge_onreadresource_returnResource
 }
@@ -273,11 +259,7 @@ function AppBridge_onlistprompts_returnPrompts(
 ) {
   //#region AppBridge_onlistprompts_returnPrompts
   bridge.onlistprompts = async (params, extra) => {
-    return mcpClient.request(
-      { method: "prompts/list", params },
-      ListPromptsResultSchema,
-      { signal: extra.signal },
-    );
+    return mcpClient.listPrompts(params, { signal: extra.signal });
   };
   //#endregion AppBridge_onlistprompts_returnPrompts
 }
@@ -422,10 +404,10 @@ async function AppBridge_sendToolResult_afterExecution(
   args: Record<string, unknown>,
 ) {
   //#region AppBridge_sendToolResult_afterExecution
-  const result = await mcpClient.request(
-    { method: "tools/call", params: { name: "get_weather", arguments: args } },
-    CallToolResultSchema,
-  );
+  const result = (await mcpClient.callTool({
+    name: "get_weather",
+    arguments: args,
+  })) as CallToolResult;
   bridge.sendToolResult(result);
   //#endregion AppBridge_sendToolResult_afterExecution
 }

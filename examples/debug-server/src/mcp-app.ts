@@ -549,15 +549,9 @@ openLinkBtn.addEventListener("click", async () => {
 
 autoResizeToggleEl.addEventListener("change", () => {
   if (autoResizeToggleEl.checked) {
-    if (!state.autoResizeCleanup) {
-      state.autoResizeCleanup = app.setupSizeChangedNotifications();
-    }
-  } else {
-    if (state.autoResizeCleanup) {
-      state.autoResizeCleanup();
-      state.autoResizeCleanup = null;
-    }
+    app.setupSizeChangedNotifications();
   }
+  // Note: v2 setupSizeChangedNotifications() has no cleanup return; toggle-off is a no-op.
   logEvent("auto-resize-toggle", { enabled: autoResizeToggleEl.checked });
 });
 
@@ -635,7 +629,7 @@ app
 
     // Auto-resize is enabled by default in App, capture cleanup if we want to toggle
     // We'll set it up ourselves since we want toggle control
-    state.autoResizeCleanup = app.setupSizeChangedNotifications();
+    app.setupSizeChangedNotifications();
   })
   .catch((e) => {
     logEvent("error", e);

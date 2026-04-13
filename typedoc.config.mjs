@@ -26,9 +26,17 @@ const config = {
     "src/message-transport.ts",
     "src/types.ts",
   ],
+  externalSymbolLinkMappings: {
+    "@modelcontextprotocol/client": {
+      "*": "https://modelcontextprotocol.github.io/typescript-sdk/",
+    },
+    "@modelcontextprotocol/server": {
+      "*": "https://modelcontextprotocol.github.io/typescript-sdk/",
+    },
+  },
   excludePrivate: true,
   excludeInternal: false,
-  intentionallyNotExported: ["AppOptions", "MethodSchema"],
+  intentionallyNotExported: [],
   blockTags: [...OptionDefaults.blockTags, "@description"],
   jsDocCompatibility: {
     exampleTag: false,

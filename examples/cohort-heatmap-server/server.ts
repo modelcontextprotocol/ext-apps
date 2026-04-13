@@ -178,8 +178,8 @@ export function createServer(): McpServer {
       title: "Get Cohort Retention Data",
       description:
         "Returns cohort retention heatmap data showing customer retention over time by signup month",
-      inputSchema: GetCohortDataInputSchema.shape,
-      outputSchema: CohortDataSchema.shape,
+      inputSchema: GetCohortDataInputSchema,
+      outputSchema: CohortDataSchema,
       _meta: { ui: { resourceUri } },
     },
     async ({ metric, periodType, cohortCount, maxPeriods }) => {
