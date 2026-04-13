@@ -20,8 +20,7 @@ import {
 import { EventDispatcher } from "./events";
 export { EventDispatcher, ProtocolWithEvents } from "./events";
 import { PostMessageTransport } from "./message-transport";
-import { isSpecType } from "@modelcontextprotocol/client";
-import { z } from "zod/v4";
+import { specTypeSchema } from "@modelcontextprotocol/client";
 import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
@@ -226,9 +225,7 @@ export class App extends EventDispatcher<AppEventMap> {
     // Non-spec host→iframe tool surface (renamed from tools/call & tools/list).
     this.ui.setRequestHandler(
       "ui/call-view-tool",
-      z.custom<CallToolRequest["params"]>((v) =>
-        isSpecType("CallToolRequestParams", v),
-      ),
+      specTypeSchema("CallToolRequestParams"),
       async (params, ctx) => {
         if (!this._oncalltool) throw new Error("No oncalltool handler set");
         return this._oncalltool(params, toExtra(ctx));
@@ -236,9 +233,7 @@ export class App extends EventDispatcher<AppEventMap> {
     );
     this.ui.setRequestHandler(
       "ui/list-view-tools",
-      z.custom<ListToolsRequest["params"]>((v) =>
-        v === undefined || isSpecType("PaginatedRequestParams", v),
-      ),
+      specTypeSchema("PaginatedRequestParams"),
       async (params, ctx) => {
         if (!this._onlisttools) throw new Error("No onlisttools handler set");
         return this._onlisttools(params, toExtra(ctx));
@@ -430,7 +425,7 @@ export class App extends EventDispatcher<AppEventMap> {
     return this.ui.sendRequest(
       "ui/update-model-context",
       params,
-      z.custom<Record<string, never>>((v) => isSpecType("EmptyResult", v)),
+      specTypeSchema("EmptyResult"),
       options,
     );
   }

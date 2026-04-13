@@ -197,7 +197,7 @@ import { isSpecType } from "@modelcontextprotocol/client";
 import type { ${typeImports} } from "@modelcontextprotocol/client";`,
   );
 
-  // 2. Replace z.any() placeholders for external SDK types with isSpecType-backed z.custom
+  // 2. Replace z.any() placeholders for external SDK types with specTypeSchema()
   for (const schema of EXTERNAL_TYPE_SCHEMAS) {
     const typeName = schema.replace(/Schema$/, "");
     content = content.replace(

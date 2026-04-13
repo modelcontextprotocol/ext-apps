@@ -26,7 +26,7 @@ import {
 } from "@modelcontextprotocol/server";
 
 import { EventDispatcher } from "./events";
-import { isSpecType } from "@modelcontextprotocol/server";
+import { specTypeSchema, type StandardSchemaV1 } from "@modelcontextprotocol/server";
 import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
@@ -93,9 +93,7 @@ function toExtra(ctx: ServerContext): RequestHandlerExtra {
   return { signal: ctx.mcpReq.signal };
 }
 
-const LogParamsSchema = z.custom<LoggingMessageNotification["params"]>(
-  (v) => v != null && typeof v === "object",
-);
+const LogParamsSchema = specTypeSchema("LoggingMessageNotificationParams");
 
 /** Options for constructing an {@link AppBridge `AppBridge`}. */
 export interface HostOptions extends ProtocolOptions {
@@ -124,7 +122,7 @@ export type AppBridgeEventMap = {
 
 const BRIDGE_EVENT_NOTIFICATION_SCHEMAS: Record<
   keyof AppBridgeEventMap,
-  { method: string; params: z.ZodType }
+  { method: string; params: StandardSchemaV1 }
 > = {
   sizechange: {
     method: McpUiSizeChangedNotificationSchema.shape.method.value,
@@ -634,7 +632,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
     return this.ui.sendRequest(
       "ui/call-view-tool",
       params,
-      z.custom<CallToolResult>((v) => isSpecType("CallToolResult", v)),
+      specTypeSchema("CallToolResult"),
       options,
     );
   }
@@ -648,7 +646,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
     return this.ui.sendRequest(
       "ui/list-view-tools",
       params,
-      z.custom<ListToolsResult>((v) => isSpecType("ListToolsResult", v)),
+      specTypeSchema("ListToolsResult"),
       options,
     );
   }
