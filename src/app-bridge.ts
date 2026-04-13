@@ -26,10 +26,7 @@ import {
 } from "@modelcontextprotocol/server";
 
 import { EventDispatcher } from "./events";
-import {
-  CallToolResultSchema,
-  ListToolsResultSchema,
-} from "./sdk-compat";
+import { isSpecType } from "@modelcontextprotocol/server";
 import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
@@ -637,7 +634,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
     return this.ui.sendRequest(
       "ui/call-view-tool",
       params,
-      CallToolResultSchema,
+      z.custom<CallToolResult>((v) => isSpecType("CallToolResult", v)),
       options,
     );
   }
@@ -651,7 +648,7 @@ export class AppBridge extends EventDispatcher<AppBridgeEventMap> {
     return this.ui.sendRequest(
       "ui/list-view-tools",
       params,
-      ListToolsResultSchema,
+      z.custom<ListToolsResult>((v) => isSpecType("ListToolsResult", v)),
       options,
     );
   }

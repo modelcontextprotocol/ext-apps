@@ -2,15 +2,16 @@
 // Post-processed for Zod v3/v4 compatibility and MCP SDK integration
 // Run: npm run generate:schemas
 import { z } from "zod/v4";
-import {
-  ContentBlockSchema,
-  CallToolResultSchema,
-  EmbeddedResourceSchema,
-  ImplementationSchema,
-  RequestIdSchema,
-  ResourceLinkSchema,
-  ToolSchema,
-} from "../sdk-compat.js";
+import { isSpecType } from "@modelcontextprotocol/client";
+import type {
+  ContentBlock,
+  CallToolResult,
+  EmbeddedResource,
+  Implementation,
+  RequestId,
+  ResourceLink,
+  Tool,
+} from "@modelcontextprotocol/client";
 
 /**
  * @description Color theme preference for the host environment.
@@ -743,6 +744,30 @@ export const McpUiClientCapabilitiesSchema = z.object({
       'Array of supported MIME types for UI resources.\nMust include `"text/html;profile=mcp-app"` for MCP Apps support.',
     ),
 });
+
+const EmbeddedResourceSchema = z.custom<EmbeddedResource>((v) =>
+  isSpecType("EmbeddedResource", v),
+);
+
+const ResourceLinkSchema = z.custom<ResourceLink>((v) =>
+  isSpecType("ResourceLink", v),
+);
+
+const ContentBlockSchema = z.custom<ContentBlock>((v) =>
+  isSpecType("ContentBlock", v),
+);
+
+const CallToolResultSchema = z.custom<CallToolResult>((v) =>
+  isSpecType("CallToolResult", v),
+);
+
+const RequestIdSchema = z.custom<RequestId>((v) => isSpecType("RequestId", v));
+
+const ToolSchema = z.custom<Tool>((v) => isSpecType("Tool", v));
+
+const ImplementationSchema = z.custom<Implementation>((v) =>
+  isSpecType("Implementation", v),
+);
 
 /**
  * @description Request to download a file through the host.

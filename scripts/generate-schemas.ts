@@ -187,20 +187,22 @@ function postProcess(content: string): string {
   // 1. Rewrite to zod/v4 and add MCP SDK schema imports.
   // zod/v4 aligns with the SDK's own zod import — composing v3 and v4
   // schema instances throws at parse time. See header comment for details.
-  const mcpImports = EXTERNAL_TYPE_SCHEMAS.join(",\n  ");
+  const typeImports = EXTERNAL_TYPE_SCHEMAS.map((s) =>
+    s.replace(/Schema$/, ""),
+  ).join(", ");
   content = content.replace(
     'import { z } from "zod";',
     `import { z } from "zod/v4";
-import {
-  ${mcpImports},
-} from "../sdk-compat.js";`,
+import { isSpecType } from "@modelcontextprotocol/client";
+import type { ${typeImports} } from "@modelcontextprotocol/client";`,
   );
 
-  // 2. Remove z.any() placeholders for external types (now imported from MCP SDK)
+  // 2. Replace z.any() placeholders for external SDK types with isSpecType-backed z.custom
   for (const schema of EXTERNAL_TYPE_SCHEMAS) {
+    const typeName = schema.replace(/Schema$/, "");
     content = content.replace(
-      new RegExp(`(?:export )?const ${schema} = z\\.any\\(\\);\\n?`, "g"),
-      "",
+      new RegExp(`((?:export )?const ${schema}) = z\\.any\\(\\);`, "g"),
+      `$1 = z.custom<${typeName}>((v) => isSpecType("${typeName}", v));`,
     );
   }
 

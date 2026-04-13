@@ -242,7 +242,7 @@ export function createServer(): McpServer {
 ```ts source="../examples/quickstart/main.ts"
 import { createMcpExpressApp } from "@modelcontextprotocol/express";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { StdioServerTransport } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { NodeStreamableHTTPServerTransport as StreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import cors from "cors";
 import type { Request, Response } from "express";

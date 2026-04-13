@@ -10,8 +10,8 @@
  * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx
  */
 
-import type { RequestId } from "./sdk-compat.js";
 import type {
+  RequestId,
   CallToolResult,
   ContentBlock,
   EmbeddedResource,
