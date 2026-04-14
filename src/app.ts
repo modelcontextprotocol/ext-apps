@@ -860,7 +860,14 @@ export class App extends ProtocolWithEvents<
     return await this.request(
       { method: "tools/call", params },
       CallToolResultSchema,
-      options,
+      {
+        // Hosts may interpose long-running or user-interactive steps before the
+        // tool result arrives. Opting in here lets a host heartbeat keep the
+        // request alive past the default timeout; callers can still override.
+        onprogress: () => {},
+        resetTimeoutOnProgress: true,
+        ...options,
+      },
     );
   }
 
