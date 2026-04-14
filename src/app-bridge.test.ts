@@ -698,8 +698,8 @@ describe("App <-> AppBridge integration", () => {
     });
 
     it("registerTool creates a registered tool", async () => {
-      const InputSchema = z.object({ name: z.string() }) as any;
-      const OutputSchema = z.object({ greeting: z.string() }) as any;
+      const InputSchema = z.object({ name: z.string() });
+      const OutputSchema = z.object({ greeting: z.string() });
 
       const tool = app.registerTool(
         "greet",
@@ -803,7 +803,7 @@ describe("App <-> AppBridge integration", () => {
       await app.connect(appTransport);
       const tool = app.registerTool(
         "evolving",
-        { inputSchema: z.object({ a: z.string() }) as any },
+        { inputSchema: z.object({ a: z.string() }) },
         async (args: any) => ({
           content: [{ type: "text" as const, text: JSON.stringify(args) }],
         }),
@@ -811,7 +811,7 @@ describe("App <-> AppBridge integration", () => {
       expect(
         bridge.callTool({ name: "evolving", arguments: { a: 123 } }),
       ).rejects.toThrow(/Invalid input/);
-      tool.update({ inputSchema: z.object({ a: z.number() }) as any });
+      tool.update({ inputSchema: z.object({ a: z.number() }) });
       const result = await bridge.callTool({
         name: "evolving",
         arguments: { a: 123 },
@@ -845,7 +845,7 @@ describe("App <-> AppBridge integration", () => {
     });
 
     it("tool validates input schema", async () => {
-      const InputSchema = z.object({ name: z.string() }) as any;
+      const InputSchema = z.object({ name: z.string() });
 
       const tool = app.registerTool(
         "greet",
@@ -877,7 +877,7 @@ describe("App <-> AppBridge integration", () => {
     });
 
     it("tool validates output schema", async () => {
-      const OutputSchema = z.object({ greeting: z.string() }) as any;
+      const OutputSchema = z.object({ greeting: z.string() });
 
       const tool = app.registerTool(
         "greet",
@@ -1031,7 +1031,7 @@ describe("App <-> AppBridge integration", () => {
         "greet",
         {
           description: "Greets user",
-          inputSchema: z.object({ name: z.string() }) as any,
+          inputSchema: z.object({ name: z.string() }),
         },
         async (args: any) => ({
           content: [{ type: "text" as const, text: `Hello, ${args.name}!` }],
@@ -1072,7 +1072,7 @@ describe("App <-> AppBridge integration", () => {
           "greet",
           {
             description: "Greets user",
-            inputSchema: z.object({ name: z.string() }) as any,
+            inputSchema: z.object({ name: z.string() }),
           },
           async (args: any) => ({
             content: [{ type: "text" as const, text: `Hello, ${args.name}!` }],
@@ -1119,7 +1119,7 @@ describe("App <-> AppBridge integration", () => {
           "add",
           {
             description: "Add two numbers",
-            inputSchema: z.object({ a: z.number(), b: z.number() }) as any,
+            inputSchema: z.object({ a: z.number(), b: z.number() }),
           },
           async (args: any) => ({
             content: [
@@ -1136,7 +1136,7 @@ describe("App <-> AppBridge integration", () => {
           "multiply",
           {
             description: "Multiply two numbers",
-            inputSchema: z.object({ a: z.number(), b: z.number() }) as any,
+            inputSchema: z.object({ a: z.number(), b: z.number() }),
           },
           async (args: any) => ({
             content: [

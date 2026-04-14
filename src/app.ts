@@ -176,9 +176,24 @@ type RequestHandlerExtra = Parameters<
 >[1];
 
 /**
+ * Result of an app-registered tool callback. When `Out` is provided,
+ * `structuredContent` is required and typed (unless `isError: true`).
+ */
+export type AppToolResult<
+  Out extends StandardSchemaV1 | undefined = undefined,
+> = Out extends StandardSchemaV1
+  ?
+      | (CallToolResult & {
+          structuredContent: StandardSchemaV1.InferOutput<Out>;
+          isError?: false;
+        })
+      | (CallToolResult & { isError: true })
+  : CallToolResult;
+
+/**
  * Callback for an app-registered tool. When `In` is provided, `args` is the
  * validated/parsed input; when `In` is `undefined`, the callback receives only
- * `extra`.
+ * `extra`. When `Out` is provided, the return's `structuredContent` is typed.
  *
  * Mirrors `ToolCallback` from `@modelcontextprotocol/sdk/server/mcp.js` but is
  * parameterized over {@link StandardSchemaV1} instead of zod, so any
@@ -186,12 +201,15 @@ type RequestHandlerExtra = Parameters<
  */
 export type AppToolCallback<
   In extends StandardSchemaV1 | undefined = undefined,
+  Out extends StandardSchemaV1 | undefined = undefined,
 > = In extends StandardSchemaV1
   ? (
       args: StandardSchemaV1.InferOutput<In>,
       extra: RequestHandlerExtra,
-    ) => CallToolResult | Promise<CallToolResult>
-  : (extra: RequestHandlerExtra) => CallToolResult | Promise<CallToolResult>;
+    ) => AppToolResult<Out> | Promise<AppToolResult<Out>>
+  : (
+      extra: RequestHandlerExtra,
+    ) => AppToolResult<Out> | Promise<AppToolResult<Out>>;
 
 /**
  * Handle returned by {@link App.registerTool}. Mirrors `RegisteredTool` from
@@ -363,7 +381,7 @@ export class App extends ProtocolWithEvents<
   }
 
   registerTool<
-    OutputArgs extends StandardSchemaV1,
+    OutputArgs extends undefined | StandardSchemaV1 = undefined,
     InputArgs extends undefined | StandardSchemaV1 = undefined,
   >(
     name: string,
@@ -375,7 +393,7 @@ export class App extends ProtocolWithEvents<
       annotations?: ToolAnnotations;
       _meta?: Record<string, unknown>;
     },
-    cb: AppToolCallback<InputArgs>,
+    cb: AppToolCallback<InputArgs, OutputArgs>,
   ): RegisteredAppTool {
     if (this._registeredTools[name]) {
       throw new Error(`Tool ${name} is already registered`);
@@ -419,12 +437,13 @@ export class App extends ProtocolWithEvents<
             rawArgs,
             `Invalid input for tool ${name}: `,
           );
-          result = await (cb as AppToolCallback<StandardSchemaV1>)(
-            parsedArgs,
+          result = await (
+            cb as AppToolCallback<StandardSchemaV1, StandardSchemaV1>
+          )(parsedArgs, extra);
+        } else {
+          result = await (cb as AppToolCallback<undefined, StandardSchemaV1>)(
             extra,
           );
-        } else {
-          result = await (cb as AppToolCallback<undefined>)(extra);
         }
         if (registeredTool.outputSchema) {
           result.structuredContent = (await validateStandardSchema(
