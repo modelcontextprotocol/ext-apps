@@ -71,6 +71,7 @@ export interface ViewProps<TToolInput = Record<string, unknown>> {
 function registerWidgetTools(
   app: App,
   sceneStateRef: React.RefObject<SceneState>,
+  setToolInputs: (args: Record<string, unknown>) => void,
 ): void {
   // Tool: set-scene-source - Update the scene source/configuration
   app.registerTool(
@@ -95,12 +96,12 @@ function registerWidgetTools(
       }),
     },
     async (args) => {
-      // Update scene state
       sceneStateRef.current.code = args.code;
       if (args.height !== undefined) {
         sceneStateRef.current.height = args.height;
       }
       sceneStateRef.current.error = null;
+      setToolInputs({ code: args.code, height: sceneStateRef.current.height });
 
       const result = {
         success: true,
@@ -179,7 +180,7 @@ function McpAppWrapper() {
       appRef.current = app;
 
       // Register widget interaction tools before connect()
-      registerWidgetTools(app, sceneStateRef);
+      registerWidgetTools(app, sceneStateRef, setToolInputs);
 
       // Complete tool input (streaming finished)
       app.ontoolinput = (params) => {

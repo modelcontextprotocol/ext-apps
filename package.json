@@ -118,9 +118,6 @@
     },
     "react-dom": {
       "optional": true
-    },
-    "zod": {
-      "optional": true
     }
   },
   "overrides": {

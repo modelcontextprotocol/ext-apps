@@ -377,7 +377,13 @@ export class App extends ProtocolWithEvents<
     },
     cb: AppToolCallback<InputArgs>,
   ): RegisteredAppTool {
+    if (this._registeredTools[name]) {
+      throw new Error(`Tool ${name} is already registered`);
+    }
     const app = this;
+    const notify = () => {
+      if (app.transport) void app.sendToolListChanged();
+    };
     const registeredTool: RegisteredAppTool = {
       title: config.title,
       description: config.description,
@@ -388,38 +394,41 @@ export class App extends ProtocolWithEvents<
       enabled: true,
       enable(): void {
         this.enabled = true;
-        app.sendToolListChanged();
+        notify();
       },
       disable(): void {
         this.enabled = false;
-        app.sendToolListChanged();
+        notify();
       },
       update(updates) {
         Object.assign(this, updates);
-        app.sendToolListChanged();
+        notify();
       },
       remove() {
         delete app._registeredTools[name];
-        app.sendToolListChanged();
+        notify();
       },
       handler: async (rawArgs, extra) => {
         if (!registeredTool.enabled) {
           throw new Error(`Tool ${name} is disabled`);
         }
-        const parsedArgs = config.inputSchema
-          ? await validateStandardSchema(
-              config.inputSchema,
-              rawArgs,
-              `Invalid input for tool ${name}: `,
-            )
-          : rawArgs;
-        const result = await (cb as AppToolCallback<StandardSchemaV1>)(
-          parsedArgs,
-          extra,
-        );
-        if (config.outputSchema) {
+        let result: CallToolResult;
+        if (registeredTool.inputSchema) {
+          const parsedArgs = await validateStandardSchema(
+            registeredTool.inputSchema,
+            rawArgs,
+            `Invalid input for tool ${name}: `,
+          );
+          result = await (cb as AppToolCallback<StandardSchemaV1>)(
+            parsedArgs,
+            extra,
+          );
+        } else {
+          result = await (cb as AppToolCallback<undefined>)(extra);
+        }
+        if (registeredTool.outputSchema) {
           result.structuredContent = (await validateStandardSchema(
-            config.outputSchema,
+            registeredTool.outputSchema,
             result.structuredContent,
             `Invalid output for tool ${name}: `,
           )) as CallToolResult["structuredContent"];
@@ -440,6 +449,7 @@ export class App extends ProtocolWithEvents<
     }
 
     this.ensureToolHandlersInitialized();
+    notify();
     return registeredTool;
   }
 

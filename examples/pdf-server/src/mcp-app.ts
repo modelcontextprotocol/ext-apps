@@ -5136,7 +5136,7 @@ const PageIntervalSchema = z.object({
 /** Dispatch a command via processCommands and return a text result. */
 async function runCommand(
   cmd: PdfCommand,
-  okText: string,
+  okText: string | (() => string),
 ): Promise<CallToolResult> {
   if (!pdfDocument) {
     return {
@@ -5145,7 +5145,8 @@ async function runCommand(
     };
   }
   await processCommands([cmd]);
-  return { content: [{ type: "text" as const, text: okText }] };
+  const text = typeof okText === "function" ? okText() : okText;
+  return { content: [{ type: "text" as const, text }] };
 }
 
 app.registerTool(
@@ -5218,7 +5219,7 @@ app.registerTool(
   async ({ query }) =>
     runCommand(
       { type: "search", query },
-      `Searched for "${query}": ${allMatches.length} match(es)`,
+      () => `Searched for "${query}": ${allMatches.length} match(es)`,
     ),
 );
 
@@ -5235,7 +5236,7 @@ app.registerTool(
   async ({ query }) =>
     runCommand(
       { type: "find", query },
-      `Found ${allMatches.length} match(es) for "${query}"`,
+      () => `Found ${allMatches.length} match(es) for "${query}"`,
     ),
 );
 

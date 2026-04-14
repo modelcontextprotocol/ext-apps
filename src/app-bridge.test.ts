@@ -772,6 +772,53 @@ describe("App <-> AppBridge integration", () => {
       // Tool should no longer be registered (internal check)
     });
 
+    it("registerTool throws on duplicate name", () => {
+      app.registerTool("dup", {}, async () => ({ content: [] }));
+      expect(() =>
+        app.registerTool("dup", {}, async () => ({ content: [] })),
+      ).toThrow(/already registered/);
+    });
+
+    it("enable/disable/update/remove pre-connect do not throw", () => {
+      const tool = app.registerTool("t", {}, async () => ({ content: [] }));
+      expect(() => tool.disable()).not.toThrow();
+      expect(() => tool.enable()).not.toThrow();
+      expect(() => tool.update({ description: "x" })).not.toThrow();
+      expect(() => tool.remove()).not.toThrow();
+    });
+
+    it("callback without inputSchema receives extra as first arg", async () => {
+      await app.connect(appTransport);
+      let receivedExtra: any;
+      app.registerTool("noargs", {}, async (extra: any) => {
+        receivedExtra = extra;
+        return { content: [] };
+      });
+      await bridge.callTool({ name: "noargs", arguments: {} });
+      expect(receivedExtra).toBeDefined();
+      expect(receivedExtra.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("update({inputSchema}) is honored by handler validation", async () => {
+      await app.connect(appTransport);
+      const tool = app.registerTool(
+        "evolving",
+        { inputSchema: z.object({ a: z.string() }) as any },
+        async (args: any) => ({
+          content: [{ type: "text" as const, text: JSON.stringify(args) }],
+        }),
+      );
+      expect(
+        bridge.callTool({ name: "evolving", arguments: { a: 123 } }),
+      ).rejects.toThrow(/Invalid input/);
+      tool.update({ inputSchema: z.object({ a: z.number() }) as any });
+      const result = await bridge.callTool({
+        name: "evolving",
+        arguments: { a: 123 },
+      });
+      expect(result.content[0]).toEqual({ type: "text", text: '{"a":123}' });
+    });
+
     it("tool throws error when disabled and called", async () => {
       await app.connect(appTransport);
 

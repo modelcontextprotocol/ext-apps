@@ -1775,8 +1775,8 @@ await app.connect(new PostMessageTransport(window.parent));
 |-------|------|----------|-------------|
 | `name` | string | Yes | Unique tool identifier |
 | `description` | string | No | Human-readable description for agent |
-| `inputSchema` | Zod schema or JSON Schema | No | Validates arguments |
-| `outputSchema` | Zod schema | No | Validates return value |
+| `inputSchema` | [Standard Schema](https://standardschema.dev/) | No | Validates arguments; serialized to JSON Schema for `tools/list` |
+| `outputSchema` | [Standard Schema](https://standardschema.dev/) | No | Validates `structuredContent` |
 | `annotations` | ToolAnnotations | No | MCP tool hints (e.g., `readOnlyHint`) |
 | `_meta` | object | No | Custom metadata |
 
@@ -2292,7 +2292,7 @@ This specification defines the Minimum Viable Product (MVP) for MCP Apps.
 - **App-Provided Tools:** Apps can register tools via `app.registerTool()` that agents can call
   - Bidirectional tool flow (Apps consume server tools AND provide app tools)
   - Full lifecycle management (enable/disable/update/remove)
-  - Schema validation with Zod
+  - Schema validation via [Standard Schema](https://standardschema.dev/) (Zod, ArkType, Valibot, …)
   - Tool list change notifications
 
 **Content Types (deferred from MVP):**
@@ -2602,7 +2602,7 @@ Hosts MAY implement different permission levels based on tool annotations:
 
 App tools MUST be tied to the app's lifecycle:
 
-- Tools become available only after app sends `notifications/tools/list_changed`
+- Tools become available once the app advertises the `tools` capability in `ui/initialize` and the host issues `tools/list`; subsequent changes are signaled via `notifications/tools/list_changed`
 - Tools automatically disappear when app iframe is torn down
 - Hosts MUST NOT persist app tool registrations across sessions
 - Calling a tool from a closed app MUST return an error
