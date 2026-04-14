@@ -425,12 +425,11 @@ app.registerTool(
       arguments: { url: searchUrl },
     });
 
-    // Clear existing graph and start fresh with this article
-    graphData.nodes = [];
-    graphData.links = [];
-
     const response = result.structuredContent as unknown as ToolResponse;
     if (response && response.page) {
+      // Clear existing graph and start fresh with this article
+      graphData.nodes = [];
+      graphData.links = [];
       initialUrl = response.page.url;
       addNode(response.page.url, response.page.title, "default", {
         x: 0,

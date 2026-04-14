@@ -400,8 +400,13 @@ export class App extends ProtocolWithEvents<
     }
     const app = this;
     const notify = () => {
-      if (app.transport) void app.sendToolListChanged();
+      if (app.transport && app._capabilities.tools?.listChanged) {
+        void app.sendToolListChanged();
+      }
     };
+    // Arity is fixed at registration time even if inputSchema is later
+    // update()d, since cb's signature can't change.
+    const cbTakesArgs = config.inputSchema !== undefined;
     const registeredTool: RegisteredAppTool = {
       title: config.title,
       description: config.description,
@@ -423,6 +428,7 @@ export class App extends ProtocolWithEvents<
         notify();
       },
       remove() {
+        if (app._registeredTools[name] !== registeredTool) return;
         delete app._registeredTools[name];
         notify();
       },
@@ -431,12 +437,15 @@ export class App extends ProtocolWithEvents<
           throw new Error(`Tool ${name} is disabled`);
         }
         let result: CallToolResult;
-        if (registeredTool.inputSchema) {
-          const parsedArgs = await validateStandardSchema(
-            registeredTool.inputSchema,
-            rawArgs,
-            `Invalid input for tool ${name}: `,
-          );
+        if (cbTakesArgs) {
+          const schema = registeredTool.inputSchema;
+          const parsedArgs = schema
+            ? await validateStandardSchema(
+                schema,
+                rawArgs ?? {},
+                `Invalid input for tool ${name}: `,
+              )
+            : (rawArgs ?? {});
           result = await (
             cb as AppToolCallback<StandardSchemaV1, StandardSchemaV1>
           )(parsedArgs, extra);
@@ -445,7 +454,7 @@ export class App extends ProtocolWithEvents<
             extra,
           );
         }
-        if (registeredTool.outputSchema) {
+        if (registeredTool.outputSchema && !result.isError) {
           result.structuredContent = (await validateStandardSchema(
             registeredTool.outputSchema,
             result.structuredContent,

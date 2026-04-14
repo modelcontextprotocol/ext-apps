@@ -685,7 +685,7 @@ app.registerTool(
       categoryId: z
         .string()
         .describe(
-          "Category ID (e.g., 'rd', 'sales', 'marketing', 'ops', 'ga')",
+          "Category ID (e.g., 'marketing', 'engineering', 'operations', 'sales', 'rd')",
         ),
       percent: z
         .number()
@@ -795,7 +795,7 @@ app.registerTool(
   {
     title: "Set Company Stage",
     description:
-      "Set the company stage for benchmark comparison (seed, series_a, series_b, growth)",
+      "Set the company stage for benchmark comparison (e.g., 'Seed', 'Series A', 'Series B', 'Growth')",
     inputSchema: z.object({
       stage: z.string().describe("Company stage ID"),
     }),

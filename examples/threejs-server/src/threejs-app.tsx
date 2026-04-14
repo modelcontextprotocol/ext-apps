@@ -321,12 +321,18 @@ export default function ThreeJSApp({
       w,
       h,
       animControllerRef.current.visibilityAwareRAF,
-    ).catch((e) => setError(e instanceof Error ? e.message : "Unknown error"));
+    ).catch((e) => {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      setError(msg);
+      onSceneError(msg);
+      onSceneRendering(false);
+    });
 
     return () => {
       canvas.removeEventListener("touchstart", preventDefault);
       canvas.removeEventListener("touchmove", preventDefault);
       animControllerRef.current?.cleanup();
+      onSceneRendering(false);
     };
   }, [code, height, containerWidth, isFullscreen, hostHeight]);
 

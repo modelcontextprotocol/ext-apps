@@ -692,8 +692,11 @@ describe("App <-> AppBridge integration", () => {
 
   describe("App tool registration", () => {
     beforeEach(async () => {
-      // App needs tool capabilities to register tools
-      app = new App(testAppInfo, { tools: {} }, { autoResize: false });
+      app = new App(
+        testAppInfo,
+        { tools: { listChanged: true } },
+        { autoResize: false },
+      );
       await bridge.connect(bridgeTransport);
     });
 
@@ -797,6 +800,46 @@ describe("App <-> AppBridge integration", () => {
       await bridge.callTool({ name: "noargs", arguments: {} });
       expect(receivedExtra).toBeDefined();
       expect(receivedExtra.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("isError result skips output schema validation", async () => {
+      await app.connect(appTransport);
+      app.registerTool(
+        "errs",
+        { outputSchema: z.object({ ok: z.boolean() }) },
+        async () => ({
+          content: [{ type: "text" as const, text: "boom" }],
+          isError: true,
+        }),
+      );
+      const res = await bridge.callTool({ name: "errs", arguments: {} });
+      expect(res.isError).toBe(true);
+      expect(res.structuredContent).toBeUndefined();
+    });
+
+    it("stale handle remove() does not delete a re-registered tool", async () => {
+      const t1 = app.registerTool("phoenix", {}, async () => ({ content: [] }));
+      t1.remove();
+      app.registerTool("phoenix", {}, async () => ({ content: [] }));
+      t1.remove();
+      await app.connect(appTransport);
+      const list = await bridge.listTools({});
+      expect(list.tools.map((t) => t.name)).toContain("phoenix");
+    });
+
+    it("host omitting arguments defaults to empty object", async () => {
+      await app.connect(appTransport);
+      let received: unknown;
+      app.registerTool(
+        "noargs2",
+        { inputSchema: z.object({}) },
+        async (args) => {
+          received = args;
+          return { content: [] };
+        },
+      );
+      await bridge.callTool({ name: "noargs2" });
+      expect(received).toEqual({});
     });
 
     it("update({inputSchema}) is honored by handler validation", async () => {

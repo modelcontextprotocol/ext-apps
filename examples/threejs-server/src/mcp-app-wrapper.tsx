@@ -272,19 +272,21 @@ function McpAppWrapper() {
 
     // Send errors to model context for awareness
     if (sceneError && appRef.current) {
-      appRef.current.updateModelContext({
-        content: [
-          {
-            type: "text" as const,
-            text: `Three.js Scene Error: ${sceneError}`,
+      void appRef.current
+        .updateModelContext({
+          content: [
+            {
+              type: "text" as const,
+              text: `Three.js Scene Error: ${sceneError}`,
+            },
+          ],
+          structuredContent: {
+            type: "scene_error",
+            error: sceneError,
+            timestamp: new Date().toISOString(),
           },
-        ],
-        structuredContent: {
-          type: "scene_error",
-          error: sceneError,
-          timestamp: new Date().toISOString(),
-        },
-      });
+        })
+        .catch(() => {});
     }
   }, []);
 
