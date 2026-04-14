@@ -63,8 +63,13 @@ test.describe("PDF Viewer — fullscreen fit + pinch zoom", () => {
     await waitForPdfRender(page);
     const app = getAppFrame(page);
 
+    // Initial fit-to-width measures container.clientWidth immediately after
+    // showViewer() flips display:flex; under CI load the reflow can lag, so
+    // poll until the shrink-to-fit scale has actually applied.
+    await expect
+      .poll(() => readZoomPercent(page), { timeout: 5000 })
+      .toBeLessThan(100);
     const inlineZoom = await readZoomPercent(page);
-    expect(inlineZoom).toBeLessThan(100);
 
     // Widen + give plenty of height, then enter fullscreen. Fullscreen uses
     // fit-to-PAGE (whole page visible), so the resulting zoom is whichever
