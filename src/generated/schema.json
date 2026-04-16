@@ -159,8 +159,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -169,9 +177,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -214,8 +220,16 @@
                               }
                             },
                             "theme": {
-                              "type": "string",
-                              "enum": ["light", "dark"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "light"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "dark"
+                                }
+                              ]
                             }
                           },
                           "required": ["src"],
@@ -231,17 +245,22 @@
                       "mimeType": {
                         "type": "string"
                       },
-                      "size": {
-                        "type": "number"
-                      },
                       "annotations": {
                         "type": "object",
                         "properties": {
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -250,16 +269,19 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
                       },
+                      "size": {
+                        "type": "number"
+                      },
                       "_meta": {
                         "type": "object",
-                        "properties": {},
+                        "propertyNames": {
+                          "type": "string"
+                        },
                         "additionalProperties": {}
                       },
                       "type": {
@@ -527,9 +549,7 @@
                       "type": "string"
                     },
                     {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "type": "number"
                     }
                   ]
                 },
@@ -560,8 +580,16 @@
                             }
                           },
                           "theme": {
-                            "type": "string",
-                            "enum": ["light", "dark"]
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "light"
+                              },
+                              {
+                                "type": "string",
+                                "const": "dark"
+                              }
+                            ]
                           }
                         },
                         "required": ["src"],
@@ -574,6 +602,9 @@
                     "inputSchema": {
                       "type": "object",
                       "properties": {
+                        "$schema": {
+                          "type": "string"
+                        },
                         "type": {
                           "type": "string",
                           "const": "object"
@@ -583,7 +614,13 @@
                           "propertyNames": {
                             "type": "string"
                           },
-                          "additionalProperties": {}
+                          "additionalProperties": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
                         },
                         "required": {
                           "type": "array",
@@ -593,11 +630,36 @@
                         }
                       },
                       "required": ["type"],
-                      "additionalProperties": {}
+                      "additionalProperties": false
+                    },
+                    "execution": {
+                      "type": "object",
+                      "properties": {
+                        "taskSupport": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "forbidden"
+                            },
+                            {
+                              "type": "string",
+                              "const": "optional"
+                            },
+                            {
+                              "type": "string",
+                              "const": "required"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "outputSchema": {
                       "type": "object",
                       "properties": {
+                        "$schema": {
+                          "type": "string"
+                        },
                         "type": {
                           "type": "string",
                           "const": "object"
@@ -607,7 +669,13 @@
                           "propertyNames": {
                             "type": "string"
                           },
-                          "additionalProperties": {}
+                          "additionalProperties": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
                         },
                         "required": {
                           "type": "array",
@@ -617,7 +685,7 @@
                         }
                       },
                       "required": ["type"],
-                      "additionalProperties": {}
+                      "additionalProperties": false
                     },
                     "annotations": {
                       "type": "object",
@@ -636,16 +704,6 @@
                         },
                         "openWorldHint": {
                           "type": "boolean"
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    "execution": {
-                      "type": "object",
-                      "properties": {
-                        "taskSupport": {
-                          "type": "string",
-                          "enum": ["required", "optional", "forbidden"]
                         }
                       },
                       "additionalProperties": false
@@ -1290,9 +1348,7 @@
                   "type": "string"
                 },
                 {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
+                  "type": "number"
                 }
               ]
             },
@@ -1323,8 +1379,16 @@
                         }
                       },
                       "theme": {
-                        "type": "string",
-                        "enum": ["light", "dark"]
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "light"
+                          },
+                          {
+                            "type": "string",
+                            "const": "dark"
+                          }
+                        ]
                       }
                     },
                     "required": ["src"],
@@ -1337,6 +1401,9 @@
                 "inputSchema": {
                   "type": "object",
                   "properties": {
+                    "$schema": {
+                      "type": "string"
+                    },
                     "type": {
                       "type": "string",
                       "const": "object"
@@ -1346,7 +1413,13 @@
                       "propertyNames": {
                         "type": "string"
                       },
-                      "additionalProperties": {}
+                      "additionalProperties": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      }
                     },
                     "required": {
                       "type": "array",
@@ -1356,11 +1429,36 @@
                     }
                   },
                   "required": ["type"],
-                  "additionalProperties": {}
+                  "additionalProperties": false
+                },
+                "execution": {
+                  "type": "object",
+                  "properties": {
+                    "taskSupport": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "forbidden"
+                        },
+                        {
+                          "type": "string",
+                          "const": "optional"
+                        },
+                        {
+                          "type": "string",
+                          "const": "required"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
                 },
                 "outputSchema": {
                   "type": "object",
                   "properties": {
+                    "$schema": {
+                      "type": "string"
+                    },
                     "type": {
                       "type": "string",
                       "const": "object"
@@ -1370,7 +1468,13 @@
                       "propertyNames": {
                         "type": "string"
                       },
-                      "additionalProperties": {}
+                      "additionalProperties": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      }
                     },
                     "required": {
                       "type": "array",
@@ -1380,7 +1484,7 @@
                     }
                   },
                   "required": ["type"],
-                  "additionalProperties": {}
+                  "additionalProperties": false
                 },
                 "annotations": {
                   "type": "object",
@@ -1399,16 +1503,6 @@
                     },
                     "openWorldHint": {
                       "type": "boolean"
-                    }
-                  },
-                  "additionalProperties": false
-                },
-                "execution": {
-                  "type": "object",
-                  "properties": {
-                    "taskSupport": {
-                      "type": "string",
-                      "enum": ["required", "optional", "forbidden"]
                     }
                   },
                   "additionalProperties": false
@@ -2498,8 +2592,16 @@
                         }
                       },
                       "theme": {
-                        "type": "string",
-                        "enum": ["light", "dark"]
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "light"
+                          },
+                          {
+                            "type": "string",
+                            "const": "dark"
+                          }
+                        ]
                       }
                     },
                     "required": ["src"],
@@ -2509,10 +2611,10 @@
                 "version": {
                   "type": "string"
                 },
-                "websiteUrl": {
+                "description": {
                   "type": "string"
                 },
-                "description": {
+                "websiteUrl": {
                   "type": "string"
                 }
               },
@@ -2612,8 +2714,16 @@
                     }
                   },
                   "theme": {
-                    "type": "string",
-                    "enum": ["light", "dark"]
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "light"
+                      },
+                      {
+                        "type": "string",
+                        "const": "dark"
+                      }
+                    ]
                   }
                 },
                 "required": ["src"],
@@ -2623,10 +2733,10 @@
             "version": {
               "type": "string"
             },
-            "websiteUrl": {
+            "description": {
               "type": "string"
             },
-            "description": {
+            "websiteUrl": {
               "type": "string"
             }
           },
@@ -2860,9 +2970,7 @@
                       "type": "string"
                     },
                     {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "type": "number"
                     }
                   ]
                 },
@@ -2893,8 +3001,16 @@
                             }
                           },
                           "theme": {
-                            "type": "string",
-                            "enum": ["light", "dark"]
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "light"
+                              },
+                              {
+                                "type": "string",
+                                "const": "dark"
+                              }
+                            ]
                           }
                         },
                         "required": ["src"],
@@ -2907,6 +3023,9 @@
                     "inputSchema": {
                       "type": "object",
                       "properties": {
+                        "$schema": {
+                          "type": "string"
+                        },
                         "type": {
                           "type": "string",
                           "const": "object"
@@ -2916,7 +3035,13 @@
                           "propertyNames": {
                             "type": "string"
                           },
-                          "additionalProperties": {}
+                          "additionalProperties": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
                         },
                         "required": {
                           "type": "array",
@@ -2926,11 +3051,36 @@
                         }
                       },
                       "required": ["type"],
-                      "additionalProperties": {}
+                      "additionalProperties": false
+                    },
+                    "execution": {
+                      "type": "object",
+                      "properties": {
+                        "taskSupport": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "forbidden"
+                            },
+                            {
+                              "type": "string",
+                              "const": "optional"
+                            },
+                            {
+                              "type": "string",
+                              "const": "required"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "outputSchema": {
                       "type": "object",
                       "properties": {
+                        "$schema": {
+                          "type": "string"
+                        },
                         "type": {
                           "type": "string",
                           "const": "object"
@@ -2940,7 +3090,13 @@
                           "propertyNames": {
                             "type": "string"
                           },
-                          "additionalProperties": {}
+                          "additionalProperties": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
                         },
                         "required": {
                           "type": "array",
@@ -2950,7 +3106,7 @@
                         }
                       },
                       "required": ["type"],
-                      "additionalProperties": {}
+                      "additionalProperties": false
                     },
                     "annotations": {
                       "type": "object",
@@ -2969,16 +3125,6 @@
                         },
                         "openWorldHint": {
                           "type": "boolean"
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    "execution": {
-                      "type": "object",
-                      "properties": {
-                        "taskSupport": {
-                          "type": "string",
-                          "enum": ["required", "optional", "forbidden"]
                         }
                       },
                       "additionalProperties": false
@@ -3666,8 +3812,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -3676,9 +3830,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -3713,8 +3865,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -3723,9 +3883,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -3760,8 +3918,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -3770,9 +3936,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -3815,8 +3979,16 @@
                               }
                             },
                             "theme": {
-                              "type": "string",
-                              "enum": ["light", "dark"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "light"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "dark"
+                                }
+                              ]
                             }
                           },
                           "required": ["src"],
@@ -3832,17 +4004,22 @@
                       "mimeType": {
                         "type": "string"
                       },
-                      "size": {
-                        "type": "number"
-                      },
                       "annotations": {
                         "type": "object",
                         "properties": {
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -3851,16 +4028,19 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
                       },
+                      "size": {
+                        "type": "number"
+                      },
                       "_meta": {
                         "type": "object",
-                        "properties": {},
+                        "propertyNames": {
+                          "type": "string"
+                        },
                         "additionalProperties": {}
                       },
                       "type": {
@@ -3934,8 +4114,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -3944,9 +4132,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -5291,34 +5477,12 @@
           "properties": {
             "_meta": {
               "type": "object",
-              "properties": {
-                "progressToken": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    }
-                  ]
-                },
-                "io.modelcontextprotocol/related-task": {
-                  "type": "object",
-                  "properties": {
-                    "taskId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["taskId"],
-                  "additionalProperties": false
-                }
+              "propertyNames": {
+                "type": "string"
               },
               "additionalProperties": {}
             },
             "content": {
-              "default": [],
               "type": "array",
               "items": {
                 "anyOf": [
@@ -5338,8 +5502,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5348,9 +5520,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -5385,8 +5555,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5395,9 +5573,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -5432,8 +5608,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5442,9 +5626,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -5487,8 +5669,16 @@
                               }
                             },
                             "theme": {
-                              "type": "string",
-                              "enum": ["light", "dark"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "light"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "dark"
+                                }
+                              ]
                             }
                           },
                           "required": ["src"],
@@ -5504,17 +5694,22 @@
                       "mimeType": {
                         "type": "string"
                       },
-                      "size": {
-                        "type": "number"
-                      },
                       "annotations": {
                         "type": "object",
                         "properties": {
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5523,16 +5718,19 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
                       },
+                      "size": {
+                        "type": "number"
+                      },
                       "_meta": {
                         "type": "object",
-                        "properties": {},
+                        "propertyNames": {
+                          "type": "string"
+                        },
                         "additionalProperties": {}
                       },
                       "type": {
@@ -5606,8 +5804,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5616,9 +5822,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -5702,8 +5906,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5712,9 +5924,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -5749,8 +5959,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5759,9 +5977,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -5796,8 +6012,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5806,9 +6030,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
@@ -5851,8 +6073,16 @@
                               }
                             },
                             "theme": {
-                              "type": "string",
-                              "enum": ["light", "dark"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "light"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "dark"
+                                }
+                              ]
                             }
                           },
                           "required": ["src"],
@@ -5868,17 +6098,22 @@
                       "mimeType": {
                         "type": "string"
                       },
-                      "size": {
-                        "type": "number"
-                      },
                       "annotations": {
                         "type": "object",
                         "properties": {
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5887,16 +6122,19 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false
                       },
+                      "size": {
+                        "type": "number"
+                      },
                       "_meta": {
                         "type": "object",
-                        "properties": {},
+                        "propertyNames": {
+                          "type": "string"
+                        },
                         "additionalProperties": {}
                       },
                       "type": {
@@ -5970,8 +6208,16 @@
                           "audience": {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "enum": ["user", "assistant"]
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "assistant"
+                                }
+                              ]
                             }
                           },
                           "priority": {
@@ -5980,9 +6226,7 @@
                             "maximum": 1
                           },
                           "lastModified": {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "type": "string"
                           }
                         },
                         "additionalProperties": false

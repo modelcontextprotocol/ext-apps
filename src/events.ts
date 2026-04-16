@@ -1,9 +1,9 @@
-import { Protocol } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import {
+import { Protocol } from "./vendor/protocol.js";
+import type {
   Request,
   Notification,
   Result,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "./vendor/mcp-types.js";
 import { ZodLiteral, ZodObject } from "zod/v4";
 
 type MethodSchema = ZodObject<{ method: ZodLiteral<string> }>;
@@ -260,13 +260,13 @@ export abstract class ProtocolWithEvents<
     SendNotificationT,
     SendResultT
   >["setRequestHandler"] = (schema, handler) => {
-    const method = (schema as MethodSchema).shape.method.value;
+    const method = (schema as unknown as MethodSchema).shape.method.value;
     this._registeredMethods.add(method);
     super.setRequestHandler(schema, handler);
   };
 
   private _assertMethodNotRegistered(schema: unknown, via: string): void {
-    const method = (schema as MethodSchema).shape.method.value;
+    const method = (schema as unknown as MethodSchema).shape.method.value;
     if (this._registeredMethods.has(method)) {
       throw new Error(
         `Handler for "${method}" already registered (via ${via}). ` +

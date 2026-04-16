@@ -156,7 +156,7 @@ import {
   ReadResourceResult,
   ResourceListChangedNotification,
   ToolListChangedNotification,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "./vendor/mcp-types.js";
 
 /**
  * All request types in the MCP Apps protocol.

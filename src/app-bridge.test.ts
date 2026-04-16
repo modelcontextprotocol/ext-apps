@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
+import { InMemoryTransport } from "./vendor/in-memory-transport.js";
+import type { McpClient } from "./vendor/mcp-client.js";
+import type { ServerCapabilities } from "./vendor/mcp-types.js";
 import {
   EmptyResultSchema,
   ListPromptsResultSchema,
@@ -11,7 +11,7 @@ import {
   ReadResourceResultSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "./generated/mcp-schemas.js";
 
 import { App } from "./app";
 import {
@@ -31,11 +31,12 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
  */
 function createMockClient(
   serverCapabilities: ServerCapabilities = {},
-): Pick<Client, "getServerCapabilities" | "request" | "notification"> {
+): McpClient {
   return {
     getServerCapabilities: () => serverCapabilities,
     request: async () => ({}) as never,
     notification: async () => {},
+    setNotificationHandler: () => {},
   };
 }
 
@@ -57,7 +58,7 @@ describe("App <-> AppBridge integration", () => {
     [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
     app = new App(testAppInfo, {}, { autoResize: false });
     bridge = new AppBridge(
-      createMockClient() as Client,
+      createMockClient(),
       testHostInfo,
       testHostCapabilities,
     );
@@ -118,7 +119,7 @@ describe("App <-> AppBridge integration", () => {
         containerDimensions: { width: 800, maxHeight: 600 },
       };
       const newBridge = new AppBridge(
-        createMockClient() as Client,
+        createMockClient(),
         testHostInfo,
         testHostCapabilities,
         { hostContext: testHostContext },
@@ -262,7 +263,7 @@ describe("App <-> AppBridge integration", () => {
         locale: "en-US",
       };
       const newBridge = new AppBridge(
-        createMockClient() as Client,
+        createMockClient(),
         testHostInfo,
         testHostCapabilities,
         { hostContext: initialContext },
@@ -305,7 +306,7 @@ describe("App <-> AppBridge integration", () => {
         locale: "en-US",
       };
       const newBridge = new AppBridge(
-        createMockClient() as Client,
+        createMockClient(),
         testHostInfo,
         testHostCapabilities,
         { hostContext: initialContext },
@@ -342,7 +343,7 @@ describe("App <-> AppBridge integration", () => {
         containerDimensions: { width: 800, maxHeight: 600 },
       };
       const newBridge = new AppBridge(
-        createMockClient() as Client,
+        createMockClient(),
         testHostInfo,
         testHostCapabilities,
         { hostContext: initialContext },
@@ -1232,7 +1233,7 @@ describe("isToolVisibilityAppOnly", () => {
       [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
       app = new App(testAppInfo, {}, { autoResize: false });
       bridge = new AppBridge(
-        createMockClient() as Client,
+        createMockClient(),
         testHostInfo,
         testHostCapabilities,
       );
@@ -1365,7 +1366,7 @@ describe("isToolVisibilityAppOnly", () => {
 
     it("direct setRequestHandler throws when called twice", () => {
       const bridge2 = new AppBridge(
-        createMockClient() as Client,
+        createMockClient(),
         testHostInfo,
         testHostCapabilities,
       );

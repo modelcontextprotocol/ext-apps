@@ -1,47 +1,49 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import {
+import type { McpClient } from "./vendor/mcp-client.js";
+import type { Transport } from "./vendor/transport.js";
+import type {
   CallToolRequest,
-  CallToolRequestSchema,
   CallToolResult,
-  CallToolResultSchema,
   EmptyResult,
   Implementation,
   ListPromptsRequest,
-  ListPromptsRequestSchema,
   ListPromptsResult,
-  ListPromptsResultSchema,
   ListResourcesRequest,
-  ListResourcesRequestSchema,
   ListResourcesResult,
-  ListResourcesResultSchema,
   ListResourceTemplatesRequest,
-  ListResourceTemplatesRequestSchema,
   ListResourceTemplatesResult,
-  ListResourceTemplatesResultSchema,
   ListToolsRequest,
-  ListToolsRequestSchema,
-  ListToolsResultSchema,
   LoggingMessageNotification,
-  LoggingMessageNotificationSchema,
   PingRequest,
-  PingRequestSchema,
   PromptListChangedNotification,
-  PromptListChangedNotificationSchema,
   ReadResourceRequest,
-  ReadResourceRequestSchema,
   ReadResourceResult,
-  ReadResourceResultSchema,
   ResourceListChangedNotification,
-  ResourceListChangedNotificationSchema,
   Tool,
   ToolListChangedNotification,
-  ToolListChangedNotificationSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "./vendor/mcp-types.js";
 import {
-  ProtocolOptions,
-  RequestOptions,
-} from "@modelcontextprotocol/sdk/shared/protocol.js";
+  CallToolRequestSchema,
+  CallToolResultSchema,
+  ListPromptsRequestSchema,
+  ListPromptsResultSchema,
+  ListResourcesRequestSchema,
+  ListResourcesResultSchema,
+  ListResourceTemplatesRequestSchema,
+  ListResourceTemplatesResultSchema,
+  ListToolsRequestSchema,
+  ListToolsResultSchema,
+  LoggingMessageNotificationSchema,
+  PingRequestSchema,
+  PromptListChangedNotificationSchema,
+  ReadResourceRequestSchema,
+  ReadResourceResultSchema,
+  ResourceListChangedNotificationSchema,
+  ToolListChangedNotificationSchema,
+} from "./generated/mcp-schemas.js";
+import {
+  type ProtocolOptions,
+  type RequestOptions,
+} from "./vendor/protocol.js";
 import { ProtocolWithEvents } from "./events";
 
 import {
@@ -350,7 +352,7 @@ export class AppBridge extends ProtocolWithEvents<
    * ```
    */
   constructor(
-    private _client: Client | null,
+    private _client: McpClient | null,
     private _hostInfo: Implementation,
     private _capabilities: McpUiHostCapabilities,
     options?: HostOptions,
@@ -1772,12 +1774,12 @@ export class AppBridge extends ProtocolWithEvents<
             { method: "tools/call", params },
             CallToolResultSchema,
             { signal: extra.signal },
-          );
+          ) as Promise<CallToolResult>;
         };
         if (serverCapabilities.tools.listChanged) {
           this._client.setNotificationHandler(
             ToolListChangedNotificationSchema,
-            (n) => this.sendToolListChanged(n.params),
+            (n: unknown) => this.sendToolListChanged((n as { params: ToolListChangedNotification["params"] }).params),
           );
         }
       }
@@ -1787,26 +1789,26 @@ export class AppBridge extends ProtocolWithEvents<
             { method: "resources/list", params },
             ListResourcesResultSchema,
             { signal: extra.signal },
-          );
+          ) as Promise<ListResourcesResult>;
         };
         this.onlistresourcetemplates = async (params, extra) => {
           return this._client!.request(
             { method: "resources/templates/list", params },
             ListResourceTemplatesResultSchema,
             { signal: extra.signal },
-          );
+          ) as Promise<ListResourceTemplatesResult>;
         };
         this.onreadresource = async (params, extra) => {
           return this._client!.request(
             { method: "resources/read", params },
             ReadResourceResultSchema,
             { signal: extra.signal },
-          );
+          ) as Promise<ReadResourceResult>;
         };
         if (serverCapabilities.resources.listChanged) {
           this._client.setNotificationHandler(
             ResourceListChangedNotificationSchema,
-            (n) => this.sendResourceListChanged(n.params),
+            (n: unknown) => this.sendResourceListChanged((n as { params: ResourceListChangedNotification["params"] }).params),
           );
         }
       }
@@ -1816,12 +1818,12 @@ export class AppBridge extends ProtocolWithEvents<
             { method: "prompts/list", params },
             ListPromptsResultSchema,
             { signal: extra.signal },
-          );
+          ) as Promise<ListPromptsResult>;
         };
         if (serverCapabilities.prompts.listChanged) {
           this._client.setNotificationHandler(
             PromptListChangedNotificationSchema,
-            (n) => this.sendPromptListChanged(n.params),
+            (n: unknown) => this.sendPromptListChanged((n as { params: PromptListChangedNotification["params"] }).params),
           );
         }
       }

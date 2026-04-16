@@ -48,9 +48,10 @@
   ],
   "scripts": {
     "start": "npm run examples:dev",
+    "generate:mcp-schemas": "tsx scripts/generate-mcp-schemas.ts && prettier --write \"src/generated/mcp-schemas.ts\"",
     "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
     "sync:snippets": "bun scripts/sync-snippets.ts",
-    "build": "npm run generate:schemas && npm run sync:snippets && node scripts/run-bun.mjs build.bun.ts && node scripts/link-self.mjs",
+    "build": "npm run generate:mcp-schemas && npm run generate:schemas && npm run sync:snippets && node scripts/run-bun.mjs build.bun.ts && node scripts/link-self.mjs",
     "prepack": "npm run build",
     "build:all": "npm run examples:build",
     "test": "bun test src examples",

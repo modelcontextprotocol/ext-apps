@@ -496,6 +496,6 @@ async function AppBridge_connect_withoutMcpClient(
     return { content: [] };
   };
 
-  await bridge.connect(transport);
+  await bridge.connect(transport as import("./vendor/transport.js").Transport);
   //#endregion AppBridge_connect_withoutMcpClient
 }

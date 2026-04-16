@@ -56,7 +56,7 @@ import type {
   ClientCapabilities,
   ReadResourceResult,
   ToolAnnotations,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "../vendor/mcp-types.js";
 
 // Re-exports for convenience
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };

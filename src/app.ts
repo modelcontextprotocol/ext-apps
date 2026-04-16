@@ -1,27 +1,29 @@
 import {
   type RequestOptions,
-  ProtocolOptions,
-} from "@modelcontextprotocol/sdk/shared/protocol.js";
+  type ProtocolOptions,
+} from "./vendor/protocol.js";
 
-import {
+import type {
   CallToolRequest,
-  CallToolRequestSchema,
   CallToolResult,
-  CallToolResultSchema,
-  EmptyResultSchema,
   Implementation,
   ListResourcesRequest,
   ListResourcesResult,
-  ListResourcesResultSchema,
   ListToolsRequest,
-  ListToolsRequestSchema,
   ListToolsResult,
   LoggingMessageNotification,
-  PingRequestSchema,
   ReadResourceRequest,
   ReadResourceResult,
+} from "./vendor/mcp-types.js";
+import {
+  CallToolRequestSchema,
+  CallToolResultSchema,
+  EmptyResultSchema,
+  ListResourcesResultSchema,
+  ListToolsRequestSchema,
+  PingRequestSchema,
   ReadResourceResultSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "./generated/mcp-schemas.js";
 import { AppNotification, AppRequest, AppResult } from "./types";
 import { ProtocolWithEvents } from "./events";
 export { ProtocolWithEvents };
@@ -59,7 +61,7 @@ import {
   McpUiRequestDisplayModeRequest,
   McpUiRequestDisplayModeResultSchema,
 } from "./types";
-import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { Transport } from "./vendor/transport.js";
 
 export { PostMessageTransport } from "./message-transport";
 export * from "./types";
