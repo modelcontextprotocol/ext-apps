@@ -45,7 +45,7 @@ import type {
   McpServer,
   RegisteredTool,
   ResourceMetadata,
-  ToolCallback as SchemaToolCallback,
+  ToolCallback,
   ReadResourceCallback as _ReadResourceCallback,
   RegisteredResource,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -55,13 +55,6 @@ import type {
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { ZodRawShape } from "@modelcontextprotocol/sdk";
-
-type ToolCallback<Args extends ZodRawShapeCompat | AnySchema | undefined> =
-  Args extends ZodRawShape
-    ? LegacyToolCallback<Args>
-    : Args extends StandardSchemaWithJSON
-      ? SchemaToolCallback<Args>
-      : SchemaToolCallback<undefined>;
 import type {
   ClientCapabilities,
   ReadResourceResult,
@@ -70,7 +63,7 @@ import type {
 
 // Re-exports for convenience
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
-export type { ResourceMetadata, ToolCallback };
+export type { ResourceMetadata, ToolCallback, LegacyToolCallback };
 
 /**
  * Base tool configuration matching the standard MCP server tool options.
@@ -224,8 +217,8 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  * @see {@link registerAppResource `registerAppResource`} to register the HTML resource referenced by the tool
  */
 export function registerAppTool<
-  OutputArgs extends ZodRawShapeCompat | AnySchema,
-  InputArgs extends undefined | ZodRawShapeCompat | AnySchema = undefined,
+  OutputArgs extends StandardSchemaWithJSON,
+  InputArgs extends StandardSchemaWithJSON | undefined = undefined,
 >(
   server: Pick<McpServer, "registerTool">,
   name: string,
@@ -234,6 +227,25 @@ export function registerAppTool<
     outputSchema?: OutputArgs;
   },
   cb: ToolCallback<InputArgs>,
+): RegisteredTool;
+/** Raw-shape form: `inputSchema` may be a plain `{ field: z.string() }` record. */
+export function registerAppTool<
+  InputArgs extends ZodRawShape,
+  OutputArgs extends ZodRawShape | StandardSchemaWithJSON | undefined = undefined,
+>(
+  server: Pick<McpServer, "registerTool">,
+  name: string,
+  config: McpUiAppToolConfig & {
+    inputSchema: InputArgs;
+    outputSchema?: OutputArgs;
+  },
+  cb: LegacyToolCallback<InputArgs>,
+): RegisteredTool;
+export function registerAppTool(
+  server: Pick<McpServer, "registerTool">,
+  name: string,
+  config: McpUiAppToolConfig,
+  cb: (...args: never) => ReturnType<ToolCallback<undefined>>,
 ): RegisteredTool {
   // Normalize metadata for backward compatibility:
   // - If _meta.ui.resourceUri is set, also set the legacy flat key
@@ -251,12 +263,11 @@ export function registerAppTool<
     normalizedMeta = { ...meta, ui: { ...uiMeta, resourceUri: legacyUri } };
   }
 
-  return (server.registerTool as McpServer["registerTool"])(
-    name,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { ...config, _meta: normalizedMeta } as any,
-    cb as SchemaToolCallback<undefined>,
-  );
+  // The two public overloads above guarantee (config.inputSchema, cb) match one
+  // of registerTool's overloads. The impl signature loses that pairing, so this
+  // forward needs a single suppression rather than three casts.
+  // @ts-expect-error -- forwarding overload-paired args through one impl signature
+  return server.registerTool(name, { ...config, _meta: normalizedMeta }, cb);
 }
 
 export type McpUiReadResourceResult = ReadResourceResult & {

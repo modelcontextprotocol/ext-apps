@@ -5,12 +5,10 @@ import {
   Result,
   type BaseContext,
   type LegacyContextFields,
+  type ZodLikeRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 type AppContext = BaseContext & LegacyContextFields;
-import { ZodLiteral, ZodObject } from "zod/v4";
-
-type MethodSchema = ZodObject<{ method: ZodLiteral<string> }>;
 
 /**
  * Per-event state: a singular `on*` handler (replace semantics) plus a
@@ -78,7 +76,7 @@ export abstract class ProtocolWithEvents<
    * schema on first use.
    */
   protected abstract readonly eventSchemas: {
-    [K in keyof EventMap]: MethodSchema;
+    [K in keyof EventMap]: ZodLikeRequestSchema;
   };
 
   /**
@@ -202,12 +200,15 @@ export abstract class ProtocolWithEvents<
 
   // ── Handler registration with double-set protection ─────────────────
 
-  // The two overrides below are arrow-function class fields rather than
-  // prototype methods so that Protocol's constructor — which registers its
-  // own ping/cancelled/progress handlers via `this.setRequestHandler`
-  // before our fields initialize — hits the base implementation and skips
-  // tracking. Converting these to proper methods would crash with
-  // `_registeredMethods` undefined during super().
+  // These overrides are prototype methods, so Protocol's constructor (which
+  // registers built-in ping/cancelled/progress handlers via
+  // `this.setRequestHandler` during super()) dispatches here before our own
+  // fields have initialized. The `_registeredMethods === undefined` guard
+  // skips tracking during that window.
+  //
+  // The base method has four overloads in v2; we expose only the Zod-schema
+  // form here since that is all this package uses. Subclasses retain the
+  // typed (request, ctx) handler signature.
 
   /**
    * Registers a request handler. Throws if a handler for the same method
@@ -216,11 +217,24 @@ export abstract class ProtocolWithEvents<
    *
    * @throws {Error} if a handler for this method is already registered.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override setRequestHandler = ((...args: any) => {
-    this._assertMethodNotRegistered(args[0], "setRequestHandler");
-    super.setRequestHandler(...(args as [MethodSchema, () => Result]));
-  }) as Protocol<AppContext>["setRequestHandler"];
+  override setRequestHandler<T extends ZodLikeRequestSchema>(
+    requestSchema: T,
+    handler: (
+      request: ReturnType<T["parse"]>,
+      ctx: AppContext,
+    ) => Result | Promise<Result>,
+  ): void;
+  override setRequestHandler(
+    schema: ZodLikeRequestSchema,
+    handler: (request: unknown, ctx: AppContext) => Result | Promise<Result>,
+  ): void {
+    if (this._registeredMethods === undefined) {
+      super.setRequestHandler(schema, handler);
+      return;
+    }
+    this._assertMethodNotRegistered(schema, "setRequestHandler");
+    super.setRequestHandler(schema, handler);
+  }
 
   /**
    * Registers a notification handler. Throws if a handler for the same
@@ -229,11 +243,21 @@ export abstract class ProtocolWithEvents<
    *
    * @throws {Error} if a handler for this method is already registered.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override setNotificationHandler = ((...args: any) => {
-    this._assertMethodNotRegistered(args[0], "setNotificationHandler");
-    super.setNotificationHandler(...(args as [MethodSchema, () => void]));
-  }) as Protocol<AppContext>["setNotificationHandler"];
+  override setNotificationHandler<T extends ZodLikeRequestSchema>(
+    notificationSchema: T,
+    handler: (notification: ReturnType<T["parse"]>) => void | Promise<void>,
+  ): void;
+  override setNotificationHandler(
+    schema: ZodLikeRequestSchema,
+    handler: (notification: unknown) => void | Promise<void>,
+  ): void {
+    if (this._registeredMethods === undefined) {
+      super.setNotificationHandler(schema, handler);
+      return;
+    }
+    this._assertMethodNotRegistered(schema, "setNotificationHandler");
+    super.setNotificationHandler(schema, handler);
+  }
 
   /**
    * Warn if a request handler `on*` setter is replacing a previously-set
@@ -256,15 +280,30 @@ export abstract class ProtocolWithEvents<
    * Replace a request handler, bypassing double-set protection. Used by
    * `on*` request-handler setters that need replace semantics.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected replaceRequestHandler = ((...args: any) => {
-    const method = (args[0] as MethodSchema).shape.method.value;
-    this._registeredMethods.add(method);
-    super.setRequestHandler(...(args as [MethodSchema, () => Result]));
-  }) as Protocol<AppContext>["setRequestHandler"];
+  protected replaceRequestHandler<T extends ZodLikeRequestSchema>(
+    requestSchema: T,
+    handler: (
+      request: ReturnType<T["parse"]>,
+      ctx: AppContext,
+    ) => Result | Promise<Result>,
+  ): void;
+  protected replaceRequestHandler(
+    schema: ZodLikeRequestSchema,
+    handler: (request: unknown, ctx: AppContext) => Result | Promise<Result>,
+  ): void {
+    this._registeredMethods.add(this._methodOf(schema));
+    super.setRequestHandler(schema, handler);
+  }
 
-  private _assertMethodNotRegistered(schema: unknown, via: string): void {
-    const method = (schema as MethodSchema).shape.method.value;
+  private _methodOf(arg: ZodLikeRequestSchema | string): string {
+    return typeof arg === "string" ? arg : arg.shape.method.value;
+  }
+
+  private _assertMethodNotRegistered(
+    schema: ZodLikeRequestSchema | string,
+    via: string,
+  ): void {
+    const method = this._methodOf(schema);
     if (this._registeredMethods.has(method)) {
       throw new Error(
         `Handler for "${method}" already registered (via ${via}). ` +
