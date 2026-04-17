@@ -756,6 +756,11 @@ export interface McpUiRequestDisplayModeResult {
 export type McpUiToolVisibility = "model" | "app";
 
 /**
+ * @description When the host should render the View relative to the agent's turn.
+ */
+export type McpUiRenderTiming = "inline" | "end-of-turn";
+
+/**
  * @description UI-related metadata for tools.
  */
 export interface McpUiToolMeta {
@@ -775,6 +780,12 @@ export interface McpUiToolMeta {
    * - "app": Tool callable by the app from this server only
    */
   visibility?: McpUiToolVisibility[];
+  /**
+   * @description When the host should render the View in the conversation. Default: "inline"
+   * - "inline": Render the View as soon as the tool returns
+   * - "end-of-turn": Defer rendering until the agent's turn is complete (no more tool calls)
+   */
+  renderTiming?: McpUiRenderTiming;
 }
 
 /**
