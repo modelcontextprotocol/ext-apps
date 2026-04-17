@@ -10,13 +10,15 @@ description: Diagnose common MCP App issues including blank iframes, CSP errors,
 
 The most common causes, in the order you should check them:
 
-1. **Uncaught JavaScript error.** Open browser developer tools inside the iframe: right-click the App area, choose _Inspect_, then switch the console context dropdown (top-left of the Console tab) from `top` to the sandboxed frame. An uncaught error stops the App before it paints.
+1. **`connect()` was never called.** The host waits for the App to send `ui/initialize` before giving the iframe a non-zero size, so an App that constructs `new App(...)` but never calls `app.connect(transport)` renders as an empty sliver. Confirm `connect()` runs on page load and that its promise resolves.
 
-2. **CSP violation.** Look for `Refused to connect to…` or `Refused to load…` in the console. Any network request, including to `localhost` during development, must be declared in `_meta.ui.csp.connectDomains` or `resourceDomains`. See the [CSP & CORS guide](./csp-cors.md).
+2. **Uncaught JavaScript error.** Open browser developer tools inside the iframe: right-click the App area, choose _Inspect_, then switch the console context dropdown (top-left of the Console tab) from `top` to the sandboxed frame. An uncaught error stops the App before it paints.
 
-3. **Resource URI mismatch.** The `_meta.ui.resourceUri` on the tool must match the URI passed to `registerAppResource` exactly. A trailing slash or case difference prevents the host from finding the HTML.
+3. **CSP violation.** Look for `Refused to connect to…` or `Refused to load…` in the console. Any network request, including to `localhost` during development, must be declared in `_meta.ui.csp.connectDomains` or `resourceDomains`. See the [CSP & CORS guide](./csp-cors.md).
 
-4. **Wrong MIME type.** The resource's `mimeType` must be `text/html;profile=mcp-app` (exported as {@link app!RESOURCE_MIME_TYPE `RESOURCE_MIME_TYPE`}). Plain `text/html` is not recognized as an App resource.
+4. **Resource URI mismatch.** The `_meta.ui.resourceUri` on the tool must match the URI passed to `registerAppResource` exactly. A trailing slash or case difference prevents the host from finding the HTML.
+
+5. **Wrong MIME type.** The resource's `mimeType` must be `text/html;profile=mcp-app` (exported as {@link app!RESOURCE_MIME_TYPE `RESOURCE_MIME_TYPE`}). Plain `text/html` is not recognized as an App resource.
 
 ## `ontoolinput` / `ontoolresult` never fires
 
@@ -28,7 +30,7 @@ The most common causes, in the order you should check them:
 
 MCP Apps are portable only if they use the SDK exclusively. Common portability mistakes:
 
-- **Host-specific globals.** Do not reference `window.openai`, `window.claude`, or any other host-injected object. Use the `App` class from this SDK, which speaks the standard protocol to any compliant host.
+- **Host-specific globals.** Do not reference host-injected globals such as `window.openai`. Use the `App` class from this SDK, which speaks the standard protocol to any compliant host.
 - **Hardcoded CDN URLs.** Bundle assets into the App or declare their origins in `resourceDomains`.
 - **Hardcoded sandbox origin.** The origin that serves the App varies by host. Use `_meta.ui.domain` to request a stable origin rather than hardcoding one in CORS allowlists. See [CSP & CORS](./csp-cors.md).
 

@@ -24,19 +24,19 @@ A title inside the content area (for example, "Q3 Revenue by Region" above a cha
 
 An MCP App answers one question or supports one task. Avoid building a full dashboard with tabs, sidebars, and settings panels.
 
-- Inline mode should fit within roughly one viewport of scroll. Content that is significantly taller than the chat viewport belongs in fullscreen mode, or should be trimmed.
-- Limit inline mode to one primary action. A "Confirm" button is appropriate; a toolbar with eight icons is not.
-- Let the conversation handle navigation. Rather than adding a search box inside the App, let the user ask a follow-up question that re-invokes the tool with new arguments.
+- Inline content can be tall, but it must scroll with the surrounding conversation. Do not introduce nested scroll containers in inline mode; a scrollable region inside a scrollable chat is difficult to use on every input device.
+- Design the inline layout to remain usable at narrow widths. Chat columns can be as narrow as a mobile message bubble, so dense toolbars and side-by-side panels should collapse or move to fullscreen mode rather than overflow.
+- Avoid multi-page navigation (routes, wizards, tab stacks) in inline mode. The conversation already provides history and back-navigation. In-App search or filtering over the current data set is fine; navigating to a different document or view is better handled by a follow-up tool call, or reserved for fullscreen mode.
 
 ## Host UI imitation
 
-Your App must not resemble the surrounding chat client. Do not render:
+Use host-provided styles so your App matches the surrounding theme, but keep the boundary between App content and host UI unambiguous. Do not render:
 
 - Chat bubbles or message threads
 - Anything that resembles the host's text input or send button
 - System notifications or permission dialogs
 
-These patterns blur the line between host UI and App content, and most hosts prohibit them in their submission guidelines.
+A user must never mistake App-rendered surfaces for host controls. Most hosts prohibit these patterns in their submission guidelines.
 
 ## Host styling
 
@@ -46,14 +46,14 @@ Brand colors are appropriate for content elements such as chart series or status
 
 ## Display modes
 
-Design for inline mode first. It is the default, and it is narrow (often the width of a chat message) and height-constrained.
+Design for inline mode first. It is the default, and it is narrow (often the width of a chat message). Inline height is effectively unconstrained: hosts apply only a high safety cap, so the iframe will grow to whatever content height the App reports.
 
 Treat fullscreen as a progressive enhancement for Apps that benefit from more space: editors, maps, large datasets. Check `hostContext.availableDisplayModes` before rendering a fullscreen toggle, since not every host supports it.
 
-When the display mode changes, update your layout: remove edge border radius, expand to fill the viewport, and re-read `containerDimensions` from the updated host context.
+When the display mode changes, update your layout: remove edge border radius and expand to fill the viewport. To size the App to the space the host provides, subscribe to `hostContext.containerDimensions` via {@link app!App.onhostcontextchanged `onhostcontextchanged`} and apply the reported width and height to your root element.
 
 ## Loading and empty states
 
-The App mounts before the tool result arrives. Between `ui/initialize` and `ontoolresult`, render a loading indicator such as a skeleton, spinner, or neutral background. A blank rectangle looks broken.
+The App mounts before the tool result arrives, and even before the tool inputs are sent. Between `ui/initialize` and `ontoolresult`, render a loading indicator such as a skeleton, spinner, or neutral background. A blank rectangle looks broken.
 
 If the tool result can be empty (no search results, empty cart), design an explicit empty state rather than rendering nothing.

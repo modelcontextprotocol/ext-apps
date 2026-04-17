@@ -41,18 +41,18 @@ registerAppTool(
 
 A tool result has three fields for data, each with different visibility:
 
-| Field               | Seen by model | Seen by App | Use for                                                       |
-| ------------------- | ------------- | ----------- | ------------------------------------------------------------- |
-| `content`           | Yes           | Yes         | Short text summary for the model and for text-only hosts      |
-| `structuredContent` | No            | Yes         | Structured data the App renders (tables, charts, lists)       |
-| `_meta`             | No            | Yes         | Opaque metadata such as IDs, timestamps, and view identifiers |
+| Field               | Seen by model                | Seen by App | Use for                                                       |
+| ------------------- | ---------------------------- | ----------- | ------------------------------------------------------------- |
+| `content`           | Yes                          | Yes         | Short text summary for the model and for text-only hosts      |
+| `structuredContent` | Only when `content` is empty | Yes         | Structured data the App renders (tables, charts, lists)       |
+| `_meta`             | No                           | Yes         | Opaque metadata such as IDs, timestamps, and view identifiers |
 
-Keep `content` brief. The model uses it to decide what to say next, so a one-line summary is preferable to raw data.
+Per the MCP guideline, hosts pass `structuredContent` to the model only when `content` is omitted, so populating `content` is the way to keep large render payloads out of the model's context. The App receives all three fields regardless. Keep `content` brief: the model uses it to decide what to say next, so a one-line summary is preferable to raw data.
 
 > [!WARNING]
-> Do not return large payloads in tool results. Serve base64-encoded audio, images, or file contents via MCP resources (see [Serving binary blobs via resources](#serving-binary-blobs-via-resources)) or have the App fetch them over the network. Although `structuredContent` is excluded from the model's context by the specification, large tool results still slow down transport, inflate conversation storage, and some host implementations include more of the result than the specification requires.
+> Do not return large payloads in tool results. Serve base64-encoded audio, images, or file contents via MCP resources (see [Serving binary blobs via resources](#serving-binary-blobs-via-resources)) or have the App fetch them over the network. Even when `structuredContent` is kept out of the model's context, large tool results still slow down transport, inflate conversation storage, and some host implementations include more of the result than the specification requires.
 
-Write `content` for the model, not the user. The user sees your App, not the `content` text. Use `content` to tell the model what happened so it can respond without repeating what is already on screen:
+Write `content` for the model, not the user. The user sees your App, not the `content` text. State explicitly that a view was displayed and what it contains so the model does not re-describe what is already on screen:
 
 ```ts
 return {
@@ -436,21 +436,23 @@ function MyApp() {
 
 ## Supporting touch devices
 
-Apps that handle pointer gestures (pan, drag, pinch) must prevent those gestures from also scrolling the surrounding chat. Set [`touch-action`](https://developer.mozilla.org/en-US/docs/Web/CSS/touch-action) on interactive surfaces:
+In inline mode, the App scrolls with the surrounding conversation. Do not capture vertical pan gestures or add nested scroll containers to inline layouts; let touch-drag pass through so the user can scroll the chat past your App.
+
+For interactive surfaces that handle horizontal drag or pinch (sliders, canvases, maps), set [`touch-action`](https://developer.mozilla.org/en-US/docs/Web/CSS/touch-action) so the browser delivers `pointermove` events to the App while still allowing vertical scroll to reach the page:
 
 ```css
-/* Chart or canvas that handles its own panning */
-.chart-surface {
-  touch-action: none;
+/* Horizontal slider: consume horizontal drag, leave vertical to the chat */
+.slider-track {
+  touch-action: pan-y;
 }
 
-/* Horizontal slider that should not trigger vertical page scroll */
-.slider-track {
-  touch-action: pan-y; /* allow vertical scroll, consume horizontal */
+/* Fullscreen canvas that handles its own pan and pinch */
+.fullscreen .chart-surface {
+  touch-action: none;
 }
 ```
 
-Without `touch-action`, dragging across the App on a mobile device also scrolls the chat, and the App may never receive `pointermove` events.
+Reserve `touch-action: none` for fullscreen mode, where the App owns the viewport and there is no outer scroll to conflict with.
 
 Prevent horizontal overflow by setting `overflow-x: hidden` on the root container if the layout contains any fixed-width elements. Horizontal overflow on mobile causes the entire App to shift when the page is scrolled.
 
@@ -513,7 +515,7 @@ There are three height strategies:
 
 **Auto-resize (default).** For content with a natural height. The iframe grows to fit. Do not set `height: 100vh` or `height: 100%` on the root element; doing so creates a feedback loop where the reported height keeps increasing.
 
-**Fixed height.** For UI that should remain the same size when inline. Disable auto-resize and set an explicit height:
+**Fixed height.** For UI that should remain the same size when inline. Disable auto-resize, set an explicit height, and report it to the host with {@link app!App.sendSizeChanged `sendSizeChanged`} so the iframe is allocated the correct size:
 
 ```ts
 const app = new App(
@@ -521,6 +523,8 @@ const app = new App(
   {},
   { autoResize: false },
 );
+await app.connect(new PostMessageTransport(window.parent));
+app.sendSizeChanged({ width: document.body.clientWidth, height: 500 });
 ```
 
 ```css
@@ -727,7 +731,39 @@ app.ontoolresult = (result) => {
 
 The tool-to-resource binding is declared at registration time. A tool either has a `_meta.ui.resourceUri` or it does not; the server cannot decide per-call whether to render UI.
 
-If both behaviors are needed, register two tools:
+A stateful server can decide at connection time. During `initialize`, the client declares whether it supports the Apps extension; use {@link server-helpers!getUiCapability `getUiCapability`} to read that declaration and register UI-backed tools only for clients that can render them:
+
+<!-- prettier-ignore -->
+```ts source="../src/server/index.examples.ts#getUiCapability_checkSupport"
+server.server.oninitialized = () => {
+  const clientCapabilities = server.server.getClientCapabilities();
+  const uiCap = getUiCapability(clientCapabilities);
+
+  if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
+    // App-enhanced tool
+    registerAppTool(
+      server,
+      "weather",
+      {
+        description: "Get weather information with interactive dashboard",
+        _meta: { ui: { resourceUri: "ui://weather/dashboard" } },
+      },
+      weatherHandler,
+    );
+  } else {
+    // Text-only fallback
+    server.registerTool(
+      "weather",
+      {
+        description: "Get weather information",
+      },
+      textWeatherHandler,
+    );
+  }
+};
+```
+
+If both behaviors are needed for a single UI-capable client, register two tools:
 
 - `query-data` with no `_meta.ui`, returning text and structured data for the model to reason about
 - `visualize-data` with `_meta.ui`, returning the same data rendered as an interactive App
@@ -736,15 +772,34 @@ Write distinct descriptions so the model selects the correct tool based on user 
 
 If the decision must be made server-side (for example, showing UI only when the result set exceeds a threshold), the workaround is to always attach the UI resource and have the App render a minimal collapsed placeholder when there is nothing to show. Keep the placeholder small to avoid adding visual noise to the conversation.
 
-## Opening external links
+## Opening external links and downloading files
 
-Use {@link app!App.openLink `app.openLink()`} instead of `window.open()` or `<a target="_blank">`. The sandbox blocks direct navigation; `openLink` asks the host to open the URL on the App's behalf.
+Use {@link app!App.openLink `app.openLink()`} instead of `window.open()` or `<a target="_blank">`, and {@link app!App.downloadFile `app.downloadFile()`} instead of synthesizing `<a download>` clicks. The sandbox blocks direct navigation and downloads; these methods ask the host to perform the action on the App's behalf.
 
-Hosts typically show an interstitial confirmation so users can review the destination before navigating. Do not assume navigation is instant, and do not chain multiple `openLink` calls.
+Both are optional host capabilities. Check {@link app!App.getHostCapabilities `getHostCapabilities`} before rendering the corresponding controls so the App degrades gracefully on hosts that do not implement them:
 
 ```ts
-await app.openLink({ url: "https://example.com/docs" });
+if (app.getHostCapabilities()?.openLinks) {
+  await app.openLink({ url: "https://example.com/docs" });
+}
+
+if (app.getHostCapabilities()?.downloadFile) {
+  await app.downloadFile({
+    contents: [
+      {
+        type: "resource",
+        resource: {
+          uri: "file:///report.csv",
+          mimeType: "text/csv",
+          text: csv,
+        },
+      },
+    ],
+  });
+}
 ```
+
+Hosts typically show an interstitial confirmation for `openLink` so users can review the destination before navigating. Do not assume navigation is instant, and do not chain multiple `openLink` calls.
 
 ## Lowering perceived latency
 
