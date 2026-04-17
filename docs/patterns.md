@@ -523,7 +523,7 @@ const app = new App(
   {},
   { autoResize: false },
 );
-await app.connect(new PostMessageTransport(window.parent));
+await app.connect(new PostMessageTransport(window.parent, window.parent));
 app.sendSizeChanged({ width: document.body.clientWidth, height: 500 });
 ```
 
