@@ -103,7 +103,15 @@ jobs:
 
       - name: Build MCPB bundle (pdf-server)
         if: runner.os == 'Linux' && matrix.name == 'Linux x64'
-        run: npx -y @anthropic-ai/mcpb pack
+        run: node build-mcpb.mjs
+        working-directory: examples/pdf-server
+
+      - name: Smoke-test MCPB bundle starts
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: |
+          unzip -q pdf-server.mcpb -d .mcpb-smoke
+          node .mcpb-smoke/dist/index.js --stdio < /dev/null 2>&1 | tee /tmp/mcpb-smoke.log
+          grep -q "Ready" /tmp/mcpb-smoke.log
         working-directory: examples/pdf-server
 
   e2e:

@@ -289,10 +289,23 @@ function panelFieldNames(): Set<string> {
   return new Set([...formFieldValues.keys(), ...pdfBaselineFormValues.keys()]);
 }
 
+/** Baseline annotations the user has deleted. Shown crossed-out in the panel
+ *  (mirroring cleared form fields) so they can be reverted, and so save knows
+ *  to strip their refs from /Annots. */
+function removedBaselineAnnotations(): PdfAnnotationDef[] {
+  return deps
+    .state()
+    .pdfBaselineAnnotations.filter((a) => !annotationMap.has(a.id));
+}
+
 /** Total count of annotations + form fields for the sidebar badge.
  *  Uses the union so cleared baseline items still contribute. */
 function sidebarItemCount(): number {
-  return annotationMap.size + panelFieldNames().size;
+  return (
+    annotationMap.size +
+    removedBaselineAnnotations().length +
+    panelFieldNames().size
+  );
 }
 
 export function updateAnnotationsBadge(): void {
@@ -338,6 +351,8 @@ export function getAnnotationLabel(def: PdfAnnotationDef): string {
       return "Line";
     case "image":
       return "Image";
+    case "imported":
+      return `${def.subtype} (from PDF)`;
   }
 }
 
@@ -381,6 +396,8 @@ export function getAnnotationColor(def: PdfAnnotationDef): string {
       return "#333";
     case "image":
       return "#999";
+    case "imported":
+      return "#666";
   }
 }
 
@@ -425,6 +442,14 @@ export function renderAnnotationPanel(): void {
     byPage.get(page)!.push(tracked);
   }
 
+  // Removed baseline annotations: still listed (crossed-out) so they can be
+  // reverted before save strips them from the file.
+  const removedByPage = new Map<number, PdfAnnotationDef[]>();
+  for (const def of removedBaselineAnnotations()) {
+    if (!removedByPage.has(def.page)) removedByPage.set(def.page, []);
+    removedByPage.get(def.page)!.push(def);
+  }
+
   // Group form fields by page — iterate the UNION so cleared baseline
   // fields remain visible (crossed out) with a per-item revert button.
   const fieldsByPage = new Map<number, string[]>();
@@ -441,7 +466,11 @@ export function renderAnnotationPanel(): void {
   }
 
   // Collect all pages that have annotations or form fields
-  const allPages = new Set([...byPage.keys(), ...fieldsByPage.keys()]);
+  const allPages = new Set([
+    ...byPage.keys(),
+    ...removedByPage.keys(),
+    ...fieldsByPage.keys(),
+  ]);
   const sortedPages = [...allPages].sort((a, b) => a - b);
 
   // Sort annotations within each page by Y position (descending = top-first in PDF coords)
@@ -466,8 +495,9 @@ export function renderAnnotationPanel(): void {
     const sectionKey = `page-${pageNum}`;
     const isOpen = panelState.openAccordionSection === sectionKey;
     const annotations = byPage.get(pageNum) ?? [];
+    const removed = removedByPage.get(pageNum) ?? [];
     const fields = fieldsByPage.get(pageNum) ?? [];
-    const itemCount = annotations.length + fields.length;
+    const itemCount = annotations.length + removed.length + fields.length;
 
     appendAccordionSection(
       `Page ${pageNum} (${itemCount})`,
@@ -482,6 +512,10 @@ export function renderAnnotationPanel(): void {
         // Then annotations
         for (const tracked of annotations) {
           body.appendChild(createAnnotationCard(tracked));
+        }
+        // Then removed baseline annotations (crossed-out, revertable)
+        for (const def of removed) {
+          body.appendChild(createRemovedAnnotationCard(def));
         }
       },
     );
@@ -645,6 +679,55 @@ function createAnnotationCard(tracked: TrackedAnnotation): HTMLElement {
       .catch(log.error);
   });
 
+  return card;
+}
+
+/**
+ * Card for a baseline annotation the user deleted: crossed-out, no select/
+ * navigate (it has no DOM on the page anymore), revert button puts it back
+ * into `annotationMap` so it renders again and save leaves it in the file.
+ */
+function createRemovedAnnotationCard(def: PdfAnnotationDef): HTMLElement {
+  const card = document.createElement("div");
+  card.className = "annotation-card annotation-card-cleared";
+  card.dataset.annotationId = def.id;
+
+  const row = document.createElement("div");
+  row.className = "annotation-card-row";
+
+  const swatch = document.createElement("div");
+  swatch.className = "annotation-card-swatch annotation-card-swatch-cleared";
+  swatch.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" stroke="${getAnnotationColor(def)}" stroke-width="1.5" stroke-linecap="round"><path d="M2 2l6 6M8 2L2 8"/></svg>`;
+  row.appendChild(swatch);
+
+  const typeLabel = document.createElement("span");
+  typeLabel.className = "annotation-card-type";
+  typeLabel.textContent = getAnnotationLabel(def);
+  row.appendChild(typeLabel);
+
+  const preview = getAnnotationPreview(def);
+  if (preview) {
+    const previewEl = document.createElement("span");
+    previewEl.className = "annotation-card-preview";
+    previewEl.textContent = preview;
+    row.appendChild(previewEl);
+  }
+
+  const revertBtn = document.createElement("button");
+  revertBtn.className = "annotation-card-delete";
+  revertBtn.title = "Restore annotation from file";
+  revertBtn.innerHTML = REVERT_SVG;
+  revertBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    annotationMap.set(def.id, { def: { ...def }, elements: [] });
+    updateAnnotationsBadge();
+    renderAnnotationPanel();
+    deps.renderPage();
+    deps.persistAnnotations();
+  });
+  row.appendChild(revertBtn);
+
+  card.appendChild(row);
   return card;
 }
 
@@ -831,8 +914,15 @@ function clearFieldInStorage(name: string): void {
     meta?.[0]?.defaultValue ??
     "";
   const type = meta?.find((f) => f.type)?.type;
-  const clearValue =
-    type === "checkbox" || type === "radiobutton" ? (dv ?? "Off") : (dv ?? "");
+  // Radio: per-widget BOOLEANS, never a string. pdf.js's
+  // RadioButtonWidgetAnnotation render() has inverted string coercion (see
+  // setFieldInStorage), so writing the same string to every widget checks
+  // the wrong one. {value:false} on all = nothing selected.
+  if (type === "radiobutton") {
+    for (const id of ids) storage.setValue(id, { value: false });
+    return;
+  }
+  const clearValue = type === "checkbox" ? (dv ?? "Off") : (dv ?? "");
   for (const id of ids) storage.setValue(id, { value: clearValue });
 }
 

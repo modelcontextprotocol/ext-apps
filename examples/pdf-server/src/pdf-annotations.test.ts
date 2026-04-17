@@ -10,6 +10,7 @@ import {
   defaultColor,
   importPdfjsAnnotation,
   buildAnnotatedPdfBytes,
+  parseAnnotationRef,
   base64ToUint8Array,
   uint8ArrayToBase64,
   convertFromModelCoords,
@@ -460,7 +461,8 @@ describe("importPdfjsAnnotation", () => {
       annotationType: 9,
       ref: { num: 5, gen: 0 },
       rect: [72, 700, 272, 712],
-      quadPoints: [[72, 712, 272, 712, 72, 700, 272, 700]],
+      // pdf.js emits a FLAT Float32Array, not nested arrays.
+      quadPoints: new Float32Array([72, 712, 272, 712, 72, 700, 272, 700]),
       color: new Uint8ClampedArray([255, 255, 0]),
       contentsObj: { str: "Important" },
     };
@@ -474,12 +476,57 @@ describe("importPdfjsAnnotation", () => {
     expect((result as any).color).toBe("#ffff00");
   });
 
+  it("imports a multi-line highlight (multiple quads → multiple rects)", () => {
+    // Regression: the parser iterated quadPoints as if nested; pdf.js's
+    // flat array yielded numbers, so rects stayed empty and import bailed.
+    const ann = {
+      annotationType: 9,
+      ref: { num: 8, gen: 0 },
+      quadPoints: new Float32Array([
+        // line 1
+        72, 712, 272, 712, 72, 700, 272, 700,
+        // line 2
+        72, 698, 200, 698, 72, 686, 200, 686,
+      ]),
+      color: new Uint8ClampedArray([255, 255, 0]),
+    };
+    const result = importPdfjsAnnotation(ann, 1, 0);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe("highlight");
+    expect((result as any).rects).toHaveLength(2);
+    expect((result as any).rects[0]).toEqual({
+      x: 72,
+      y: 700,
+      width: 200,
+      height: 12,
+    });
+    expect((result as any).rects[1]).toEqual({
+      x: 72,
+      y: 686,
+      width: 128,
+      height: 12,
+    });
+  });
+
+  it("falls back to ann.rect when quadPoints is absent", () => {
+    const ann = {
+      annotationType: 9,
+      ref: { num: 9, gen: 0 },
+      rect: [72, 700, 272, 712],
+      color: new Uint8ClampedArray([255, 255, 0]),
+    };
+    const result = importPdfjsAnnotation(ann, 1, 0);
+    expect(result).not.toBeNull();
+    expect((result as any).rects).toHaveLength(1);
+  });
+
   it("imports an underline annotation", () => {
     const ann = {
       annotationType: 10,
       ref: { num: 6, gen: 0 },
       rect: [72, 700, 272, 712],
-      quadPoints: [[72, 712, 272, 712, 72, 700, 272, 700]],
+      // pdf.js emits a FLAT Float32Array, not nested arrays.
+      quadPoints: new Float32Array([72, 712, 272, 712, 72, 700, 272, 700]),
       color: new Uint8ClampedArray([255, 0, 0]),
     };
     const result = importPdfjsAnnotation(ann, 1, 0);
@@ -493,13 +540,84 @@ describe("importPdfjsAnnotation", () => {
       annotationType: 12,
       ref: { num: 7, gen: 0 },
       rect: [72, 700, 272, 712],
-      quadPoints: [[72, 712, 272, 712, 72, 700, 272, 700]],
+      // pdf.js emits a FLAT Float32Array, not nested arrays.
+      quadPoints: new Float32Array([72, 712, 272, 712, 72, 700, 272, 700]),
       color: new Uint8ClampedArray([255, 0, 0]),
     };
     const result = importPdfjsAnnotation(ann, 2, 0);
     expect(result).not.toBeNull();
     expect(result!.type).toBe("strikethrough");
     expect(result!.page).toBe(2);
+  });
+
+  it("imports an unsupported subtype as 'imported' (placement only)", () => {
+    // annotationType 15 = Ink, not in PDFJS_TYPE_MAP. We keep it as a
+    // placement-only "imported" record so it's listed in the panel and
+    // rendered from annotationCanvasMap instead of being dropped.
+    const ann = {
+      annotationType: 15,
+      subtype: "Ink",
+      id: "200R",
+      rect: [100, 200, 180, 260],
+    };
+    const result = importPdfjsAnnotation(ann, 3, 0);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe("imported");
+    expect(result!.page).toBe(3);
+    expect((result as any).pdfjsId).toBe("200R");
+    expect((result as any).subtype).toBe("Ink");
+    expect((result as any).width).toBeCloseTo(80);
+    expect((result as any).height).toBeCloseTo(60);
+  });
+
+  it("imports an appearance-stream stamp as 'imported' (not text-label)", () => {
+    // A Stamp with hasAppearance carries a custom visual (e.g. an image
+    // signature) that our text-label StampAnnotation can't reproduce.
+    const ann = {
+      annotationType: 13,
+      subtype: "Stamp",
+      id: "118R",
+      rect: [420, 760, 514, 792],
+      hasAppearance: true,
+      contentsObj: { str: "DRAFT" },
+    };
+    const result = importPdfjsAnnotation(ann, 1, 0);
+    expect(result!.type).toBe("imported");
+    expect((result as any).pdfjsId).toBe("118R");
+    expect((result as any).subtype).toBe("Stamp");
+  });
+
+  it("computeDiff: 'imported' present in both baseline and current → no diff", () => {
+    const imp: PdfAnnotationDef = {
+      type: "imported",
+      id: "pdf-118R",
+      page: 1,
+      x: 420,
+      y: 760,
+      width: 94,
+      height: 32,
+      pdfjsId: "118R",
+      subtype: "Stamp",
+    };
+    const diff = computeDiff([imp], [imp], new Map());
+    expect(diff.added).toHaveLength(0);
+    expect(diff.removed).toHaveLength(0);
+  });
+
+  it("computeDiff: deleting an 'imported' annotation lists it in removed", () => {
+    const imp: PdfAnnotationDef = {
+      type: "imported",
+      id: "pdf-118R",
+      page: 1,
+      x: 420,
+      y: 760,
+      width: 94,
+      height: 32,
+      pdfjsId: "118R",
+      subtype: "Stamp",
+    };
+    const diff = computeDiff([imp], [], new Map());
+    expect(diff.removed).toEqual(["pdf-118R"]);
   });
 
   it("imports a note (Text) annotation", () => {
@@ -671,6 +789,29 @@ describe("base64 helpers", () => {
 // PDF Annotation Dict Creation (integration test with pdf-lib)
 // =============================================================================
 
+describe("parseAnnotationRef", () => {
+  it("parses pdf-<num>-<gen> ids", () => {
+    expect(parseAnnotationRef("pdf-118-0")).toEqual({
+      objectNumber: 118,
+      generationNumber: 0,
+    });
+    expect(parseAnnotationRef("pdf-5-2")).toEqual({
+      objectNumber: 5,
+      generationNumber: 2,
+    });
+  });
+  it("parses pdf-<num>R ids (pdf.js string id, gen=0)", () => {
+    expect(parseAnnotationRef("pdf-118R")).toEqual({
+      objectNumber: 118,
+      generationNumber: 0,
+    });
+  });
+  it("returns null for page-index fallback ids", () => {
+    expect(parseAnnotationRef("pdf-1-idx-3")).toBeNull();
+    expect(parseAnnotationRef("user-abc")).toBeNull();
+  });
+});
+
 describe("buildAnnotatedPdfBytes", () => {
   let blankPdfBytes: Uint8Array;
 
@@ -689,6 +830,56 @@ describe("buildAnnotatedPdfBytes", () => {
     // Verify it's a valid PDF (starts with %PDF)
     const header = String.fromCharCode(...result.slice(0, 5));
     expect(header).toBe("%PDF-");
+  });
+
+  it("strips removedRefs entries from each page's /Annots array", async () => {
+    // Seed: add two highlights, save, capture their object refs.
+    const seeded = await buildAnnotatedPdfBytes(
+      blankPdfBytes,
+      [
+        {
+          type: "highlight",
+          id: "h1",
+          page: 1,
+          rects: [{ x: 72, y: 700, width: 100, height: 12 }],
+          color: "#ffff00",
+        },
+        {
+          type: "highlight",
+          id: "h2",
+          page: 1,
+          rects: [{ x: 72, y: 680, width: 100, height: 12 }],
+          color: "#ffff00",
+        },
+      ],
+      new Map(),
+    );
+    const seededDoc = await PDFDocument.load(seeded);
+    const annots = seededDoc.getPage(0).node.Annots()!;
+    expect(annots.size()).toBe(2);
+    const ref0 = annots.get(0) as unknown as {
+      objectNumber: number;
+      generationNumber: number;
+    };
+
+    // Now remove the first one by ref.
+    const stripped = await buildAnnotatedPdfBytes(seeded, [], new Map(), [
+      {
+        objectNumber: ref0.objectNumber,
+        generationNumber: ref0.generationNumber,
+      },
+    ]);
+    const strippedDoc = await PDFDocument.load(stripped);
+    const remaining = strippedDoc.getPage(0).node.Annots();
+    expect(remaining?.size() ?? 0).toBe(1);
+  });
+
+  it("removedRefs ignores refs not present in /Annots", async () => {
+    const out = await buildAnnotatedPdfBytes(blankPdfBytes, [], new Map(), [
+      { objectNumber: 9999, generationNumber: 0 },
+    ]);
+    const doc = await PDFDocument.load(out);
+    expect(doc.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
   });
 
   it("adds highlight annotation to PDF", async () => {
@@ -1030,6 +1221,151 @@ describe("buildAnnotatedPdfBytes", () => {
     // Should be able to save it again
     const bytes2 = await doc.save();
     expect(bytes2.length).toBeGreaterThan(0);
+  });
+
+  describe("form field persistence", () => {
+    // One fixture with every field type we support. pdf-lib's addOptionToPage
+    // writes radio buttonValues as numeric index strings ("0","1","2"), which
+    // is the stress case — the viewer stores those, but .select() wants labels.
+    let formPdfBytes: Uint8Array;
+    beforeAll(async () => {
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([612, 792]);
+      const form = doc.getForm();
+      form.createTextField("name").addToPage(page, { x: 10, y: 700 });
+      form.createCheckBox("agree").addToPage(page, { x: 10, y: 660 });
+      const dd = form.createDropdown("country");
+      dd.addOptions(["USA", "UK", "Canada"]);
+      dd.addToPage(page, { x: 10, y: 620 });
+      const rg = form.createRadioGroup("size");
+      rg.addOptionToPage("small", page, { x: 10, y: 580 });
+      rg.addOptionToPage("medium", page, { x: 50, y: 580 });
+      rg.addOptionToPage("large", page, { x: 90, y: 580 });
+      formPdfBytes = await doc.save();
+    });
+
+    it("writes text, checkbox, dropdown, and radio (by label) in one pass", async () => {
+      const out = await buildAnnotatedPdfBytes(
+        formPdfBytes,
+        [],
+        new Map<string, string | boolean>([
+          ["name", "Alice"],
+          ["agree", true],
+          ["country", "Canada"],
+          ["size", "medium"],
+        ]),
+      );
+      const form = (await PDFDocument.load(out)).getForm();
+      expect(form.getTextField("name").getText()).toBe("Alice");
+      expect(form.getCheckBox("agree").isChecked()).toBe(true);
+      expect(form.getDropdown("country").getSelected()).toEqual(["Canada"]);
+      expect(form.getRadioGroup("size").getSelected()).toBe("medium");
+    });
+
+    it("maps numeric radio buttonValue to option label by index", async () => {
+      // The viewer stores what pdf.js reports as buttonValue ("2"), not the
+      // label. Save must translate or the radio is silently dropped.
+      const out = await buildAnnotatedPdfBytes(
+        formPdfBytes,
+        [],
+        new Map<string, string | boolean>([["size", "2"]]),
+      );
+      const form = (await PDFDocument.load(out)).getForm();
+      expect(form.getRadioGroup("size").getSelected()).toBe("large");
+    });
+
+    it("leaves radio unset when value is neither label nor valid index", async () => {
+      const out = await buildAnnotatedPdfBytes(
+        formPdfBytes,
+        [],
+        new Map<string, string | boolean>([["size", "bogus"]]),
+      );
+      const form = (await PDFDocument.load(out)).getForm();
+      expect(form.getRadioGroup("size").getSelected()).toBeUndefined();
+    });
+
+    it("skips unknown field names without throwing", async () => {
+      const out = await buildAnnotatedPdfBytes(
+        formPdfBytes,
+        [],
+        new Map<string, string | boolean>([
+          ["nonexistent", "x"],
+          ["name", "kept"],
+        ]),
+      );
+      const form = (await PDFDocument.load(out)).getForm();
+      expect(form.getTextField("name").getText()).toBe("kept");
+    });
+
+    it("a field that throws on write does not abort subsequent fields", async () => {
+      // Regression for #577: the per-field try/catch was dropped, so the
+      // first throwing field bubbled to the outer catch and silently dropped
+      // every field after it. setText() throws when value exceeds maxLength.
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([612, 792]);
+      const form = doc.getForm();
+      const limited = form.createTextField("limited");
+      limited.setMaxLength(2);
+      limited.addToPage(page, { x: 10, y: 700 });
+      form.createTextField("after").addToPage(page, { x: 10, y: 660 });
+      const fixture = await doc.save();
+
+      const out = await buildAnnotatedPdfBytes(
+        fixture,
+        [],
+        new Map<string, string | boolean>([
+          ["limited", "way too long"], // throws
+          ["after", "kept"],
+        ]),
+      );
+
+      const saved = (await PDFDocument.load(out)).getForm();
+      expect(saved.getTextField("after").getText()).toBe("kept");
+      // The throwing field is left at whatever pdf-lib could do with it —
+      // we only assert it didn't poison "after".
+    });
+
+    it("radio misclassified as PDFCheckBox: string value selects the matching widget", async () => {
+      // Some PDFs (e.g. IRS/third-party forms) omit the /Ff Radio bit, so
+      // pdf-lib hands us a PDFCheckBox. The viewer stored pdf.js's
+      // buttonValue ("0"/"1"), not a boolean — check() would always pick
+      // the first widget. setButtonGroupValue writes /V + per-widget /AS
+      // directly so the chosen widget sticks.
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([612, 792]);
+      const form = doc.getForm();
+      const rg = form.createRadioGroup("Gender");
+      rg.addOptionToPage("Male", page, { x: 10, y: 700 });
+      rg.addOptionToPage("Female", page, { x: 60, y: 700 });
+      // pdf-lib's addOptionToPage writes widget on-values "0","1". Clear the
+      // Radio flag (bit 16) so the reloaded form classifies it as checkbox.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (rg.acroField as any).clearFlag(1 << 15);
+      const fixture = await doc.save();
+
+      // Sanity: reload sees it as PDFCheckBox now.
+      const reForm = (await PDFDocument.load(fixture)).getForm();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const reField = reForm.getFieldMaybe("Gender") as any;
+      expect(reField?.constructor?.name).toBe("PDFCheckBox");
+
+      const out = await buildAnnotatedPdfBytes(
+        fixture,
+        [],
+        new Map<string, string | boolean>([["Gender", "1"]]),
+      );
+
+      const saved = await PDFDocument.load(out);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const acro = (saved.getForm().getFieldMaybe("Gender") as any).acroField;
+      const v = acro.dict.get(PDFName.of("V"));
+      expect(v).toBeInstanceOf(PDFName);
+      expect((v as PDFName).decodeText()).toBe("1");
+      // Second widget /AS is the on-state, first is /Off.
+      const widgets = acro.getWidgets();
+      expect(widgets[0].getAppearanceState()?.decodeText()).toBe("Off");
+      expect(widgets[1].getAppearanceState()?.decodeText()).toBe("1");
+    });
   });
 });
 

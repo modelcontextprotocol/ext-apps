@@ -151,6 +151,12 @@ test.describe("PDF Server - Annotations", () => {
     // Check that a highlight annotation element was rendered
     const highlightEl = appFrame.locator(".annotation-highlight");
     await expect(highlightEl.first()).toBeVisible({ timeout: 5000 });
+    // Regression: highlight must be translucent (not opaque hex), so text
+    // underneath remains readable.
+    await expect(highlightEl.first()).toHaveCSS(
+      "background-color",
+      /rgba\(255, 255, 0, 0\.35\)/,
+    );
   });
 
   test("add_annotations renders multiple annotation types", async ({
@@ -305,6 +311,96 @@ test.describe("PDF Server - Annotations", () => {
       {
         timeout: 10000,
       },
+    );
+  });
+});
+
+/**
+ * Read the most recent interact result text from the basic-host UI.
+ * Waits for the result-panel count to reach `expectedCount` first —
+ * `callInteract` doesn't block, so `.last()` would otherwise race to the
+ * previous (display_pdf) panel.
+ */
+async function readLastToolResult(
+  page: Page,
+  expectedCount: number,
+): Promise<string> {
+  const panels = page.locator('text="📤 Tool Result"');
+  await expect(panels).toHaveCount(expectedCount, { timeout: 30000 });
+  await panels.last().click();
+  const pre = page.locator("pre").last();
+  await expect(pre).toBeVisible({ timeout: 5000 });
+  return (await pre.textContent()) ?? "";
+}
+
+/** Unwrap basic-host's `CallToolResult` JSON to the first text block. */
+function unwrapTextResult(raw: string): string {
+  const parsed = JSON.parse(raw) as {
+    content?: { type: string; text?: string }[];
+  };
+  const block = parsed.content?.find((c) => c.type === "text");
+  if (!block?.text) throw new Error(`No text block in: ${raw.slice(0, 200)}`);
+  return block.text;
+}
+
+test.describe("PDF Server - get_viewer_state", () => {
+  test("returns page/zoom/mode and selection:null when nothing is selected", async ({
+    page,
+  }) => {
+    await loadPdfServer(page);
+    await waitForPdfCanvas(page);
+
+    const viewUUID = await extractViewUUID(page);
+
+    await callInteract(page, { viewUUID, action: "get_viewer_state" });
+    const raw = await readLastToolResult(page, 2);
+    const state = JSON.parse(unwrapTextResult(raw));
+
+    expect(state.currentPage).toBe(1);
+    expect(state.pageCount).toBeGreaterThan(1);
+    expect(typeof state.zoom).toBe("number");
+    expect(state.displayMode).toBe("inline");
+    expect(state.selection).toBeNull();
+    expect(Array.isArray(state.selectedAnnotationIds)).toBe(true);
+  });
+
+  test("returns selected text and bounding rect when text-layer text is selected", async ({
+    page,
+  }) => {
+    await loadPdfServer(page);
+    await waitForPdfCanvas(page);
+
+    const viewUUID = await extractViewUUID(page);
+    const app = getAppFrame(page);
+
+    // Programmatically select the contents of the first text-layer span.
+    const selectedText = await app
+      .locator("#text-layer span")
+      .first()
+      .evaluate((span) => {
+        const range = span.ownerDocument.createRange();
+        range.selectNodeContents(span);
+        const sel = span.ownerDocument.defaultView!.getSelection()!;
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return sel.toString().replace(/\s+/g, " ").trim();
+      });
+    expect(selectedText.length).toBeGreaterThan(0);
+
+    await callInteract(page, { viewUUID, action: "get_viewer_state" });
+    const raw = await readLastToolResult(page, 2);
+    const state = JSON.parse(unwrapTextResult(raw));
+
+    expect(state.currentPage).toBe(1);
+    expect(state.selection).not.toBeNull();
+    expect(state.selection.text).toContain(selectedText);
+    expect(state.selection.boundingRect).toEqual(
+      expect.objectContaining({
+        x: expect.any(Number),
+        y: expect.any(Number),
+        width: expect.any(Number),
+        height: expect.any(Number),
+      }),
     );
   });
 });

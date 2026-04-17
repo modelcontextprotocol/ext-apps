@@ -18,6 +18,12 @@ import {
   PDFString,
   PDFHexString,
   StandardFonts,
+  PDFTextField,
+  PDFCheckBox,
+  PDFDropdown,
+  PDFOptionList,
+  PDFRadioGroup,
+  type PDFForm,
 } from "pdf-lib";
 
 // =============================================================================
@@ -124,6 +130,32 @@ export interface ImageAnnotation extends AnnotationBase {
   aspect?: "preserve" | "ignore";
 }
 
+/**
+ * An annotation that already exists in the loaded PDF and that we render
+ * verbatim from its appearance stream (via pdf.js's annotationCanvasMap)
+ * rather than re-modeling it with one of our shape types.
+ *
+ * Covers two cases:
+ *  - subtypes we don't model (Ink, Polygon, Caret, FileAttachment, …)
+ *  - subtypes we *could* model but whose appearance carries information
+ *    our model would drop (e.g. Stamp with an image signature)
+ *
+ * The rasterized canvas is supplied at render time by mcp-app.ts; this
+ * struct only carries placement and identity. Coords are PDF user-space
+ * (origin bottom-left), matching the other rect-shaped types.
+ */
+export interface ImportedAnnotation extends AnnotationBase {
+  type: "imported";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** pdf.js getAnnotations() id (e.g. "118R") — key into annotationCanvasMap. */
+  pdfjsId: string;
+  /** Original PDF /Subtype (e.g. "Stamp", "Ink") for the panel label. */
+  subtype: string;
+}
+
 export type PdfAnnotationDef =
   | HighlightAnnotation
   | UnderlineAnnotation
@@ -134,7 +166,8 @@ export type PdfAnnotationDef =
   | LineAnnotation
   | FreetextAnnotation
   | StampAnnotation
-  | ImageAnnotation;
+  | ImageAnnotation
+  | ImportedAnnotation;
 
 // =============================================================================
 // Coordinate Conversion (model ↔ internal PDF coords)
@@ -168,6 +201,7 @@ export function convertFromModelCoords(
     case "rectangle":
     case "circle":
     case "image":
+    case "imported":
       return { ...def, y: pageHeight - def.y - def.height };
     case "line":
       return {
@@ -368,6 +402,7 @@ export function defaultColor(type: PdfAnnotationDef["type"]): string {
     case "stamp":
       return "#cc0000";
     case "image":
+    case "imported":
       return "#00000000";
   }
 }
@@ -489,6 +524,11 @@ export async function addAnnotationDicts(
   const pages = pdfDoc.getPages();
 
   for (const def of annotations) {
+    // "imported" annotations are already in the source PDF — never
+    // re-serialize them. Deletion is handled by buildAnnotatedPdfBytes'
+    // removedRefs strip; moving an imported annotation is still UI-only.
+    if (def.type === "imported") continue;
+
     const pageIdx = def.page - 1;
     if (pageIdx < 0 || pageIdx >= pages.length) continue;
     const page = pages[pageIdx];
@@ -797,39 +837,189 @@ export async function addAnnotationDicts(
 }
 
 /**
+ * Select a radio-style button group by widget on-value, bypassing pdf-lib's
+ * type-level guards. Used when pdf-lib classifies a radio as `PDFCheckBox`
+ * (PDF lacks the /Ff Radio bit) — `check()` would always pick the first
+ * widget. Mirrors `PDFAcroRadioButton.setValue` minus its `onValues` throw.
+ */
+function setButtonGroupValue(
+  field: PDFCheckBox | PDFRadioGroup,
+  onValue: string,
+): void {
+  const acro = field.acroField;
+  const off = PDFName.of("Off");
+  const widgets = acro.getWidgets();
+  // Match by PDFName identity (pdf-lib interns names) — the viewer stored
+  // pdf.js's buttonValue, which IS the widget's /AP /N on-state name.
+  let target = onValue && onValue !== "Off" ? PDFName.of(onValue) : off;
+  if (
+    target !== off &&
+    !widgets.some((w: { getOnValue(): PDFName | undefined }) => {
+      return w.getOnValue() === target;
+    })
+  ) {
+    // No widget has this on-state — leave as-is rather than corrupt /V.
+    return;
+  }
+  acro.dict.set(PDFName.of("V"), target);
+  for (const w of widgets) {
+    const on = (w as { getOnValue(): PDFName | undefined }).getOnValue();
+    (w as { setAppearanceState(s: PDFName): void }).setAppearanceState(
+      on === target ? target : off,
+    );
+  }
+}
+
+/**
+ * Recover the PDF object reference from an annotation id assigned by
+ * `makeAnnotationId`. Handles both `pdf-<num>-<gen>` (from `ann.ref`) and
+ * `pdf-<num>R` (from pdf.js's string `ann.id`, gen always 0). Returns null for
+ * page-index fallback ids — those have no stable ref to remove by.
+ */
+export function parseAnnotationRef(
+  id: string,
+): { objectNumber: number; generationNumber: number } | null {
+  let m = /^pdf-(\d+)-(\d+)$/.exec(id);
+  if (m) return { objectNumber: +m[1], generationNumber: +m[2] };
+  m = /^pdf-(\d+)R$/.exec(id);
+  if (m) return { objectNumber: +m[1], generationNumber: 0 };
+  return null;
+}
+
+/**
  * Build annotated PDF bytes from the original document.
- * Applies user annotations and form fills, returns Uint8Array of the new PDF.
+ * Applies user annotations and form fills, removes baseline annotations the
+ * user deleted, returns Uint8Array of the new PDF.
  */
 export async function buildAnnotatedPdfBytes(
   pdfBytes: Uint8Array,
   annotations: PdfAnnotationDef[],
   formFields: Map<string, string | boolean>,
+  removedRefs: { objectNumber: number; generationNumber: number }[] = [],
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+
+  // Strip baseline annotations the user deleted. We match on object number +
+  // generation against each page's /Annots array entries (PDFRef). We don't
+  // know which page they were on, so scan every page — /Annots arrays are
+  // small and this only runs at save time.
+  if (removedRefs.length > 0) {
+    const wanted = new Set(
+      removedRefs.map((r) => `${r.objectNumber} ${r.generationNumber}`),
+    );
+    for (const page of pdfDoc.getPages()) {
+      const annots = page.node.Annots();
+      if (!annots) continue;
+      // Walk backwards so .remove(idx) doesn't shift unprocessed entries.
+      for (let i = annots.size() - 1; i >= 0; i--) {
+        const ref = annots.get(i) as {
+          objectNumber?: number;
+          generationNumber?: number;
+        };
+        if (
+          ref?.objectNumber !== undefined &&
+          wanted.has(`${ref.objectNumber} ${ref.generationNumber ?? 0}`)
+        ) {
+          annots.remove(i);
+        }
+      }
+    }
+  }
 
   // Add proper PDF annotation objects
   await addAnnotationDicts(pdfDoc, annotations);
 
-  // Apply form fills
+  // Apply form fills. Dispatch on actual field type — getTextField(name) throws
+  // for dropdowns/radios, so we look up the generic field and instanceof it.
+  // Each field is wrapped in its own try/catch: pdf-lib can throw on
+  // length-constrained text, radios whose buttonValue maps to neither label
+  // nor index, checkboxes missing a /Yes appearance, etc. One bad field must
+  // not abort the rest of the loop (regressed in #577 when the inner catch
+  // was dropped along with the type-specific getters).
   if (formFields.size > 0) {
+    let form: PDFForm | undefined;
     try {
-      const form = pdfDoc.getForm();
+      form = pdfDoc.getForm();
+    } catch {
+      // No AcroForm in this PDF
+    }
+    if (form) {
       for (const [name, value] of formFields) {
         try {
-          if (typeof value === "boolean") {
-            const checkbox = form.getCheckBox(name);
-            if (value) checkbox.check();
-            else checkbox.uncheck();
-          } else {
-            const textField = form.getTextField(name);
-            textField.setText(value);
+          const field = form.getFieldMaybe(name);
+          if (!field) continue;
+
+          if (field instanceof PDFCheckBox) {
+            const widgets = field.acroField.getWidgets();
+            if (typeof value === "string" && widgets.length > 1) {
+              // Multi-widget "checkbox" with a string value = pdf-lib
+              // misclassified a radio group (PDF lacks the /Ff Radio flag).
+              // The viewer stored pdf.js's buttonValue (the widget's on-state
+              // name, e.g. "0"/"1"); check()/uncheck() would hit the FIRST
+              // widget regardless. Write /V and per-widget /AS directly.
+              setButtonGroupValue(field, value);
+            } else {
+              // Single-widget (real) checkbox. Viewer normally stores boolean,
+              // but be liberal: any truthy non-"Off" string counts as checked.
+              const on =
+                value === true ||
+                (typeof value === "string" && value !== "" && value !== "Off");
+              if (on) field.check();
+              else field.uncheck();
+            }
+          } else if (field instanceof PDFRadioGroup) {
+            // The viewer stores pdf.js's buttonValue, which for PDFs with an
+            // /Opt array is a numeric index ("0","1","2") rather than the
+            // option label pdf-lib's select() expects. Try the label first,
+            // then fall back to indexing into getOptions().
+            const opts = field.getOptions();
+            const s = String(value);
+            if (opts.includes(s)) {
+              field.select(s);
+            } else {
+              const idx = Number(s);
+              if (Number.isInteger(idx) && idx >= 0 && idx < opts.length) {
+                field.select(opts[idx]);
+              }
+              // else: value is neither label nor index — leave unset
+            }
+          } else if (field instanceof PDFDropdown) {
+            // select() auto-enables edit mode for values outside getOptions(),
+            // so this works for both enumerated and free-text combos.
+            field.select(String(value));
+          } else if (field instanceof PDFOptionList) {
+            // Viewer stores multiselect listboxes as a comma-joined string
+            // (pdf.js's annotationStorage value for /Ch is string|string[];
+            // our Map<string,string|boolean> flattens arrays). Only select
+            // values that are actually in the option list — pdf-lib throws
+            // on unknowns and there's no edit-mode fallback like Dropdown.
+            const opts = field.getOptions();
+            const wanted = String(value)
+              .split(",")
+              .map((s) => s.trim())
+              .filter((s) => opts.includes(s));
+            if (wanted.length > 0) field.select(wanted);
+            else field.clear();
+          } else if (field instanceof PDFTextField) {
+            field.setText(String(value));
           }
-        } catch {
-          // Field not found or wrong type — skip
+          // PDFButton, PDFSignature: no fill_form support yet
+        } catch (err) {
+          // Skip this field; carry on with the rest. Surfacing per-field
+          // failures is the caller's job (see fill_form result), not save's.
+          console.warn(`buildAnnotatedPdfBytes: skipped field "${name}":`, err);
         }
       }
-    } catch {
-      // Form not available — skip
+      // Some PDFs ship widgets with no on-state appearance stream (no
+      // /AP/N/<onValue>). pdf-lib's check()/select()/setText() set /V and /AS
+      // but don't synthesize the missing appearance, so other readers
+      // (Preview, Acrobat) show the field as if unchanged. This generates a
+      // default appearance for any field marked dirty above.
+      try {
+        form.updateFieldAppearances();
+      } catch (err) {
+        console.warn("buildAnnotatedPdfBytes: updateFieldAppearances:", err);
+      }
     }
   }
 
@@ -912,46 +1102,70 @@ export function importPdfjsAnnotation(
   pageNum: number,
   index: number,
 ): PdfAnnotationDef | null {
-  const ourType = PDFJS_TYPE_MAP[ann.annotationType];
-  if (!ourType) return null;
-
-  // Skip form widgets (they're handled separately by AnnotationLayer)
-  if (ann.annotationType === 20) return null;
+  // Skip form widgets (they're handled separately by AnnotationLayer) and
+  // auxiliary types that aren't user-visible markup:
+  //   2 = Link (navigational, AnnotationLayer handles the click target)
+  //  16 = Popup (the speech-bubble UI for a parent annotation, not content)
+  if (
+    ann.annotationType === 20 ||
+    ann.annotationType === 2 ||
+    ann.annotationType === 16
+  ) {
+    return null;
+  }
 
   const id = makeAnnotationId(ann, pageNum, index);
   const color = pdfjsColorToHex(ann.color);
+  const ourType = PDFJS_TYPE_MAP[ann.annotationType];
+
+  // Anything we don't model — and stamps whose visual is an appearance
+  // stream we can't reproduce as a text label — are kept as "imported":
+  // a placement-only record that the renderer fills with the rasterized
+  // appearance from pdf.js's annotationCanvasMap. This keeps Ink, Polygon,
+  // image-signature stamps, etc. visible AND selectable in our layer.
+  const importAsBitmap = !ourType || (ourType === "stamp" && ann.hasAppearance);
+  if (importAsBitmap) {
+    if (!ann.rect) return null;
+    const r = pdfjsRectToRect(ann.rect);
+    return {
+      type: "imported",
+      id,
+      page: pageNum,
+      x: r.x,
+      y: r.y,
+      width: r.width,
+      height: r.height,
+      pdfjsId: String(ann.id ?? ""),
+      subtype: String(ann.subtype ?? `type${ann.annotationType}`),
+    };
+  }
 
   switch (ourType) {
     case "highlight":
     case "underline":
     case "strikethrough": {
-      // PDF.js provides quadPoints as array of arrays [[x1,y1,x2,y2,...], ...]
-      // or rect as [x1,y1,x2,y2]
-      let rects: Rect[];
-      if (ann.quadPoints && ann.quadPoints.length > 0) {
-        rects = [];
-        for (const qp of ann.quadPoints) {
-          // Each quadPoint is [x1,y1,x2,y2,x3,y3,x4,y4]
-          // We need the bounding box
-          if (qp.length >= 8) {
-            const xs = [qp[0], qp[2], qp[4], qp[6]];
-            const ys = [qp[1], qp[3], qp[5], qp[7]];
-            const minX = Math.min(...xs);
-            const minY = Math.min(...ys);
-            const maxX = Math.max(...xs);
-            const maxY = Math.max(...ys);
-            rects.push({
-              x: minX,
-              y: minY,
-              width: maxX - minX,
-              height: maxY - minY,
-            });
-          }
+      // pdf.js emits quadPoints as a FLAT Float32Array [x1,y1,...,x4,y4, …]
+      // (8 numbers per quad), NOT as nested arrays. Iterating it yields
+      // numbers, so the old `for (const qp of …) if (qp.length>=8)` never
+      // matched and every quad-based annotation was dropped (#506).
+      const rects: Rect[] = [];
+      const qp = ann.quadPoints as ArrayLike<number> | undefined;
+      if (qp && qp.length >= 8) {
+        for (let i = 0; i + 8 <= qp.length; i += 8) {
+          const xs = [qp[i], qp[i + 2], qp[i + 4], qp[i + 6]];
+          const ys = [qp[i + 1], qp[i + 3], qp[i + 5], qp[i + 7]];
+          const minX = Math.min(...xs);
+          const minY = Math.min(...ys);
+          rects.push({
+            x: minX,
+            y: minY,
+            width: Math.max(...xs) - minX,
+            height: Math.max(...ys) - minY,
+          });
         }
-      } else if (ann.rect) {
-        rects = [pdfjsRectToRect(ann.rect)];
-      } else {
-        return null;
+      }
+      if (rects.length === 0 && ann.rect) {
+        rects.push(pdfjsRectToRect(ann.rect));
       }
       if (rects.length === 0) return null;
 

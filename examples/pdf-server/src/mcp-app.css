@@ -227,6 +227,10 @@ body {
   align-items: flex-start;
   padding: 1rem;
   background: var(--bg200);
+  /* JS owns pinch (inline pinch-in → fullscreen). pan-x/pan-y keeps native
+   * scrolling; the fullscreen rule below repeats this with a comment on the
+   * iOS-Safari preventDefault backstop. */
+  touch-action: pan-x pan-y;
 }
 
 .page-wrapper {
@@ -310,9 +314,20 @@ body {
 }
 
 .main.fullscreen .toolbar {
-  padding-top: calc(0.5rem + var(--safe-top, 0px));
-  padding-left: calc(0.5rem + var(--safe-left, 0px));
-  padding-right: calc(0.5rem + var(--safe-right, 0px));
+  /* Hosts wrap fullscreen in their own header (title + close), which already
+   * clears the top safe-area — so no --safe-top here, only sides. */
+  padding: 0.25rem calc(0.5rem + var(--safe-right, 0px)) 0.25rem
+    calc(0.5rem + var(--safe-left, 0px));
+  min-height: 40px;
+  /* Inline can wrap (narrow chat bubble); fullscreen has the width, and
+   * wrapping would double the bar height + desync the search-bar offset. */
+  flex-wrap: nowrap;
+}
+
+.main.fullscreen .search-bar {
+  /* -1px overlaps the toolbar border so the dropdown looks attached. */
+  top: 39px;
+  right: calc(var(--safe-right, 0px) - 1px);
 }
 
 .main.fullscreen .viewer {
@@ -326,6 +341,17 @@ body {
 .main.fullscreen .canvas-container {
   min-height: 0; /* Allow flex item to shrink below content size */
   overflow: auto; /* Scroll within the document area only */
+  /* Let JS own pinch-zoom (we re-render the PDF, not the viewport).
+   * pan-x pan-y keeps native scrolling/panning working. iOS Safari only
+   * partially honours this — preventDefault on touchmove backs it up. */
+  touch-action: pan-x pan-y;
+  /* Keep the page clear of host overlays (chat input, home indicator).
+   * computeFitScale subtracts padding, so fit-to-page lands above these.
+   * The container background still extends edge-to-edge (.main.fullscreen
+   * has padding:0). Top inset is on the toolbar; the rest land here. */
+  padding-bottom: calc(1rem + var(--safe-bottom, 0px));
+  padding-left: calc(1rem + var(--safe-left, 0px));
+  padding-right: calc(1rem + var(--safe-right, 0px));
 }
 
 /* Search Button */
@@ -562,6 +588,21 @@ body {
   pointer-events: auto;
   cursor: grab;
   user-select: none;
+}
+
+/* Annotation imported verbatim from the PDF (Stamp/Ink/etc. via
+ * annotationCanvasMap). The body is the rasterized appearance canvas;
+ * if pdf.js didn't divert it (no hasOwnCanvas), the box stays transparent
+ * over the main-canvas pixel and just captures clicks. */
+.annotation-imported {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+.annotation-imported:hover {
+  outline: 1px dashed var(--accent, #2563eb);
+  outline-offset: 1px;
 }
 
 /* Selection visuals */

@@ -30,6 +30,7 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         // Use default Chromium everywhere for consistent screenshot rendering
         // Run `npm run test:e2e:docker` locally for CI-identical results
+        ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}),
       },
     },
   ],

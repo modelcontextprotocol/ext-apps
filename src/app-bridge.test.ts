@@ -1221,4 +1221,180 @@ describe("isToolVisibilityAppOnly", () => {
       expect(isToolVisibilityAppOnly(tool)).toBe(false);
     });
   });
+
+  describe("addEventListener / removeEventListener", () => {
+    let app: App;
+    let bridge: AppBridge;
+    let appTransport: InMemoryTransport;
+    let bridgeTransport: InMemoryTransport;
+
+    beforeEach(async () => {
+      [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+      app = new App(testAppInfo, {}, { autoResize: false });
+      bridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+      );
+      await bridge.connect(bridgeTransport);
+    });
+
+    afterEach(async () => {
+      await appTransport.close();
+      await bridgeTransport.close();
+    });
+
+    it("App.addEventListener fires multiple listeners for the same event", async () => {
+      const a: unknown[] = [];
+      const b: unknown[] = [];
+      app.addEventListener("hostcontextchanged", (p) => a.push(p));
+      app.addEventListener("hostcontextchanged", (p) => b.push(p));
+
+      await app.connect(appTransport);
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      expect(a).toEqual([{ theme: "dark" }]);
+      expect(b).toEqual([{ theme: "dark" }]);
+    });
+
+    it("App notification setters replace (DOM onclick model)", async () => {
+      const a: unknown[] = [];
+      const b: unknown[] = [];
+      const first = (p: unknown) => a.push(p);
+      app.ontoolinput = first;
+      expect(app.ontoolinput).toBe(first);
+      app.ontoolinput = (p) => b.push(p);
+
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: { x: 1 } });
+      await flush();
+
+      // Second assignment replaced the first (like el.onclick)
+      expect(a).toEqual([]);
+      expect(b).toEqual([{ arguments: { x: 1 } }]);
+    });
+
+    it("App notification setter coexists with addEventListener", async () => {
+      const a: unknown[] = [];
+      const b: unknown[] = [];
+      app.ontoolinput = (p) => a.push(p);
+      app.addEventListener("toolinput", (p) => b.push(p));
+
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: { x: 1 } });
+      await flush();
+
+      // Both the on* handler and addEventListener listener fire
+      expect(a).toEqual([{ arguments: { x: 1 } }]);
+      expect(b).toEqual([{ arguments: { x: 1 } }]);
+    });
+
+    it("App notification getter returns the on* handler", () => {
+      expect(app.ontoolinput).toBeUndefined();
+      const handler = () => {};
+      app.ontoolinput = handler;
+      expect(app.ontoolinput).toBe(handler);
+    });
+
+    it("App notification setter can be cleared with undefined", async () => {
+      const a: unknown[] = [];
+      app.ontoolinput = (p) => a.push(p);
+      expect(app.ontoolinput).toBeDefined();
+      app.ontoolinput = undefined;
+
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: { x: 1 } });
+      await flush();
+
+      expect(a).toEqual([]);
+      expect(app.ontoolinput).toBeUndefined();
+    });
+
+    it("App.removeEventListener stops a listener from firing", async () => {
+      const a: unknown[] = [];
+      const listener = (p: unknown) => a.push(p);
+      app.addEventListener("toolinput", listener);
+      app.removeEventListener("toolinput", listener);
+
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: {} });
+      await flush();
+
+      expect(a).toEqual([]);
+    });
+
+    it("App.onEventDispatch merges hostcontext before listeners fire", async () => {
+      let seen: unknown;
+      app.addEventListener("hostcontextchanged", () => {
+        seen = app.getHostContext();
+      });
+
+      await app.connect(appTransport);
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      expect(seen).toEqual({ theme: "dark" });
+    });
+
+    it("AppBridge.addEventListener fires multiple listeners", async () => {
+      let a = 0;
+      let b = 0;
+      bridge.addEventListener("initialized", () => a++);
+      bridge.addEventListener("initialized", () => b++);
+
+      await app.connect(appTransport);
+
+      expect(a).toBe(1);
+      expect(b).toBe(1);
+    });
+
+    it("on* request setters have replace semantics (no throw)", () => {
+      app.onteardown = async () => ({});
+      expect(() => {
+        app.onteardown = async () => ({});
+      }).not.toThrow();
+    });
+
+    it("on* request setters have getters", () => {
+      expect(app.onteardown).toBeUndefined();
+      const handler = async () => ({});
+      app.onteardown = handler;
+      expect(app.onteardown).toBe(handler);
+    });
+
+    it("direct setRequestHandler throws when called twice", () => {
+      const bridge2 = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+      );
+      bridge2.setRequestHandler(
+        // @ts-expect-error — exercising throw path with raw schema
+        { shape: { method: { value: "test/method" } } },
+        () => ({}),
+      );
+      expect(() => {
+        bridge2.setRequestHandler(
+          // @ts-expect-error — exercising throw path with raw schema
+          { shape: { method: { value: "test/method" } } },
+          () => ({}),
+        );
+      }).toThrow(/already registered/);
+    });
+
+    it("direct setNotificationHandler throws for event-mapped methods", () => {
+      const app2 = new App(testAppInfo, {}, { autoResize: false });
+      app2.addEventListener("toolinput", () => {});
+      expect(() => {
+        app2.setNotificationHandler(
+          // @ts-expect-error — exercising throw path with raw schema
+          {
+            shape: { method: { value: "ui/notifications/tool-input" } },
+          },
+          () => {},
+        );
+      }).toThrow(/already registered/);
+    });
+  });
 });

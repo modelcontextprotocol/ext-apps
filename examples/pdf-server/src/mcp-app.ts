@@ -25,14 +25,17 @@ import {
   type LineAnnotation,
   type StampAnnotation,
   type ImageAnnotation,
+  type ImportedAnnotation,
   type NoteAnnotation,
   type FreetextAnnotation,
+  cssColorToRgb,
   serializeDiff,
   deserializeDiff,
   mergeAnnotations,
   computeDiff,
   isDiffEmpty,
   buildAnnotatedPdfBytes,
+  parseAnnotationRef,
   importPdfjsAnnotation,
   uint8ArrayToBase64,
   convertFromModelCoords,
@@ -128,6 +131,8 @@ let pdfDocument: pdfjsLib.PDFDocumentProxy | null = null;
 let currentPage = 1;
 let totalPages = 0;
 let scale = 1.0;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3.0;
 let pdfUrl = "";
 let pdfTitle: string | undefined;
 let viewUUID: string | undefined;
@@ -209,6 +214,7 @@ const searchCloseBtn = document.getElementById(
 ) as HTMLButtonElement;
 const highlightLayerEl = document.getElementById("highlight-layer")!;
 const annotationLayerEl = document.getElementById("annotation-layer")!;
+const pageWrapperEl = document.querySelector(".page-wrapper") as HTMLElement;
 // formLayerEl → imported from ./viewer-state.js
 const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
 const downloadBtn = document.getElementById(
@@ -256,39 +262,122 @@ let currentDisplayMode: "inline" | "fullscreen" = "inline";
 let userHasZoomed = false;
 
 /**
- * Compute a scale that fits the PDF page width to the available container width.
- * Returns null if the container isn't visible or the page width is unavailable.
+ * Compute the scale that best fits the PDF page to the container.
+ * Returns null only when the container hasn't laid out yet.
+ *
+ * Inline mode: fit-to-WIDTH capped at 1.0. We shrink to fit a narrow chat
+ * column but don't blow up past natural size — the iframe sizes itself to
+ * the page via sendSizeChanged, so growing past 1.0 would just make the
+ * iframe huge.
+ *
+ * Fullscreen mode: fit-to-PAGE capped at ZOOM_MAX. The whole page is visible
+ * without scrolling (min of width-fit and height-fit). On a wide screen this
+ * typically lands well above 1.0; on a phone in portrait, width is the
+ * tighter constraint and it degrades to fit-to-width.
  */
-async function computeFitToWidthScale(): Promise<number | null> {
+async function computeFitScale(): Promise<number | null> {
   if (!pdfDocument) return null;
 
   try {
     const page = await pdfDocument.getPage(currentPage);
     const naturalViewport = page.getViewport({ scale: 1.0 });
     const pageWidth = naturalViewport.width;
+    const pageHeight = naturalViewport.height;
 
     const container = canvasContainerEl as HTMLElement;
     const containerStyle = getComputedStyle(container);
-    const paddingLeft = parseFloat(containerStyle.paddingLeft);
-    const paddingRight = parseFloat(containerStyle.paddingRight);
-    const availableWidth = container.clientWidth - paddingLeft - paddingRight;
+    const padX =
+      parseFloat(containerStyle.paddingLeft) +
+      parseFloat(containerStyle.paddingRight);
+    const padY =
+      parseFloat(containerStyle.paddingTop) +
+      parseFloat(containerStyle.paddingBottom);
+    const availableWidth = container.clientWidth - padX;
+    const availableHeight = container.clientHeight - padY;
 
     if (availableWidth <= 0 || pageWidth <= 0) return null;
-    if (availableWidth >= pageWidth) return null; // Already fits
 
-    return availableWidth / pageWidth;
+    const widthFit = availableWidth / pageWidth;
+    if (currentDisplayMode !== "fullscreen") {
+      return Math.min(1.0, widthFit);
+    }
+    // Fullscreen: fit the WHOLE page. If height isn't measurable yet
+    // (early layout) fall back to width-fit.
+    const heightFit =
+      availableHeight > 0 && pageHeight > 0
+        ? availableHeight / pageHeight
+        : widthFit;
+    return Math.min(ZOOM_MAX, widthFit, heightFit);
   } catch {
     return null;
   }
 }
 
 /**
+ * Re-apply the auto-fit scale if the user hasn't taken over zoom. Runs on
+ * container resize (ResizeObserver) and display-mode transitions.
+ *
+ * The ResizeObserver path is the load-bearing one. Hosts disagree on
+ * what they send and when:
+ *  - basic-host sends containerDimensions only at init, never on resize
+ *  - Claude Desktop resizes the iframe and sends displayMode, but the
+ *    iframe element may not have its new size yet when the message lands
+ * The observer fires after the iframe has actually laid out at the new
+ * size, so clientWidth is fresh. The hostContextChanged hooks are kept
+ * as a fast path / belt-and-suspenders.
+ */
+async function refitScale(): Promise<void> {
+  if (!pdfDocument || userHasZoomed) return;
+  const fitScale = await computeFitScale();
+  if (fitScale !== null && Math.abs(fitScale - scale) > 0.01) {
+    scale = fitScale;
+    log.info("Refit scale:", scale);
+    renderPage();
+  }
+}
+
+// Refit when the container actually changes size. In INLINE mode this is
+// gated to width-GROWTH only — renderPage() → requestFitToContent() → host
+// resizes iframe to the (smaller) page width would otherwise re-trigger the
+// observer and walk the scale down to ZOOM_MIN. In FULLSCREEN
+// requestFitToContent early-returns so there's no loop, and fit-to-page
+// needs height changes too (rotation, browser chrome on mobile).
+let lastContainerW = 0;
+let lastContainerH = 0;
+/** One-shot: refit on the next resize even if it's a shrink in inline mode.
+ *  Set on fullscreen→inline so the page snaps to the new (smaller) width
+ *  once the host has actually resized the iframe — the inline `grewW` gate
+ *  would otherwise swallow that shrink. */
+let forceNextResizeRefit = false;
+const containerResizeObserver = new ResizeObserver(([entry]) => {
+  const { width: w, height: h } = entry.contentRect;
+  const grewW = w > lastContainerW + 1;
+  const changed =
+    Math.abs(w - lastContainerW) > 1 || Math.abs(h - lastContainerH) > 1;
+  lastContainerW = w;
+  lastContainerH = h;
+  if (forceNextResizeRefit && changed) {
+    forceNextResizeRefit = false;
+    refitScale();
+  } else if (currentDisplayMode === "fullscreen" ? changed : grewW) {
+    refitScale();
+  }
+});
+containerResizeObserver.observe(canvasContainerEl as HTMLElement);
+
+/**
  * Request the host to resize the app to fit the current PDF page.
  * Only applies in inline mode - fullscreen mode uses scrolling.
  */
 function requestFitToContent() {
-  if (currentDisplayMode === "fullscreen") {
-    return; // Fullscreen uses scrolling
+  // Read the host's current state, not our cached currentDisplayMode.
+  // currentDisplayMode defaults to "inline" and handleHostContextChanged
+  // only updates it `if (ctx.displayMode)` — if the host omits the field
+  // or the update lands one tick late, the cached value lies. We've seen
+  // this measure a near-empty pageWrapper (~85px = toolbar + padding) and
+  // shrink a fullscreen iframe to a sliver.
+  if (app.getHostContext()?.displayMode === "fullscreen") {
+    return;
   }
 
   const canvasHeight = canvasEl.height;
@@ -297,13 +386,9 @@ function requestFitToContent() {
   }
 
   // Get actual element dimensions
-  const canvasContainerEl = document.querySelector(
-    ".canvas-container",
-  ) as HTMLElement;
-  const pageWrapperEl = document.querySelector(".page-wrapper") as HTMLElement;
   const toolbarEl = document.querySelector(".toolbar") as HTMLElement;
 
-  if (!canvasContainerEl || !toolbarEl || !pageWrapperEl) {
+  if (!toolbarEl) {
     return;
   }
 
@@ -323,6 +408,16 @@ function requestFitToContent() {
 
   // In inline mode (this function early-returns for fullscreen) the side panel is hidden
   const totalWidth = pageWrapperEl.offsetWidth + BUFFER;
+
+  // pageWrapper measuring ≈ 0 means the canvas hasn't laid out yet (early
+  // render, hidden ancestor, etc). Sending toolbar-height-only would shrink
+  // the iframe to a sliver. The next renderPage() will measure correctly.
+  if (pageWrapperHeight < toolbarHeight) {
+    log.info(
+      `requestFitToContent: pageWrapper ${pageWrapperHeight}px < toolbar ${toolbarHeight}px — skipping`,
+    );
+    return;
+  }
 
   app.sendSizeChanged({ width: totalWidth, height: totalHeight });
 }
@@ -1290,6 +1385,10 @@ const DRAGGABLE_TYPES = new Set<string>([
   "stamp",
   "note",
   "image",
+  // "imported" is draggable in the UI but the move does NOT persist to the
+  // PDF on save (addAnnotationDicts skips it). Resize/rotate stay disabled
+  // — the appearance bitmap would just stretch.
+  "imported",
 ]);
 
 function setupAnnotationInteraction(
@@ -1797,6 +1896,25 @@ function paintAnnotationsOnCanvas(
         }
         break;
       }
+
+      case "imported": {
+        const s = pdfRectToScreen(
+          { x: def.x, y: def.y, width: def.width, height: def.height },
+          viewport,
+        );
+        const bmp = annotationCanvasMap.get(def.pdfjsId);
+        ctx.save();
+        if (bmp) {
+          ctx.drawImage(bmp, s.left, s.top, s.width, s.height);
+        } else {
+          ctx.strokeStyle = "#666";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(s.left, s.top, s.width, s.height);
+        }
+        ctx.restore();
+        break;
+      }
     }
   }
 }
@@ -1851,13 +1969,20 @@ function renderAnnotation(
   viewport: { width: number; height: number; scale: number },
 ): HTMLElement[] {
   switch (def.type) {
-    case "highlight":
+    case "highlight": {
+      // Force translucency: def.color is an opaque hex (e.g. "#ffff00"), which
+      // would override the rgba()/mix-blend-mode in CSS and hide the text.
+      const rgb = def.color ? cssColorToRgb(def.color) : null;
+      const bg = rgb
+        ? `rgba(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)}, 0.35)`
+        : undefined;
       return renderRectsAnnotation(
         def.rects,
         "annotation-highlight",
         viewport,
-        def.color ? { background: def.color } : {},
+        bg ? { background: bg } : {},
       );
+    }
     case "underline":
       return renderRectsAnnotation(
         def.rects,
@@ -1887,6 +2012,8 @@ function renderAnnotation(
       return [renderLineAnnotation(def, viewport)];
     case "image":
       return [renderImageAnnotation(def, viewport)];
+    case "imported":
+      return [renderImportedAnnotation(def, viewport)];
   }
 }
 
@@ -2071,6 +2198,45 @@ function renderImageAnnotation(
     img.style.pointerEvents = "none";
     img.draggable = false;
     el.appendChild(img);
+  }
+  return el;
+}
+
+/**
+ * Per-annotation appearance bitmaps from page.render(). Keyed by pdf.js
+ * annotation id (e.g. "118R"). Populated for the current page only —
+ * cleared at the start of each renderPage().
+ */
+const annotationCanvasMap = new Map<string, HTMLCanvasElement>();
+
+function renderImportedAnnotation(
+  def: ImportedAnnotation,
+  viewport: { width: number; height: number; scale: number },
+): HTMLElement {
+  const screen = pdfRectToScreen(
+    { x: def.x, y: def.y, width: def.width, height: def.height },
+    viewport,
+  );
+  const el = document.createElement("div");
+  el.className = "annotation-imported";
+  el.style.left = `${screen.left}px`;
+  el.style.top = `${screen.top}px`;
+  el.style.width = `${screen.width}px`;
+  el.style.height = `${screen.height}px`;
+  el.title = `${def.subtype} (from PDF)`;
+
+  // page.render() may or may not have produced a separate canvas for this
+  // annotation (hasOwnCanvas depends on the PDF's flags). When it did, use
+  // it as a pixel-faithful body; when it didn't, the appearance is on the
+  // main canvas already, so leave the box transparent — it still captures
+  // clicks for select/delete.
+  const canvas = annotationCanvasMap.get(def.pdfjsId);
+  if (canvas) {
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.display = "block";
+    canvas.style.pointerEvents = "none";
+    el.appendChild(canvas);
   }
   return el;
 }
@@ -2328,6 +2494,84 @@ async function renderPageOffscreen(pageNum: number): Promise<string> {
   return dataUrl.split(",")[1];
 }
 
+/**
+ * Snapshot the live viewer for `interact({action:"get_viewer_state"})`.
+ *
+ * Selection is read from `window.getSelection()` at call time — no caching;
+ * if the user navigated away or nothing is selected, `selection` is `null`.
+ * `boundingRect` is in model coords (PDF points, origin top-left, y-down) so
+ * it can be fed straight back into `add_annotations`.
+ */
+async function handleGetViewerState(requestId: string): Promise<void> {
+  const CONTEXT_CHARS = 200;
+
+  let selection: {
+    text: string;
+    contextBefore: string;
+    contextAfter: string;
+    boundingRect: { x: number; y: number; width: number; height: number };
+  } | null = null;
+
+  const sel = window.getSelection();
+  const selectedText = sel?.toString().replace(/\s+/g, " ").trim();
+  if (sel && selectedText && sel.rangeCount > 0) {
+    // Only treat it as a PDF selection if it lives inside the text layer of
+    // the rendered page (not the toolbar, search box, etc.).
+    const range = sel.getRangeAt(0);
+    const anchor =
+      range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.commonAncestorContainer as Element)
+        : range.commonAncestorContainer.parentElement;
+    if (anchor && textLayerEl.contains(anchor)) {
+      // Context: locate selection in the page's extracted text and slice
+      // ±CONTEXT_CHARS around it. Falls back to empty strings if fuzzy
+      // match fails (still return text + rect — they're the load-bearing
+      // bits).
+      const pageText = pageTextCache.get(currentPage) ?? "";
+      const loc = findSelectionInText(pageText, selectedText);
+      const contextBefore = loc
+        ? pageText.slice(Math.max(0, loc.start - CONTEXT_CHARS), loc.start)
+        : "";
+      const contextAfter = loc
+        ? pageText.slice(loc.end, loc.end + CONTEXT_CHARS)
+        : "";
+
+      // Single bounding box, page-relative model coords. getBoundingClientRect
+      // is viewport-relative; subtract the page-wrapper origin then divide by
+      // scale → PDF points (top-left origin, y-down — matches the coord
+      // system documented in the interact tool description).
+      const r = range.getBoundingClientRect();
+      const origin = pageWrapperEl.getBoundingClientRect();
+      const round = (n: number) => Math.round(n * 100) / 100;
+      selection = {
+        text: selectedText,
+        contextBefore,
+        contextAfter,
+        boundingRect: {
+          x: round((r.left - origin.left) / scale),
+          y: round((r.top - origin.top) / scale),
+          width: round(r.width / scale),
+          height: round(r.height / scale),
+        },
+      };
+    }
+  }
+
+  const state = {
+    currentPage,
+    pageCount: totalPages,
+    zoom: Math.round(scale * 100),
+    displayMode: currentDisplayMode,
+    selectedAnnotationIds: [...selectedAnnotationIds],
+    selection,
+  };
+
+  await app.callServerTool({
+    name: "submit_viewer_state",
+    arguments: { requestId, state: JSON.stringify(state, null, 2) },
+  });
+}
+
 async function handleGetPages(cmd: {
   requestId: string;
   intervals: Array<{ start?: number; end?: number }>;
@@ -2583,7 +2827,8 @@ function normaliseFieldValue(
  */
 async function buildFieldNameMap(
   doc: pdfjsLib.PDFDocumentProxy,
-): Promise<void> {
+): Promise<boolean> {
+  let pushedToStorage = false;
   fieldNameToIds.clear();
   radioButtonValues.clear();
   fieldNameToPage.clear();
@@ -2679,12 +2924,16 @@ async function buildFieldNameMap(
       if (!widgetIds) continue; // no widget → not rendered anyway
 
       // Type comes from getFieldObjects (widget annot data doesn't have it).
-      // Value comes from the widget annotation (fall back to field-dict if
-      // the widget didn't expose one).
+      // Value: prefer the AcroForm field-tree value over the widget's
+      // fieldValue. pdf-lib's save() can leave a page widget pointing at a
+      // stale /V while the field tree has the new one (seen with comb text
+      // fields), and getAnnotations() reads the widget. If the two disagree
+      // we push the field-tree value into annotationStorage so the rendered
+      // input matches what's actually in /AcroForm.
       const type = fieldArr.find((f) => f.type)?.type;
-      const raw = widgetFieldValues.has(name)
-        ? widgetFieldValues.get(name)
-        : fieldArr.find((f) => f.value != null)?.value;
+      const fieldTreeRaw = fieldArr.find((f) => f.value != null)?.value;
+      const widgetRaw = widgetFieldValues.get(name);
+      const raw = fieldTreeRaw ?? widgetRaw;
       const v = normaliseFieldValue(type, raw);
       if (v !== null) {
         pdfBaselineFormValues.set(name, v);
@@ -2692,6 +2941,13 @@ async function buildFieldNameMap(
         // restored localStorage diff (applied in restoreAnnotations) will
         // overwrite specific fields the user changed.
         if (!formFieldValues.has(name)) formFieldValues.set(name, v);
+        // Widget out of sync with field tree → force storage so
+        // AnnotationLayer renders the field-tree value, not the stale
+        // widget. (syncFormValuesToStorage skips baseline==current.)
+        if (fieldTreeRaw != null && fieldTreeRaw !== widgetRaw) {
+          setFieldInStorage(name, v);
+          pushedToStorage = true;
+        }
       }
 
       // Skip parent entries with no concrete id (radio groups: the /T tree
@@ -2706,6 +2962,61 @@ async function buildFieldNameMap(
   }
 
   log.info(`Built field name map: ${fieldNameToIds.size} fields`);
+  return pushedToStorage;
+}
+
+/**
+ * Set one form field's value in pdf.js's annotationStorage, in the format
+ * AnnotationLayer expects to READ when it re-renders.
+ *
+ * Radio buttons need per-widget booleans: pdf.js's RadioButtonWidgetAnnotation
+ * render() has inverted string coercion (`value !== buttonValue` → true for
+ * every NON-matching widget), so a string value on all widgets checks the
+ * first rendered one and clears the rest regardless of what you asked for.
+ * Match pdf.js's own change handler instead: `{value: true}` on the widget
+ * whose buttonValue matches, `{value: false}` on the siblings.
+ *
+ * Also patches the live DOM element for the current page so the user sees the
+ * change without waiting for a full re-render.
+ */
+function setFieldInStorage(name: string, value: string | boolean): void {
+  if (!pdfDocument) return;
+  const ids = fieldNameToIds.get(name);
+  if (!ids) return;
+  const storage = pdfDocument.annotationStorage;
+
+  // Radio group: at least one widget ID has a buttonValue recorded.
+  const isRadio = ids.some((id) => radioButtonValues.has(id));
+  if (isRadio) {
+    const want = String(value);
+    for (const id of ids) {
+      const checked = radioButtonValues.get(id) === want;
+      storage.setValue(id, { value: checked });
+      const el = formLayerEl.querySelector(
+        `input[data-element-id="${id}"]`,
+      ) as HTMLInputElement | null;
+      if (el) el.checked = checked;
+    }
+    return;
+  }
+
+  // Text / checkbox / select: same value on every widget (a field can have
+  // multiple widget annotations sharing one /V).
+  const storageValue = typeof value === "boolean" ? value : String(value);
+  for (const id of ids) {
+    storage.setValue(id, { value: storageValue });
+    const el = formLayerEl.querySelector(`[data-element-id="${id}"]`) as
+      | HTMLInputElement
+      | HTMLSelectElement
+      | HTMLTextAreaElement
+      | null;
+    if (!el) continue;
+    if (el instanceof HTMLInputElement && el.type === "checkbox") {
+      el.checked = !!value;
+    } else {
+      el.value = String(value);
+    }
+  }
 }
 
 /** Sync formFieldValues into pdfDocument.annotationStorage so AnnotationLayer renders pre-filled values.
@@ -2715,17 +3026,9 @@ async function buildFieldNameMap(
  *  form can break the Reset button's ability to restore defaults. */
 function syncFormValuesToStorage(): void {
   if (!pdfDocument || fieldNameToIds.size === 0) return;
-  const storage = pdfDocument.annotationStorage;
   for (const [name, value] of formFieldValues) {
     if (pdfBaselineFormValues.get(name) === value) continue;
-    const ids = fieldNameToIds.get(name);
-    if (ids) {
-      for (const id of ids) {
-        storage.setValue(id, {
-          value: typeof value === "boolean" ? value : String(value),
-        });
-      }
-    }
+    setFieldInStorage(name, value);
   }
 }
 
@@ -2747,15 +3050,31 @@ async function getAnnotatedPdfBytes(): Promise<Uint8Array> {
     }
   }
 
-  // buildAnnotatedPdfBytes gates on formFields.size > 0 and only writes
-  // entries present in the map. After clearAllItems() the map is empty →
-  // zero setText/uncheck calls → pdf-lib leaves original /V intact →
-  // the "stripped PDF" we promised keeps all its form data. To actually
-  // clear, send an explicit sentinel for every baseline field the user
-  // dropped: "" for text, false for checkbox (matching baseline type).
-  const formFieldsOut = new Map(formFieldValues);
+  // Baseline annotations the user deleted: strip their refs from /Annots so
+  // they don't reappear on reload. Ids without a recoverable ref (page-index
+  // fallback) can't be removed by-ref and are skipped.
+  const removedRefs = pdfBaselineAnnotations
+    .filter((a) => !annotationMap.has(a.id))
+    .map((a) => parseAnnotationRef(a.id))
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  // Only write fields that actually changed vs. what's already in the PDF.
+  // Unchanged fields are no-ops at best, and at worst trip pdf-lib edge
+  // cases (max-length text, missing /Yes appearance, …) on fields the user
+  // never touched — which, before the per-field catch in
+  // buildAnnotatedPdfBytes, aborted every subsequent field.
+  //
+  // Fields the user cleared (present in baseline, absent from formFieldValues
+  // after clearAllItems()) still need an explicit "" / false so pdf-lib
+  // overwrites the original /V instead of leaving it intact.
+  const formFieldsOut = new Map<string, string | boolean>();
+  for (const [name, value] of formFieldValues) {
+    if (pdfBaselineFormValues.get(name) !== value) {
+      formFieldsOut.set(name, value);
+    }
+  }
   for (const [name, baselineValue] of pdfBaselineFormValues) {
-    if (!formFieldsOut.has(name)) {
+    if (!formFieldValues.has(name)) {
       formFieldsOut.set(name, typeof baselineValue === "boolean" ? false : "");
     }
   }
@@ -2763,6 +3082,7 @@ async function getAnnotatedPdfBytes(): Promise<Uint8Array> {
     fullBytes as Uint8Array,
     annotations,
     formFieldsOut,
+    removedRefs,
   );
 }
 
@@ -2804,15 +3124,6 @@ async function savePdf(): Promise<void> {
       const sc = result.structuredContent as { mtimeMs?: number } | undefined;
       lastSavedMtime = sc?.mtimeMs ?? null;
 
-      // Rebase: the file on disk now contains our annotations + form values.
-      // Update the baseline so future diffs are relative to what was saved.
-      pdfBaselineAnnotations = [...annotationMap.values()].map((t) => ({
-        ...t.def,
-      }));
-      pdfBaselineFormValues.clear();
-      for (const [k, v] of formFieldValues) pdfBaselineFormValues.set(k, v);
-
-      setDirty(false); // → updateSaveBtn() disables button
       const key = annotationStorageKey();
       if (key) {
         try {
@@ -2821,6 +3132,13 @@ async function savePdf(): Promise<void> {
           /* ignore */
         }
       }
+      // Reload from the bytes we just wrote. The previous approach (rebase
+      // baselines but keep the old pdfDocument) drifts: subsequent renders
+      // still rasterize stripped annotations from the old bytes, and the
+      // field/widget split that pdf-lib's save can create isn't reflected
+      // until reload anyway. Reload makes "what you see = what's on disk"
+      // an invariant. (file_changed echo is suppressed by lastSavedMtime.)
+      await reloadPdf();
     }
   } catch (err) {
     log.error("Save failed:", err);
@@ -2920,9 +3238,19 @@ async function renderPage() {
     // Set display size in CSS pixels
     canvasEl.style.width = `${viewport.width}px`;
     canvasEl.style.height = `${viewport.height}px`;
+    // Drop any pinch preview transform in the same frame as the canvas
+    // resize so the size handoff is atomic.
+    pageWrapperEl.style.transform = "";
 
-    // Scale context for retina
-    ctx.scale(dpr, dpr);
+    // Retina: pass dpr via page.render's `transform` (NOT ctx.scale).
+    // pdf.js sizes per-annotation canvases as
+    //   width = rectW * outputScaleX * viewport.scale
+    // and outputScaleX is read from transform[0] (defaults to 1). A bare
+    // ctx.scale(dpr,dpr) leaves outputScaleX at 1, so the
+    // annotationCanvasMap canvases get a half-sized backing store on
+    // retina while their internal setTransform IS dpr-aware → the
+    // appearance renders 2× too big into a 1× buffer → cropped/shifted.
+    const dprTransform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined;
 
     // Clear and setup text layer
     textLayerEl.innerHTML = "";
@@ -2931,11 +3259,29 @@ async function renderPage() {
     // Set --scale-factor so CSS font-size/transform rules work correctly.
     textLayerEl.style.setProperty("--scale-factor", `${scale}`);
 
-    // Render canvas - track the task so we can cancel it
+    // Render canvas - track the task so we can cancel it.
+    //
+    // annotationCanvasMap: pdf.js diverts annotations whose appearance needs
+    // its own bitmap (Stamp/Ink/FreeText/etc. with hasOwnCanvas) into
+    // per-id canvases instead of compositing onto the main canvas.
+    // renderImportedAnnotation() pulls from this map so those annotations
+    // become movable DOM elements with pixel-faithful visuals — instead of
+    // unselectable canvas pixels (the old "ghost annotation" problem) or
+    // our lossy text-label re-render.
+    annotationCanvasMap.clear();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const renderTask = (page.render as any)({
       canvasContext: ctx,
       viewport,
+      transform: dprTransform,
+      annotationCanvasMap,
+      // isEditing forces hasOwnCanvas=true for stamps regardless of /F
+      // NoRotate (StampAnnotation.mustBeViewedWhenEditing in pdf.worker).
+      // Without this, stamps without NoRotate composite onto the main canvas
+      // and deleting the "imported" overlay leaves an unclickable pixel
+      // behind. Other markup types still gate on noRotate; for those the
+      // overlay stays a transparent click-box (delete is UI-only until save).
+      isEditing: true,
     });
     currentRenderTask = renderTask;
 
@@ -3016,8 +3362,15 @@ async function renderPage() {
           commentManager: null,
         } as any);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // Only feed Widgets (form fields) here. Markup annotations are
+        // owned by #annotation-layer; letting AnnotationLayer create
+        // <section> elements for them in #form-layer adds invisible
+        // pointer-events:auto boxes that steal clicks from our overlays.
+        const widgetAnns = annotations.filter(
+          (a: { subtype?: string }) => a.subtype === "Widget",
+        );
         await annotationLayer.render({
-          annotations,
+          annotations: widgetAnns,
           div: formLayerEl,
           page,
           viewport,
@@ -3187,20 +3540,28 @@ function scrollSelectionIntoView(): void {
 
 function zoomIn() {
   userHasZoomed = true;
-  scale = Math.min(scale + 0.25, 3.0);
+  scale = Math.min(scale + 0.25, ZOOM_MAX);
   renderPage().then(scrollSelectionIntoView);
 }
 
 function zoomOut() {
   userHasZoomed = true;
-  scale = Math.max(scale - 0.25, 0.5);
+  // Intentionally NOT floored at fit-to-page (unlike pinch). Hosts may
+  // overlay UI on the iframe without reporting it in safeAreaInsets, so
+  // "fit" can leave the page bottom hidden; the button is the escape hatch
+  // to shrink past it. Pinch still rubber-bands at fit (see commitPinch).
+  scale = Math.max(scale - 0.25, ZOOM_MIN);
   renderPage().then(scrollSelectionIntoView);
 }
 
 function resetZoom() {
   userHasZoomed = false;
-  scale = 1.0;
-  renderPage().then(scrollSelectionIntoView);
+  // Re-fit rather than blindly snapping to 1.0 — in a narrow inline iframe
+  // 1.0 overflows, and in fullscreen 1.0 leaves the page floating in space.
+  computeFitScale().then((fitScale) => {
+    scale = fitScale ?? 1.0;
+    renderPage().then(scrollSelectionIntoView);
+  });
 }
 
 async function toggleFullscreen() {
@@ -3264,6 +3625,10 @@ formLayerEl.addEventListener("input", (e) => {
     if (!target.checked) return; // unchecking siblings — ignore
     const wid = target.getAttribute("data-element-id");
     value = (wid && radioButtonValues.get(wid)) ?? target.value;
+  } else if (target instanceof HTMLSelectElement && target.multiple) {
+    // .value on a <select multiple> is only the first option; join them all
+    // so save can select() the full set on a PDFOptionList.
+    value = Array.from(target.selectedOptions, (o) => o.value).join(",");
   } else {
     value = target.value;
   }
@@ -3604,6 +3969,104 @@ document.addEventListener("selectionchange", () => {
   }, 300);
 });
 
+// --- Pinch zoom (fullscreen only) ---
+//
+// Covers two input paths:
+//   1. wheel + ctrlKey  → trackpad pinch on macOS Safari/Chrome/FF and
+//                         Windows precision touchpads. The browser synthesizes
+//                         these on pinch; deltaY < 0 is zoom-in.
+//   2. two-finger touch → mobile Safari / Chrome Android. We track the
+//                         distance between the two touches and scale by the
+//                         ratio against the initial distance.
+//
+// Both paths apply a CSS transform to .page-wrapper for live feedback (GPU,
+// no canvas re-render per frame), then commit to a real renderPage() once
+// the gesture settles. renderPage() is heavy (PDF.js page.render → canvas,
+// TextLayer, AnnotationLayer all rebuilt) — way too slow for touchmove.
+
+/** Scale at gesture start. The CSS transform is relative to the rendered
+ *  canvas, so previewScale / pinchStartScale is what we paint. */
+let pinchStartScale = 1.0;
+/** What we'd commit to if the gesture ended right now. */
+let previewScale = 1.0;
+/** Debounce timer — wheel events have no end event, so we wait for quiet. */
+let pinchSettleTimer: ReturnType<typeof setTimeout> | null = null;
+/** computeFitScale() snapshot at gesture start (async — may be null briefly). */
+let fitScaleAtPinchStart: number | null = null;
+/** Guards against firing toggleFullscreen() once per wheel event during a
+ *  single inline pinch-in gesture. */
+let modeTransitionInFlight = false;
+
+function beginPinch() {
+  pinchStartScale = scale;
+  previewScale = scale;
+  // Seed synchronously when we can (at fit ⇔ !userHasZoomed) so the very
+  // first updatePinch already has the right floor — avoids a one-frame
+  // jitter when the async computeFitScale resolves mid-gesture.
+  fitScaleAtPinchStart = userHasZoomed ? null : scale;
+  void computeFitScale().then((s) => (fitScaleAtPinchStart = s));
+  // transform-origin matches the flex layout's anchor (justify-content:
+  // center, align-items: flex-start) so the preview and the committed
+  // canvas grow from the same point — otherwise the page jumps on release.
+  pageWrapperEl.style.transformOrigin = "50% 0";
+}
+
+/** Fit-to-page floor for fullscreen (committed scale never goes below this).
+ *  The preview is allowed to overshoot down to 0.75×fit for rubber-band
+ *  feedback; release below 0.9×fit exits to inline, otherwise snaps to fit. */
+function pinchFitFloor(): number | null {
+  return currentDisplayMode === "fullscreen" ? fitScaleAtPinchStart : null;
+}
+
+function updatePinch(nextScale: number) {
+  const fit = pinchFitFloor();
+  // Rubber-band: preview may dip to 0.75×fit so the user sees the page pull
+  // away as they pinch out. Committed scale is clamped to fit in commitPinch.
+  const previewFloor = fit !== null ? fit * 0.75 : ZOOM_MIN;
+  previewScale = Math.min(ZOOM_MAX, Math.max(previewFloor, nextScale));
+  // Transform is RELATIVE to the rendered canvas (which sits at
+  // pinchStartScale), so a previewScale equal to pinchStartScale → ratio 1.
+  pageWrapperEl.style.transform = `scale(${previewScale / pinchStartScale})`;
+  zoomLevelEl.textContent = `${Math.round(previewScale * 100)}%`;
+}
+
+function commitPinch() {
+  const fit = pinchFitFloor();
+  // Pinched out past fit (page visibly pulled away) → exit fullscreen.
+  // Only when the gesture *started* near fit, so a single big pinch-out
+  // from deep zoom lands at fit instead of ejecting unexpectedly.
+  if (
+    fit !== null &&
+    pinchStartScale <= fit * 1.05 &&
+    previewScale < fit * 0.9
+  ) {
+    pageWrapperEl.style.transform = "";
+    userHasZoomed = false; // let refitScale() size the inline view
+    forceNextResizeRefit = true; // ResizeObserver inline path ignores shrinks
+    modeTransitionInFlight = true;
+    void toggleFullscreen().finally(() => {
+      setTimeout(() => (modeTransitionInFlight = false), 250);
+    });
+    return;
+  }
+  // Committed scale never below fit in fullscreen — overshoot snaps back.
+  const target =
+    fit !== null
+      ? Math.max(fit, previewScale)
+      : Math.max(ZOOM_MIN, previewScale);
+  if (Math.abs(target - scale) < 0.01) {
+    // Snap-back / dead-zone — no re-render needed.
+    pageWrapperEl.style.transform = "";
+    zoomLevelEl.textContent = `${Math.round(scale * 100)}%`;
+    return;
+  }
+  userHasZoomed = true;
+  scale = target;
+  // renderPage clears the transform in the same frame as the canvas
+  // resize (after its first await) so there's no snap-back.
+  renderPage().then(scrollSelectionIntoView);
+}
+
 // Horizontal scroll/swipe to change pages (disabled when zoomed)
 let horizontalScrollAccumulator = 0;
 const SCROLL_THRESHOLD = 50;
@@ -3613,13 +4076,55 @@ canvasContainerEl.addEventListener(
   (event) => {
     const e = event as WheelEvent;
 
+    // Trackpad pinch arrives as wheel with ctrlKey set (Chrome/FF/Edge on
+    // macOS+Windows, Safari on macOS). MUST check before the deltaX/deltaY
+    // comparison below — pinch deltas come through on deltaY.
+    if (e.ctrlKey) {
+      e.preventDefault();
+      if (currentDisplayMode !== "fullscreen") {
+        // Inline: pinch-in (deltaY<0) is a request to go fullscreen.
+        // Pinch-out is ignored — nothing smaller than inline.
+        if (e.deltaY < 0 && !modeTransitionInFlight) {
+          modeTransitionInFlight = true;
+          void toggleFullscreen().finally(() => {
+            // Hold the latch through the settle window so the tail of the
+            // gesture doesn't immediately start zooming the new fullscreen
+            // view (or, worse, re-toggle).
+            setTimeout(() => (modeTransitionInFlight = false), 250);
+          });
+        }
+        return;
+      }
+      if (modeTransitionInFlight) return; // swallow gesture tail post-toggle
+      if (pinchSettleTimer === null) beginPinch();
+      // exp(-deltaY * k) makes equal-magnitude in/out deltas inverse —
+      // pinch out then back lands where you started. Clamp per event so a
+      // physical mouse wheel (deltaY ≈ ±100/notch) doesn't slam to the
+      // limit; trackpad pinch deltas are ~±1-10 so the clamp is a no-op.
+      const d = Math.max(-25, Math.min(25, e.deltaY));
+      updatePinch(previewScale * Math.exp(-d * 0.01));
+      if (pinchSettleTimer) clearTimeout(pinchSettleTimer);
+      // 200ms — slow trackpad pinches can leave >150ms gaps between wheel
+      // events, which would commit-then-restart and feel steppy.
+      pinchSettleTimer = setTimeout(() => {
+        pinchSettleTimer = null;
+        commitPinch();
+      }, 200);
+      return;
+    }
+
     // Only intercept horizontal scroll, let vertical scroll through
     if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
 
-    // When zoomed, let natural panning happen (no page changes)
-    if (scale > 1.0) return;
+    // If the page overflows horizontally, let native panning handle it
+    // (no page changes). Checking actual overflow rather than `scale > 1.0`
+    // because fullscreen fit-scale is often >100% with the page still fully
+    // visible — we want swipe-to-page there. +1 absorbs sub-pixel rounding.
+    if (canvasContainerEl.scrollWidth > canvasContainerEl.clientWidth + 1) {
+      return;
+    }
 
-    // At 100% zoom, handle page navigation
+    // No horizontal overflow → swipe changes pages.
     e.preventDefault();
     horizontalScrollAccumulator += e.deltaX;
     if (horizontalScrollAccumulator > SCROLL_THRESHOLD) {
@@ -3632,6 +4137,77 @@ canvasContainerEl.addEventListener(
   },
   { passive: false },
 );
+
+// Two-finger touch pinch. We listen on the container (not page-wrapper)
+// because the wrapper transforms during the gesture and would shift the
+// touch target out from under the fingers.
+let touchStartDist = 0;
+
+function touchDist(t: TouchList): number {
+  const dx = t[0].clientX - t[1].clientX;
+  const dy = t[0].clientY - t[1].clientY;
+  return Math.hypot(dx, dy);
+}
+
+canvasContainerEl.addEventListener(
+  "touchstart",
+  (event) => {
+    const e = event as TouchEvent;
+    if (e.touches.length !== 2) return;
+    // No preventDefault here — keep iOS Safari happy. We block native
+    // pinch-zoom via touch-action CSS + preventDefault on touchmove.
+    touchStartDist = touchDist(e.touches);
+    if (touchStartDist > 0) beginPinch();
+  },
+  { passive: true },
+);
+
+canvasContainerEl.addEventListener(
+  "touchmove",
+  (event) => {
+    const e = event as TouchEvent;
+    if (e.touches.length !== 2 || touchStartDist === 0) return;
+    e.preventDefault(); // stop the browser zooming the whole viewport
+    const ratio = touchDist(e.touches) / touchStartDist;
+    if (currentDisplayMode !== "fullscreen") {
+      // Inline: a clear pinch-in means "go fullscreen". 1.15× threshold
+      // avoids triggering on jittery two-finger taps/scrolls.
+      if (ratio > 1.15 && !modeTransitionInFlight) {
+        modeTransitionInFlight = true;
+        touchStartDist = 0; // end this gesture; fullscreen will refit
+        pageWrapperEl.style.transform = "";
+        void toggleFullscreen().finally(() => {
+          setTimeout(() => (modeTransitionInFlight = false), 250);
+        });
+      }
+      return;
+    }
+    updatePinch(pinchStartScale * ratio);
+  },
+  { passive: false },
+);
+
+canvasContainerEl.addEventListener("touchend", (event) => {
+  const e = event as TouchEvent;
+  // Gesture ends when we drop below two fingers. e.touches is the
+  // REMAINING set — lifting one of two leaves length 1.
+  if (touchStartDist === 0 || e.touches.length >= 2) return;
+  touchStartDist = 0;
+  if (currentDisplayMode !== "fullscreen") {
+    // Inline pinch that didn't cross the threshold — discard preview.
+    pageWrapperEl.style.transform = "";
+    return;
+  }
+  commitPinch();
+});
+
+canvasContainerEl.addEventListener("touchcancel", () => {
+  if (touchStartDist === 0) return;
+  touchStartDist = 0;
+  // Cancelled (call, app-switch) → revert, don't commit a half-gesture.
+  pageWrapperEl.style.transform = "";
+  zoomLevelEl.textContent = `${Math.round(scale * 100)}%`;
+});
 
 // Parse tool result
 function parseToolResult(result: CallToolResult): {
@@ -3850,11 +4426,17 @@ async function reloadPdf(): Promise<void> {
     log.info("PDF reloaded:", totalPages, "pages,", totalBytes, "bytes");
 
     showViewer();
+    // Render immediately — annotation/form scans below are O(numPages) and
+    // do NOT block the canvas. See same pattern in the initial-load path.
+    await renderPage();
+
     await loadBaselineAnnotations(document);
-    await buildFieldNameMap(document);
+    const seeded = await buildFieldNameMap(document);
     syncFormValuesToStorage();
+    if (seeded) await renderPage();
     updateAnnotationsBadge();
     renderAnnotationPanel();
+
     renderPage();
     startPreloading();
   } catch (err) {
@@ -4057,9 +4639,18 @@ app.ontoolresult = async (result: CallToolResult) => {
     downloadBtn.style.display = app.getHostCapabilities()?.downloadFile
       ? ""
       : "none";
-    // Save button visibility driven by setDirty()/updateSaveBtn();
-    // restoreAnnotations() above may have already shown it via setDirty(true).
-    updateSaveBtn();
+
+    // Compute fit + render IMMEDIATELY for fast first paint. The canvas is
+    // unsized until renderPage() runs — anything async between showViewer()
+    // and here makes the empty viewer visible. The annotation/form scans
+    // below are O(numPages) and do NOT block the canvas (page.render only
+    // needs canvasContext+viewport), so they run after.
+    const fitScale = await computeFitScale();
+    if (fitScale !== null) {
+      scale = fitScale;
+      log.info("Initial fit scale:", scale);
+    }
+    await renderPage();
 
     // Import annotations from the PDF to establish baseline
     await loadBaselineAnnotations(document);
@@ -4067,19 +4658,24 @@ app.ontoolresult = async (result: CallToolResult) => {
     restoreAnnotations();
 
     // Build field name → annotation ID mapping for form filling
-    await buildFieldNameMap(document);
+    const seeded = await buildFieldNameMap(document);
     // Pre-populate annotationStorage from restored formFieldValues
     syncFormValuesToStorage();
+    // buildFieldNameMap may have pushed AcroForm-tree values into storage
+    // (when the page widget's /V is stale vs the field dict — pdf-lib's save
+    // can leave them split). The first renderPage above ran BEFORE that, so
+    // the form layer shows the stale widget value. Re-render so it picks up
+    // storage. Only when something was actually seeded — most PDFs don't hit
+    // this and the extra render would be pure waste.
+    if (seeded) await renderPage();
 
     updateAnnotationsBadge();
+    // Save button visibility driven by setDirty()/updateSaveBtn();
+    // restoreAnnotations() may have just flipped it via setDirty(true).
+    updateSaveBtn();
 
-    // Compute fit-to-width scale for narrow containers (e.g. mobile)
-    const fitScale = await computeFitToWidthScale();
-    if (fitScale !== null) {
-      scale = fitScale;
-      log.info("Fit-to-width scale:", scale);
-    }
-
+    // Re-render to overlay PDF-baseline annotations + restored form values.
+    // For PDFs with neither, the canvas is identical → no flicker.
     renderPage();
     // Start background preloading of all pages for text extraction
     startPreloading();
@@ -4093,6 +4689,15 @@ app.ontoolresult = async (result: CallToolResult) => {
   } catch (err) {
     log.error("Error loading PDF:", err);
     showError(err instanceof Error ? err.message : String(err));
+    // Poll anyway. The server's interact tool has no way to know we choked —
+    // without a poll it waits 45s on every get_screenshot against this
+    // viewUUID. handleGetPages already null-guards pdfDocument, so a failed
+    // load just means empty page data → server returns "No screenshot
+    // returned" (fast, actionable) instead of "Timeout waiting for page data
+    // from viewer" (slow, opaque).
+    if (viewUUID && interactEnabled) {
+      startPolling();
+    }
   }
 };
 
@@ -4162,42 +4767,64 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
         }
         break;
       case "add_annotations":
+        // Per-def isolation. If convertFromModelCoords or addAnnotation throws
+        // for one def (bad shape, NaN coords), the rest still apply — and
+        // critically, a get_pages later in this batch still runs. Without
+        // this, a single bad annotation makes the whole batch throw out of
+        // processCommands, the iframe never reaches submit_page_data, and the
+        // server's interact() waits the full 45s for a reply that never comes.
         for (const def of cmd.annotations) {
-          const pageHeight = await getPageHeight(def.page);
-          addAnnotation(convertFromModelCoords(def, pageHeight));
+          try {
+            const pageHeight = await getPageHeight(def.page);
+            addAnnotation(convertFromModelCoords(def, pageHeight));
+          } catch (err) {
+            log.error(`add_annotations: failed for id=${def.id}:`, err);
+          }
         }
         break;
       case "update_annotations":
         for (const update of cmd.annotations) {
           const existing = annotationMap.get(update.id);
-          if (!existing) continue;
-          // The model sends model coords (y-down, y = top-left). existing.def
-          // is internal coords (y-up, y = bottom-left). For rect/circle/image
-          // the converted internal y = pageHeight - modelY - height — a function
-          // of BOTH y AND height. If the model patches only {height}, we must
-          // still rewrite internal y to keep the top fixed; otherwise the
-          // bottom stays fixed and the top shifts. Same coupling applies to
-          // {page} changes across differently-sized pages.
-          //
-          // Fix: round-trip through model space. Convert existing to model
-          // coords, spread the patch on top (all-model now), convert back.
-          // convertToModelCoords is self-inverse (pdf-annotations.ts:192) so
-          // unchanged fields pass through unmolested.
-          const srcPageH = await getPageHeight(existing.def.page);
-          const existingModel = convertToModelCoords(existing.def, srcPageH);
-          const mergedModel = {
-            ...existingModel,
-            ...update,
-          } as PdfAnnotationDef;
-          const dstPageH =
-            update.page != null && update.page !== existing.def.page
-              ? await getPageHeight(update.page)
-              : srcPageH;
-          const mergedInternal = convertFromModelCoords(mergedModel, dstPageH);
-          // Pass the FULL merged def. updateAnnotation() already merges over
-          // the tracked def, so passing everything is correct and avoids the
-          // "only copy back Object.keys(update)" loop that caused the bug.
-          updateAnnotation(mergedInternal);
+          if (!existing) {
+            log.error(
+              `update_annotations: id=${update.id} not found — skipping`,
+            );
+            continue;
+          }
+          try {
+            // The model sends model coords (y-down, y = top-left). existing.def
+            // is internal coords (y-up, y = bottom-left). For rect/circle/image
+            // the converted internal y = pageHeight - modelY - height — a function
+            // of BOTH y AND height. If the model patches only {height}, we must
+            // still rewrite internal y to keep the top fixed; otherwise the
+            // bottom stays fixed and the top shifts. Same coupling applies to
+            // {page} changes across differently-sized pages.
+            //
+            // Fix: round-trip through model space. Convert existing to model
+            // coords, spread the patch on top (all-model now), convert back.
+            // convertToModelCoords is self-inverse (pdf-annotations.ts:192) so
+            // unchanged fields pass through unmolested.
+            const srcPageH = await getPageHeight(existing.def.page);
+            const existingModel = convertToModelCoords(existing.def, srcPageH);
+            const mergedModel = {
+              ...existingModel,
+              ...update,
+            } as PdfAnnotationDef;
+            const dstPageH =
+              update.page != null && update.page !== existing.def.page
+                ? await getPageHeight(update.page)
+                : srcPageH;
+            const mergedInternal = convertFromModelCoords(
+              mergedModel,
+              dstPageH,
+            );
+            // Pass the FULL merged def. updateAnnotation() already merges over
+            // the tracked def, so passing everything is correct and avoids the
+            // "only copy back Object.keys(update)" loop that caused the bug.
+            updateAnnotation(mergedInternal);
+          } catch (err) {
+            log.error(`update_annotations: failed for id=${update.id}:`, err);
+          }
         }
         break;
       case "remove_annotations":
@@ -4213,44 +4840,10 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
       case "fill_form":
         for (const field of cmd.fields) {
           formFieldValues.set(field.name, field.value);
-          // Set in PDF.js annotation storage and update DOM elements directly
-          if (pdfDocument) {
-            const ids = fieldNameToIds.get(field.name);
-            if (ids) {
-              for (const id of ids) {
-                pdfDocument.annotationStorage.setValue(id, {
-                  value:
-                    typeof field.value === "boolean"
-                      ? field.value
-                      : String(field.value),
-                });
-                // Update the live DOM element if it exists on the current page
-                const el = formLayerEl.querySelector(
-                  `[data-element-id="${id}"]`,
-                ) as
-                  | HTMLInputElement
-                  | HTMLSelectElement
-                  | HTMLTextAreaElement
-                  | null;
-                if (el) {
-                  if (
-                    el instanceof HTMLInputElement &&
-                    el.type === "checkbox"
-                  ) {
-                    el.checked = !!field.value;
-                  } else if (el instanceof HTMLSelectElement) {
-                    el.value = String(field.value);
-                  } else {
-                    el.value = String(field.value);
-                  }
-                }
-              }
-            } else {
-              log.info(
-                `fill_form: no annotation IDs for field "${field.name}"`,
-              );
-            }
+          if (!fieldNameToIds.has(field.name)) {
+            log.info(`fill_form: no annotation IDs for field "${field.name}"`);
           }
+          setFieldInStorage(field.name, field.value);
         }
         // Re-render to show updated form values (handles fields on other pages)
         renderPage();
@@ -4273,6 +4866,47 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
             .callServerTool({
               name: "submit_page_data",
               arguments: { requestId: cmd.requestId, pages: [] },
+            })
+            .catch(() => {});
+        }
+        break;
+      case "save_as":
+        // Same await-before-next-poll discipline as get_pages — submit must
+        // be SENT before we re-poll, or it queues behind the 30s long-poll.
+        try {
+          const pdfBytes = await getAnnotatedPdfBytes();
+          const base64 = uint8ArrayToBase64(pdfBytes);
+          await app.callServerTool({
+            name: "submit_save_data",
+            arguments: { requestId: cmd.requestId, data: base64 },
+          });
+          log.info(`save_as: submitted ${pdfBytes.length} bytes`);
+        } catch (err) {
+          log.error("save_as: failed to build bytes — submitting error:", err);
+          await app
+            .callServerTool({
+              name: "submit_save_data",
+              arguments: {
+                requestId: cmd.requestId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+            })
+            .catch(() => {});
+        }
+        break;
+      case "get_viewer_state":
+        // Same await-before-next-poll discipline as get_pages/save_as.
+        try {
+          await handleGetViewerState(cmd.requestId);
+        } catch (err) {
+          log.error("get_viewer_state failed — submitting error:", err);
+          await app
+            .callServerTool({
+              name: "submit_viewer_state",
+              arguments: {
+                requestId: cmd.requestId,
+                error: err instanceof Error ? err.message : String(err),
+              },
             })
             .catch(() => {});
         }
@@ -4316,10 +4950,15 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
   }
 
   // Persist after processing batch — but only if anything mutated.
-  // get_pages / file_changed are read-only; writing localStorage and
-  // recomputing the diff for them is wasted work.
+  // get_pages / save_as / file_changed are read-only; writing localStorage
+  // and recomputing the diff for them is wasted work.
   if (
-    commands.some((c) => c.type !== "get_pages" && c.type !== "file_changed")
+    commands.some(
+      (c) =>
+        c.type !== "get_pages" &&
+        c.type !== "save_as" &&
+        c.type !== "file_changed",
+    )
   ) {
     persistAnnotations();
   }
@@ -4393,19 +5032,10 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
     mainEl.style.paddingLeft = `${left}px`;
   }
 
-  // Recompute fit-to-width when container dimensions change
-  if (ctx.containerDimensions && pdfDocument && !userHasZoomed) {
-    log.info("Container dimensions changed:", ctx.containerDimensions);
-    computeFitToWidthScale().then((fitScale) => {
-      if (fitScale !== null && Math.abs(fitScale - scale) > 0.01) {
-        scale = fitScale;
-        log.info("Recomputed fit-to-width scale:", scale);
-        renderPage();
-      }
-    });
-  }
-
-  // Handle display mode changes
+  // Display-mode handling MUST run before the fit-to-width recompute below.
+  // Toggling .fullscreen flips `padding: 0 !important` on mainEl, which
+  // changes how much width the canvas-container actually gets. Measuring
+  // before the class lands sees the wrong padding.
   if (ctx.displayMode) {
     const wasFullscreen = currentDisplayMode === "fullscreen";
     currentDisplayMode = ctx.displayMode as "inline" | "fullscreen";
@@ -4416,11 +5046,28 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
     if (panelState.open) {
       setAnnotationPanelOpen(true);
     }
-    // When exiting fullscreen, request resize to fit content
-    if (wasFullscreen && !isFullscreen && pdfDocument) {
-      requestFitToContent();
+    if (!isFullscreen) {
+      // Fullscreen zoom level is meaningless inline — always refit on exit,
+      // however it was triggered (pinch, button, host Escape/×).
+      userHasZoomed = false;
+      // The iframe shrink lands after this handler; let the ResizeObserver
+      // do one refit on that shrink (its inline branch normally ignores
+      // shrinks to avoid a requestFitToContent feedback loop).
+      forceNextResizeRefit = true;
+    }
+    if (wasFullscreen !== isFullscreen) {
+      // Fast-path refit (computeFitScale reads displayMode). The iframe may
+      // not have its final size yet — the ResizeObserver one-shot above
+      // covers the inline-shrink case once it does.
+      void refitScale();
     }
     updateFullscreenButton();
+  }
+
+  // ResizeObserver on canvasContainerEl drives refit on actual size change;
+  // ctx.containerDimensions is logged for debugging but isn't load-bearing.
+  if (ctx.containerDimensions) {
+    log.info("Container dimensions changed:", ctx.containerDimensions);
   }
 }
 
@@ -4434,22 +5081,38 @@ app.onteardown = async () => {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = null;
   }
+  if (pinchSettleTimer) {
+    clearTimeout(pinchSettleTimer);
+    pinchSettleTimer = null;
+  }
+  containerResizeObserver.disconnect();
   return {};
 };
 
 app.onhostcontextchanged = handleHostContextChanged;
 
 // Connect to host
-app.connect().then(() => {
-  log.info("Connected to host");
-  const ctx = app.getHostContext();
-  if (ctx) {
-    handleHostContextChanged(ctx);
-  }
-  // Restore annotations early using toolInfo.id (available before tool result)
-  restoreAnnotations();
-  updateAnnotationsBadge();
-});
+app
+  .connect()
+  .then(() => {
+    log.info("Connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+    // Restore annotations early using toolInfo.id (available before tool result)
+    restoreAnnotations();
+    updateAnnotationsBadge();
+  })
+  .catch((err: unknown) => {
+    // ui/initialize failed or transport rejected. Without a catch this is an
+    // unhandled rejection — iframe shows blank, server times out on every
+    // interact call with no clue why.
+    log.error("Failed to connect to host:", err);
+    showError(
+      `Failed to connect to host: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
 
 // Debug helper: dump all annotation state. Run in DevTools console as
 // `__pdfDebug()` to diagnose ghost annotations (visible on canvas but not

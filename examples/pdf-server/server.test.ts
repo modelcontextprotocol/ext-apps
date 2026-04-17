@@ -17,6 +17,7 @@ import {
   cliLocalFiles,
   isWritablePath,
   writeFlags,
+  viewSourcePaths,
   CACHE_INACTIVITY_TIMEOUT_MS,
   CACHE_MAX_LIFETIME_MS,
   CACHE_MAX_PDF_SIZE_BYTES,
@@ -1053,5 +1054,433 @@ describe("interact tool", () => {
       await client.close();
       await server.close();
     });
+  });
+
+  describe("save_as", () => {
+    // Roundtrip tests need: writable scope, kick off interact WITHOUT awaiting
+    // (it blocks until the view replies), poll → submit → await. The poll()
+    // call also registers the uuid in viewsPolled, satisfying
+    // ensureViewerIsPolling — without it interact would hang ~8s and fail.
+
+    let tmpDir: string;
+    let savedDirs: Set<string>;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf-saveas-"));
+      savedDirs = new Set(allowedLocalDirs);
+      allowedLocalDirs.add(tmpDir); // make tmpDir a directory root → writable
+    });
+
+    afterEach(() => {
+      allowedLocalDirs.clear();
+      for (const x of savedDirs) allowedLocalDirs.add(x);
+      viewSourcePaths.clear();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("no path, no source tracked → tells model to provide a path", async () => {
+      // Fresh UUID never seen by display_pdf → viewSourcePaths has no entry.
+      // Same condition as a remote (https://) PDF or a stale viewUUID.
+      const { server, client } = await connect();
+      const r = await client.callTool({
+        name: "interact",
+        arguments: { viewUUID: "saveas-nosource", action: "save_as" },
+      });
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("no local source file");
+      expect(firstText(r)).toContain("Provide an explicit `path`");
+      await client.close();
+      await server.close();
+    });
+
+    it("no path, source tracked, overwrite omitted → asks for confirmation", async () => {
+      const { server, client } = await connect();
+      const source = path.join(tmpDir, "original.pdf");
+      fs.writeFileSync(source, "%PDF-1.4\noriginal");
+      viewSourcePaths.set("saveas-noconfirm", source);
+
+      const r = await client.callTool({
+        name: "interact",
+        arguments: { viewUUID: "saveas-noconfirm", action: "save_as" },
+      });
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("overwrites the original");
+      expect(firstText(r)).toContain(source);
+      expect(firstText(r)).toContain("overwrite: true");
+      // Nothing enqueued, file untouched
+      expect(fs.readFileSync(source, "utf8")).toBe("%PDF-1.4\noriginal");
+      await client.close();
+      await server.close();
+    });
+
+    it("no path, source not writable → same gate as save button", async () => {
+      const { server, client } = await connect();
+      // Source outside any directory root → isWritablePath false → save button
+      // would be hidden in the viewer. save_as should refuse for the same reason.
+      const outside = path.join(os.tmpdir(), "saveas-outside.pdf");
+      fs.writeFileSync(outside, "x");
+      viewSourcePaths.set("saveas-buttongate", outside);
+
+      try {
+        const r = await client.callTool({
+          name: "interact",
+          arguments: {
+            viewUUID: "saveas-buttongate",
+            action: "save_as",
+            overwrite: true,
+          },
+        });
+        expect(r.isError).toBe(true);
+        expect(firstText(r)).toContain("not writable");
+        expect(firstText(r)).toContain("save button is hidden");
+      } finally {
+        fs.rmSync(outside, { force: true });
+      }
+      await client.close();
+      await server.close();
+    });
+
+    it("no path, overwrite: true → roundtrip overwrites the original", async () => {
+      const { server, client } = await connect();
+      const uuid = "saveas-original";
+      const source = path.join(tmpDir, "report.pdf");
+      fs.writeFileSync(source, "%PDF-1.4\noriginal contents");
+      viewSourcePaths.set(uuid, source);
+
+      const interactPromise = client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "save_as", overwrite: true },
+      });
+
+      const cmds = await poll(client, uuid);
+      expect(cmds).toHaveLength(1);
+      expect(cmds[0].type).toBe("save_as");
+      await client.callTool({
+        name: "submit_save_data",
+        arguments: {
+          requestId: cmds[0].requestId as string,
+          data: Buffer.from("%PDF-1.4\nannotated").toString("base64"),
+        },
+      });
+
+      const r = await interactPromise;
+      expect(r.isError).toBeFalsy();
+      expect(firstText(r)).toContain(source);
+      expect(fs.readFileSync(source, "utf8")).toBe("%PDF-1.4\nannotated");
+
+      await client.close();
+      await server.close();
+    });
+
+    it("rejects non-absolute path", async () => {
+      const { server, client } = await connect();
+      const r = await client.callTool({
+        name: "interact",
+        arguments: {
+          viewUUID: "saveas-rel",
+          action: "save_as",
+          path: "relative.pdf",
+        },
+      });
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("absolute");
+      await client.close();
+      await server.close();
+    });
+
+    it("rejects non-writable path", async () => {
+      const { server, client } = await connect();
+      // Path outside any directory root → not writable. Validation is sync,
+      // so nothing is enqueued and the queue stays empty.
+      const r = await client.callTool({
+        name: "interact",
+        arguments: {
+          viewUUID: "saveas-nowrite",
+          action: "save_as",
+          path: "/somewhere/else/out.pdf",
+        },
+      });
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("not under a mounted directory root");
+      await client.close();
+      await server.close();
+    });
+
+    it("rejects existing file when overwrite is false (default)", async () => {
+      const { server, client } = await connect();
+      const target = path.join(tmpDir, "exists.pdf");
+      fs.writeFileSync(target, "old contents");
+
+      const r = await client.callTool({
+        name: "interact",
+        arguments: {
+          viewUUID: "saveas-exists",
+          action: "save_as",
+          path: target,
+        },
+      });
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("already exists");
+      expect(firstText(r)).toContain("overwrite: true");
+      // Existence check is sync — nothing enqueued, file untouched.
+      expect(fs.readFileSync(target, "utf8")).toBe("old contents");
+      await client.close();
+      await server.close();
+    });
+
+    it("full roundtrip: enqueue → poll → submit → file written", async () => {
+      const { server, client } = await connect();
+      const uuid = "saveas-roundtrip";
+      const target = path.join(tmpDir, "out.pdf");
+      const pdfBytes = "%PDF-1.4\nfake-annotated-contents\n%%EOF";
+
+      // interact blocks in waitForSaveData until submit_save_data resolves it
+      const interactPromise = client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "save_as", path: target },
+      });
+
+      // Viewer polls → receives the save_as command with a requestId
+      const cmds = await poll(client, uuid);
+      expect(cmds).toHaveLength(1);
+      expect(cmds[0].type).toBe("save_as");
+      const requestId = cmds[0].requestId as string;
+      expect(typeof requestId).toBe("string");
+
+      // Viewer submits bytes
+      const submit = await client.callTool({
+        name: "submit_save_data",
+        arguments: {
+          requestId,
+          data: Buffer.from(pdfBytes).toString("base64"),
+        },
+      });
+      expect(submit.isError).toBeFalsy();
+
+      // interact now unblocks with success
+      const r = await interactPromise;
+      expect(r.isError).toBeFalsy();
+      expect(firstText(r)).toContain("Saved");
+      expect(firstText(r)).toContain(target);
+      expect(fs.readFileSync(target, "utf8")).toBe(pdfBytes);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("overwrite: true replaces an existing file", async () => {
+      const { server, client } = await connect();
+      const uuid = "saveas-overwrite";
+      const target = path.join(tmpDir, "replace.pdf");
+      fs.writeFileSync(target, "old contents");
+
+      const interactPromise = client.callTool({
+        name: "interact",
+        arguments: {
+          viewUUID: uuid,
+          action: "save_as",
+          path: target,
+          overwrite: true,
+        },
+      });
+
+      const cmds = await poll(client, uuid);
+      const requestId = cmds[0].requestId as string;
+      await client.callTool({
+        name: "submit_save_data",
+        arguments: {
+          requestId,
+          data: Buffer.from("%PDF-1.4\nnew").toString("base64"),
+        },
+      });
+
+      const r = await interactPromise;
+      expect(r.isError).toBeFalsy();
+      expect(fs.readFileSync(target, "utf8")).toBe("%PDF-1.4\nnew");
+
+      await client.close();
+      await server.close();
+    });
+
+    it("propagates viewer-reported errors to the model", async () => {
+      const { server, client } = await connect();
+      const uuid = "saveas-viewerr";
+      const target = path.join(tmpDir, "wontwrite.pdf");
+
+      const interactPromise = client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "save_as", path: target },
+      });
+
+      const cmds = await poll(client, uuid);
+      // Viewer hit an error building bytes → reports it instead of timing out
+      await client.callTool({
+        name: "submit_save_data",
+        arguments: {
+          requestId: cmds[0].requestId as string,
+          error: "pdf-lib choked on a comb field",
+        },
+      });
+
+      const r = await interactPromise;
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("pdf-lib choked on a comb field");
+      expect(fs.existsSync(target)).toBe(false);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("submit_save_data with unknown requestId returns isError", async () => {
+      const { server, client } = await connect();
+      const r = await client.callTool({
+        name: "submit_save_data",
+        arguments: { requestId: "never-created", data: "AAAA" },
+      });
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("No pending request");
+      await client.close();
+      await server.close();
+    });
+  });
+
+  describe("viewer liveness", () => {
+    // get_screenshot/get_text fail fast when the iframe never polled, instead
+    // of waiting 45s for a viewer that isn't there. Reproduces the case where
+    // the host goes idle before the iframe reaches startPolling().
+
+    it("get_screenshot fails fast when viewer never polled", async () => {
+      const { server, client } = await connect();
+      const uuid = "never-polled-screenshot";
+
+      const started = Date.now();
+      const r = await client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "get_screenshot", page: 1 },
+      });
+      const elapsed = Date.now() - started;
+
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("never connected");
+      expect(firstText(r)).toContain(uuid);
+      expect(firstText(r)).toContain("display_pdf again"); // recovery hint
+      // Fast-fail bound (~8s grace), well under the 45s page-data timeout.
+      // 15s upper bound leaves slack for CI scheduling.
+      expect(elapsed).toBeLessThan(15_000);
+
+      await client.close();
+      await server.close();
+    }, 20_000);
+
+    it("get_screenshot waits full timeout when viewer polled then went silent", async () => {
+      // Viewer polled once (proving it mounted) then hung on a heavy render.
+      // The grace check passes, so we fall through to the 45s page-data wait —
+      // verified here by racing against a 12s deadline that should NOT win.
+      const { server, client } = await connect();
+      const uuid = "polled-then-silent";
+
+      // Viewer's first poll: drain whatever's there so it returns fast.
+      // Enqueue a trivial command first so poll returns via the batch-wait
+      // path (~200ms) instead of blocking on the 30s long-poll.
+      await client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "navigate", page: 1 },
+      });
+      await poll(client, uuid);
+
+      // Now get_screenshot — viewer has polled, so no fast-fail. But viewer
+      // never calls submit_page_data → should wait beyond the grace period.
+      const outcome = await Promise.race([
+        client
+          .callTool({
+            name: "interact",
+            arguments: { viewUUID: uuid, action: "get_screenshot", page: 1 },
+          })
+          .then(() => "completed" as const),
+        new Promise<"still-waiting">((r) =>
+          setTimeout(() => r("still-waiting"), 12_000),
+        ),
+      ]);
+
+      expect(outcome).toBe("still-waiting");
+
+      await client.close();
+      await server.close();
+    }, 20_000);
+
+    it("get_screenshot succeeds when viewer polls during grace window", async () => {
+      // Model calls interact before the viewer has polled — but the viewer
+      // shows up within the grace period and completes the roundtrip.
+      const { server, client } = await connect();
+      const uuid = "late-arriving-viewer";
+
+      const interactPromise = client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "get_screenshot", page: 1 },
+      });
+
+      // Viewer connects 500ms late — well inside the grace window.
+      await new Promise((r) => setTimeout(r, 500));
+      const cmds = await poll(client, uuid);
+      const getPages = cmds.find((c) => c.type === "get_pages");
+      expect(getPages).toBeDefined();
+
+      // Viewer responds with the page data.
+      await client.callTool({
+        name: "submit_page_data",
+        arguments: {
+          requestId: getPages!.requestId as string,
+          pages: [
+            { page: 1, image: Buffer.from("fake-jpeg").toString("base64") },
+          ],
+        },
+      });
+
+      const r = await interactPromise;
+      expect(r.isError).toBeFalsy();
+      expect((r.content as Array<{ type: string }>)[0].type).toBe("image");
+
+      await client.close();
+      await server.close();
+    }, 15_000);
+
+    it("batch step failure: 1:1 content, no isError, ERROR-prefixed slot", async () => {
+      // LocalAgentMode SDK 2.1.87 collapses isError:true results to a bare
+      // string of content[0].text — drops images from earlier successful
+      // steps. So we don't set isError on a step failure: each command gets
+      // one content slot, the failed one starts with "ERROR", and the batch
+      // stops there. content.length tells the model how far it got.
+      const { server, client } = await connect();
+      const uuid = "batch-error-ordering";
+
+      const r = await client.callTool({
+        name: "interact",
+        arguments: {
+          viewUUID: uuid,
+          commands: [
+            { action: "navigate", page: 3 }, // succeeds → "Queued: ..."
+            { action: "get_screenshot", page: 1 }, // never-polled → fast-fail
+            { action: "navigate", page: 5 }, // never reached
+          ],
+        },
+      });
+
+      // Not isError — that would trigger the SDK flatten
+      expect(r.isError).toBeFalsy();
+      const content = r.content as Array<{ type: string; text?: string }>;
+      // Stopped at step 2; step 3 never ran
+      expect(content).toHaveLength(2);
+      // Slot 0: step 1's success, untouched
+      expect(content[0].text).toContain("Queued");
+      expect(content[0].text).not.toMatch(/^ERROR/);
+      // Slot 1: step 2's failure, ERROR-prefixed with the actual message
+      expect(content[1].text).toMatch(/^ERROR/);
+      expect(content[1].text).toContain("2/3");
+      expect(content[1].text).toContain("get_screenshot");
+      expect(content[1].text).toContain("never connected");
+
+      await client.close();
+      await server.close();
+    }, 15_000);
   });
 });

@@ -188,13 +188,13 @@ When roots are ignored the server logs:
 
 ## Tools
 
-| Tool             | Visibility | Purpose                                               |
-| ---------------- | ---------- | ----------------------------------------------------- |
-| `list_pdfs`      | Model      | List available local files and origins                |
-| `display_pdf`    | Model + UI | Display interactive viewer                            |
-| `interact`¹      | Model      | Navigate, annotate, search, extract pages, fill forms |
-| `read_pdf_bytes` | App only   | Stream PDF data in chunks                             |
-| `save_pdf`       | App only   | Save annotated PDF back to local file                 |
+| Tool             | Visibility | Purpose                                                             |
+| ---------------- | ---------- | ------------------------------------------------------------------- |
+| `list_pdfs`      | Model      | List available local files and origins                              |
+| `display_pdf`    | Model + UI | Display interactive viewer                                          |
+| `interact`¹      | Model      | Navigate, annotate, search, extract pages, fill forms, save to file |
+| `read_pdf_bytes` | App only   | Stream PDF data in chunks                                           |
+| `save_pdf`       | App only   | Save annotated PDF back to local file                               |
 
 ¹ stdio only by default; in HTTP mode requires `--enable-interact` — see [Deployment](#deployment).
 
@@ -249,6 +249,16 @@ After the model calls `display_pdf`, it receives the `viewUUID` and a descriptio
 > **User:** Fill in the "Name" field with "Alice" and "Date" with "2026-02-26".
 >
 > _Model calls `interact` with action `fill_form`, fields `[{name:"Name", value:"Alice"}, {name:"Date", value:"2026-02-26"}]`_
+
+### Saving
+
+> **User:** Save the annotated version as `/docs/contract-signed.pdf`.
+>
+> _Model calls `interact` with action `save_as`, path `/docs/contract-signed.pdf`. Fails if the file exists; pass `overwrite: true` to replace. The target path must be under a mounted directory root._
+
+> **User:** Save my changes back to the file.
+>
+> _Model calls `interact` with action `save_as`, `overwrite: true` (no `path`). Overwrites the original — same writability gate as the viewer's save button. Only works for local files; remote PDFs need an explicit `path`._
 
 ## Testing
 

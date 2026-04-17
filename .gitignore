@@ -16,3 +16,5 @@ __pycache__/
 
 # MCPB bundles (built artifacts)
 *.mcpb
+.mcpb-stage/
+.mcpb-smoke/

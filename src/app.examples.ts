@@ -303,7 +303,11 @@ function App_onlisttools_returnTools(app: App) {
   //#region App_onlisttools_returnTools
   app.onlisttools = async (params, extra) => {
     return {
-      tools: ["greet", "calculate", "format"],
+      tools: [
+        { name: "greet", inputSchema: { type: "object" as const } },
+        { name: "calculate", inputSchema: { type: "object" as const } },
+        { name: "format", inputSchema: { type: "object" as const } },
+      ],
     };
   };
   //#endregion App_onlisttools_returnTools
