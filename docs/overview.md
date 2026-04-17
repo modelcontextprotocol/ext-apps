@@ -94,7 +94,7 @@ sequenceDiagram
 
 1. **Discovery** — The Host learns about tools and their UI resources when connecting to the server.
 2. **Initialization** — When a UI tool is called, the Host renders the iframe. The View sends `ui/initialize` and receives host context (theme, capabilities, container dimensions). This handshake ensures the View is ready before receiving data.
-3. **Data delivery** — The Host sends tool arguments and, once available, tool results to the View. Results include both `content` (text for the model's context) and optionally `structuredContent` (data optimized for UI rendering). This separation lets servers provide rich data to the UI without bloating the model's context.
+3. **Data delivery** — The Host sends tool arguments and, once available, tool results to the View. Results include both `content` (text for the model's context) and optionally `structuredContent` (data optimized for UI rendering, passed to the model only when `content` is empty). This separation lets servers provide rich data to the UI without bloating the model's context.
 4. **Interactive phase** — The user interacts with the View. The View can call tools, send messages, or update context.
 5. **Teardown** — Before unmounting, the Host notifies the View so it can save state or release resources.
 

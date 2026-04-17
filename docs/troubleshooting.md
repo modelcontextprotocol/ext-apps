@@ -8,6 +8,9 @@ description: Diagnose common MCP App issues including blank iframes, CSP errors,
 
 ## Blank iframe
 
+> [!TIP]
+> The fastest way to diagnose any of the issues below is to load your App in the reference host, which logs all protocol traffic to the browser console. See [Test with basic-host](./testing-mcp-apps.md#test-with-basic-host).
+
 The most common causes, in the order you should check them:
 
 1. **`connect()` was never called.** The host waits for the App to send `ui/initialize` before giving the iframe a non-zero size, so an App that constructs `new App(...)` but never calls `app.connect(transport)` renders as an empty sliver. Confirm `connect()` runs on page load and that its promise resolves.
@@ -20,9 +23,9 @@ The most common causes, in the order you should check them:
 
 5. **Wrong MIME type.** The resource's `mimeType` must be `text/html;profile=mcp-app` (exported as {@link app!RESOURCE_MIME_TYPE `RESOURCE_MIME_TYPE`}). Plain `text/html` is not recognized as an App resource.
 
-## `ontoolinput` / `ontoolresult` never fires
+## `toolinput` / `toolresult` events never fire
 
-- **Handlers registered too late.** Attach `app.ontoolresult` before calling `connect()`. If the handler is attached after `connect()` resolves, the notification may have already been delivered and discarded. The React `useApp` hook handles this ordering automatically.
+- **Listeners registered too late.** Call `app.addEventListener("toolresult", …)` before calling `connect()`. If the listener is attached after `connect()` resolves, the notification may have already been delivered and discarded. The React `useApp` hook handles this ordering automatically.
 - **Tool was not called.** If the model chose a different tool, or none, there is no result to deliver. Check the host's tool-call log.
 - **SDK version mismatch.** Older SDK versions used stricter schemas for host notifications. If the App was built against a significantly older `@modelcontextprotocol/ext-apps` than the host expects, the initialize handshake can fail silently. Keep the SDK version current.
 

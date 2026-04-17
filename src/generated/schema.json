@@ -231,9 +231,6 @@
                       "mimeType": {
                         "type": "string"
                       },
-                      "size": {
-                        "type": "number"
-                      },
                       "annotations": {
                         "type": "object",
                         "properties": {
@@ -3832,9 +3829,6 @@
                       "mimeType": {
                         "type": "string"
                       },
-                      "size": {
-                        "type": "number"
-                      },
                       "annotations": {
                         "type": "object",
                         "properties": {
@@ -5504,9 +5498,6 @@
                       "mimeType": {
                         "type": "string"
                       },
-                      "size": {
-                        "type": "number"
-                      },
                       "annotations": {
                         "type": "object",
                         "properties": {
@@ -5867,9 +5858,6 @@
                       },
                       "mimeType": {
                         "type": "string"
-                      },
-                      "size": {
-                        "type": "number"
                       },
                       "annotations": {
                         "type": "object",

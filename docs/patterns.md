@@ -47,7 +47,7 @@ A tool result has three fields for data, each with different visibility:
 | `structuredContent` | Only when `content` is empty | Yes         | Structured data the App renders (tables, charts, lists)       |
 | `_meta`             | No                           | Yes         | Opaque metadata such as IDs, timestamps, and view identifiers |
 
-Per the MCP guideline, hosts pass `structuredContent` to the model only when `content` is omitted, so populating `content` is the way to keep large render payloads out of the model's context. The App receives all three fields regardless. Keep `content` brief: the model uses it to decide what to say next, so a one-line summary is preferable to raw data.
+Per the core MCP guideline, hosts fall back to passing `structuredContent` to the model only when `content` is empty, so populating `content` is the way to keep large render payloads out of the model's context. The App receives all three fields regardless. Keep `content` brief: the model uses it to decide what to say next, so a one-line summary is preferable to raw data.
 
 > [!WARNING]
 > Do not return large payloads in tool results. Serve base64-encoded audio, images, or file contents via MCP resources (see [Serving binary blobs via resources](#serving-binary-blobs-via-resources)) or have the App fetch them over the network. Even when `structuredContent` is kept out of the model's context, large tool results still slow down transport, inflate conversation storage, and some host implementations include more of the result than the specification requires.
@@ -511,9 +511,13 @@ In fullscreen mode, remove the container's border radius so content extends to t
 
 By default, the SDK observes the document's content height and reports it to the host so the iframe grows to fit (`autoResize: true`). This is appropriate for content-driven UI such as cards, tables, and forms. It is the wrong choice for viewport-filling UI such as canvases, maps, and editors.
 
-There are three height strategies:
+| UI type                               | Strategy    | `autoResize` | Root CSS height            |
+| ------------------------------------- | ----------- | ------------ | -------------------------- |
+| Cards, tables, forms (natural height) | Auto-resize | `true`       | unset                      |
+| Fixed-size widgets                    | Fixed       | `false`      | explicit `px`              |
+| Canvases, maps, editors (fill space)  | Host-driven | `false`      | from `containerDimensions` |
 
-**Auto-resize (default).** For content with a natural height. The iframe grows to fit. Do not set `height: 100vh` or `height: 100%` on the root element; doing so creates a feedback loop where the reported height keeps increasing.
+**Auto-resize (default).** For content with a natural height. The iframe grows to fit.
 
 **Fixed height.** For UI that should remain the same size when inline. Disable auto-resize, set an explicit height, and report it to the host with {@link app!App.sendSizeChanged `sendSizeChanged`} so the iframe is allocated the correct size:
 
@@ -523,7 +527,7 @@ const app = new App(
   {},
   { autoResize: false },
 );
-await app.connect(new PostMessageTransport(window.parent, window.parent));
+await app.connect();
 app.sendSizeChanged({ width: document.body.clientWidth, height: 500 });
 ```
 
@@ -535,12 +539,28 @@ body {
 }
 ```
 
-**Host-driven height.** For UI that should fill the space the host provides (common for fullscreen-capable Apps). Disable auto-resize and read dimensions from {@link types!McpUiHostContext `hostContext.containerDimensions`}, updating on {@link app!App.onhostcontextchanged `onhostcontextchanged`}.
+**Host-driven height.** For UI that should fill the space the host provides (common for fullscreen-capable Apps). Disable auto-resize and size the root element from {@link types!McpUiHostContext `hostContext.containerDimensions`}, which may report fixed `width`/`height` or `maxWidth`/`maxHeight` bounds:
+
+```ts
+const app = new App(
+  { name: "my-app", version: "0.1.0" },
+  {},
+  { autoResize: false },
+);
+const root = document.getElementById("root")!;
+
+app.addEventListener("hostcontextchanged", (ctx) => {
+  const dims = ctx.containerDimensions;
+  if (dims && "height" in dims) root.style.height = `${dims.height}px`;
+  if (dims && "width" in dims) root.style.width = `${dims.width}px`;
+});
+await app.connect();
+```
 
 > [!WARNING]
 > Do not combine `autoResize: true` with `height: 100vh` or `100%` on the root element. The SDK reports the document height, the host grows the iframe to match, the document sees a taller viewport and grows again. This loops until the host's maximum height cap.
 
-The React `useApp` hook always creates the App with `autoResize: true`. For fixed or host-driven height, construct the `App` manually or use the `useAutoResize` hook with a specific element.
+The React `useApp` hook always creates the App with `autoResize: true` and does not currently expose an option to disable it. For fixed or host-driven height, construct the `App` manually with `{ autoResize: false }` instead of using `useApp`.
 
 ## Passing contextual information from the App to the model
 
@@ -714,7 +734,10 @@ return {
 
 ```ts
 // In the App, branch on the discriminator
-app.ontoolresult = (result) => {
+app.addEventListener("toolresult", (result) => {
+  if (result.isError || !result.structuredContent) {
+    return renderError(result);
+  }
   const data = result.structuredContent as { kind: string };
   switch (data.kind) {
     case "open-document":
@@ -724,7 +747,7 @@ app.ontoolresult = (result) => {
       renderSearchResults(data);
       break;
   }
-};
+});
 ```
 
 ## Conditionally showing UI
@@ -779,12 +802,16 @@ Use {@link app!App.openLink `app.openLink()`} instead of `window.open()` or `<a 
 Both are optional host capabilities. Check {@link app!App.getHostCapabilities `getHostCapabilities`} before rendering the corresponding controls so the App degrades gracefully on hosts that do not implement them:
 
 ```ts
-if (app.getHostCapabilities()?.openLinks) {
-  await app.openLink({ url: "https://example.com/docs" });
-}
+const caps = app.getHostCapabilities();
 
-if (app.getHostCapabilities()?.downloadFile) {
-  await app.downloadFile({
+// Hide controls the host cannot honor
+docsLink.hidden = !caps?.openLinks;
+downloadButton.hidden = !caps?.downloadFile;
+
+docsLink.onclick = () => app.openLink({ url: "https://example.com/docs" });
+
+downloadButton.onclick = () =>
+  app.downloadFile({
     contents: [
       {
         type: "resource",
@@ -796,7 +823,6 @@ if (app.getHostCapabilities()?.downloadFile) {
       },
     ],
   });
-}
 ```
 
 Hosts typically show an interstitial confirmation for `openLink` so users can review the destination before navigating. Do not assume navigation is instant, and do not chain multiple `openLink` calls.
