@@ -1325,7 +1325,7 @@ export class AppBridge extends ProtocolWithEvents<
    * Verify that the guest supports the capability required for the given request method.
    * @internal
    */
-  assertCapabilityForMethod(method: AppRequest["method"]): void {
+  assertCapabilityForMethod(method: string): void {
     // TODO
   }
 
@@ -1341,7 +1341,7 @@ export class AppBridge extends ProtocolWithEvents<
    * Verify that the host supports the capability required for the given notification method.
    * @internal
    */
-  assertNotificationCapability(method: AppNotification["method"]): void {
+  assertNotificationCapability(method: string): void {
     // TODO
   }
 

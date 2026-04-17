@@ -3,7 +3,11 @@ import {
   Request,
   Notification,
   Result,
+  type BaseContext,
+  type LegacyContextFields,
 } from "@modelcontextprotocol/sdk/types.js";
+
+type AppContext = BaseContext & LegacyContextFields;
 import { ZodLiteral, ZodObject } from "zod/v4";
 
 type MethodSchema = ZodObject<{ method: ZodLiteral<string> }>;
@@ -61,7 +65,10 @@ export abstract class ProtocolWithEvents<
   SendNotificationT extends Notification,
   SendResultT extends Result,
   EventMap extends Record<string, unknown>,
-> extends Protocol<SendRequestT, SendNotificationT, SendResultT> {
+> extends Protocol<AppContext> {
+  protected buildContext(ctx: AppContext): AppContext {
+    return ctx;
+  }
   private _registeredMethods = new Set<string>();
   private _eventSlots = new Map<keyof EventMap, EventSlot>();
 
@@ -209,14 +216,11 @@ export abstract class ProtocolWithEvents<
    *
    * @throws {Error} if a handler for this method is already registered.
    */
-  override setRequestHandler: Protocol<
-    SendRequestT,
-    SendNotificationT,
-    SendResultT
-  >["setRequestHandler"] = (schema, handler) => {
-    this._assertMethodNotRegistered(schema, "setRequestHandler");
-    super.setRequestHandler(schema, handler);
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  override setRequestHandler = ((...args: any) => {
+    this._assertMethodNotRegistered(args[0], "setRequestHandler");
+    super.setRequestHandler(...(args as [MethodSchema, () => Result]));
+  }) as Protocol<AppContext>["setRequestHandler"];
 
   /**
    * Registers a notification handler. Throws if a handler for the same
@@ -225,14 +229,11 @@ export abstract class ProtocolWithEvents<
    *
    * @throws {Error} if a handler for this method is already registered.
    */
-  override setNotificationHandler: Protocol<
-    SendRequestT,
-    SendNotificationT,
-    SendResultT
-  >["setNotificationHandler"] = (schema, handler) => {
-    this._assertMethodNotRegistered(schema, "setNotificationHandler");
-    super.setNotificationHandler(schema, handler);
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  override setNotificationHandler = ((...args: any) => {
+    this._assertMethodNotRegistered(args[0], "setNotificationHandler");
+    super.setNotificationHandler(...(args as [MethodSchema, () => void]));
+  }) as Protocol<AppContext>["setNotificationHandler"];
 
   /**
    * Warn if a request handler `on*` setter is replacing a previously-set
@@ -255,15 +256,12 @@ export abstract class ProtocolWithEvents<
    * Replace a request handler, bypassing double-set protection. Used by
    * `on*` request-handler setters that need replace semantics.
    */
-  protected replaceRequestHandler: Protocol<
-    SendRequestT,
-    SendNotificationT,
-    SendResultT
-  >["setRequestHandler"] = (schema, handler) => {
-    const method = (schema as MethodSchema).shape.method.value;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  protected replaceRequestHandler = ((...args: any) => {
+    const method = (args[0] as MethodSchema).shape.method.value;
     this._registeredMethods.add(method);
-    super.setRequestHandler(schema, handler);
-  };
+    super.setRequestHandler(...(args as [MethodSchema, () => Result]));
+  }) as Protocol<AppContext>["setRequestHandler"];
 
   private _assertMethodNotRegistered(schema: unknown, via: string): void {
     const method = (schema as MethodSchema).shape.method.value;

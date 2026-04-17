@@ -41,17 +41,27 @@ import {
 } from "../app.js";
 import type {
   BaseToolCallback,
+  LegacyToolCallback,
   McpServer,
   RegisteredTool,
   ResourceMetadata,
-  ToolCallback,
+  ToolCallback as SchemaToolCallback,
   ReadResourceCallback as _ReadResourceCallback,
   RegisteredResource,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   AnySchema,
   ZodRawShapeCompat,
+  StandardSchemaWithJSON,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type { ZodRawShape } from "@modelcontextprotocol/sdk";
+
+type ToolCallback<Args extends ZodRawShapeCompat | AnySchema | undefined> =
+  Args extends ZodRawShape
+    ? LegacyToolCallback<Args>
+    : Args extends StandardSchemaWithJSON
+      ? SchemaToolCallback<Args>
+      : SchemaToolCallback<undefined>;
 import type {
   ClientCapabilities,
   ReadResourceResult,
@@ -241,7 +251,12 @@ export function registerAppTool<
     normalizedMeta = { ...meta, ui: { ...uiMeta, resourceUri: legacyUri } };
   }
 
-  return server.registerTool(name, { ...config, _meta: normalizedMeta }, cb);
+  return (server.registerTool as McpServer["registerTool"])(
+    name,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { ...config, _meta: normalizedMeta } as any,
+    cb as SchemaToolCallback<undefined>,
+  );
 }
 
 export type McpUiReadResourceResult = ReadResourceResult & {
