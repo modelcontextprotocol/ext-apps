@@ -7,10 +7,6 @@ export * from "../app";
 /**
  * Options for configuring the {@link useApp `useApp`} hook.
  *
- * Note: This interface does NOT expose {@link App `App`} options like `autoResize`.
- * The hook creates the `App` with default options (`autoResize: true`). If you
- * need custom `App` options, create the `App` manually instead of using this hook.
- *
  * @see {@link useApp `useApp`} for the hook that uses these options
  * @see {@link useAutoResize `useAutoResize`} for manual auto-resize control with custom `App` options
  */
@@ -21,6 +17,16 @@ export interface UseAppOptions {
    * Declares what features this app supports.
    */
   capabilities: McpUiAppCapabilities;
+  /**
+   * Automatically report size changes to the host.
+   *
+   * Disable this for apps that manage their own height (canvases, editors,
+   * diagrams) or that use viewport-relative sizing like `100vh`, and call
+   * {@link App.sendSizeChanged `app.sendSizeChanged`} manually instead.
+   *
+   * @default true
+   */
+  autoResize?: boolean;
   /**
    * Called after {@link App `App`} is created but before connection.
    *
@@ -120,6 +126,7 @@ export interface AppState {
 export function useApp({
   appInfo,
   capabilities,
+  autoResize = true,
   onAppCreated,
 }: UseAppOptions): AppState {
   const [app, setApp] = useState<App | null>(null);
@@ -135,7 +142,7 @@ export function useApp({
           window.parent,
           window.parent,
         );
-        const app = new App(appInfo, capabilities);
+        const app = new App(appInfo, capabilities, { autoResize });
 
         // Register handlers BEFORE connecting
         onAppCreated?.(app);

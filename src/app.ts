@@ -1391,22 +1391,30 @@ export class App extends ProtocolWithEvents<
       scheduled = true;
       requestAnimationFrame(() => {
         scheduled = false;
-        const html = document.documentElement;
+        const body = document.body;
 
-        // Measure actual content height by temporarily overriding html sizing.
-        // Height uses max-content because fit-content would clamp to the viewport
-        // height when content is taller than the iframe, causing internal scrolling.
+        // Measure content height via body.scrollHeight + vertical body margins.
         //
-        // Width uses window.innerWidth instead of measuring via fit-content.
-        // Setting html.style.width to fit-content forces a synchronous reflow at
-        // 0px width for responsive apps (whose content derives width from the
-        // container rather than having intrinsic width). This causes the browser
-        // to clamp scrollLeft on any horizontal scroll containers to 0, permanently
-        // destroying their scroll positions.
-        const originalHeight = html.style.height;
-        html.style.height = "max-content";
-        const height = Math.ceil(html.getBoundingClientRect().height);
-        html.style.height = originalHeight;
+        // scrollHeight captures overflow (so the iframe grows when content is
+        // taller than the viewport — see #525) and equals the content height for
+        // a default-styled body (so the iframe shrinks to fit — see #57).
+        //
+        // We previously forced html.style.height = "max-content" to measure
+        // intrinsic height, but that makes height:100% descendants resolve to
+        // auto during measurement. Apps that set html,body{height:100%} with a
+        // viewport-filling child reported a collapsed (spinner-sized) height
+        // and then never recovered — see #143. Reading scrollHeight without a
+        // style override leaves those layouts intact.
+        //
+        // Tradeoff: an app that sets body{height:100%} won't shrink below the
+        // current viewport height. That's the semantically correct behavior for
+        // a viewport-filling layout; apps that need explicit control should
+        // pass {autoResize: false} and call sendSizeChanged() manually.
+        const bodyStyle = getComputedStyle(body);
+        const bodyMarginY =
+          (parseFloat(bodyStyle.marginTop) || 0) +
+          (parseFloat(bodyStyle.marginBottom) || 0);
+        const height = Math.ceil(body.scrollHeight + bodyMarginY);
 
         const width = Math.ceil(window.innerWidth);
 
