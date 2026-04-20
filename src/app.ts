@@ -74,6 +74,7 @@ import {
   standardSchemaToJsonSchema,
   validateStandardSchema,
 } from "./standard-schema";
+import { z } from "zod/v4";
 
 export type {
   StandardSchemaV1,
@@ -187,6 +188,20 @@ export type AppOptions = ProtocolOptions & {
    * @default false
    */
   strict?: boolean;
+  /**
+   * Allow code paths that require CSP `unsafe-eval` (e.g. `new Function()`).
+   *
+   * Views typically run under a strict CSP without `unsafe-eval`. Zod's JIT
+   * object parser uses `new Function()` and throws on the first message parse
+   * under such a policy. By default (`allowUnsafeEval: false`) the
+   * {@link App `App`} constructor sets `z.config({ jitless: true })` so the
+   * SDK works out of the box under the spec's default CSP. Set
+   * `allowUnsafeEval: true` to skip that and keep the faster JIT path when
+   * the host's CSP permits `unsafe-eval`.
+   *
+   * @default false
+   */
+  allowUnsafeEval?: boolean;
 };
 
 type RequestHandlerExtra = Parameters<
@@ -402,6 +417,10 @@ export class App extends ProtocolWithEvents<
     private options: AppOptions = { autoResize: true },
   ) {
     super(options);
+
+    if (!options.allowUnsafeEval) {
+      z.config({ jitless: true });
+    }
 
     this.setRequestHandler(PingRequestSchema, (request) => {
       console.log("Received ping:", request.params);
