@@ -15,6 +15,7 @@ import {
 import { z } from "zod/v4";
 
 import { App } from "./app";
+import { LATEST_PROTOCOL_VERSION } from "./types";
 import {
   AppBridge,
   getToolUiResourceUri,
@@ -2091,6 +2092,30 @@ describe("App <-> AppBridge integration", () => {
           }).not.toThrow();
           expect(warnings().filter((m) => lateMsg.test(m))).toEqual([]);
         });
+      });
+
+      it("AppBridge warns on a second ui/initialize (View double-mount)", async () => {
+        await bridge.connect(bridgeTransport);
+        await app.connect(appTransport);
+        expect(warnings()).toEqual([]);
+
+        // Simulate a second View instance re-running the handshake.
+        appTransport.send({
+          jsonrpc: "2.0",
+          id: 99,
+          method: "ui/initialize",
+          params: {
+            protocolVersion: LATEST_PROTOCOL_VERSION,
+            appInfo: testAppInfo,
+            appCapabilities: {},
+          },
+        });
+        await flush();
+
+        const doubleInit = warnings().filter((m) =>
+          /second ui\/initialize/.test(m),
+        );
+        expect(doubleInit).toHaveLength(1);
       });
 
       it("close() stops further notification delivery (StrictMode cleanup relies on this)", async () => {

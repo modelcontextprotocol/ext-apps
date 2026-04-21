@@ -1463,6 +1463,15 @@ export class AppBridge extends ProtocolWithEvents<
   ): Promise<McpUiInitializeResult> {
     const requestedVersion = request.params.protocolVersion;
 
+    if (this._appInfo !== undefined) {
+      console.warn(
+        "[ext-apps] AppBridge received a second ui/initialize. The View may " +
+          "be double-mounting (e.g. React StrictMode in dev) without closing " +
+          "the previous App instance. Responding normally; the latest " +
+          "appInfo/appCapabilities replace the previous values.",
+      );
+    }
+
     this._appCapabilities = request.params.appCapabilities;
     this._appInfo = request.params.appInfo;
 
