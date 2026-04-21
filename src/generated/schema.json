@@ -5274,6 +5274,12 @@
             ],
             "description": "Tool visibility scope - who can access the tool."
           }
+        },
+        "csp": {
+          "not": {}
+        },
+        "permissions": {
+          "not": {}
         }
       },
       "additionalProperties": false
