@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
@@ -778,6 +778,102 @@ describe("App <-> AppBridge integration", () => {
         'callServerTool() expects an object as its first argument, but received a string ("my_tool"). ' +
           'Did you mean: callServerTool({ name: "my_tool", arguments: { ... } })?',
       );
+    });
+
+    describe("pre-handshake guard (claude-ai-mcp#149)", () => {
+      const guardMsg =
+        /called before connect\(\) completed the ui\/initialize handshake/;
+
+      it("callServerTool warns when called before connect() completes", async () => {
+        const errSpy = spyOn(console, "error").mockImplementation(() => {});
+        bridge.oncalltool = async () => ({ content: [] });
+        await bridge.connect(bridgeTransport);
+
+        const connecting = app.connect(appTransport);
+        // Handshake is in flight; _initializedSent is still false.
+        await app.callServerTool({ name: "t", arguments: {} }).catch(() => {});
+
+        expect(errSpy).toHaveBeenCalledTimes(1);
+        expect(errSpy.mock.calls[0][0]).toMatch(guardMsg);
+        expect(errSpy.mock.calls[0][0]).toContain("App.callServerTool()");
+
+        await connecting;
+        errSpy.mockRestore();
+      });
+
+      it("callServerTool does not warn after connect() resolves", async () => {
+        const errSpy = spyOn(console, "error").mockImplementation(() => {});
+        bridge.oncalltool = async () => ({ content: [] });
+        await bridge.connect(bridgeTransport);
+        await app.connect(appTransport);
+
+        await app.callServerTool({ name: "t", arguments: {} });
+
+        expect(errSpy).not.toHaveBeenCalled();
+        errSpy.mockRestore();
+      });
+
+      it("sendMessage and readServerResource also warn before handshake", async () => {
+        const errSpy = spyOn(console, "error").mockImplementation(() => {});
+
+        await app.sendMessage({ role: "user", content: [] }).catch(() => {});
+        await app.readServerResource({ uri: "test://r" }).catch(() => {});
+
+        expect(errSpy).toHaveBeenCalledTimes(2);
+        expect(errSpy.mock.calls[0][0]).toContain("App.sendMessage()");
+        expect(errSpy.mock.calls[1][0]).toContain("App.readServerResource()");
+        errSpy.mockRestore();
+      });
+
+      it("throws instead of warning when strict: true", async () => {
+        const errSpy = spyOn(console, "error").mockImplementation(() => {});
+        const strictApp = new App(
+          testAppInfo,
+          {},
+          { autoResize: false, strict: true },
+        );
+
+        await expect(
+          strictApp.callServerTool({ name: "t", arguments: {} }),
+        ).rejects.toThrow(guardMsg);
+        expect(errSpy).not.toHaveBeenCalled();
+
+        errSpy.mockRestore();
+      });
+
+      it("AppBridge warns on tools/call from a View that skipped the handshake", async () => {
+        const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+        bridge.oncalltool = async () => ({ content: [] });
+        await bridge.connect(bridgeTransport);
+
+        // Simulate a hand-rolled View (no SDK, no handshake) sending tools/call.
+        await appTransport.start();
+        appTransport.send({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "t", arguments: {} },
+        });
+        await flush();
+
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy.mock.calls[0][0]).toContain(
+          "received 'tools/call' before ui/notifications/initialized",
+        );
+        warnSpy.mockRestore();
+      });
+
+      it("AppBridge does not warn after initialized is received", async () => {
+        const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+        bridge.oncalltool = async () => ({ content: [] });
+        await bridge.connect(bridgeTransport);
+        await app.connect(appTransport);
+
+        await app.callServerTool({ name: "t", arguments: {} });
+
+        expect(warnSpy).not.toHaveBeenCalled();
+        warnSpy.mockRestore();
+      });
     });
 
     it("onlistresources setter registers handler for resources/list requests", async () => {

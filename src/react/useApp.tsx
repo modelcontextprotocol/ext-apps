@@ -1,20 +1,25 @@
 import { useEffect, useState } from "react";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
 import { Client } from "@modelcontextprotocol/sdk/client";
-import { App, McpUiAppCapabilities, PostMessageTransport } from "../app";
+import {
+  App,
+  AppOptions,
+  McpUiAppCapabilities,
+  PostMessageTransport,
+} from "../app";
 export * from "../app";
 
 /**
  * Options for configuring the {@link useApp `useApp`} hook.
  *
- * Note: This interface does NOT expose {@link App `App`} options like `autoResize`.
- * The hook creates the `App` with default options (`autoResize: true`). If you
- * need custom `App` options, create the `App` manually instead of using this hook.
+ * The `strict` option is forwarded to the underlying {@link App `App`}
+ * instance. For other {@link AppOptions `AppOptions`}, create the `App`
+ * manually instead of using this hook.
  *
  * @see {@link useApp `useApp`} for the hook that uses these options
  * @see {@link useAutoResize `useAutoResize`} for manual auto-resize control with custom `App` options
  */
-export interface UseAppOptions {
+export interface UseAppOptions extends Pick<AppOptions, "strict"> {
   /** App identification (name and version) */
   appInfo: Implementation;
   /**
@@ -121,6 +126,7 @@ export function useApp({
   appInfo,
   capabilities,
   onAppCreated,
+  strict,
 }: UseAppOptions): AppState {
   const [app, setApp] = useState<App | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -135,7 +141,10 @@ export function useApp({
           window.parent,
           window.parent,
         );
-        const app = new App(appInfo, capabilities);
+        const app = new App(appInfo, capabilities, {
+          autoResize: true,
+          strict,
+        });
 
         // Register handlers BEFORE connecting
         onAppCreated?.(app);
