@@ -1824,6 +1824,43 @@ describe("App <-> AppBridge integration", () => {
       expect(result.content).toEqual(resultContent);
     });
 
+    it("oncreatesamplingmessage setter registers handler for sampling/createMessage requests", async () => {
+      // Re-create bridge with sampling capability so App's capability check passes
+      bridge = new AppBridge(null, testHostInfo, {
+        ...testHostCapabilities,
+        sampling: { tools: {} },
+      });
+
+      const receivedParams: unknown[] = [];
+      bridge.oncreatesamplingmessage = async (params) => {
+        receivedParams.push(params);
+        return {
+          role: "assistant",
+          content: { type: "text", text: "Hello from the model" },
+          model: "test-model",
+          stopReason: "endTurn",
+        };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      expect(app.getHostCapabilities()?.sampling?.tools).toEqual({});
+
+      const result = await app.createSamplingMessage({
+        messages: [{ role: "user", content: { type: "text", text: "Hi" } }],
+        maxTokens: 50,
+      });
+
+      expect(receivedParams).toHaveLength(1);
+      expect(receivedParams[0]).toMatchObject({ maxTokens: 50 });
+      expect(result.model).toEqual("test-model");
+      expect(result.content).toEqual({
+        type: "text",
+        text: "Hello from the model",
+      });
+    });
+
     it("ondownloadfile setter registers handler for ui/download-file requests", async () => {
       const downloadParams = {
         contents: [

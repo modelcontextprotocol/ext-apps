@@ -558,6 +558,24 @@ export const McpUiHostCapabilitiesSchema = z.object({
   message: McpUiSupportedContentBlockModalitiesSchema.optional().describe(
     "Host supports receiving content messages (ui/message) from the view.",
   ),
+  /**
+   * @description Host supports LLM sampling (sampling/createMessage) from the view.
+   * Mirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.
+   */
+  sampling: z
+    .object({
+      /** @description Host supports tool use via `tools` and `toolChoice` parameters. */
+      tools: z
+        .object({})
+        .optional()
+        .describe(
+          "Host supports tool use via `tools` and `toolChoice` parameters.",
+        ),
+    })
+    .optional()
+    .describe(
+      "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
+    ),
 });
 
 /**

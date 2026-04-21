@@ -5,6 +5,10 @@ import {
   CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
+  CreateMessageRequest,
+  CreateMessageRequestSchema,
+  CreateMessageResult,
+  CreateMessageResultWithTools,
   EmptyResult,
   Implementation,
   ListPromptsRequest,
@@ -1045,6 +1049,49 @@ export class AppBridge extends ProtocolWithEvents<
       async (request, extra) => {
         if (!this._oncalltool) throw new Error("No oncalltool handler set");
         return this._oncalltool(request.params, extra);
+      },
+    );
+  }
+
+  /**
+   * Register a handler for LLM sampling requests from the view.
+   *
+   * The view sends standard MCP `sampling/createMessage` requests to obtain
+   * LLM completions via the host's model connection. The host has full
+   * discretion over which model to use and SHOULD apply rate limiting,
+   * cost controls, and user approval (human-in-the-loop) before sampling.
+   *
+   * Hosts that register this handler SHOULD advertise `sampling` (and
+   * `sampling.tools` if tool-calling is supported) in
+   * {@link McpUiHostCapabilities `McpUiHostCapabilities`}.
+   *
+   * @param callback - Handler that receives `CreateMessageRequest` params and
+   *   returns a `CreateMessageResult` (or `CreateMessageResultWithTools` when
+   *   `params.tools` was provided)
+   *   - `params` - Standard MCP sampling params (messages, maxTokens, tools, etc.)
+   *   - `extra` - Request metadata (abort signal, session info)
+   *
+   * @example Forward to your LLM provider
+   * ```ts source="./app-bridge.examples.ts#AppBridge_oncreatesamplingmessage_forwardToLlm"
+   * bridge.oncreatesamplingmessage = async (params, extra) => {
+   *   // Apply rate limiting, user approval, cost controls here
+   *   return await myLlmProvider.complete(params, { signal: extra.signal });
+   * };
+   * ```
+   *
+   * @see `CreateMessageRequest` from @modelcontextprotocol/sdk for the request type
+   * @see `CreateMessageResult` / `CreateMessageResultWithTools` from @modelcontextprotocol/sdk for result types
+   */
+  set oncreatesamplingmessage(
+    callback: (
+      params: CreateMessageRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<CreateMessageResult | CreateMessageResultWithTools>,
+  ) {
+    this.setRequestHandler(
+      CreateMessageRequestSchema,
+      async (request, extra) => {
+        return callback(request.params, extra);
       },
     );
   }

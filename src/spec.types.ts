@@ -521,6 +521,14 @@ export interface McpUiHostCapabilities {
   updateModelContext?: McpUiSupportedContentBlockModalities;
   /** @description Host supports receiving content messages (ui/message) from the view. */
   message?: McpUiSupportedContentBlockModalities;
+  /**
+   * @description Host supports LLM sampling (sampling/createMessage) from the view.
+   * Mirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.
+   */
+  sampling?: {
+    /** @description Host supports tool use via `tools` and `toolChoice` parameters. */
+    tools?: {};
+  };
 }
 
 /**

@@ -528,6 +528,10 @@ Note that `tools/call` and `tools/list` flow **bidirectionally**:
 
 - `resources/read` - Read resource content
 
+**Sampling:**
+
+- `sampling/createMessage` - Request an LLM completion from the host (uses the standard MCP [`CreateMessageRequest`](https://modelcontextprotocol.io/specification/2025-11-25/client/sampling) / `CreateMessageResult` types, including SEP-1577 `tools` / `toolChoice` / `tool_use` content blocks). The host has full discretion over model selection and SHOULD apply rate limiting, cost controls, and user approval (human-in-the-loop). Apps MUST check `hostCapabilities.sampling` before sending this request, and `hostCapabilities.sampling.tools` before including `tools` in the request params.
+
 **Notifications:**
 
 - `notifications/message` - Log messages to host
@@ -674,6 +678,14 @@ interface HostCapabilities {
   };
   /** Host accepts log messages. */
   logging?: {};
+  /**
+   * Host supports LLM sampling (sampling/createMessage) from the view.
+   * Mirrors MCP ClientCapabilities.sampling so hosts can pass it through.
+   */
+  sampling?: {
+    /** Host supports tool use via `tools` and `toolChoice` params (SEP-1577). */
+    tools?: {};
+  };
   /** Sandbox configuration applied by the host. */
   sandbox?: {
     /** Permissions granted by the host (camera, microphone, geolocation, clipboard-write). */

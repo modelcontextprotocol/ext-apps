@@ -501,6 +501,19 @@
             }
           },
           "additionalProperties": false
+        },
+        "sampling": {
+          "description": "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
+          "type": "object",
+          "properties": {
+            "tools": {
+              "description": "Host supports tool use via `tools` and `toolChoice` parameters.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -2835,6 +2848,19 @@
                 },
                 "structuredContent": {
                   "description": "Host supports structured content.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "sampling": {
+              "description": "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
+              "type": "object",
+              "properties": {
+                "tools": {
+                  "description": "Host supports tool use via `tools` and `toolChoice` parameters.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
