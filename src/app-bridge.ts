@@ -336,8 +336,7 @@ export class AppBridge extends ProtocolWithEvents<
           `[ext-apps] AppBridge received '${request.method}' before ` +
             `ui/notifications/initialized. The View is calling host ` +
             `methods before completing the handshake; it should await ` +
-            `app.connect() first. See ` +
-            `https://github.com/anthropics/claude-ai-mcp/issues/149`,
+            `app.connect() first.`,
         );
       }
       return handler(request, extra);

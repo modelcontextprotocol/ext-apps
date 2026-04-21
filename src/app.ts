@@ -280,8 +280,7 @@ export class App extends ProtocolWithEvents<
     const msg =
       `[ext-apps] App.${method}() called before connect() completed the ` +
       `ui/initialize handshake. Await app.connect() before calling this ` +
-      `method, or move data loading to an ontoolresult handler. ` +
-      `See https://github.com/anthropics/claude-ai-mcp/issues/149`;
+      `method, or move data loading to an ontoolresult handler.`;
     if (this.options?.strict) {
       throw new Error(msg);
     }
