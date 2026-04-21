@@ -537,39 +537,19 @@ Before publishing releases, ensure the following are configured:
    - Name it `Release`
    - Add required reviewers or other protection rules as needed
 
-3. **`RELEASE_TOKEN` secret**: The release workflow creates GitHub Releases that must trigger the npm-publish workflow. Events from the default `GITHUB_TOKEN` don't cascade to other workflows, so a separate token is needed.
-   - Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) scoped to this repository with **Contents: write** permission
-   - Go to Settings > Secrets and variables > Actions > New repository secret
-   - Name: `RELEASE_TOKEN`, value: the PAT
-
 ### Publishing a Release
 
-Releases are automated via the [Release workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/release.yml).
+1. **Bump the version** across the root and all workspace packages:
 
-#### Steps to publish:
+   ```bash
+   npm run bump -- minor   # or: patch | major | prerelease --preid=beta | 1.7.0
+   ```
 
-1. **Trigger the Release workflow**:
-   - Go to Actions → [Release](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/release.yml) → "Run workflow"
-   - Select the bump type (`patch`, `minor`, `major`, or `prerelease`)
-   - Click "Run workflow"
+   Commit and open a PR with a grouped changelog in the body (see prior `chore: bump …` PRs for the format).
 
-2. **Review the release PR**:
-   - The workflow bumps the version across all packages and opens a PR labeled `release`
-   - Add release notes to `RELEASES.md` in the PR
-   - Approve and merge the PR
-   - _Note: re-running the workflow for the same version fails if the branch already exists. Delete the `release/vX.Y.Z` branch first if you need to redo the bump._
+2. **Merge the PR**, then [draft a GitHub Release](https://github.com/modelcontextprotocol/ext-apps/releases/new) — create a `vX.Y.Z` tag on `main`, paste the changelog, publish.
 
-3. **Done** — merging the PR automatically tags the commit and creates the GitHub Release (with auto-generated notes), which triggers the [npm-publish workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/npm-publish.yml). Approve the deployment once when prompted.
-
-#### Manual alternative
-
-You can also bump versions locally:
-
-```bash
-npm run bump -- patch   # or: minor | major | prerelease --preid=beta
-```
-
-Then commit, push, and create a GitHub Release manually — the npm-publish workflow triggers on release creation.
+3. **Approve the deployment** — publishing the Release triggers the [npm-publish workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/npm-publish.yml); all publish jobs wait together for a single "Review deployments" approval.
 
 #### npm Tags
 
