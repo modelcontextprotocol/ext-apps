@@ -158,7 +158,7 @@ export const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
  *
  * @see `ProtocolOptions` from @modelcontextprotocol/sdk for inherited options
  */
-type AppOptions = ProtocolOptions & {
+export type AppOptions = ProtocolOptions & {
   /**
    * Automatically report size changes to the host using `ResizeObserver`.
    *
@@ -169,6 +169,19 @@ type AppOptions = ProtocolOptions & {
    * @default true
    */
   autoResize?: boolean;
+  /**
+   * Throw on detected misuse instead of logging a console error.
+   *
+   * Currently this affects calling host-bound methods (e.g.
+   * {@link App.callServerTool `callServerTool`}, {@link App.sendMessage `sendMessage`})
+   * before {@link App.connect `connect`} has completed the `ui/initialize`
+   * handshake. With `strict: false` (default) a `console.error` is emitted;
+   * with `strict: true` an `Error` is thrown.
+   *
+   * @remarks Throwing will become the default in a future release.
+   * @default false
+   */
+  strict?: boolean;
 };
 
 type RequestHandlerExtra = Parameters<
@@ -319,6 +332,32 @@ export class App extends ProtocolWithEvents<
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
   private _registeredTools: { [name: string]: RegisteredAppTool } = {};
+  private _initializedSent = false;
+
+  /**
+   * Warn if a host-bound method is called before {@link connect `connect`} has
+   * completed the `ui/initialize` → `ui/notifications/initialized` handshake.
+   *
+   * Calling these methods early can race the handshake on strict hosts and
+   * leave the iframe permanently hidden. See
+   * {@link https://github.com/anthropics/claude-ai-mcp/issues/61 claude-ai-mcp#61} /
+   * {@link https://github.com/anthropics/claude-ai-mcp/issues/149 #149}.
+   *
+   * @remarks This will become a thrown `Error` in a future minor release.
+   */
+  private _assertInitialized(method: string): void {
+    if (this._initializedSent) return;
+    const msg =
+      `[ext-apps] App.${method}() called before connect() completed the ` +
+      `ui/initialize handshake. Await app.connect() before calling this ` +
+      `method, or move data loading to an ontoolresult handler. ` +
+      `See https://github.com/anthropics/claude-ai-mcp/issues/149`;
+    if (this.options?.strict) {
+      throw new Error(msg);
+    }
+    // TODO(next-minor): make `strict: true` the default.
+    console.error(`${msg}. This will throw in a future release.`);
+  }
 
   protected readonly eventSchemas = {
     toolinput: McpUiToolInputNotificationSchema,
@@ -400,7 +439,7 @@ export class App extends ProtocolWithEvents<
     }
     const app = this;
     const notify = () => {
-      if (app.transport && app._capabilities.tools?.listChanged) {
+      if (app._initializedSent && app._capabilities.tools?.listChanged) {
         void app.sendToolListChanged();
       }
     };
@@ -535,6 +574,7 @@ export class App extends ProtocolWithEvents<
   async sendToolListChanged(
     params: ToolListChangedNotification["params"] = {},
   ): Promise<void> {
+    this._assertInitialized("sendToolListChanged");
     await this.notification(<ToolListChangedNotification>{
       method: "notifications/tools/list_changed",
       params,
@@ -1108,6 +1148,7 @@ export class App extends ProtocolWithEvents<
     params: CallToolRequest["params"],
     options?: RequestOptions,
   ): Promise<CallToolResult> {
+    this._assertInitialized("callServerTool");
     if (typeof params === "string") {
       throw new Error(
         `callServerTool() expects an object as its first argument, but received a string ("${params}"). ` +
@@ -1172,6 +1213,7 @@ export class App extends ProtocolWithEvents<
     params: ReadResourceRequest["params"],
     options?: RequestOptions,
   ): Promise<ReadResourceResult> {
+    this._assertInitialized("readServerResource");
     return await this.request(
       { method: "resources/read", params },
       ReadResourceResultSchema,
@@ -1219,6 +1261,7 @@ export class App extends ProtocolWithEvents<
     params?: ListResourcesRequest["params"],
     options?: RequestOptions,
   ): Promise<ListResourcesResult> {
+    this._assertInitialized("listServerResources");
     return await this.request(
       { method: "resources/list", params },
       ListResourcesResultSchema,
@@ -1277,6 +1320,7 @@ export class App extends ProtocolWithEvents<
    * @see {@link McpUiMessageRequest `McpUiMessageRequest`} for request structure
    */
   sendMessage(params: McpUiMessageRequest["params"], options?: RequestOptions) {
+    this._assertInitialized("sendMessage");
     return this.request(
       <McpUiMessageRequest>{
         method: "ui/message",
@@ -1370,6 +1414,7 @@ export class App extends ProtocolWithEvents<
     params: McpUiUpdateModelContextRequest["params"],
     options?: RequestOptions,
   ) {
+    this._assertInitialized("updateModelContext");
     return this.request(
       <McpUiUpdateModelContextRequest>{
         method: "ui/update-model-context",
@@ -1406,6 +1451,7 @@ export class App extends ProtocolWithEvents<
    * @see {@link McpUiOpenLinkResult `McpUiOpenLinkResult`} for result structure
    */
   openLink(params: McpUiOpenLinkRequest["params"], options?: RequestOptions) {
+    this._assertInitialized("openLink");
     return this.request(
       <McpUiOpenLinkRequest>{
         method: "ui/open-link",
@@ -1486,6 +1532,7 @@ export class App extends ProtocolWithEvents<
     params: McpUiDownloadFileRequest["params"],
     options?: RequestOptions,
   ) {
+    this._assertInitialized("downloadFile");
     return this.request(
       <McpUiDownloadFileRequest>{
         method: "ui/download-file",
@@ -1570,6 +1617,7 @@ export class App extends ProtocolWithEvents<
     params: McpUiRequestDisplayModeRequest["params"],
     options?: RequestOptions,
   ) {
+    this._assertInitialized("requestDisplayMode");
     return this.request(
       <McpUiRequestDisplayModeRequest>{
         method: "ui/request-display-mode",
@@ -1732,6 +1780,7 @@ export class App extends ProtocolWithEvents<
         "App is already connected. Call close() before connecting again.",
       );
     }
+    this._initializedSent = false;
     await super.connect(transport);
 
     try {
@@ -1759,6 +1808,7 @@ export class App extends ProtocolWithEvents<
       await this.notification(<McpUiInitializedNotification>{
         method: "ui/notifications/initialized",
       });
+      this._initializedSent = true;
 
       if (this.options?.autoResize) {
         this.setupSizeChangedNotifications();
