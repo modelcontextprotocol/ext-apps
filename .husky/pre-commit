@@ -15,8 +15,9 @@ if grep -E '"resolved": "https?://' package-lock.json | grep -v registry.npmjs.o
 fi
 
 # Capture staged files so we only re-stage what the user intended to commit
-# (avoids sweeping unrelated WIP into the commit)
-STAGED=$(git diff --name-only --cached)
+# (avoids sweeping unrelated WIP into the commit). --diff-filter=d skips
+# deletions so the xargs git add below doesn't fail on removed paths.
+STAGED=$(git diff --name-only --cached --diff-filter=d)
 
 npm run build:all
 npm run prettier:fix
