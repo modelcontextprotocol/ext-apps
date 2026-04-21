@@ -1965,6 +1965,99 @@ describe("App <-> AppBridge integration", () => {
         errSpy.mockRestore();
       });
 
+      describe("late handler registration", () => {
+        const lateMsg =
+          /handler registered after connect\(\) completed the ui\/initialize handshake/;
+
+        it("warns when ontoolresult is set after connect() resolves", async () => {
+          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+          await bridge.connect(bridgeTransport);
+          await app.connect(appTransport);
+
+          app.ontoolresult = () => {};
+
+          expect(warnSpy).toHaveBeenCalledTimes(1);
+          expect(warnSpy.mock.calls[0][0]).toMatch(lateMsg);
+          expect(warnSpy.mock.calls[0][0]).toContain('"toolresult"');
+          warnSpy.mockRestore();
+        });
+
+        it("warns when addEventListener('toolinput', …) is called after connect()", async () => {
+          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+          await bridge.connect(bridgeTransport);
+          await app.connect(appTransport);
+
+          app.addEventListener("toolinput", () => {});
+
+          expect(warnSpy).toHaveBeenCalledTimes(1);
+          expect(warnSpy.mock.calls[0][0]).toContain('"toolinput"');
+          warnSpy.mockRestore();
+        });
+
+        it("does not warn for handlers set before connect()", async () => {
+          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+          app.ontoolinput = () => {};
+          app.addEventListener("toolresult", () => {});
+
+          await bridge.connect(bridgeTransport);
+          await app.connect(appTransport);
+
+          expect(warnSpy).not.toHaveBeenCalled();
+          warnSpy.mockRestore();
+        });
+
+        it("does not warn for hostcontextchanged (repeating event)", async () => {
+          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+          await bridge.connect(bridgeTransport);
+          await app.connect(appTransport);
+
+          app.onhostcontextchanged = () => {};
+          app.addEventListener("hostcontextchanged", () => {});
+
+          expect(warnSpy).not.toHaveBeenCalled();
+          warnSpy.mockRestore();
+        });
+
+        it("does not warn when clearing a handler (set to undefined)", async () => {
+          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+          app.ontoolinput = () => {};
+          await bridge.connect(bridgeTransport);
+          await app.connect(appTransport);
+
+          app.ontoolinput = undefined;
+
+          expect(warnSpy).not.toHaveBeenCalled();
+          warnSpy.mockRestore();
+        });
+
+        it("throws instead of warning when strict: true", async () => {
+          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+          const [strictAppT, strictBridgeT] =
+            InMemoryTransport.createLinkedPair();
+          const strictBridge = new AppBridge(
+            createMockClient() as Client,
+            testHostInfo,
+            testHostCapabilities,
+          );
+          const strictApp = new App(
+            testAppInfo,
+            {},
+            { autoResize: false, strict: true },
+          );
+          await strictBridge.connect(strictBridgeT);
+          await strictApp.connect(strictAppT);
+
+          expect(() => {
+            strictApp.ontoolresult = () => {};
+          }).toThrow(lateMsg);
+          expect(() => {
+            strictApp.addEventListener("toolinput", () => {});
+          }).toThrow(lateMsg);
+          expect(warnSpy).not.toHaveBeenCalled();
+          warnSpy.mockRestore();
+        });
+      });
+
       it("AppBridge warns on tools/call from a View that skipped the handshake", async () => {
         const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
         bridge.oncalltool = async () => ({ content: [] });

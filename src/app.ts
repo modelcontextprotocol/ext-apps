@@ -371,6 +371,49 @@ export class App extends ProtocolWithEvents<
     hostcontextchanged: McpUiHostContextChangedNotificationSchema,
   };
 
+  /**
+   * Events the host typically sends once, shortly after the handshake.
+   * Registering a handler for one of these *after* {@link connect `connect`}
+   * resolves risks missing the notification entirely.
+   */
+  private static readonly ONE_SHOT_EVENTS: ReadonlySet<keyof AppEventMap> =
+    new Set(["toolinput", "toolinputpartial", "toolresult", "toolcancelled"]);
+
+  /**
+   * Warn (or throw under `strict`) when a one-shot event handler is registered
+   * after the `ui/initialize` → `ui/notifications/initialized` handshake has
+   * completed. The host may have already fired the notification by then.
+   *
+   * Mirrors {@link _assertInitialized `_assertInitialized`} (the outbound-side guard).
+   */
+  private _assertHandlerTiming(event: keyof AppEventMap): void {
+    if (!this._initializedSent || !App.ONE_SHOT_EVENTS.has(event)) return;
+    const msg =
+      `[ext-apps] "${String(event)}" handler registered after connect() ` +
+      `completed the ui/initialize handshake. The host may have already sent ` +
+      `this notification. Register handlers before calling app.connect().`;
+    if (this.options?.strict) {
+      throw new Error(msg);
+    }
+    console.warn(msg);
+  }
+
+  protected override setEventHandler<K extends keyof AppEventMap>(
+    event: K,
+    handler: ((params: AppEventMap[K]) => void) | undefined,
+  ): void {
+    if (handler) this._assertHandlerTiming(event);
+    super.setEventHandler(event, handler);
+  }
+
+  override addEventListener<K extends keyof AppEventMap>(
+    event: K,
+    handler: (params: AppEventMap[K]) => void,
+  ): void {
+    this._assertHandlerTiming(event);
+    super.addEventListener(event, handler);
+  }
+
   protected override onEventDispatch<K extends keyof AppEventMap>(
     event: K,
     params: AppEventMap[K],
