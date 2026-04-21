@@ -395,14 +395,28 @@ export class App extends ProtocolWithEvents<
     new Set(["toolinput", "toolinputpartial", "toolresult", "toolcancelled"]);
 
   /**
-   * Warn (or throw under `strict`) when a one-shot event handler is registered
-   * after the `ui/initialize` → `ui/notifications/initialized` handshake has
-   * completed. The host may have already fired the notification by then.
+   * One-shot events that have had at least one handler registered (via `on*`
+   * setter or `addEventListener`) at any point. Once an event is in this set,
+   * subsequent late registrations are not flagged — only the *first* handler
+   * matters for the missed-notification race, and re-registration (e.g. React
+   * `useEffect` cleanup → re-add on dep change) is a legitimate pattern.
+   */
+  private readonly _everHadListener = new Set<keyof AppEventMap>();
+
+  /**
+   * Warn (or throw under `strict`) when the *first* handler for a one-shot
+   * event is registered after the `ui/initialize` → `ui/notifications/initialized`
+   * handshake has completed. The host may have already fired the notification
+   * by then. Subsequent registrations for the same event are not flagged.
    *
    * Mirrors {@link _assertInitialized `_assertInitialized`} (the outbound-side guard).
    */
   private _assertHandlerTiming(event: keyof AppEventMap): void {
-    if (!this._initializedSent || !App.ONE_SHOT_EVENTS.has(event)) return;
+    if (!App.ONE_SHOT_EVENTS.has(event) || this._everHadListener.has(event)) {
+      return;
+    }
+    this._everHadListener.add(event);
+    if (!this._initializedSent) return;
     const msg =
       `[ext-apps] "${String(event)}" handler registered after connect() ` +
       `completed the ui/initialize handshake. The host may have already sent ` +

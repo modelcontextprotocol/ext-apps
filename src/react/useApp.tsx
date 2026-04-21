@@ -138,6 +138,7 @@ export function useApp({
 
   useEffect(() => {
     let mounted = true;
+    let appInstance: App | undefined;
 
     async function connect() {
       try {
@@ -145,18 +146,24 @@ export function useApp({
           window.parent,
           window.parent,
         );
-        const app = new App(appInfo, capabilities, { autoResize, strict });
+        appInstance = new App(appInfo, capabilities, { autoResize, strict });
 
         // Register handlers BEFORE connecting
-        onAppCreated?.(app);
+        onAppCreated?.(appInstance);
 
-        await app.connect(transport);
+        await appInstance.connect(transport);
 
-        if (mounted) {
-          setApp(app);
-          setIsConnected(true);
-          setError(null);
+        if (!mounted) {
+          // Unmounted during the handshake (e.g. React StrictMode dev
+          // double-invoke). Close so the abandoned transport's window
+          // `message` listener doesn't keep receiving host postMessages
+          // alongside the second mount's instance.
+          void appInstance.close();
+          return;
         }
+        setApp(appInstance);
+        setIsConnected(true);
+        setError(null);
       } catch (error) {
         if (mounted) {
           setApp(null);
@@ -172,6 +179,7 @@ export function useApp({
 
     return () => {
       mounted = false;
+      void appInstance?.close();
     };
   }, []); // Intentionally not including options to avoid reconnection
 

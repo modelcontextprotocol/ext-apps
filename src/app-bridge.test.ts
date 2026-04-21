@@ -2021,6 +2021,45 @@ describe("App <-> AppBridge integration", () => {
           expect(warnings()).toEqual([]);
         });
 
+        it("does not warn on re-registration when a handler existed pre-connect", async () => {
+          const h = () => {};
+          app.addEventListener("toolresult", h);
+          await bridge.connect(bridgeTransport);
+          await app.connect(appTransport);
+
+          // React-style: useEffect cleanup removes, dep change re-adds.
+          app.removeEventListener("toolresult", h);
+          app.addEventListener("toolresult", () => {});
+
+          expect(warnings().filter((m) => lateMsg.test(m))).toEqual([]);
+        });
+
+        it("warns once for the first late registration, not on subsequent ones", async () => {
+          await bridge.connect(bridgeTransport);
+          await app.connect(appTransport);
+
+          app.addEventListener("toolinput", () => {});
+          app.addEventListener("toolinput", () => {});
+          app.addEventListener("toolinput", () => {});
+
+          const late = warnings().filter((m) => lateMsg.test(m));
+          expect(late).toHaveLength(1);
+          expect(late[0]).toContain('"toolinput"');
+        });
+
+        it("tracks first-handler per event independently", async () => {
+          app.addEventListener("toolinput", () => {});
+          await bridge.connect(bridgeTransport);
+          await app.connect(appTransport);
+
+          app.addEventListener("toolinput", () => {}); // had pre-connect handler → silent
+          app.addEventListener("toolresult", () => {}); // first reg, late → warns
+
+          const late = warnings().filter((m) => lateMsg.test(m));
+          expect(late).toHaveLength(1);
+          expect(late[0]).toContain('"toolresult"');
+        });
+
         it("throws instead of warning when strict: true", async () => {
           const [strictAppT, strictBridgeT] =
             InMemoryTransport.createLinkedPair();
@@ -2034,6 +2073,9 @@ describe("App <-> AppBridge integration", () => {
             {},
             { autoResize: false, strict: true },
           );
+          // Pre-connect registration for toolcancelled — later swap must not throw.
+          strictApp.addEventListener("toolcancelled", () => {});
+
           await strictBridge.connect(strictBridgeT);
           await strictApp.connect(strictAppT);
 
@@ -2043,8 +2085,31 @@ describe("App <-> AppBridge integration", () => {
           expect(() => {
             strictApp.addEventListener("toolinput", () => {});
           }).toThrow(lateMsg);
-          expect(warnings()).toEqual([]);
+          // Swapping a handler that existed pre-connect is allowed under strict.
+          expect(() => {
+            strictApp.addEventListener("toolcancelled", () => {});
+          }).not.toThrow();
+          expect(warnings().filter((m) => lateMsg.test(m))).toEqual([]);
         });
+      });
+
+      it("close() stops further notification delivery (StrictMode cleanup relies on this)", async () => {
+        const received: unknown[] = [];
+        app.addEventListener("toolresult", (r) => received.push(r));
+        await bridge.connect(bridgeTransport);
+        await app.connect(appTransport);
+
+        await bridge.sendToolResult({
+          content: [{ type: "text", text: "before" }],
+        });
+        expect(received).toHaveLength(1);
+
+        await app.close();
+
+        await bridge
+          .sendToolResult({ content: [{ type: "text", text: "after" }] })
+          .catch(() => {});
+        expect(received).toHaveLength(1);
       });
 
       it("AppBridge warns on tools/call from a View that skipped the handshake", async () => {
