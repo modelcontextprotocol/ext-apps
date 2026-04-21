@@ -1907,9 +1907,18 @@ describe("App <-> AppBridge integration", () => {
     describe("pre-handshake guard (claude-ai-mcp#149)", () => {
       const guardMsg =
         /called before connect\(\) completed the ui\/initialize handshake/;
+      let warnSpy: ReturnType<typeof spyOn<Console, "warn">>;
+
+      beforeEach(() => {
+        warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+      });
+      afterEach(() => {
+        warnSpy.mockRestore();
+      });
+
+      const warnings = () => warnSpy.mock.calls.map((c) => String(c[0]));
 
       it("callServerTool warns when called before connect() completes", async () => {
-        const errSpy = spyOn(console, "error").mockImplementation(() => {});
         bridge.oncalltool = async () => ({ content: [] });
         await bridge.connect(bridgeTransport);
 
@@ -1917,40 +1926,34 @@ describe("App <-> AppBridge integration", () => {
         // Handshake is in flight; _initializedSent is still false.
         await app.callServerTool({ name: "t", arguments: {} }).catch(() => {});
 
-        expect(errSpy).toHaveBeenCalledTimes(1);
-        expect(errSpy.mock.calls[0][0]).toMatch(guardMsg);
-        expect(errSpy.mock.calls[0][0]).toContain("App.callServerTool()");
+        const appSide = warnings().filter((m) => guardMsg.test(m));
+        expect(appSide).toHaveLength(1);
+        expect(appSide[0]).toContain("App.callServerTool()");
 
         await connecting;
-        errSpy.mockRestore();
       });
 
       it("callServerTool does not warn after connect() resolves", async () => {
-        const errSpy = spyOn(console, "error").mockImplementation(() => {});
         bridge.oncalltool = async () => ({ content: [] });
         await bridge.connect(bridgeTransport);
         await app.connect(appTransport);
 
         await app.callServerTool({ name: "t", arguments: {} });
 
-        expect(errSpy).not.toHaveBeenCalled();
-        errSpy.mockRestore();
+        expect(warnings()).toEqual([]);
       });
 
       it("sendMessage and readServerResource also warn before handshake", async () => {
-        const errSpy = spyOn(console, "error").mockImplementation(() => {});
-
         await app.sendMessage({ role: "user", content: [] }).catch(() => {});
         await app.readServerResource({ uri: "test://r" }).catch(() => {});
 
-        expect(errSpy).toHaveBeenCalledTimes(2);
-        expect(errSpy.mock.calls[0][0]).toContain("App.sendMessage()");
-        expect(errSpy.mock.calls[1][0]).toContain("App.readServerResource()");
-        errSpy.mockRestore();
+        const appSide = warnings().filter((m) => guardMsg.test(m));
+        expect(appSide).toHaveLength(2);
+        expect(appSide[0]).toContain("App.sendMessage()");
+        expect(appSide[1]).toContain("App.readServerResource()");
       });
 
       it("throws instead of warning when strict: true", async () => {
-        const errSpy = spyOn(console, "error").mockImplementation(() => {});
         const strictApp = new App(
           testAppInfo,
           {},
@@ -1960,9 +1963,7 @@ describe("App <-> AppBridge integration", () => {
         await expect(
           strictApp.callServerTool({ name: "t", arguments: {} }),
         ).rejects.toThrow(guardMsg);
-        expect(errSpy).not.toHaveBeenCalled();
-
-        errSpy.mockRestore();
+        expect(warnings()).toEqual([]);
       });
 
       describe("late handler registration", () => {
@@ -1970,68 +1971,57 @@ describe("App <-> AppBridge integration", () => {
           /handler registered after connect\(\) completed the ui\/initialize handshake/;
 
         it("warns when ontoolresult is set after connect() resolves", async () => {
-          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
           await bridge.connect(bridgeTransport);
           await app.connect(appTransport);
 
           app.ontoolresult = () => {};
 
-          expect(warnSpy).toHaveBeenCalledTimes(1);
-          expect(warnSpy.mock.calls[0][0]).toMatch(lateMsg);
-          expect(warnSpy.mock.calls[0][0]).toContain('"toolresult"');
-          warnSpy.mockRestore();
+          expect(warnings()).toHaveLength(1);
+          expect(warnings()[0]).toMatch(lateMsg);
+          expect(warnings()[0]).toContain('"toolresult"');
         });
 
         it("warns when addEventListener('toolinput', …) is called after connect()", async () => {
-          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
           await bridge.connect(bridgeTransport);
           await app.connect(appTransport);
 
           app.addEventListener("toolinput", () => {});
 
-          expect(warnSpy).toHaveBeenCalledTimes(1);
-          expect(warnSpy.mock.calls[0][0]).toContain('"toolinput"');
-          warnSpy.mockRestore();
+          expect(warnings()).toHaveLength(1);
+          expect(warnings()[0]).toContain('"toolinput"');
         });
 
         it("does not warn for handlers set before connect()", async () => {
-          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
           app.ontoolinput = () => {};
           app.addEventListener("toolresult", () => {});
 
           await bridge.connect(bridgeTransport);
           await app.connect(appTransport);
 
-          expect(warnSpy).not.toHaveBeenCalled();
-          warnSpy.mockRestore();
+          expect(warnings()).toEqual([]);
         });
 
         it("does not warn for hostcontextchanged (repeating event)", async () => {
-          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
           await bridge.connect(bridgeTransport);
           await app.connect(appTransport);
 
           app.onhostcontextchanged = () => {};
           app.addEventListener("hostcontextchanged", () => {});
 
-          expect(warnSpy).not.toHaveBeenCalled();
-          warnSpy.mockRestore();
+          expect(warnings()).toEqual([]);
         });
 
         it("does not warn when clearing a handler (set to undefined)", async () => {
-          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
           app.ontoolinput = () => {};
           await bridge.connect(bridgeTransport);
           await app.connect(appTransport);
 
           app.ontoolinput = undefined;
 
-          expect(warnSpy).not.toHaveBeenCalled();
-          warnSpy.mockRestore();
+          expect(warnings()).toEqual([]);
         });
 
         it("throws instead of warning when strict: true", async () => {
-          const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
           const [strictAppT, strictBridgeT] =
             InMemoryTransport.createLinkedPair();
           const strictBridge = new AppBridge(
@@ -2053,13 +2043,11 @@ describe("App <-> AppBridge integration", () => {
           expect(() => {
             strictApp.addEventListener("toolinput", () => {});
           }).toThrow(lateMsg);
-          expect(warnSpy).not.toHaveBeenCalled();
-          warnSpy.mockRestore();
+          expect(warnings()).toEqual([]);
         });
       });
 
       it("AppBridge warns on tools/call from a View that skipped the handshake", async () => {
-        const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
         bridge.oncalltool = async () => ({ content: [] });
         await bridge.connect(bridgeTransport);
 
@@ -2073,23 +2061,20 @@ describe("App <-> AppBridge integration", () => {
         });
         await flush();
 
-        expect(warnSpy).toHaveBeenCalledTimes(1);
-        expect(warnSpy.mock.calls[0][0]).toContain(
+        expect(warnings()).toHaveLength(1);
+        expect(warnings()[0]).toContain(
           "received 'tools/call' before ui/notifications/initialized",
         );
-        warnSpy.mockRestore();
       });
 
       it("AppBridge does not warn after initialized is received", async () => {
-        const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
         bridge.oncalltool = async () => ({ content: [] });
         await bridge.connect(bridgeTransport);
         await app.connect(appTransport);
 
         await app.callServerTool({ name: "t", arguments: {} });
 
-        expect(warnSpy).not.toHaveBeenCalled();
-        warnSpy.mockRestore();
+        expect(warnings()).toEqual([]);
       });
     });
 

@@ -176,12 +176,12 @@ export type AppOptions = ProtocolOptions & {
    */
   autoResize?: boolean;
   /**
-   * Throw on detected misuse instead of logging a console error.
+   * Throw on detected misuse instead of logging a console warning.
    *
    * Currently this affects calling host-bound methods (e.g.
    * {@link App.callServerTool `callServerTool`}, {@link App.sendMessage `sendMessage`})
    * before {@link App.connect `connect`} has completed the `ui/initialize`
-   * handshake. With `strict: false` (default) a `console.error` is emitted;
+   * handshake. With `strict: false` (default) a `console.warn` is emitted;
    * with `strict: true` an `Error` is thrown.
    *
    * @remarks Throwing will become the default in a future release.
@@ -375,7 +375,7 @@ export class App extends ProtocolWithEvents<
       throw new Error(msg);
     }
     // TODO(next-minor): make `strict: true` the default.
-    console.error(`${msg}. This will throw in a future release.`);
+    console.warn(`${msg}. This will throw in a future release.`);
   }
 
   protected readonly eventSchemas = {
