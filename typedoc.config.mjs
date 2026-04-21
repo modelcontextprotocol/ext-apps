@@ -17,6 +17,7 @@ const config = {
     "docs/authorization.md",
     "docs/csp-cors.md",
     "docs/migrate_from_openai_apps.md",
+    "docs/community-examples.md",
   ],
   entryPoints: [
     "src/server/index.ts",
