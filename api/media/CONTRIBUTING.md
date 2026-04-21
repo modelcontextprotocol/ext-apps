@@ -27,6 +27,14 @@ We welcome contributions to the MCP Apps SDK! This document outlines the process
 - Provide a clear description of changes
 - **Keep "Allow edits by maintainers" checked** when opening your PR — this lets maintainers rebase your branch and lets the [`/update-snapshots` workflow](#updating-snapshots-in-ci) push updated screenshots to it
 
+## Examples Policy
+
+The examples in `examples/` are maintained by the core team. **We do not accept pull requests that add new example servers from outside contributors.** Each example carries an ongoing maintenance cost — keeping it building, tested, and up to date with SDK changes — so we are deliberate about what we add.
+
+If you have an idea for an example that would provide significant educational value, please [open an issue](https://github.com/modelcontextprotocol/ext-apps/issues) describing what the example would demonstrate and why it would be useful, and maintainers will evaluate the request.
+
+PRs that add new examples without a prior approved issue may be closed.
+
 ## Running Examples
 
 Start the development environment with hot reloading:
@@ -531,40 +539,17 @@ Before publishing releases, ensure the following are configured:
 
 ### Publishing a Release
 
-Releases are published automatically via GitHub Actions when a GitHub Release is created.
-
-#### Steps to publish:
-
-1. **Update the version** in `package.json`:
+1. **Bump the version** across the root and all workspace packages:
 
    ```bash
-   # For a regular release
-   npm version patch  # or minor, or major
-
-   # For a beta release
-   npm version prerelease --preid=beta
+   npm run bump -- minor   # or: patch | major | prerelease --preid=beta | 1.7.0
    ```
 
-2. **Commit the version bump** (if not done by `npm version`):
+   Commit and open a PR with a grouped changelog in the body (see prior `chore: bump …` PRs for the format).
 
-   ```bash
-   git add package.json
-   git commit -m "Bump version to X.Y.Z"
-   git push origin main
-   ```
+2. **Merge the PR**, then [draft a GitHub Release](https://github.com/modelcontextprotocol/ext-apps/releases/new) — create a `vX.Y.Z` tag on `main`, paste the changelog, publish.
 
-3. **Create a GitHub Release**:
-   - Go to [Releases](https://github.com/modelcontextprotocol/ext-apps/releases)
-   - Click "Draft a new release"
-   - Create a new tag matching the version (e.g., `v0.1.0`)
-   - Set the target branch (usually `main`)
-   - Write release notes describing the changes
-   - Click "Publish release"
-
-4. **Monitor the workflow**:
-   - The [npm-publish workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/npm-publish.yml) will trigger automatically
-   - It runs build and test jobs before publishing
-   - On success, the package is published to npm with provenance
+3. **Approve the deployment** — publishing the Release triggers the [npm-publish workflow](https://github.com/modelcontextprotocol/ext-apps/actions/workflows/npm-publish.yml); all publish jobs wait together for a single "Review deployments" approval.
 
 #### npm Tags
 
