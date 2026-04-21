@@ -769,7 +769,6 @@ export type McpUiToolVisibility = "model" | "app";
 export interface McpUiToolMeta {
   /**
    * URI of the UI resource to display for this tool, if any.
-   * This is converted to `_meta["ui/resourceUri"]`.
    *
    * @example
    * ```ts

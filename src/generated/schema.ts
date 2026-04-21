@@ -711,7 +711,6 @@ export const McpUiToolVisibilitySchema = z
 export const McpUiToolMetaSchema = z.object({
   /**
    * URI of the UI resource to display for this tool, if any.
-   * This is converted to `_meta["ui/resourceUri"]`.
    *
    * @example
    * ```ts
