@@ -1097,6 +1097,7 @@ export class App extends ProtocolWithEvents<
     params: CreateMessageRequest["params"],
     options?: RequestOptions,
   ): Promise<CreateMessageResult | CreateMessageResultWithTools> {
+    this._assertInitialized("createSamplingMessage");
     const resultSchema = params.tools
       ? CreateMessageResultWithToolsSchema
       : CreateMessageResultSchema;
