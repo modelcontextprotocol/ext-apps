@@ -7,6 +7,7 @@ import {
   Transport,
   TransportSendOptions,
 } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types";
 
 /**
  * JSON-RPC transport using `window.postMessage` for iframe↔parent communication.
@@ -123,7 +124,11 @@ export class PostMessageTransport implements Transport {
    * @param options - Optional send options (currently unused)
    */
   async send(message: JSONRPCMessage, options?: TransportSendOptions) {
-    console.debug("Sending message", message);
+    // Skip debug log for high-frequency streaming notifications — these
+    // can fire dozens of times per second and flood the console.
+    if ((message as { method?: string }).method !== TOOL_INPUT_PARTIAL_METHOD) {
+      console.debug("Sending message", message);
+    }
     this.eventTarget.postMessage(message, "*");
   }
 

@@ -1297,8 +1297,10 @@ Host MUST send this notification if the tool execution was cancelled, for any re
 }
 ```
 
-Host MUST send this notification before tearing down the UI resource, for any reason, including user action, resource re-allocation, etc. The Host MAY specify the reason.
+Host MUST send this notification before tearing down the UI resource, for any reason, including user action, view-initiated teardown, resource re-allocation, etc. The Host MAY specify the reason.
 Host SHOULD wait for a response before tearing down the resource (to prevent data loss).
+
+#### Notifications (View → Host)
 
 `ui/notifications/size-changed` - View's size changed
 
@@ -1314,6 +1316,22 @@ Host SHOULD wait for a response before tearing down the resource (to prevent dat
 ```
 
 The View SHOULD send this notification when rendered content body size changes (e.g. using ResizeObserver API to report up to date size).
+
+`ui/notifications/request-teardown` - View requests host to tear it down
+
+```typescript
+{
+  jsonrpc: "2.0",
+  method: "ui/notifications/request-teardown",
+  params: {}
+}
+```
+
+The View MAY send this notification to request that the host tear it down. This enables View-initiated teardown flows (e.g., user clicks a "Done" button in the View).
+
+**Host behavior:**
+- Host MAY defer or ignore the teardown request.
+- If the Host accepts the request, it MUST follow the graceful termination process by sending `ui/resource-teardown` to the View. The Host SHOULD wait for a response before tearing down the resource (to prevent data loss).
 
 `ui/notifications/host-context-changed` - Host context has changed
 
@@ -1467,19 +1485,24 @@ sequenceDiagram
   end
 ```
 
-#### 4. Cleanup
+#### 4. Teardown
+
+The Host can tear down Views. Views may request teardown by sending `ui/notifications/request-teardown` to the Host. In any case, the Host MUST send `ui/resource-teardown` to allow the View to terminate gracefully.
 
 ```mermaid
 sequenceDiagram
   participant H as Host
   participant UI as View (iframe)
+  opt View-initiated teardown
+    UI ->> H: ui/notifications/request-teardown
+  end
   H ->> UI: ui/resource-teardown
   UI --> UI: Graceful termination
   UI -->> H: ui/resource-teardown response
   H -x H: Tear down iframe and listeners
 ```
 
-Note: Cleanup may be triggered at any point in the lifecycle following View initialization.
+Note: Teardown may be triggered at any point in the lifecycle following View initialization.
 
 #### Key Differences from Pre-SEP MCP-UI:
 

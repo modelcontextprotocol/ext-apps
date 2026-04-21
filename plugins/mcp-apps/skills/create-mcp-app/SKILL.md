@@ -13,11 +13,10 @@ Every MCP App requires two parts linked together:
 
 1. **Tool** - Called by the LLM/host, returns data
 2. **Resource** - Serves the bundled HTML UI that displays the data
-3. **Link** - The tool's `_meta.ui.resourceUri` references the resource
 
-```
-Host calls tool → Server returns result → Host renders resource UI → UI receives result
-```
+The tool's `_meta.ui.resourceUri` references the resource's URI.
+
+Host calls tool → Host renders resource UI → Server returns result → UI receives result.
 
 ## Quick Start Decision Tree
 
@@ -63,10 +62,12 @@ Learn and adapt from `/tmp/mcp-ext-apps/examples/basic-server-{framework}/`:
 | `basic-server-solid/` | `server.ts`, `src/mcp-app.tsx` |
 
 Each template includes:
-- Complete `server.ts` with `registerAppTool` and `registerAppResource`
-- Client-side app with all lifecycle handlers
-- `vite.config.ts` with `vite-plugin-singlefile`
-- `package.json` with all required dependencies
+- `server.ts` with `registerAppTool` and `registerAppResource`
+- `main.ts` entry point with HTTP and stdio transport setup
+- Client-side app (e.g., `src/mcp-app.ts`, `src/mcp-app.tsx`) with lifecycle handlers
+- `src/global.css` with global styles and host style variable fallbacks
+- `vite.config.ts` using `vite-plugin-singlefile`
+- `package.json` with `npm run` scripts and required dependencies
 - `.gitignore` excluding `node_modules/` and `dist/`
 
 ### API Reference (Source Files)
@@ -75,54 +76,58 @@ Read JSDoc documentation directly from `/tmp/mcp-ext-apps/src/`:
 
 | File | Contents |
 |------|----------|
-| `src/app.ts` | `App` class, handlers (`ontoolinput`, `ontoolresult`, `onhostcontextchanged`, `onteardown`), lifecycle |
-| `src/server/index.ts` | `registerAppTool`, `registerAppResource`, tool visibility options |
-| `src/spec.types.ts` | All type definitions: `McpUiHostContext`, CSS variable keys, display modes |
+| `src/app.ts` | `App` class, handlers (`ontoolinput`, `ontoolresult`, `onhostcontextchanged`, `onteardown`, etc.), lifecycle |
+| `src/server/index.ts` | `registerAppTool`, `registerAppResource`, helper functions |
+| `src/spec.types.ts` | All type definitions: `McpUiHostContext`, `McpUiStyleVariableKey` (CSS variable names), `McpUiResourceCsp` (CSP configuration), etc. |
 | `src/styles.ts` | `applyDocumentTheme`, `applyHostStyleVariables`, `applyHostFonts` |
 | `src/react/useApp.tsx` | `useApp` hook for React apps |
-| `src/react/useHostStyles.ts` | `useHostStyles`, `useHostStyleVariables`, `useHostFonts` hooks |
 
-### Advanced Examples
+### Advanced Patterns
 
-| Example | Pattern Demonstrated |
-|---------|---------------------|
-| `examples/shadertoy-server/` | **Streaming partial input** + visibility-based pause/play (best practice for large inputs) |
-| `examples/wiki-explorer-server/` | `callServerTool` for interactive data fetching |
-| `examples/system-monitor-server/` | Polling pattern with interval management |
-| `examples/video-resource-server/` | Binary/blob resources |
-| `examples/sheet-music-server/` | `ontoolinput` - processing tool args before execution completes |
-| `examples/threejs-server/` | `ontoolinputpartial` - streaming/progressive rendering |
-| `examples/map-server/` | `updateModelContext` - keeping model informed of UI state |
-| `examples/transcript-server/` | `updateModelContext` + `sendMessage` - background context updates + user-initiated messages |
-| `examples/basic-host/` | Reference host implementation using `AppBridge` |
+See `/tmp/mcp-ext-apps/docs/patterns.md` for detailed recipes:
+
+- **App-only tools** — `visibility: ["app"]`, hiding tools from model
+- **Polling** — real-time dashboards, interval management
+- **Chunked responses** — large files, pagination, base64 encoding
+- **Error handling** — `isError`, informing model of failures
+- **Binary resources** — audio/video/etc via `resources/read`, blob field
+- **Network requests** — assets, fetch, CSP, `_meta.ui.csp`, CORS, `_meta.ui.domain`
+- **Host context** — theme, styling, fonts, safe area insets
+- **Fullscreen mode** — `requestDisplayMode`, display mode changes
+- **Model context** — `updateModelContext`, `sendMessage`, keeping model informed
+- **View state** — `viewUUID`, localStorage, state recovery
+- **Visibility-based pause** — IntersectionObserver, pausing animations/WebGL
+- **Streaming input** — `ontoolinputpartial`, progressive rendering
+
+### Reference Host Implementation
+
+`/tmp/mcp-ext-apps/examples/basic-host/` shows one way an MCP Apps-capable host could be implemented. Real-world hosts like Claude Desktop are more sophisticated—use basic-host for local testing and protocol understanding, not as a guarantee of host behavior.
 
 ## Critical Implementation Notes
 
 ### Adding Dependencies
 
-Use `npm install` to add dependencies rather than manually writing version numbers:
+**Always** use `npm install` to add dependencies rather than manually writing version numbers:
 
 ```bash
-npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/sdk zod
+npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/sdk zod express cors
+npm install -D typescript vite vite-plugin-singlefile concurrently cross-env @types/node @types/express @types/cors
 ```
 
-This lets npm resolve the latest compatible versions. Never specify version numbers from memory.
+This lets npm resolve the latest compatible versions. **Never** specify version numbers from memory.
 
 ### TypeScript Server Execution
 
-Use `tsx` as a devDependency for running TypeScript server files:
+Unless the user has specified otherwise, use `tsx` for running TypeScript server files. For example:
 
 ```bash
 npm install -D tsx
+
+npm pkg set scripts.dev="cross-env NODE_ENV=development concurrently 'cross-env INPUT=mcp-app.html vite build --watch' 'tsx --watch main.ts'"
 ```
 
-```json
-"scripts": {
-  "serve": "tsx server.ts"
-}
-```
-
-Note: The SDK examples use `bun` but generated projects should use `tsx` for broader compatibility.
+> [!NOTE]
+> The SDK examples use `bun` but generated projects should default to `tsx` for broader compatibility.
 
 ### Handler Registration Order
 
@@ -136,182 +141,19 @@ app.ontoolinput = (params) => { /* handle input */ };
 app.ontoolresult = (result) => { /* handle result */ };
 app.onhostcontextchanged = (ctx) => { /* handle context */ };
 app.onteardown = async () => { return {}; };
+// etc.
 
 // Then connect
 await app.connect();
 ```
 
-### Tool Visibility
-
-Control who can access tools via `_meta.ui.visibility`:
-
-```typescript
-// Default: visible to both model and app
-_meta: { ui: { resourceUri, visibility: ["model", "app"] } }
-
-// UI-only (hidden from model) - for refresh buttons, form submissions
-_meta: { ui: { resourceUri, visibility: ["app"] } }
-
-// Model-only (app cannot call)
-_meta: { ui: { resourceUri, visibility: ["model"] } }
-```
-
-### Host Styling Integration
-
-**Vanilla JS** - Use helper functions:
-```typescript
-import { applyDocumentTheme, applyHostStyleVariables, applyHostFonts } from "@modelcontextprotocol/ext-apps";
-
-app.onhostcontextchanged = (ctx) => {
-  if (ctx.theme) applyDocumentTheme(ctx.theme);
-  if (ctx.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
-  if (ctx.styles?.css?.fonts) applyHostFonts(ctx.styles.css.fonts);
-};
-```
-
-**React** - Use hooks:
-```typescript
-import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
-
-const { app } = useApp({ appInfo, capabilities, onAppCreated });
-useHostStyles(app); // Injects CSS variables to document, making var(--*) available
-```
-
-**Using variables in CSS** - After applying, use `var()`:
-```css
-.container {
-  background: var(--color-background-secondary);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  border-radius: var(--border-radius-md);
-}
-.code {
-  font-family: var(--font-mono);
-  font-size: var(--font-text-sm-size);
-  line-height: var(--font-text-sm-line-height);
-  color: var(--color-text-secondary);
-}
-.heading {
-  font-size: var(--font-heading-lg-size);
-  font-weight: var(--font-weight-semibold);
-}
-```
-
-Key variable groups: `--color-background-*`, `--color-text-*`, `--color-border-*`, `--font-sans`, `--font-mono`, `--font-text-*-size`, `--font-heading-*-size`, `--border-radius-*`. See `src/spec.types.ts` for full list.
-
-### Safe Area Handling
-
-Always respect `safeAreaInsets`:
-
-```typescript
-app.onhostcontextchanged = (ctx) => {
-  if (ctx.safeAreaInsets) {
-    const { top, right, bottom, left } = ctx.safeAreaInsets;
-    document.body.style.padding = `${top}px ${right}px ${bottom}px ${left}px`;
-  }
-};
-```
-
-### Streaming Partial Input
-
-For large tool inputs, use `ontoolinputpartial` to show progress during LLM generation. The partial JSON is healed (always valid), enabling progressive UI updates.
-
-**Spec:** [ui/notifications/tool-input-partial](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#streaming-tool-input)
-
-```typescript
-app.ontoolinputpartial = (params) => {
-  const args = params.arguments; // Healed partial JSON - always valid, fields appear as generated
-  // Use args directly for progressive rendering
-};
-
-app.ontoolinput = (params) => {
-  // Final complete input - switch from preview to full render
-};
-```
-
-**Use cases:**
-| Pattern | Example |
-|---------|---------|
-| Code preview | Show streaming code in `<pre>`, render on complete (`examples/shadertoy-server/`) |
-| Progressive form | Fill form fields as they stream in |
-| Live chart | Add data points to chart as array grows |
-| Partial render | Render incomplete structured data (tables, lists, trees) |
-
-**Simple pattern (code preview):**
-```typescript
-app.ontoolinputpartial = (params) => {
-  codePreview.textContent = params.arguments?.code ?? "";
-  codePreview.style.display = "block";
-  canvas.style.display = "none";
-};
-app.ontoolinput = (params) => {
-  codePreview.style.display = "none";
-  canvas.style.display = "block";
-  render(params.arguments);
-};
-```
-
-### Visibility-Based Resource Management
-
-Pause expensive operations (animations, WebGL, polling) when view scrolls out of viewport:
-
-```typescript
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach((entry) => {
-    if (entry.isIntersecting) {
-      animation.play(); // or: startPolling(), shaderToy.play()
-    } else {
-      animation.pause(); // or: stopPolling(), shaderToy.pause()
-    }
-  });
-});
-observer.observe(document.querySelector(".main"));
-```
-
-### Fullscreen Mode
-
-Request fullscreen via `app.requestDisplayMode()`. Check availability in host context:
-
-```typescript
-let currentMode: "inline" | "fullscreen" = "inline";
-
-app.onhostcontextchanged = (ctx) => {
-  // Check if fullscreen available
-  if (ctx.availableDisplayModes?.includes("fullscreen")) {
-    fullscreenBtn.style.display = "block";
-  }
-  // Track current mode
-  if (ctx.displayMode) {
-    currentMode = ctx.displayMode;
-    container.classList.toggle("fullscreen", currentMode === "fullscreen");
-  }
-};
-
-async function toggleFullscreen() {
-  const newMode = currentMode === "fullscreen" ? "inline" : "fullscreen";
-  const result = await app.requestDisplayMode({ mode: newMode });
-  currentMode = result.mode;
-}
-```
-
-**CSS pattern** - Remove border radius in fullscreen:
-```css
-.main { border-radius: var(--border-radius-lg); overflow: hidden; }
-.main.fullscreen { border-radius: 0; }
-```
-
-See `examples/shadertoy-server/` for complete implementation.
-
 ## Common Mistakes to Avoid
 
-1. **Handlers after connect()** - Register ALL handlers BEFORE calling `app.connect()`
-2. **Missing single-file bundling** - Must use `vite-plugin-singlefile`
-3. **Forgetting resource registration** - Both tool AND resource must be registered
-4. **Missing resourceUri link** - Tool must have `_meta.ui.resourceUri`
-5. **Ignoring safe area insets** - Always handle `ctx.safeAreaInsets`
-6. **No text fallback** - Always provide `content` array for non-UI hosts
-7. **Hardcoded styles** - Use host CSS variables for theme integration
-8. **No streaming for large inputs** - Use `ontoolinputpartial` to show progress during generation
+1. **No text fallback** - Always provide `content` array for non-UI hosts
+2. **Missing CSP configuration** - MCP Apps HTML is served as an MCP resource with no same-origin server; ALL network requests—even to `localhost`—require a CSP configuration
+3. **CSP or CORS config in wrong _meta object** - `_meta.ui.csp` and `_meta.ui.domain` go in the `contents[]` objects returned by `registerAppResource()`'s read callback, not in `registerAppResource()`'s config object
+4. **Handlers after app.connect()** - Register ALL handlers BEFORE calling `app.connect()`
+5. **No streaming for large inputs** - Use `ontoolinputpartial` to show progress during input generation
 
 ## Testing
 

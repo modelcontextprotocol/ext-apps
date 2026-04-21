@@ -46,11 +46,11 @@ Configure your [`package.json`](https://github.com/modelcontextprotocol/ext-apps
 ```bash
 npm pkg set type=module
 npm pkg set scripts.build="tsc --noEmit && tsc -p tsconfig.server.json && cross-env INPUT=mcp-app.html vite build"
-npm pkg set scripts.start='concurrently "cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch" "tsx watch main.ts"'
+npm pkg set scripts.start='concurrently --raw "cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch" "tsx watch main.ts"'
 ```
 
 > [!NOTE]
-> Windows `cmd.exe` users will need to convert quotes in the above command: `npm pkg set scripts.start="concurrently ""cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch"" ""tsx watch main.ts"""`.
+> Windows `cmd.exe` users will need to convert quotes in the above command: `npm pkg set scripts.start="concurrently --raw ""cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch"" ""tsx watch main.ts"""`.
 
 <details>
 <summary>Create <a href="https://github.com/modelcontextprotocol/ext-apps/blob/main/examples/quickstart/tsconfig.json"><code>tsconfig.json</code></a>:</summary>
@@ -113,7 +113,7 @@ npm pkg set scripts.start='concurrently "cross-env NODE_ENV=development INPUT=mc
 
 <!-- prettier-ignore -->
 ```ts source="../examples/quickstart/vite.config.ts"
-import { defineConfig } from "vite";
+import { createLogger, defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
 const INPUT = process.env.INPUT;
@@ -123,7 +123,14 @@ if (!INPUT) {
 
 const isDevelopment = process.env.NODE_ENV === "development";
 
+const prefixedLogger = createLogger();
+for (const level of ["info", "warn", "error"] as const) {
+  const fn = prefixedLogger[level];
+  prefixedLogger[level] = (msg, opts) => fn(msg.replace(/^/mg, "[vite] "), opts);
+}
+
 export default defineConfig({
+  customLogger: prefixedLogger,
   plugins: [viteSingleFile()],
   build: {
     sourcemap: isDevelopment ? "inline" : undefined,

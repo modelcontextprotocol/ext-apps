@@ -25,6 +25,7 @@ We welcome contributions to the MCP Apps SDK! This document outlines the process
 - Update documentation as needed
 - Keep changes focused and atomic
 - Provide a clear description of changes
+- **Keep "Allow edits by maintainers" checked** when opening your PR — this lets maintainers rebase your branch and lets the [`/update-snapshots` workflow](#updating-snapshots-in-ci) push updated screenshots to it
 
 ## Running Examples
 

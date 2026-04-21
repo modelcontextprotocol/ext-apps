@@ -306,6 +306,28 @@ export function newAppBridge(
     appBridge.sendHostContextChange({ theme: newTheme });
   });
 
+  // Per spec, the host SHOULD notify the view when container dimensions
+  // change. A ResizeObserver on the iframe covers window resize, layout
+  // shifts, and the inline↔fullscreen panel toggle (which React applies
+  // a tick after onrequestdisplaymode returns — sending containerDimensions
+  // alongside displayMode there would race the layout). Height stays
+  // flexible (maxHeight) so the view can keep driving it via sendSizeChanged.
+  const iframeResizeObserver = new ResizeObserver(([entry]) => {
+    const width = Math.round(entry.contentRect.width);
+    if (width > 0) {
+      appBridge.sendHostContextChange({
+        containerDimensions: { width, maxHeight: 6000 },
+      });
+    }
+  });
+  iframeResizeObserver.observe(iframe);
+  // AppBridge inherits Protocol's onclose hook — chain disposal there.
+  const prevOnclose = appBridge.onclose;
+  appBridge.onclose = () => {
+    iframeResizeObserver.disconnect();
+    prevOnclose?.();
+  };
+
   // Register all handlers before calling connect(). The view can start
   // sending requests immediately after the initialization handshake, so any
   // handlers registered after connect() might miss early requests.

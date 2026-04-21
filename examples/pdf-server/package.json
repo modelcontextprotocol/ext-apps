@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-pdf",
-  "version": "1.1.2",
+  "version": "1.6.0",
   "type": "module",
   "description": "MCP server for loading and extracting text from PDF files with chunked pagination and interactive viewer",
   "repository": {
@@ -14,20 +14,22 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node --external pdfjs-dist && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --external pdfjs-dist --banner \"#!/usr/bin/env node\"",
+    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build pdfjs-polyfill.ts --outdir dist --target node && bun build server.ts --outdir dist --target node --external pdfjs-dist --external \"./pdfjs-polyfill.js\" && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --external pdfjs-dist --banner \"#!/usr/bin/env node\"",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
-    "serve": "bun --watch main.ts",
+    "serve": "bun --watch main.ts --enable-interact",
     "serve:stdio": "bun main.ts --stdio",
     "start": "cross-env NODE_ENV=development npm run build && npm run serve",
     "start:stdio": "cross-env NODE_ENV=development npm run build 1>&2 && npm run serve:stdio",
     "dev": "cross-env NODE_ENV=development concurrently \"npm run watch\" \"npm run serve\"",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "build:mcpb": "npm run build && node build-mcpb.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.0.0",
-    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.0.0",
     "zod": "^4.1.13"
   },

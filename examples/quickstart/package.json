@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/quickstart",
-  "version": "1.1.2",
+  "version": "1.6.0",
   "type": "module",
   "private": true,
   "description": "Quickstart MCP App Server example",
@@ -12,19 +12,19 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && cross-env INPUT=mcp-app.html vite build",
-    "start": "concurrently \"cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch\" \"tsx watch main.ts\""
+    "start": "concurrently --raw \"cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch\" \"tsx watch main.ts\""
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.0.0",
-    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "express": "^5.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
-    "concurrently": "^9.2.1",
     "@types/express": "^5.0.0",
     "@types/node": "22.19.5",
+    "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

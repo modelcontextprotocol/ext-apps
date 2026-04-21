@@ -475,6 +475,19 @@ export interface McpUiSupportedContentBlockModalities {
 }
 
 /**
+ * @description Notification for app-initiated teardown request (View -> Host).
+ * Views send this to request that the host tear them down. The host decides
+ * whether to proceed - if approved, the host will send
+ * `ui/resource-teardown` to allow the view to perform cleanup before being
+ * unmounted.
+ * @see {@link app.App.requestTeardown} for the app method that sends this
+ */
+export interface McpUiRequestTeardownNotification {
+  method: "ui/notifications/request-teardown";
+  params?: {};
+}
+
+/**
  * @description Capabilities supported by the host application.
  * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
@@ -808,6 +821,8 @@ export const TOOL_CANCELLED_METHOD: McpUiToolCancelledNotification["method"] =
   "ui/notifications/tool-cancelled";
 export const HOST_CONTEXT_CHANGED_METHOD: McpUiHostContextChangedNotification["method"] =
   "ui/notifications/host-context-changed";
+export const REQUEST_TEARDOWN_METHOD: McpUiRequestTeardownNotification["method"] =
+  "ui/notifications/request-teardown";
 export const RESOURCE_TEARDOWN_METHOD: McpUiResourceTeardownRequest["method"] =
   "ui/resource-teardown";
 export const INITIALIZE_METHOD: McpUiInitializeRequest["method"] =

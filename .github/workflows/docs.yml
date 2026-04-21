@@ -16,8 +16,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
-      - run: npm install
+          node-version: "22"
+          cache: npm
+      - run: npm ci
       - run: npm run build
       - run: npm run docs
       - uses: peaceiris/actions-gh-pages@v4

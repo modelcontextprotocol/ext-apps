@@ -16,10 +16,14 @@ permissions:
 
 jobs:
   update-snapshots:
-    # Run on workflow_dispatch OR when someone comments "/update-snapshots" on a PR
+    # Run on workflow_dispatch OR when a maintainer comments "/update-snapshots" on a PR.
+    # author_association check prevents arbitrary commenters from triggering a job with
+    # contents:write that pushes a [skip ci] commit to the PR branch.
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, '/update-snapshots'))
+      (github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/update-snapshots') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     steps:
       - name: Get PR branch
@@ -59,7 +63,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
       - uses: astral-sh/setup-uv@v7
 

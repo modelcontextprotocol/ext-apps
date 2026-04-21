@@ -77,7 +77,7 @@ export function useHostStyleVariables(
       return;
     }
 
-    app.onhostcontextchanged = (params) => {
+    const listener = (params: McpUiHostContext) => {
       if (params.theme) {
         applyDocumentTheme(params.theme);
       }
@@ -85,6 +85,8 @@ export function useHostStyleVariables(
         applyHostStyleVariables(params.styles.variables);
       }
     };
+    app.addEventListener("hostcontextchanged", listener);
+    return () => app.removeEventListener("hostcontextchanged", listener);
   }, [app]);
 }
 
@@ -145,11 +147,13 @@ export function useHostFonts(
       return;
     }
 
-    app.onhostcontextchanged = (params) => {
+    const listener = (params: McpUiHostContext) => {
       if (params.styles?.css?.fonts) {
         applyHostFonts(params.styles.css.fonts);
       }
     };
+    app.addEventListener("hostcontextchanged", listener);
+    return () => app.removeEventListener("hostcontextchanged", listener);
   }, [app]);
 }
 

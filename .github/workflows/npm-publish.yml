@@ -159,12 +159,8 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Build pdf-server
-        run: npm run build --workspace examples/pdf-server
-
-      - name: Pack MCPB bundle
-        run: npx -y @anthropic-ai/mcpb pack
-        working-directory: examples/pdf-server
+      - name: Build pdf-server + MCPB bundle
+        run: npm run build:mcpb --workspace examples/pdf-server
 
       - name: Upload MCPB to release
         run: gh release upload "${{ github.event.release.tag_name }}" examples/pdf-server/*.mcpb --clobber

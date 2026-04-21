@@ -5,10 +5,13 @@
     "url": "https://github.com/modelcontextprotocol/ext-apps"
   },
   "homepage": "https://github.com/modelcontextprotocol/ext-apps",
-  "version": "1.1.2",
+  "version": "1.6.0",
   "license": "MIT",
   "description": "MCP Apps SDK — Enable MCP servers to display interactive user interfaces in conversational clients.",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/src/app.js",
   "exports": {
     ".": {
@@ -44,14 +47,13 @@
     "examples/*"
   ],
   "scripts": {
-    "postinstall": "node scripts/setup-bun.mjs || echo 'setup-bun.mjs failed or not available'",
     "start": "npm run examples:dev",
     "generate:schemas": "tsx scripts/generate-schemas.ts && prettier --write \"src/generated/**/*\"",
     "sync:snippets": "bun scripts/sync-snippets.ts",
     "build": "npm run generate:schemas && npm run sync:snippets && node scripts/run-bun.mjs build.bun.ts && node scripts/link-self.mjs",
     "prepack": "npm run build",
     "build:all": "npm run examples:build",
-    "test": "bun test src",
+    "test": "bun test src examples",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:ui": "playwright test --ui",
@@ -62,10 +64,10 @@
     "examples:start": "NODE_ENV=development npm run build && bun examples/run-all.ts start",
     "examples:dev": "NODE_ENV=development bun examples/run-all.ts dev",
     "watch": "nodemon --watch src --ext ts,tsx --exec 'bun build.bun.ts'",
-    "prepare": "node scripts/setup-bun.mjs && npm run build && husky",
+    "prepare": "npm run build && husky",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
-    "generate:screenshots": "npm run build:all && docker run --rm -e EXAMPLE -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'apt-get update -qq && apt-get install -qq -y python3-venv curl > /dev/null && curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.local/bin:$PATH\" && npm i -g bun && npm ci && npx playwright test tests/e2e/generate-grid-screenshots.spec.ts'",
+    "generate:screenshots": "npm run build:all && docker run --rm -e EXAMPLE -e GENERATE_SCREENSHOTS=1 -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'apt-get update -qq && apt-get install -qq -y python3-venv curl > /dev/null && curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.local/bin:$PATH\" && npm i -g bun && npm ci && npx playwright test tests/e2e/generate-grid-screenshots.spec.ts'",
     "prettier": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --check",
     "prettier:fix": "prettier -u \"**/*.{js,jsx,ts,tsx,mjs,json,md,yml,yaml}\" --write",
     "check:versions": "node scripts/check-versions.mjs",
@@ -74,12 +76,13 @@
   "author": "Olivier Chafik",
   "devDependencies": {
     "@boneskull/typedoc-plugin-mermaid": "^0.2.0",
-    "@modelcontextprotocol/sdk": "1.25.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/test": "1.57.0",
     "@types/bun": "^1.3.2",
+    "@types/node": "20.19.27",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "@types/node": "20.19.27",
+    "bun": "^1.2.21",
     "caniuse-lite": "1.0.30001763",
     "cheerio": "1.1.2",
     "concurrently": "^9.2.1",
@@ -104,7 +107,7 @@
     "zod": "^4.1.13"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
     "react-dom": "^17.0.0 || ^18.0.0 || ^19.0.0",
     "zod": "^3.25.0 || ^4.0.0"
@@ -117,30 +120,10 @@
       "optional": true
     }
   },
-  "optionalDependencies": {
-    "@oven/bun-darwin-aarch64": "^1.2.21",
-    "@oven/bun-darwin-x64": "^1.2.21",
-    "@oven/bun-darwin-x64-baseline": "^1.2.21",
-    "@oven/bun-linux-aarch64": "^1.2.21",
-    "@oven/bun-linux-aarch64-musl": "^1.2.21",
-    "@oven/bun-linux-x64": "^1.2.21",
-    "@oven/bun-linux-x64-baseline": "^1.2.21",
-    "@oven/bun-linux-x64-musl": "^1.2.21",
-    "@oven/bun-linux-x64-musl-baseline": "^1.2.21",
-    "@oven/bun-windows-x64": "^1.2.21",
-    "@oven/bun-windows-x64-baseline": "^1.2.21",
-    "@rollup/rollup-darwin-arm64": "^4.53.3",
-    "@rollup/rollup-darwin-x64": "^4.53.3",
-    "@rollup/rollup-linux-arm64-gnu": "^4.53.3",
-    "@rollup/rollup-linux-x64-gnu": "^4.53.3",
-    "@rollup/rollup-win32-arm64-msvc": "^4.53.3",
-    "@rollup/rollup-win32-x64-msvc": "^4.53.3"
-  },
   "overrides": {
     "seroval": "1.4.1",
     "seroval-plugins": "1.4.2",
     "solid-js": "1.9.10",
-    "@hono/node-server": "1.19.7",
     "@types/node": "20.19.27"
   }
 }

@@ -520,6 +520,31 @@ describe("App <-> AppBridge integration", () => {
         }),
       ).rejects.toThrow("Context update failed");
     });
+
+    it("app.requestTeardown allows host to initiate teardown flow", async () => {
+      const events: string[] = [];
+
+      bridge.onrequestteardown = async () => {
+        events.push("teardown-requested");
+        await bridge.teardownResource({});
+        events.push("teardown-complete");
+      };
+
+      app.onteardown = async () => {
+        events.push("persist-unsaved-state");
+        return {};
+      };
+
+      await app.connect(appTransport);
+      await app.requestTeardown();
+      await flush();
+
+      expect(events).toEqual([
+        "teardown-requested",
+        "persist-unsaved-state",
+        "teardown-complete",
+      ]);
+    });
   });
 
   describe("App -> Host requests", () => {
@@ -816,6 +841,27 @@ describe("App <-> AppBridge integration", () => {
       expect(result.resources).toEqual(resources);
     });
 
+    it("onlistresources handles listServerResources() calls from App", async () => {
+      const resources = [
+        { uri: "test://res-1", name: "Resource 1" },
+        { uri: "test://res-2", name: "Resource 2", mimeType: "video/mp4" },
+      ];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onlistresources = async (params) => {
+        receivedRequests.push(params);
+        return { resources };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.listServerResources();
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(result.resources).toEqual(resources);
+    });
+
     it("onreadresource setter registers handler for resources/read requests", async () => {
       const requestParams = { uri: "test://resource" };
       const contents = [{ uri: "test://resource", text: "content" }];
@@ -833,6 +879,32 @@ describe("App <-> AppBridge integration", () => {
         { method: "resources/read", params: requestParams },
         ReadResourceResultSchema,
       );
+
+      expect(receivedRequests).toHaveLength(1);
+      expect(receivedRequests[0]).toMatchObject(requestParams);
+      expect(result.contents).toEqual(contents);
+    });
+
+    it("onreadresource handles readServerResource() calls from App", async () => {
+      const requestParams = { uri: "videos://bunny-1mb" };
+      const contents = [
+        {
+          uri: "videos://bunny-1mb",
+          blob: "dmlkZW9kYXRh",
+          mimeType: "video/mp4",
+        },
+      ];
+      const receivedRequests: unknown[] = [];
+
+      bridge.onreadresource = async (params) => {
+        receivedRequests.push(params);
+        return { contents };
+      };
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.readServerResource(requestParams);
 
       expect(receivedRequests).toHaveLength(1);
       expect(receivedRequests[0]).toMatchObject(requestParams);
@@ -1184,6 +1256,182 @@ describe("isToolVisibilityAppOnly", () => {
         _meta: { ui: { resourceUri: "ui://server/app.html" } },
       };
       expect(isToolVisibilityAppOnly(tool)).toBe(false);
+    });
+  });
+
+  describe("addEventListener / removeEventListener", () => {
+    let app: App;
+    let bridge: AppBridge;
+    let appTransport: InMemoryTransport;
+    let bridgeTransport: InMemoryTransport;
+
+    beforeEach(async () => {
+      [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+      app = new App(testAppInfo, {}, { autoResize: false });
+      bridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+      );
+      await bridge.connect(bridgeTransport);
+    });
+
+    afterEach(async () => {
+      await appTransport.close();
+      await bridgeTransport.close();
+    });
+
+    it("App.addEventListener fires multiple listeners for the same event", async () => {
+      const a: unknown[] = [];
+      const b: unknown[] = [];
+      app.addEventListener("hostcontextchanged", (p) => a.push(p));
+      app.addEventListener("hostcontextchanged", (p) => b.push(p));
+
+      await app.connect(appTransport);
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      expect(a).toEqual([{ theme: "dark" }]);
+      expect(b).toEqual([{ theme: "dark" }]);
+    });
+
+    it("App notification setters replace (DOM onclick model)", async () => {
+      const a: unknown[] = [];
+      const b: unknown[] = [];
+      const first = (p: unknown) => a.push(p);
+      app.ontoolinput = first;
+      expect(app.ontoolinput).toBe(first);
+      app.ontoolinput = (p) => b.push(p);
+
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: { x: 1 } });
+      await flush();
+
+      // Second assignment replaced the first (like el.onclick)
+      expect(a).toEqual([]);
+      expect(b).toEqual([{ arguments: { x: 1 } }]);
+    });
+
+    it("App notification setter coexists with addEventListener", async () => {
+      const a: unknown[] = [];
+      const b: unknown[] = [];
+      app.ontoolinput = (p) => a.push(p);
+      app.addEventListener("toolinput", (p) => b.push(p));
+
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: { x: 1 } });
+      await flush();
+
+      // Both the on* handler and addEventListener listener fire
+      expect(a).toEqual([{ arguments: { x: 1 } }]);
+      expect(b).toEqual([{ arguments: { x: 1 } }]);
+    });
+
+    it("App notification getter returns the on* handler", () => {
+      expect(app.ontoolinput).toBeUndefined();
+      const handler = () => {};
+      app.ontoolinput = handler;
+      expect(app.ontoolinput).toBe(handler);
+    });
+
+    it("App notification setter can be cleared with undefined", async () => {
+      const a: unknown[] = [];
+      app.ontoolinput = (p) => a.push(p);
+      expect(app.ontoolinput).toBeDefined();
+      app.ontoolinput = undefined;
+
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: { x: 1 } });
+      await flush();
+
+      expect(a).toEqual([]);
+      expect(app.ontoolinput).toBeUndefined();
+    });
+
+    it("App.removeEventListener stops a listener from firing", async () => {
+      const a: unknown[] = [];
+      const listener = (p: unknown) => a.push(p);
+      app.addEventListener("toolinput", listener);
+      app.removeEventListener("toolinput", listener);
+
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: {} });
+      await flush();
+
+      expect(a).toEqual([]);
+    });
+
+    it("App.onEventDispatch merges hostcontext before listeners fire", async () => {
+      let seen: unknown;
+      app.addEventListener("hostcontextchanged", () => {
+        seen = app.getHostContext();
+      });
+
+      await app.connect(appTransport);
+      bridge.setHostContext({ theme: "dark" });
+      await flush();
+
+      expect(seen).toEqual({ theme: "dark" });
+    });
+
+    it("AppBridge.addEventListener fires multiple listeners", async () => {
+      let a = 0;
+      let b = 0;
+      bridge.addEventListener("initialized", () => a++);
+      bridge.addEventListener("initialized", () => b++);
+
+      await app.connect(appTransport);
+
+      expect(a).toBe(1);
+      expect(b).toBe(1);
+    });
+
+    it("on* request setters have replace semantics (no throw)", () => {
+      app.onteardown = async () => ({});
+      expect(() => {
+        app.onteardown = async () => ({});
+      }).not.toThrow();
+    });
+
+    it("on* request setters have getters", () => {
+      expect(app.onteardown).toBeUndefined();
+      const handler = async () => ({});
+      app.onteardown = handler;
+      expect(app.onteardown).toBe(handler);
+    });
+
+    it("direct setRequestHandler throws when called twice", () => {
+      const bridge2 = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+      );
+      bridge2.setRequestHandler(
+        // @ts-expect-error — exercising throw path with raw schema
+        { shape: { method: { value: "test/method" } } },
+        () => ({}),
+      );
+      expect(() => {
+        bridge2.setRequestHandler(
+          // @ts-expect-error — exercising throw path with raw schema
+          { shape: { method: { value: "test/method" } } },
+          () => ({}),
+        );
+      }).toThrow(/already registered/);
+    });
+
+    it("direct setNotificationHandler throws for event-mapped methods", () => {
+      const app2 = new App(testAppInfo, {}, { autoResize: false });
+      app2.addEventListener("toolinput", () => {});
+      expect(() => {
+        app2.setNotificationHandler(
+          // @ts-expect-error — exercising throw path with raw schema
+          {
+            shape: { method: { value: "ui/notifications/tool-input" } },
+          },
+          () => {},
+        );
+      }).toThrow(/already registered/);
     });
   });
 });

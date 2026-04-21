@@ -24,7 +24,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
       - run: npm ci
 
@@ -71,11 +72,16 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - run: npm run build
+
+      - name: Validate TypeDoc links
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: npm exec typedoc -- --treatValidationWarningsAsErrors --emit none
 
       - run: npm run examples:build
 
@@ -97,7 +103,15 @@ jobs:
 
       - name: Build MCPB bundle (pdf-server)
         if: runner.os == 'Linux' && matrix.name == 'Linux x64'
-        run: npx -y @anthropic-ai/mcpb pack
+        run: node build-mcpb.mjs
+        working-directory: examples/pdf-server
+
+      - name: Smoke-test MCPB bundle starts
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: |
+          unzip -q pdf-server.mcpb -d .mcpb-smoke
+          node .mcpb-smoke/dist/index.js --stdio < /dev/null 2>&1 | tee /tmp/mcpb-smoke.log
+          grep -q "Ready" /tmp/mcpb-smoke.log
         working-directory: examples/pdf-server
 
   e2e:
@@ -111,7 +125,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
       - uses: astral-sh/setup-uv@v7
 
@@ -147,13 +162,13 @@ jobs:
         shell: wsl-bash {0}
         run: |
           sudo apt-get update
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
           sudo apt-get install -y nodejs
 
       - name: Build and test in WSL
         shell: wsl-bash {0}
         run: |
-          npm install
+          npm ci
           npm run build
           npm run examples:build
           npm test
@@ -182,15 +197,18 @@ jobs:
     steps:
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Create test project and install from git
         shell: bash
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: |
           mkdir test-project
           cd test-project
           npm init -y
           # Install from the PR branch (use head repo for fork PRs)
-          npm install "git+https://github.com/${{ github.event.pull_request.head.repo.full_name || github.repository }}#${{ github.head_ref || github.ref_name }}"
+          npm install "git+https://github.com/${HEAD_REPO}#${HEAD_REF}"
           # Verify the package is usable (ESM import)
           node --input-type=module -e "import { App } from '@modelcontextprotocol/ext-apps'; console.log('Import successful:', typeof App)"

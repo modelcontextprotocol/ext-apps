@@ -9,13 +9,12 @@ import {
   registerAppTool,
   registerAppResource,
   RESOURCE_MIME_TYPE,
-  RESOURCE_URI_META_KEY,
 } from "@modelcontextprotocol/ext-apps/server";
 // Works both from source (server.ts) and compiled (dist/server.js)
 const DIST_DIR = import.meta.filename.endsWith(".ts")
   ? path.join(import.meta.dirname, "dist")
   : import.meta.dirname;
-const RESOURCE_URI = "ui://transcript/mcp-app.html";
+const resourceUri = "ui://transcript/mcp-app.html";
 
 /**
  * Creates a new MCP server instance with tools and resources registered.
@@ -35,7 +34,7 @@ export function createServer(): McpServer {
       description:
         "Opens a live speech transcription interface using the Web Speech API.",
       inputSchema: {},
-      _meta: { [RESOURCE_URI_META_KEY]: RESOURCE_URI },
+      _meta: { ui: { resourceUri } },
     },
     async (): Promise<CallToolResult> => {
       return {
@@ -55,8 +54,8 @@ export function createServer(): McpServer {
   // Register the UI resource
   registerAppResource(
     server,
-    RESOURCE_URI,
-    RESOURCE_URI,
+    resourceUri,
+    resourceUri,
     { mimeType: RESOURCE_MIME_TYPE, description: "Transcript UI" },
     async (): Promise<ReadResourceResult> => {
       const html = await fs.readFile(
@@ -67,7 +66,7 @@ export function createServer(): McpServer {
       return {
         contents: [
           {
-            uri: RESOURCE_URI,
+            uri: resourceUri,
             mimeType: RESOURCE_MIME_TYPE,
             text: html,
             _meta: {

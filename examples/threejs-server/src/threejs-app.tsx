@@ -85,6 +85,7 @@ function LoadingShimmer({ height, code }: { height: number; code?: string }) {
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        touchAction: "none",
         background:
           "linear-gradient(135deg, var(--color-background-secondary, light-dark(#f0f0f5, #2a2a3c)) 0%, var(--color-background-tertiary, light-dark(#e5e5ed, #1e1e2e)) 100%)",
       }}
@@ -226,6 +227,8 @@ export default function ThreeJSApp({
   const canFullscreen =
     hostContext?.availableDisplayModes?.includes("fullscreen") ?? false;
   const isFullscreen = currentDisplayMode === "fullscreen";
+  const dims = hostContext?.containerDimensions;
+  const hostHeight = dims && "height" in dims ? dims.height : 0;
 
   // Sync display mode from host context
   useEffect(() => {
@@ -272,25 +275,51 @@ export default function ThreeJSApp({
     return () => observer.disconnect();
   }, []);
 
+  // Track container width for resize handling
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (w > 0) setContainerWidth(w);
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!code || !canvasRef.current || !containerRef.current) return;
+
+    // Prevent touch events from propagating to the parent scroll view.
+    // Three.js OrbitControls uses pointer events, which don't suppress native
+    // scroll gesture recognition on touch devices.
+    const canvas = canvasRef.current;
+    const preventDefault = (e: TouchEvent) => e.preventDefault();
+    canvas.addEventListener("touchstart", preventDefault, { passive: false });
+    canvas.addEventListener("touchmove", preventDefault, { passive: false });
 
     // Cleanup previous animation
     animControllerRef.current?.cleanup();
     animControllerRef.current = createAnimationController();
 
     setError(null);
-    const width = containerRef.current.offsetWidth || 800;
+    const w = containerWidth || containerRef.current.offsetWidth || 800;
+    const h = isFullscreen && hostHeight > 0 ? hostHeight : height;
     executeThreeCode(
       code,
       canvasRef.current,
-      width,
-      height,
+      w,
+      h,
       animControllerRef.current.visibilityAwareRAF,
     ).catch((e) => setError(e instanceof Error ? e.message : "Unknown error"));
 
-    return () => animControllerRef.current?.cleanup();
-  }, [code, height]);
+    return () => {
+      canvas.removeEventListener("touchstart", preventDefault);
+      canvas.removeEventListener("touchmove", preventDefault);
+      animControllerRef.current?.cleanup();
+    };
+  }, [code, height, containerWidth, isFullscreen, hostHeight]);
 
   if (isStreaming || !code) {
     return (
@@ -303,7 +332,7 @@ export default function ThreeJSApp({
   return (
     <div
       ref={containerRef}
-      className={`threejs-container${isFullscreen ? " fullscreen" : ""}`}
+      className={`threejs-container${isFullscreen ? " fullscreen" : ""}${hostContext?.deviceCapabilities?.touch ? " touch-device" : ""}`}
       style={containerStyle}
     >
       <canvas
@@ -311,9 +340,10 @@ export default function ThreeJSApp({
         ref={canvasRef}
         style={{
           width: "100%",
-          height,
-          borderRadius: "var(--border-radius-lg, 8px)",
+          height: isFullscreen && hostHeight > 0 ? hostHeight : height,
+          borderRadius: isFullscreen ? 0 : "var(--border-radius-lg, 8px)",
           display: "block",
+          touchAction: "none",
         }}
       />
       {error && <div className="error-overlay">Error: {error}</div>}
@@ -321,6 +351,10 @@ export default function ThreeJSApp({
         className={`fullscreen-btn${canFullscreen ? " available" : ""}`}
         title={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
         onClick={toggleFullscreen}
+        style={{
+          top: 10 + (safeAreaInsets?.top ?? 0),
+          right: 10 + (safeAreaInsets?.right ?? 0),
+        }}
       >
         <svg
           className="expand-icon"

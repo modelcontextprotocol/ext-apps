@@ -397,6 +397,17 @@ async function initCesium(): Promise<any> {
   // CesiumJS sets image-rendering: pixelated by default which looks bad on scaled displays
   // Setting to "auto" allows the browser to apply smooth interpolation
   cesiumViewer.canvas.style.imageRendering = "auto";
+  // Prevent touch events from propagating to the parent scroll view.
+  // CesiumJS uses pointer events internally, which don't suppress native
+  // scroll gesture recognition on touch devices. Explicit non-passive touch
+  // listeners with preventDefault() are needed.
+  for (const eventName of ["touchstart", "touchmove"] as const) {
+    cesiumViewer.canvas.addEventListener(
+      eventName,
+      (e: TouchEvent) => e.preventDefault(),
+      { passive: false },
+    );
+  }
   // Note: DO NOT set resolutionScale = devicePixelRatio here!
   // When useBrowserRecommendedResolution: false, Cesium already uses devicePixelRatio.
   // Setting resolutionScale = devicePixelRatio would double the scaling (e.g., 2x2=4x on Retina)
@@ -623,6 +634,16 @@ function updateFullscreenButton(): void {
   // Show button only if fullscreen is available
   btn.style.display = canFullscreen ? "flex" : "none";
 
+  // Position button respecting safe area insets
+  const insets = context?.safeAreaInsets;
+  btn.style.top = `${10 + (insets?.top ?? 0)}px`;
+  btn.style.right = `${10 + (insets?.right ?? 0)}px`;
+
+  // Always show button on touch devices (hover doesn't work on mobile)
+  if (context?.deviceCapabilities?.touch) {
+    btn.style.opacity = canFullscreen ? "0.7" : "0";
+  }
+
   // Toggle icons based on current mode
   const isFullscreen = currentDisplayMode === "fullscreen";
   expandIcon.style.display = isFullscreen ? "none" : "block";
@@ -718,8 +739,8 @@ app.onhostcontextchanged = (params) => {
     );
   }
 
-  // Update button if available modes changed
-  if (params.availableDisplayModes) {
+  // Update button if available modes or safe area changed
+  if (params.availableDisplayModes || params.safeAreaInsets) {
     updateFullscreenButton();
   }
 };

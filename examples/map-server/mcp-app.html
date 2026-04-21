@@ -1,72 +1,90 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CesiumJS Globe</title>
     <!-- CesiumJS is loaded dynamically from CDN in mcp-app.ts because static
          <script src=""> tags don't work in srcdoc iframes -->
     <style>
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: transparent;
-        }
-        #cesiumContainer {
-            width: 100%;
-            height: 100%;
-        }
-        #fullscreen-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 36px;
-            height: 36px;
-            background: rgba(0, 0, 0, 0.7);
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            z-index: 1000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-        #fullscreen-btn:hover {
-            background: rgba(0, 0, 0, 0.85);
-        }
-        #fullscreen-btn svg {
-            width: 20px;
-            height: 20px;
-            fill: white;
-        }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 20px 30px;
-            border-radius: 8px;
-            font-size: 16px;
-            z-index: 1001;
-        }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: transparent;
+      }
+      #cesiumContainer {
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+      #fullscreen-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 36px;
+        height: 36px;
+        background: rgba(0, 0, 0, 0.7);
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        z-index: 1000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        transition:
+          background 0.2s,
+          opacity 0.2s;
+        opacity: 0;
+      }
+      #fullscreen-btn:hover {
+        background: rgba(0, 0, 0, 0.85);
+        opacity: 1;
+      }
+      #cesiumContainer:hover ~ #fullscreen-btn {
+        opacity: 0.7;
+      }
+      #fullscreen-btn svg {
+        width: 20px;
+        height: 20px;
+        fill: white;
+      }
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px 30px;
+        border-radius: 8px;
+        font-size: 16px;
+        z-index: 1001;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div id="cesiumContainer"></div>
     <button id="fullscreen-btn" title="Toggle fullscreen">
-        <!-- Expand icon (shown when inline) -->
-        <svg id="expand-icon" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-        <!-- Compress icon (shown when fullscreen) -->
-        <svg id="compress-icon" style="display:none" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
+      <!-- Expand icon (shown when inline) -->
+      <svg id="expand-icon" viewBox="0 0 24 24">
+        <path
+          d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"
+        />
+      </svg>
+      <!-- Compress icon (shown when fullscreen) -->
+      <svg id="compress-icon" style="display: none" viewBox="0 0 24 24">
+        <path
+          d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"
+        />
+      </svg>
     </button>
     <div id="loading">Loading globe...</div>
     <script type="module" src="/src/mcp-app.ts"></script>
-</body>
+  </body>
 </html>

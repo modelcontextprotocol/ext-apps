@@ -21,6 +21,15 @@
     <div id="player" class="player" style="display: none;">
       <video id="video" controls></video>
       <p id="video-info" class="video-info"></p>
+      <button id="change-video-btn" class="change-btn">Change Video</button>
+    </div>
+
+    <div id="video-picker-container" class="picker-container" style="display: none;">
+      <h3>Available Videos</h3>
+      <select id="video-picker" class="video-picker">
+        <option value="">Select a video...</option>
+      </select>
+      <button id="load-video-btn" class="load-btn" disabled>Load Video</button>
     </div>
   </main>
   <script type="module" src="/src/mcp-app.ts"></script>

@@ -1,7 +1,10 @@
 <!-- LOGO -->
 <div align="center">
-  <img src="media/mcp.svg#gh-light-mode-only" alt="MCP Apps" width="128">
-  <img src="media/mcp-white.svg#gh-dark-mode-only" alt="MCP Apps" width="128">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="media/mcp-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="media/mcp.svg">
+    <img src="media/mcp.svg" alt="MCP Apps" width="128">
+  </picture>
   <h1>MCP Apps</h1>
   <p>
     Build interactive UIs for MCP tools — charts, forms, dashboards — that render inline in Claude, ChatGPT and any other compliant chat client.

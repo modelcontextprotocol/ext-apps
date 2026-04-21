@@ -20,8 +20,10 @@ import {
   pathToFileUrl,
   fileUrlToPath,
   allowedLocalFiles,
+  cliLocalFiles,
   DEFAULT_PDF,
   allowedLocalDirs,
+  writeFlags,
 } from "./server.js";
 
 /**
@@ -93,17 +95,33 @@ function parseArgs(): {
   urls: string[];
   stdio: boolean;
   useClientRoots: boolean;
+  enableInteract: boolean;
+  debug: boolean;
 } {
   const args = process.argv.slice(2);
   const urls: string[] = [];
   let stdio = false;
   let useClientRoots = false;
+  let enableInteract = false;
+  let debug = false;
 
   for (const arg of args) {
     if (arg === "--stdio") {
       stdio = true;
     } else if (arg === "--use-client-roots") {
       useClientRoots = true;
+    } else if (arg === "--enable-interact") {
+      // Force-enable interact for HTTP mode. Only use when running a
+      // single long-lived server process (e.g. the e2e test harness) —
+      // the command queue is in-memory per-process, so stateless
+      // multi-instance deployments will drop commands.
+      enableInteract = true;
+    } else if (arg === "--debug") {
+      debug = true;
+    } else if (arg === "--writeable-uploads-root") {
+      // Claude Desktop mounts attachments under a dir root named "uploads";
+      // by default we refuse to write there. This flag opts back in.
+      writeFlags.allowUploadsRoot = true;
     } else if (!arg.startsWith("-")) {
       // Convert local paths to file:// URLs, normalize arxiv URLs
       let url = arg;
@@ -124,11 +142,13 @@ function parseArgs(): {
     urls: urls.length > 0 ? urls : [DEFAULT_PDF],
     stdio,
     useClientRoots,
+    enableInteract,
+    debug,
   };
 }
 
 async function main() {
-  const { urls, stdio, useClientRoots } = parseArgs();
+  const { urls, stdio, useClientRoots, enableInteract, debug } = parseArgs();
 
   // Register local files in whitelist
   for (const url of urls) {
@@ -138,6 +158,7 @@ async function main() {
         const s = fs.statSync(filePath);
         if (s.isFile()) {
           allowedLocalFiles.add(filePath);
+          cliLocalFiles.add(filePath);
           console.error(`[pdf-server] Registered local file: ${filePath}`);
         } else if (s.isDirectory()) {
           allowedLocalDirs.add(filePath);
@@ -153,10 +174,20 @@ async function main() {
 
   if (stdio) {
     // stdio → client is local (e.g. Claude Desktop), roots are safe
-    await startStdioServer(() => createServer({ useClientRoots: true }));
+    await startStdioServer(() =>
+      createServer({ enableInteract: true, useClientRoots: true, debug }),
+    );
   } else {
     // HTTP → client is remote, only honour roots with explicit opt-in
-    await startStreamableHTTPServer(() => createServer({ useClientRoots }));
+    if (!useClientRoots) {
+      console.error(
+        "[pdf-server] Client roots are ignored (default for remote transports). " +
+          "Pass --use-client-roots to allow the client to expose local directories.",
+      );
+    }
+    await startStreamableHTTPServer(() =>
+      createServer({ useClientRoots, enableInteract, debug }),
+    );
   }
 }
 
