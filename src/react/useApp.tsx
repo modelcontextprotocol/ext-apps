@@ -12,14 +12,17 @@ export * from "../app";
 /**
  * Options for configuring the {@link useApp `useApp`} hook.
  *
- * The `strict` option is forwarded to the underlying {@link App `App`}
- * instance. For other {@link AppOptions `AppOptions`}, create the `App`
- * manually instead of using this hook.
+ * The `autoResize` and `strict` options are forwarded to the underlying
+ * {@link App `App`} instance. For other {@link AppOptions `AppOptions`},
+ * create the `App` manually instead of using this hook.
  *
  * @see {@link useApp `useApp`} for the hook that uses these options
  * @see {@link useAutoResize `useAutoResize`} for manual auto-resize control with custom `App` options
  */
-export interface UseAppOptions extends Pick<AppOptions, "strict"> {
+export interface UseAppOptions extends Pick<
+  AppOptions,
+  "autoResize" | "strict"
+> {
   /** App identification (name and version) */
   appInfo: Implementation;
   /**
@@ -126,6 +129,7 @@ export function useApp({
   appInfo,
   capabilities,
   onAppCreated,
+  autoResize = true,
   strict,
 }: UseAppOptions): AppState {
   const [app, setApp] = useState<App | null>(null);
@@ -141,10 +145,7 @@ export function useApp({
           window.parent,
           window.parent,
         );
-        const app = new App(appInfo, capabilities, {
-          autoResize: true,
-          strict,
-        });
+        const app = new App(appInfo, capabilities, { autoResize, strict });
 
         // Register handlers BEFORE connecting
         onAppCreated?.(app);
