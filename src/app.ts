@@ -1,5 +1,6 @@
 import {
   type RequestOptions,
+  mergeCapabilities,
   ProtocolOptions,
 } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
@@ -8,6 +9,11 @@ import {
   CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
+  CreateMessageRequest,
+  CreateMessageResult,
+  CreateMessageResultSchema,
+  CreateMessageResultWithTools,
+  CreateMessageResultWithToolsSchema,
   EmptyResultSchema,
   Implementation,
   ListResourcesRequest,
@@ -21,6 +27,9 @@ import {
   ReadResourceRequest,
   ReadResourceResult,
   ReadResourceResultSchema,
+  Tool,
+  ToolAnnotations,
+  ToolListChangedNotification,
 } from "@modelcontextprotocol/sdk/types.js";
 import { AppNotification, AppRequest, AppResult } from "./types";
 import { ProtocolWithEvents } from "./events";
@@ -60,6 +69,17 @@ import {
   McpUiRequestDisplayModeResultSchema,
 } from "./types";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import {
+  StandardSchemaV1,
+  standardSchemaToJsonSchema,
+  validateStandardSchema,
+} from "./standard-schema";
+import { z } from "zod/v4";
+
+export type {
+  StandardSchemaV1,
+  StandardSchemaWithJSON,
+} from "./standard-schema";
 
 export { PostMessageTransport } from "./message-transport";
 export * from "./types";
@@ -144,7 +164,7 @@ export const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
  *
  * @see `ProtocolOptions` from @modelcontextprotocol/sdk for inherited options
  */
-type AppOptions = ProtocolOptions & {
+export type AppOptions = ProtocolOptions & {
   /**
    * Automatically report size changes to the host using `ResizeObserver`.
    *
@@ -155,11 +175,98 @@ type AppOptions = ProtocolOptions & {
    * @default true
    */
   autoResize?: boolean;
+  /**
+   * Throw on detected misuse instead of logging a console warning.
+   *
+   * Currently this affects calling host-bound methods (e.g.
+   * {@link App.callServerTool `callServerTool`}, {@link App.sendMessage `sendMessage`})
+   * before {@link App.connect `connect`} has completed the `ui/initialize`
+   * handshake. With `strict: false` (default) a `console.warn` is emitted;
+   * with `strict: true` an `Error` is thrown.
+   *
+   * @remarks Throwing will become the default in a future release.
+   * @default false
+   */
+  strict?: boolean;
+  /**
+   * Allow code paths that require CSP `unsafe-eval` (e.g. `new Function()`).
+   *
+   * Views typically run under a strict CSP without `unsafe-eval`. Zod's JIT
+   * object parser uses `new Function()` and throws on the first message parse
+   * under such a policy. By default (`allowUnsafeEval: false`) the
+   * {@link App `App`} constructor sets `z.config({ jitless: true })` so the
+   * SDK works out of the box under the spec's default CSP. Set
+   * `allowUnsafeEval: true` to skip that and keep the faster JIT path when
+   * the host's CSP permits `unsafe-eval`.
+   *
+   * @default false
+   */
+  allowUnsafeEval?: boolean;
 };
 
 type RequestHandlerExtra = Parameters<
   Parameters<App["setRequestHandler"]>[1]
 >[1];
+
+/**
+ * Result of an app-registered tool callback. When `Out` is provided,
+ * `structuredContent` is required and typed (unless `isError: true`).
+ */
+export type AppToolResult<
+  Out extends StandardSchemaV1 | undefined = undefined,
+> = Out extends StandardSchemaV1
+  ?
+      | (CallToolResult & {
+          structuredContent: StandardSchemaV1.InferOutput<Out>;
+          isError?: false;
+        })
+      | (CallToolResult & { isError: true })
+  : CallToolResult;
+
+/**
+ * Callback for an app-registered tool. When `In` is provided, `args` is the
+ * validated/parsed input; when `In` is `undefined`, the callback receives only
+ * `extra`. When `Out` is provided, the return's `structuredContent` is typed.
+ *
+ * Mirrors `ToolCallback` from `@modelcontextprotocol/sdk/server/mcp.js` but is
+ * parameterized over {@link StandardSchemaV1} instead of zod, so any
+ * Standard-Schema-compatible library (Zod, ArkType, Valibot, …) can be used.
+ */
+export type AppToolCallback<
+  In extends StandardSchemaV1 | undefined = undefined,
+  Out extends StandardSchemaV1 | undefined = undefined,
+> = In extends StandardSchemaV1
+  ? (
+      args: StandardSchemaV1.InferOutput<In>,
+      extra: RequestHandlerExtra,
+    ) => AppToolResult<Out> | Promise<AppToolResult<Out>>
+  : (
+      extra: RequestHandlerExtra,
+    ) => AppToolResult<Out> | Promise<AppToolResult<Out>>;
+
+/**
+ * Handle returned by {@link App.registerTool}. Mirrors `RegisteredTool` from
+ * `@modelcontextprotocol/sdk/server/mcp.js` but stores
+ * {@link StandardSchemaV1} schemas.
+ */
+export type RegisteredAppTool = {
+  title?: string;
+  description?: string;
+  inputSchema?: StandardSchemaV1;
+  outputSchema?: StandardSchemaV1;
+  annotations?: ToolAnnotations;
+  _meta?: Record<string, unknown>;
+  enabled: boolean;
+  enable(): void;
+  disable(): void;
+  remove(): void;
+  update(updates: Partial<Omit<RegisteredAppTool, "update">>): void;
+  /** @internal */
+  handler: (
+    args: unknown,
+    extra: RequestHandlerExtra,
+  ) => Promise<CallToolResult>;
+};
 
 /**
  * Maps DOM-style event names to their notification `params` types.
@@ -244,6 +351,32 @@ export class App extends ProtocolWithEvents<
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
+  private _registeredTools: { [name: string]: RegisteredAppTool } = {};
+  private _initializedSent = false;
+
+  /**
+   * Warn if a host-bound method is called before {@link connect `connect`} has
+   * completed the `ui/initialize` → `ui/notifications/initialized` handshake.
+   *
+   * Calling these methods early can race the handshake on strict hosts and
+   * leave the iframe permanently hidden. See
+   * {@link https://github.com/anthropics/claude-ai-mcp/issues/61 claude-ai-mcp#61} /
+   * {@link https://github.com/anthropics/claude-ai-mcp/issues/149 #149}.
+   *
+   * @remarks This will become a thrown `Error` in a future minor release.
+   */
+  private _assertInitialized(method: string): void {
+    if (this._initializedSent) return;
+    const msg =
+      `[ext-apps] App.${method}() called before connect() completed the ` +
+      `ui/initialize handshake. Await app.connect() before calling this ` +
+      `method, or move data loading to an ontoolresult handler.`;
+    if (this.options?.strict) {
+      throw new Error(msg);
+    }
+    // TODO(next-minor): make `strict: true` the default.
+    console.warn(`${msg}. This will throw in a future release.`);
+  }
 
   protected readonly eventSchemas = {
     toolinput: McpUiToolInputNotificationSchema,
@@ -252,6 +385,63 @@ export class App extends ProtocolWithEvents<
     toolcancelled: McpUiToolCancelledNotificationSchema,
     hostcontextchanged: McpUiHostContextChangedNotificationSchema,
   };
+
+  /**
+   * Events the host typically sends once, shortly after the handshake.
+   * Registering a handler for one of these *after* {@link connect `connect`}
+   * resolves risks missing the notification entirely.
+   */
+  private static readonly ONE_SHOT_EVENTS: ReadonlySet<keyof AppEventMap> =
+    new Set(["toolinput", "toolinputpartial", "toolresult", "toolcancelled"]);
+
+  /**
+   * One-shot events that have had at least one handler registered (via `on*`
+   * setter or `addEventListener`) at any point. Once an event is in this set,
+   * subsequent late registrations are not flagged — only the *first* handler
+   * matters for the missed-notification race, and re-registration (e.g. React
+   * `useEffect` cleanup → re-add on dep change) is a legitimate pattern.
+   */
+  private readonly _everHadListener = new Set<keyof AppEventMap>();
+
+  /**
+   * Warn (or throw under `strict`) when the *first* handler for a one-shot
+   * event is registered after the `ui/initialize` → `ui/notifications/initialized`
+   * handshake has completed. The host may have already fired the notification
+   * by then. Subsequent registrations for the same event are not flagged.
+   *
+   * Mirrors {@link _assertInitialized `_assertInitialized`} (the outbound-side guard).
+   */
+  private _assertHandlerTiming(event: keyof AppEventMap): void {
+    if (!App.ONE_SHOT_EVENTS.has(event) || this._everHadListener.has(event)) {
+      return;
+    }
+    this._everHadListener.add(event);
+    if (!this._initializedSent) return;
+    const msg =
+      `[ext-apps] "${String(event)}" handler registered after connect() ` +
+      `completed the ui/initialize handshake. The host may have already sent ` +
+      `this notification. Register handlers before calling app.connect().`;
+    if (this.options?.strict) {
+      throw new Error(msg);
+    }
+    console.warn(msg);
+  }
+
+  protected override setEventHandler<K extends keyof AppEventMap>(
+    event: K,
+    handler: ((params: AppEventMap[K]) => void) | undefined,
+  ): void {
+    if (handler) this._assertHandlerTiming(event);
+    super.setEventHandler(event, handler);
+  }
+
+  override addEventListener<K extends keyof AppEventMap>(
+    event: K,
+    handler: (params: AppEventMap[K]) => void,
+  ): void {
+    this._assertHandlerTiming(event);
+    super.addEventListener(event, handler);
+  }
 
   protected override onEventDispatch<K extends keyof AppEventMap>(
     event: K,
@@ -285,6 +475,10 @@ export class App extends ProtocolWithEvents<
   ) {
     super(options);
 
+    if (!options.allowUnsafeEval) {
+      z.config({ jitless: true });
+    }
+
     this.setRequestHandler(PingRequestSchema, (request) => {
       console.log("Received ping:", request.params);
       return {};
@@ -294,6 +488,177 @@ export class App extends ProtocolWithEvents<
     // onEventDispatch (which merges into _hostContext) fires even if the
     // user never assigns onhostcontextchanged or calls addEventListener.
     this.setEventHandler("hostcontextchanged", undefined);
+  }
+
+  private registerCapabilities(capabilities: McpUiAppCapabilities): void {
+    if (this.transport) {
+      throw new Error(
+        "Cannot register capabilities after transport is established",
+      );
+    }
+    this._capabilities = mergeCapabilities(this._capabilities, capabilities);
+  }
+
+  registerTool<
+    OutputArgs extends undefined | StandardSchemaV1 = undefined,
+    InputArgs extends undefined | StandardSchemaV1 = undefined,
+  >(
+    name: string,
+    config: {
+      title?: string;
+      description?: string;
+      inputSchema?: InputArgs;
+      outputSchema?: OutputArgs;
+      annotations?: ToolAnnotations;
+      _meta?: Record<string, unknown>;
+    },
+    cb: AppToolCallback<InputArgs, OutputArgs>,
+  ): RegisteredAppTool {
+    if (this._registeredTools[name]) {
+      throw new Error(`Tool ${name} is already registered`);
+    }
+    const app = this;
+    const notify = () => {
+      if (app._initializedSent && app._capabilities.tools?.listChanged) {
+        void app.sendToolListChanged();
+      }
+    };
+    // Arity is fixed at registration time even if inputSchema is later
+    // update()d, since cb's signature can't change.
+    const cbTakesArgs = config.inputSchema !== undefined;
+    const registeredTool: RegisteredAppTool = {
+      title: config.title,
+      description: config.description,
+      inputSchema: config.inputSchema,
+      outputSchema: config.outputSchema,
+      annotations: config.annotations,
+      _meta: config._meta,
+      enabled: true,
+      enable(): void {
+        this.enabled = true;
+        notify();
+      },
+      disable(): void {
+        this.enabled = false;
+        notify();
+      },
+      update(updates) {
+        Object.assign(this, updates);
+        notify();
+      },
+      remove() {
+        if (app._registeredTools[name] !== registeredTool) return;
+        delete app._registeredTools[name];
+        notify();
+      },
+      handler: async (rawArgs, extra) => {
+        if (!registeredTool.enabled) {
+          throw new Error(`Tool ${name} is disabled`);
+        }
+        let result: CallToolResult;
+        if (cbTakesArgs) {
+          const schema = registeredTool.inputSchema;
+          const parsedArgs = schema
+            ? await validateStandardSchema(
+                schema,
+                rawArgs ?? {},
+                `Invalid input for tool ${name}: `,
+              )
+            : (rawArgs ?? {});
+          result = await (
+            cb as AppToolCallback<StandardSchemaV1, StandardSchemaV1>
+          )(parsedArgs, extra);
+        } else {
+          result = await (cb as AppToolCallback<undefined, StandardSchemaV1>)(
+            extra,
+          );
+        }
+        if (registeredTool.outputSchema && !result.isError) {
+          result.structuredContent = (await validateStandardSchema(
+            registeredTool.outputSchema,
+            result.structuredContent,
+            `Invalid output for tool ${name}: `,
+          )) as CallToolResult["structuredContent"];
+        }
+        return result;
+      },
+    };
+
+    this._registeredTools[name] = registeredTool;
+
+    // Auto-register tools capability so setRequestHandler's capability check
+    // passes. Mirrors McpServer.registerTool behavior — callers shouldn't need
+    // to declare { tools: {} } in the constructor just to use registerTool.
+    // Only do this pre-connect; post-connect the capability was already
+    // advertised (or wasn't) and can't change.
+    if (!this._capabilities.tools && !this.transport) {
+      this.registerCapabilities({ tools: { listChanged: true } });
+    }
+
+    this.ensureToolHandlersInitialized();
+    notify();
+    return registeredTool;
+  }
+
+  private _toolHandlersInitialized = false;
+  private ensureToolHandlersInitialized(): void {
+    if (this._toolHandlersInitialized) {
+      return;
+    }
+    this._toolHandlersInitialized = true;
+
+    this.oncalltool = async (params, extra) => {
+      const tool = this._registeredTools[params.name];
+      if (!tool) {
+        throw new Error(`Tool ${params.name} not found`);
+      }
+      return tool.handler(params.arguments, extra);
+    };
+    this.onlisttools = async (_params, _extra) => {
+      const tools: Tool[] = await Promise.all(
+        Object.entries(this._registeredTools)
+          .filter(([_, tool]) => tool.enabled)
+          .map(async ([name, tool]) => {
+            const result: Tool = {
+              name,
+              title: tool.title,
+              description: tool.description,
+              inputSchema: (tool.inputSchema
+                ? await standardSchemaToJsonSchema(tool.inputSchema, "input")
+                : {
+                    type: "object" as const,
+                    properties: {},
+                  }) as Tool["inputSchema"],
+            };
+            // outputSchema is optional in core MCP — only emit when the app
+            // provided one, otherwise hosts would assume structuredContent.
+            if (tool.outputSchema) {
+              result.outputSchema = (await standardSchemaToJsonSchema(
+                tool.outputSchema,
+                "output",
+              )) as Tool["outputSchema"];
+            }
+            if (tool.annotations) {
+              result.annotations = tool.annotations;
+            }
+            if (tool._meta) {
+              result._meta = tool._meta;
+            }
+            return result;
+          }),
+      );
+      return { tools };
+    };
+  }
+
+  async sendToolListChanged(
+    params: ToolListChangedNotification["params"] = {},
+  ): Promise<void> {
+    this._assertInitialized("sendToolListChanged");
+    await this.notification(<ToolListChangedNotification>{
+      method: "notifications/tools/list_changed",
+      params,
+    });
   }
 
   /**
@@ -721,9 +1086,21 @@ export class App extends ProtocolWithEvents<
    * app.onlisttools = async (params, extra) => {
    *   return {
    *     tools: [
-   *       { name: "greet", inputSchema: { type: "object" as const } },
-   *       { name: "calculate", inputSchema: { type: "object" as const } },
-   *       { name: "format", inputSchema: { type: "object" as const } },
+   *       {
+   *         name: "greet",
+   *         description: "Greet the user",
+   *         inputSchema: { type: "object" as const },
+   *       },
+   *       {
+   *         name: "calculate",
+   *         description: "Perform a calculation",
+   *         inputSchema: { type: "object" as const },
+   *       },
+   *       {
+   *         name: "format",
+   *         description: "Format text",
+   *         inputSchema: { type: "object" as const },
+   *       },
    *     ],
    *   };
    * };
@@ -763,7 +1140,15 @@ export class App extends ProtocolWithEvents<
    * @internal
    */
   assertCapabilityForMethod(method: AppRequest["method"]): void {
-    // TODO
+    switch (method) {
+      case "sampling/createMessage":
+        if (!this._hostCapabilities?.sampling) {
+          throw new Error(
+            `Host does not support sampling (required for ${method})`,
+          );
+        }
+        break;
+    }
   }
 
   /**
@@ -792,7 +1177,7 @@ export class App extends ProtocolWithEvents<
    * Verify that the app supports the capability required for the given notification method.
    * @internal
    */
-  assertNotificationCapability(method: AppNotification["method"]): void {
+  assertNotificationCapability(_method: AppNotification["method"]): void {
     // TODO
   }
 
@@ -851,6 +1236,7 @@ export class App extends ProtocolWithEvents<
     params: CallToolRequest["params"],
     options?: RequestOptions,
   ): Promise<CallToolResult> {
+    this._assertInitialized("callServerTool");
     if (typeof params === "string") {
       throw new Error(
         `callServerTool() expects an object as its first argument, but received a string ("${params}"). ` +
@@ -915,6 +1301,7 @@ export class App extends ProtocolWithEvents<
     params: ReadResourceRequest["params"],
     options?: RequestOptions,
   ): Promise<ReadResourceResult> {
+    this._assertInitialized("readServerResource");
     return await this.request(
       { method: "resources/read", params },
       ReadResourceResultSchema,
@@ -962,9 +1349,94 @@ export class App extends ProtocolWithEvents<
     params?: ListResourcesRequest["params"],
     options?: RequestOptions,
   ): Promise<ListResourcesResult> {
+    this._assertInitialized("listServerResources");
     return await this.request(
       { method: "resources/list", params },
       ListResourcesResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * Request an LLM completion from the host (standard MCP `sampling/createMessage`).
+   *
+   * Enables the app to use the host's model connection for completions. The host
+   * has full discretion over which model to select and MAY modify or reject the
+   * request (human-in-the-loop). Check {@link getHostCapabilities `getHostCapabilities`}`()?.sampling`
+   * before calling — hosts without this capability will reject the request.
+   *
+   * This method reuses the stock MCP `CreateMessageRequest` shape. When `params.tools`
+   * is provided, the result is parsed with the extended schema that permits
+   * `stopReason: "toolUse"` and array content containing `tool_use` blocks.
+   *
+   * @param params - Standard MCP `CreateMessageRequest` params (messages, maxTokens,
+   *   systemPrompt, temperature, modelPreferences, tools, toolChoice, etc.)
+   * @param options - Request options (timeout, abort signal)
+   * @returns `CreateMessageResult` (single content block) or `CreateMessageResultWithTools`
+   *   (array content, may include `tool_use` blocks) depending on whether `tools` was set
+   *
+   * @throws {Error} If the host rejects the request or does not support sampling
+   * @throws {Error} If the request times out or the connection is lost
+   *
+   * @example Simple completion
+   * ```ts source="./app.examples.ts#App_createSamplingMessage_simple"
+   * const result = await app.createSamplingMessage({
+   *   messages: [
+   *     {
+   *       role: "user",
+   *       content: { type: "text", text: "Summarize this in one line." },
+   *     },
+   *   ],
+   *   maxTokens: 100,
+   * });
+   * console.log(result.content);
+   * ```
+   *
+   * @example Agentic loop with tools
+   * ```ts source="./app.examples.ts#App_createSamplingMessage_withTools"
+   * if (!app.getHostCapabilities()?.sampling?.tools) return;
+   *
+   * const result = await app.createSamplingMessage({
+   *   messages,
+   *   maxTokens: 1024,
+   *   tools: [
+   *     {
+   *       name: "get_weather",
+   *       description: "Get the current weather",
+   *       inputSchema: {
+   *         type: "object",
+   *         properties: { city: { type: "string" } },
+   *       },
+   *     },
+   *   ],
+   * });
+   * if (result.stopReason === "toolUse") {
+   *   // result.content may be an array containing tool_use blocks
+   * }
+   * ```
+   *
+   * @see `CreateMessageRequest` from @modelcontextprotocol/sdk for the request type
+   * @see `CreateMessageResult` / `CreateMessageResultWithTools` from @modelcontextprotocol/sdk for result types
+   */
+  async createSamplingMessage(
+    params: CreateMessageRequest["params"] & { tools?: undefined },
+    options?: RequestOptions,
+  ): Promise<CreateMessageResult>;
+  async createSamplingMessage(
+    params: CreateMessageRequest["params"],
+    options?: RequestOptions,
+  ): Promise<CreateMessageResultWithTools>;
+  async createSamplingMessage(
+    params: CreateMessageRequest["params"],
+    options?: RequestOptions,
+  ): Promise<CreateMessageResult | CreateMessageResultWithTools> {
+    this._assertInitialized("createSamplingMessage");
+    const resultSchema = params.tools
+      ? CreateMessageResultWithToolsSchema
+      : CreateMessageResultSchema;
+    return await this.request(
+      { method: "sampling/createMessage", params },
+      resultSchema,
       options,
     );
   }
@@ -1020,6 +1492,7 @@ export class App extends ProtocolWithEvents<
    * @see {@link McpUiMessageRequest `McpUiMessageRequest`} for request structure
    */
   sendMessage(params: McpUiMessageRequest["params"], options?: RequestOptions) {
+    this._assertInitialized("sendMessage");
     return this.request(
       <McpUiMessageRequest>{
         method: "ui/message",
@@ -1113,6 +1586,7 @@ export class App extends ProtocolWithEvents<
     params: McpUiUpdateModelContextRequest["params"],
     options?: RequestOptions,
   ) {
+    this._assertInitialized("updateModelContext");
     return this.request(
       <McpUiUpdateModelContextRequest>{
         method: "ui/update-model-context",
@@ -1149,6 +1623,7 @@ export class App extends ProtocolWithEvents<
    * @see {@link McpUiOpenLinkResult `McpUiOpenLinkResult`} for result structure
    */
   openLink(params: McpUiOpenLinkRequest["params"], options?: RequestOptions) {
+    this._assertInitialized("openLink");
     return this.request(
       <McpUiOpenLinkRequest>{
         method: "ui/open-link",
@@ -1229,6 +1704,7 @@ export class App extends ProtocolWithEvents<
     params: McpUiDownloadFileRequest["params"],
     options?: RequestOptions,
   ) {
+    this._assertInitialized("downloadFile");
     return this.request(
       <McpUiDownloadFileRequest>{
         method: "ui/download-file",
@@ -1313,6 +1789,7 @@ export class App extends ProtocolWithEvents<
     params: McpUiRequestDisplayModeRequest["params"],
     options?: RequestOptions,
   ) {
+    this._assertInitialized("requestDisplayMode");
     return this.request(
       <McpUiRequestDisplayModeRequest>{
         method: "ui/request-display-mode",
@@ -1475,6 +1952,7 @@ export class App extends ProtocolWithEvents<
         "App is already connected. Call close() before connecting again.",
       );
     }
+    this._initializedSent = false;
     await super.connect(transport);
 
     try {
@@ -1502,6 +1980,7 @@ export class App extends ProtocolWithEvents<
       await this.notification(<McpUiInitializedNotification>{
         method: "ui/notifications/initialized",
       });
+      this._initializedSent = true;
 
       if (this.options?.autoResize) {
         this.setupSizeChangedNotifications();

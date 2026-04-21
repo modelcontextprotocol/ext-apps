@@ -304,9 +304,21 @@ function App_onlisttools_returnTools(app: App) {
   app.onlisttools = async (params, extra) => {
     return {
       tools: [
-        { name: "greet", inputSchema: { type: "object" as const } },
-        { name: "calculate", inputSchema: { type: "object" as const } },
-        { name: "format", inputSchema: { type: "object" as const } },
+        {
+          name: "greet",
+          description: "Greet the user",
+          inputSchema: { type: "object" as const },
+        },
+        {
+          name: "calculate",
+          description: "Perform a calculation",
+          inputSchema: { type: "object" as const },
+        },
+        {
+          name: "format",
+          description: "Format text",
+          inputSchema: { type: "object" as const },
+        },
       ],
     };
   };
@@ -332,6 +344,54 @@ async function App_callServerTool_fetchWeather(app: App) {
     console.error("Tool call failed:", error);
   }
   //#endregion App_callServerTool_fetchWeather
+}
+
+/**
+ * Example: Simple LLM completion via host sampling.
+ */
+async function App_createSamplingMessage_simple(app: App) {
+  //#region App_createSamplingMessage_simple
+  const result = await app.createSamplingMessage({
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: "Summarize this in one line." },
+      },
+    ],
+    maxTokens: 100,
+  });
+  console.log(result.content);
+  //#endregion App_createSamplingMessage_simple
+}
+
+/**
+ * Example: Agentic loop with tools (requires host sampling.tools capability).
+ */
+async function App_createSamplingMessage_withTools(
+  app: App,
+  messages: import("@modelcontextprotocol/sdk/types.js").SamplingMessage[],
+) {
+  //#region App_createSamplingMessage_withTools
+  if (!app.getHostCapabilities()?.sampling?.tools) return;
+
+  const result = await app.createSamplingMessage({
+    messages,
+    maxTokens: 1024,
+    tools: [
+      {
+        name: "get_weather",
+        description: "Get the current weather",
+        inputSchema: {
+          type: "object",
+          properties: { city: { type: "string" } },
+        },
+      },
+    ],
+  });
+  if (result.stopReason === "toolUse") {
+    // result.content may be an array containing tool_use blocks
+  }
+  //#endregion App_createSamplingMessage_withTools
 }
 
 /**

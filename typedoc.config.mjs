@@ -28,7 +28,7 @@ const config = {
   ],
   excludePrivate: true,
   excludeInternal: false,
-  intentionallyNotExported: ["AppOptions", "MethodSchema"],
+  intentionallyNotExported: ["MethodSchema", "RequestHandlerExtra"],
   blockTags: [...OptionDefaults.blockTags, "@description"],
   jsDocCompatibility: {
     exampleTag: false,

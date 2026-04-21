@@ -3,6 +3,7 @@
  */
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 import {
   forceCenter,
   forceCollide,
@@ -396,6 +397,346 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
 }
 
 app.onhostcontextchanged = handleHostContextChanged;
+
+// =============================================================================
+// Widget Interaction Tools
+// =============================================================================
+
+// Tool: Search for a Wikipedia article and navigate to it
+app.registerTool(
+  "search-article",
+  {
+    title: "Search Article",
+    description:
+      "Search for a Wikipedia article and add it to the graph as the new starting point",
+    inputSchema: z.object({
+      query: z.string().describe("Search query for Wikipedia article"),
+    }),
+  },
+  async (args) => {
+    const { query } = args as { query: string };
+
+    // Construct Wikipedia search URL that redirects to the article
+    const searchUrl = `https://en.wikipedia.org/wiki/Special:Search?go=Go&search=${encodeURIComponent(query)}`;
+
+    // Use the server tool to fetch the article
+    const result = await app.callServerTool({
+      name: "get-first-degree-links",
+      arguments: { url: searchUrl },
+    });
+
+    const response = result.structuredContent as unknown as ToolResponse;
+    if (response && response.page) {
+      // Clear existing graph and start fresh with this article
+      graphData.nodes = [];
+      graphData.links = [];
+      initialUrl = response.page.url;
+      addNode(response.page.url, response.page.title, "default", {
+        x: 0,
+        y: 0,
+      });
+      graph.warmupTicks(100);
+      handleToolResultData(result);
+      graph.centerAt(0, 0, 500);
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Navigated to article: ${response.page.title}`,
+          },
+        ],
+        structuredContent: {
+          success: true,
+          article: response.page,
+          linksFound: response.links?.length ?? 0,
+        },
+      };
+    }
+
+    return {
+      content: [
+        { type: "text" as const, text: `Could not find article for: ${query}` },
+      ],
+      structuredContent: {
+        success: false,
+        error: "Article not found",
+      },
+    };
+  },
+);
+
+// Tool: Get information about the currently displayed article
+app.registerTool(
+  "get-current-article",
+  {
+    title: "Get Current Article",
+    description:
+      "Get information about the currently selected or initial article in the graph",
+  },
+  async () => {
+    const currentUrl = selectedNodeUrl || initialUrl;
+
+    if (!currentUrl) {
+      return {
+        content: [
+          { type: "text" as const, text: "No article is currently selected" },
+        ],
+        structuredContent: {
+          hasSelection: false,
+          article: null,
+        },
+      };
+    }
+
+    const node = graphData.nodes.find((n) => n.url === currentUrl);
+
+    if (!node) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: "Selected article not found in graph",
+          },
+        ],
+        structuredContent: {
+          hasSelection: false,
+          article: null,
+        },
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Current article: ${node.title}\nURL: ${node.url}\nState: ${node.state}`,
+        },
+      ],
+      structuredContent: {
+        hasSelection: true,
+        article: {
+          url: node.url,
+          title: node.title,
+          state: node.state,
+          isExpanded: node.state === "expanded",
+          hasError: node.state === "error",
+          errorMessage: node.errorMessage,
+        },
+      },
+    };
+  },
+);
+
+// Tool: Highlight a specific node in the graph
+app.registerTool(
+  "highlight-node",
+  {
+    title: "Highlight Node",
+    description:
+      "Highlight and center on a specific node in the graph by title or URL",
+    inputSchema: z.object({
+      identifier: z
+        .string()
+        .describe("The title or URL of the node to highlight"),
+    }),
+  },
+  async (args) => {
+    const { identifier } = args as { identifier: string };
+    const lowerIdentifier = identifier.toLowerCase();
+
+    // Find node by title (case-insensitive partial match) or exact URL
+    const node = graphData.nodes.find(
+      (n) =>
+        n.url === identifier || n.title.toLowerCase().includes(lowerIdentifier),
+    );
+
+    if (!node) {
+      return {
+        content: [
+          { type: "text" as const, text: `Node not found: ${identifier}` },
+        ],
+        structuredContent: {
+          success: false,
+          error: "Node not found in graph",
+          availableNodes: graphData.nodes.map((n) => n.title),
+        },
+      };
+    }
+
+    // Center on the node and select it
+    selectedNodeUrl = node.url;
+    if (node.x !== undefined && node.y !== undefined) {
+      graph.centerAt(node.x, node.y, 500);
+      graph.zoom(2, 500);
+    }
+
+    return {
+      content: [
+        { type: "text" as const, text: `Highlighted node: ${node.title}` },
+      ],
+      structuredContent: {
+        success: true,
+        node: {
+          url: node.url,
+          title: node.title,
+          state: node.state,
+        },
+      },
+    };
+  },
+);
+
+// Tool: Expand a node to show its linked pages
+app.registerTool(
+  "expand-node",
+  {
+    title: "Expand Node",
+    description:
+      "Expand a node to fetch and display all Wikipedia pages it links to. This is the core way to explore the graph.",
+    inputSchema: z.object({
+      identifier: z.string().describe("The title or URL of the node to expand"),
+    }),
+  },
+  async (args) => {
+    const { identifier } = args as { identifier: string };
+    const lowerIdentifier = identifier.toLowerCase();
+
+    // Find node by title (case-insensitive partial match) or exact URL
+    const node = graphData.nodes.find(
+      (n) =>
+        n.url === identifier || n.title.toLowerCase().includes(lowerIdentifier),
+    );
+
+    if (!node) {
+      return {
+        content: [
+          { type: "text" as const, text: `Node not found: ${identifier}` },
+        ],
+        structuredContent: {
+          success: false,
+          error: "Node not found in graph",
+          availableNodes: graphData.nodes.map((n) => n.title),
+        },
+      };
+    }
+
+    if (node.state === "expanded") {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Node "${node.title}" is already expanded`,
+          },
+        ],
+        structuredContent: {
+          success: true,
+          alreadyExpanded: true,
+          node: { url: node.url, title: node.title },
+        },
+      };
+    }
+
+    if (node.state === "error") {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Node "${node.title}" has an error: ${node.errorMessage}`,
+          },
+        ],
+        structuredContent: {
+          success: false,
+          error: node.errorMessage,
+        },
+      };
+    }
+
+    try {
+      // Fetch the linked pages using the server tool
+      const result = await app.callServerTool({
+        name: "get-first-degree-links",
+        arguments: { url: node.url },
+      });
+
+      graph.warmupTicks(0);
+      handleToolResultData(result);
+
+      const response = result.structuredContent as unknown as ToolResponse;
+      const linksAdded = response?.links?.length ?? 0;
+
+      // Center on the expanded node
+      if (node.x !== undefined && node.y !== undefined) {
+        graph.centerAt(node.x, node.y, 500);
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Expanded "${node.title}" - found ${linksAdded} linked articles`,
+          },
+        ],
+        structuredContent: {
+          success: true,
+          node: { url: node.url, title: node.title },
+          linksAdded,
+        },
+      };
+    } catch (e) {
+      setNodeState(node.url, "error", "Request failed");
+      updateGraph();
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Failed to expand "${node.title}": ${e instanceof Error ? e.message : String(e)}`,
+          },
+        ],
+        structuredContent: {
+          success: false,
+          error: String(e),
+        },
+      };
+    }
+  },
+);
+
+// Tool: Get list of currently visible nodes in the graph
+app.registerTool(
+  "get-visible-nodes",
+  {
+    title: "Get Visible Nodes",
+    description: "Get a list of all nodes currently visible in the graph",
+  },
+  async () => {
+    const nodes = graphData.nodes.map((n) => ({
+      url: n.url,
+      title: n.title,
+      state: n.state,
+      isExpanded: n.state === "expanded",
+      hasError: n.state === "error",
+    }));
+
+    const expandedCount = nodes.filter((n) => n.isExpanded).length;
+    const errorCount = nodes.filter((n) => n.hasError).length;
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Graph contains ${nodes.length} nodes:\n${nodes.map((n) => `- ${n.title} (${n.state})`).join("\n")}`,
+        },
+      ],
+      structuredContent: {
+        totalNodes: nodes.length,
+        expandedNodes: expandedCount,
+        errorNodes: errorCount,
+        nodes,
+      },
+    };
+  },
+);
 
 // Connect to host
 app.connect().then(() => {

@@ -63,7 +63,9 @@ LIMITATIONS - Do NOT use:
 - VR features (mainVR not available)
 
 For procedural noise:
-  float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }`;
+  float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+
+The widget is interactive and exposes tools for updating shader source code and querying compilation status. Compilation errors are sent to model context automatically.`;
 
 const DEFAULT_FRAGMENT_SHADER = `void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;

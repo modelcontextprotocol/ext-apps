@@ -147,7 +147,7 @@ export function createServer(): McpServer {
     {
       title: "Show Map",
       description:
-        "Display an interactive world map zoomed to a specific bounding box. Use the GeoCode tool to find the bounding box of a location.",
+        "Display an interactive world map zoomed to a specific bounding box. Use the GeoCode tool to find the bounding box of a location. The widget is interactive and exposes tools for navigation (fly to locations) and querying the current view.",
       inputSchema: {
         west: z
           .number()

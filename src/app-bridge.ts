@@ -5,6 +5,10 @@ import {
   CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
+  CreateMessageRequest,
+  CreateMessageRequestSchema,
+  CreateMessageResult,
+  CreateMessageResultWithTools,
   EmptyResult,
   Implementation,
   ListPromptsRequest,
@@ -39,6 +43,7 @@ import {
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
+  Protocol,
   ProtocolOptions,
   RequestOptions,
 } from "@modelcontextprotocol/sdk/shared/protocol.js";
@@ -307,6 +312,36 @@ export class AppBridge extends ProtocolWithEvents<
   private _appCapabilities?: McpUiAppCapabilities;
   private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
+  private _initializedReceived = false;
+
+  /**
+   * Wrap every handler registered via `replaceRequestHandler` with a check
+   * that the View has sent `ui/notifications/initialized`. Warns (never
+   * throws) so lenient hosts keep working while still surfacing the
+   * misordering that leaves strict hosts with a permanently hidden iframe.
+   * `ui/initialize` and `ping` use `setRequestHandler` directly and are
+   * intentionally exempt.
+   *
+   * @see {@link https://github.com/anthropics/claude-ai-mcp/issues/149 claude-ai-mcp#149}
+   */
+  private _baseReplaceRequestHandler = this.replaceRequestHandler;
+  protected override replaceRequestHandler: Protocol<
+    AppRequest,
+    AppNotification,
+    AppResult
+  >["setRequestHandler"] = (schema, handler) => {
+    this._baseReplaceRequestHandler(schema, (request, extra) => {
+      if (!this._initializedReceived) {
+        console.warn(
+          `[ext-apps] AppBridge received '${request.method}' before ` +
+            `ui/notifications/initialized. The View is calling host ` +
+            `methods before completing the handshake; it should await ` +
+            `app.connect() first.`,
+        );
+      }
+      return handler(request, extra);
+    });
+  };
 
   protected readonly eventSchemas = {
     sizechange: McpUiSizeChangedNotificationSchema,
@@ -356,6 +391,10 @@ export class AppBridge extends ProtocolWithEvents<
     options?: HostOptions,
   ) {
     super(options);
+
+    this.addEventListener("initialized", () => {
+      this._initializedReceived = true;
+    });
 
     this._hostContext = options?.hostContext || {};
 
@@ -1014,6 +1053,49 @@ export class AppBridge extends ProtocolWithEvents<
   }
 
   /**
+   * Register a handler for LLM sampling requests from the view.
+   *
+   * The view sends standard MCP `sampling/createMessage` requests to obtain
+   * LLM completions via the host's model connection. The host has full
+   * discretion over which model to use and SHOULD apply rate limiting,
+   * cost controls, and user approval (human-in-the-loop) before sampling.
+   *
+   * Hosts that register this handler SHOULD advertise `sampling` (and
+   * `sampling.tools` if tool-calling is supported) in
+   * {@link McpUiHostCapabilities `McpUiHostCapabilities`}.
+   *
+   * @param callback - Handler that receives `CreateMessageRequest` params and
+   *   returns a `CreateMessageResult` (or `CreateMessageResultWithTools` when
+   *   `params.tools` was provided)
+   *   - `params` - Standard MCP sampling params (messages, maxTokens, tools, etc.)
+   *   - `extra` - Request metadata (abort signal, session info)
+   *
+   * @example Forward to your LLM provider
+   * ```ts source="./app-bridge.examples.ts#AppBridge_oncreatesamplingmessage_forwardToLlm"
+   * bridge.oncreatesamplingmessage = async (params, extra) => {
+   *   // Apply rate limiting, user approval, cost controls here
+   *   return await myLlmProvider.complete(params, { signal: extra.signal });
+   * };
+   * ```
+   *
+   * @see `CreateMessageRequest` from @modelcontextprotocol/sdk for the request type
+   * @see `CreateMessageResult` / `CreateMessageResultWithTools` from @modelcontextprotocol/sdk for result types
+   */
+  set oncreatesamplingmessage(
+    callback: (
+      params: CreateMessageRequest["params"],
+      extra: RequestHandlerExtra,
+    ) => Promise<CreateMessageResult | CreateMessageResultWithTools>,
+  ) {
+    this.setRequestHandler(
+      CreateMessageRequestSchema,
+      async (request, extra) => {
+        return callback(request.params, extra);
+      },
+    );
+  }
+
+  /**
    * Notify the view that the MCP server's tool list has changed.
    *
    * The host sends `notifications/tools/list_changed` to the view when it
@@ -1380,6 +1462,15 @@ export class AppBridge extends ProtocolWithEvents<
     request: McpUiInitializeRequest,
   ): Promise<McpUiInitializeResult> {
     const requestedVersion = request.params.protocolVersion;
+
+    if (this._appInfo !== undefined) {
+      console.warn(
+        "[ext-apps] AppBridge received a second ui/initialize. The View may " +
+          "be double-mounting (e.g. React StrictMode in dev) without closing " +
+          "the previous App instance. Responding normally; the latest " +
+          "appInfo/appCapabilities replace the previous values.",
+      );
+    }
 
     this._appCapabilities = request.params.appCapabilities;
     this._appInfo = request.params.appInfo;
@@ -1758,6 +1849,7 @@ export class AppBridge extends ProtocolWithEvents<
         "AppBridge is already connected. Call close() before connecting again.",
       );
     }
+    this._initializedReceived = false;
     if (this._client) {
       // When a client was passed to the constructor, automatically forward
       // MCP requests/notifications between the view and the server

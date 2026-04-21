@@ -52,6 +52,7 @@ import type {
   AnySchema,
   ZodRawShapeCompat,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type { StandardSchemaWithJSON } from "../standard-schema";
 import type {
   ClientCapabilities,
   ReadResourceResult,
@@ -69,8 +70,8 @@ export type { ResourceMetadata, ToolCallback };
 export interface ToolConfig {
   title?: string;
   description?: string;
-  inputSchema?: ZodRawShapeCompat | AnySchema;
-  outputSchema?: ZodRawShapeCompat | AnySchema;
+  inputSchema?: ZodRawShapeCompat | StandardSchemaWithJSON;
+  outputSchema?: ZodRawShapeCompat | StandardSchemaWithJSON;
   annotations?: ToolAnnotations;
   _meta?: Record<string, unknown>;
 }
@@ -214,8 +215,9 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  * @see {@link registerAppResource `registerAppResource`} to register the HTML resource referenced by the tool
  */
 export function registerAppTool<
-  OutputArgs extends ZodRawShapeCompat | AnySchema,
-  InputArgs extends undefined | ZodRawShapeCompat | AnySchema = undefined,
+  OutputArgs extends ZodRawShapeCompat | StandardSchemaWithJSON,
+  InputArgs extends undefined | ZodRawShapeCompat | StandardSchemaWithJSON =
+    undefined,
 >(
   server: Pick<McpServer, "registerTool">,
   name: string,
@@ -223,7 +225,15 @@ export function registerAppTool<
     inputSchema?: InputArgs;
     outputSchema?: OutputArgs;
   },
-  cb: ToolCallback<InputArgs>,
+  // The widened constraint signals the v2 API shape, but NOTE: McpServer in
+  // sdk@1.x still calls zod internals at runtime, so non-zod schemas will fail
+  // here until we depend on sdk v2. Zod (which all current callers use) is
+  // unaffected. The cast below bridges the 1.x type signature.
+  cb: ToolCallback<
+    InputArgs extends undefined | ZodRawShapeCompat | AnySchema
+      ? InputArgs
+      : AnySchema
+  >,
 ): RegisteredTool {
   // Normalize metadata for backward compatibility:
   // - If _meta.ui.resourceUri is set, also set the legacy flat key
@@ -241,7 +251,14 @@ export function registerAppTool<
     normalizedMeta = { ...meta, ui: { ...uiMeta, resourceUri: legacyUri } };
   }
 
-  return server.registerTool(name, { ...config, _meta: normalizedMeta }, cb);
+  // Cast bridges the widened StandardSchemaWithJSON constraint to the
+  // sdk@1.x zod-typed signature. Drops once we depend on sdk v2.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return server.registerTool(
+    name,
+    { ...config, _meta: normalizedMeta } as any,
+    cb as any,
+  );
 }
 
 export type McpUiReadResourceResult = ReadResourceResult & {

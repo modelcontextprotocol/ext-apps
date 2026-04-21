@@ -7,6 +7,7 @@
  */
 import { App } from "@modelcontextprotocol/ext-apps";
 import type { ContentBlock } from "@modelcontextprotocol/sdk/spec.types.js";
+import { z } from "zod";
 
 // TypeScript declaration for Cesium loaded from CDN
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -560,6 +561,76 @@ function setViewToBoundingBox(cesiumViewer: any, bbox: BoundingBox): void {
 }
 
 /**
+ * Fly camera to view a bounding box with animation
+ */
+function flyToBoundingBox(
+  cesiumViewer: any,
+  bbox: BoundingBox,
+  duration = 2,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const { destination, centerLon, centerLat, height } =
+      calculateDestination(bbox);
+
+    log.info("flyTo destination:", centerLon, centerLat, "height:", height);
+
+    cesiumViewer.camera.flyTo({
+      destination,
+      orientation: {
+        heading: 0,
+        pitch: Cesium.Math.toRadians(-90), // Look straight down
+        roll: 0,
+      },
+      duration,
+      complete: () => {
+        log.info(
+          "flyTo complete, camera height:",
+          cesiumViewer.camera.positionCartographic.height,
+        );
+        resolve();
+      },
+      cancel: () => {
+        log.warn("flyTo cancelled");
+        resolve();
+      },
+    });
+  });
+}
+
+// Label element for displaying location info
+let labelElement: HTMLDivElement | null = null;
+
+/**
+ * Set or clear the label displayed on the map
+ */
+function setLabel(text?: string): void {
+  if (!labelElement) {
+    labelElement = document.createElement("div");
+    labelElement.style.cssText = `
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 100;
+      pointer-events: none;
+    `;
+    document.body.appendChild(labelElement);
+  }
+
+  if (text) {
+    labelElement.textContent = text;
+    labelElement.style.display = "block";
+  } else {
+    labelElement.style.display = "none";
+  }
+}
+
+/**
  * Wait for globe tiles to finish loading
  */
 function waitForTilesLoaded(cesiumViewer: any): Promise<void> {
@@ -801,57 +872,110 @@ app.ontoolinput = async (params) => {
   }
 };
 
-/*
-  Register tools for the model to interact w/ this component
-  Needs https://github.com/modelcontextprotocol/ext-apps/pull/72
-*/
-// app.registerTool(
-//   "navigate-to",
-//   {
-//     title: "Navigate To",
-//     description: "Navigate the globe to a new bounding box location",
-//     inputSchema: z.object({
-//       west: z.number().describe("Western longitude (-180 to 180)"),
-//       south: z.number().describe("Southern latitude (-90 to 90)"),
-//       east: z.number().describe("Eastern longitude (-180 to 180)"),
-//       north: z.number().describe("Northern latitude (-90 to 90)"),
-//       duration: z
-//         .number()
-//         .optional()
-//         .describe("Animation duration in seconds (default: 2)"),
-//       label: z.string().optional().describe("Optional label to display"),
-//     }),
-//   },
-//   async (args) => {
-//     if (!viewer) {
-//       return {
-//         content: [
-//           { type: "text" as const, text: "Error: Viewer not initialized" },
-//         ],
-//         isError: true,
-//       };
-//     }
+// Register tools for the model to interact with this component
+app.registerTool(
+  "navigate-to",
+  {
+    title: "Navigate To",
+    description: "Navigate the globe to a new bounding box location",
+    inputSchema: z.object({
+      west: z.number().describe("Western longitude (-180 to 180)"),
+      south: z.number().describe("Southern latitude (-90 to 90)"),
+      east: z.number().describe("Eastern longitude (-180 to 180)"),
+      north: z.number().describe("Northern latitude (-90 to 90)"),
+      duration: z
+        .number()
+        .optional()
+        .describe("Animation duration in seconds (default: 2)"),
+      label: z.string().optional().describe("Optional label to display"),
+    }),
+  },
+  async (args) => {
+    if (!viewer) {
+      return {
+        content: [
+          { type: "text" as const, text: "Error: Viewer not initialized" },
+        ],
+        isError: true,
+      };
+    }
 
-//     const bbox: BoundingBox = {
-//       west: args.west,
-//       south: args.south,
-//       east: args.east,
-//       north: args.north,
-//     };
+    const bbox: BoundingBox = {
+      west: args.west,
+      south: args.south,
+      east: args.east,
+      north: args.north,
+    };
 
-//     await flyToBoundingBox(viewer, bbox, args.duration ?? 2);
-//     setLabel(args.label);
+    await flyToBoundingBox(viewer, bbox, args.duration ?? 2);
+    setLabel(args.label);
 
-//     return {
-//       content: [
-//         {
-//           type: "text" as const,
-//           text: `Navigated to: W:${bbox.west.toFixed(4)}, S:${bbox.south.toFixed(4)}, E:${bbox.east.toFixed(4)}, N:${bbox.north.toFixed(4)}${args.label ? ` (${args.label})` : ""}`,
-//         },
-//       ],
-//     };
-//   },
-// );
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Navigated to: W:${bbox.west.toFixed(4)}, S:${bbox.south.toFixed(4)}, E:${bbox.east.toFixed(4)}, N:${bbox.north.toFixed(4)}${args.label ? ` (${args.label})` : ""}`,
+        },
+      ],
+    };
+  },
+);
+
+app.registerTool(
+  "get-current-view",
+  {
+    title: "Get Current View",
+    description:
+      "Get the current camera position and bounding box visible on the globe",
+  },
+  async () => {
+    if (!viewer) {
+      return {
+        content: [
+          { type: "text" as const, text: "Error: Viewer not initialized" },
+        ],
+        isError: true,
+      };
+    }
+
+    const camera = viewer.camera;
+    const positionCartographic = camera.positionCartographic;
+    const latitude = Cesium.Math.toDegrees(positionCartographic.latitude);
+    const longitude = Cesium.Math.toDegrees(positionCartographic.longitude);
+    const height = positionCartographic.height;
+
+    // Get the visible bounding box
+    const rectangle = viewer.camera.computeViewRectangle();
+    let bbox = null;
+    if (rectangle) {
+      bbox = {
+        west: Cesium.Math.toDegrees(rectangle.west),
+        south: Cesium.Math.toDegrees(rectangle.south),
+        east: Cesium.Math.toDegrees(rectangle.east),
+        north: Cesium.Math.toDegrees(rectangle.north),
+      };
+    }
+
+    const viewData = {
+      camera: {
+        latitude,
+        longitude,
+        height,
+      },
+      bbox,
+    };
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(viewData, null, 2),
+        },
+      ],
+      structuredContent: viewData,
+    };
+  },
+);
 
 // Handle tool result - extract viewUUID and restore persisted view if available
 app.ontoolresult = async (result) => {

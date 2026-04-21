@@ -521,6 +521,14 @@ export interface McpUiHostCapabilities {
   updateModelContext?: McpUiSupportedContentBlockModalities;
   /** @description Host supports receiving content messages (ui/message) from the view. */
   message?: McpUiSupportedContentBlockModalities;
+  /**
+   * @description Host supports LLM sampling (sampling/createMessage) from the view.
+   * Mirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.
+   */
+  sampling?: {
+    /** @description Host supports tool use via `tools` and `toolChoice` parameters. */
+    tools?: {};
+  };
 }
 
 /**
@@ -761,7 +769,6 @@ export type McpUiToolVisibility = "model" | "app";
 export interface McpUiToolMeta {
   /**
    * URI of the UI resource to display for this tool, if any.
-   * This is converted to `_meta["ui/resourceUri"]`.
    *
    * @example
    * ```ts
@@ -775,6 +782,17 @@ export interface McpUiToolMeta {
    * - "app": Tool callable by the app from this server only
    */
   visibility?: McpUiToolVisibility[];
+  /**
+   * `csp` belongs on the UI **resource** (see {@link McpUiResourceMeta}),
+   * not the tool. Hosts read it from the `resources/read` content item
+   * (with `resources/list` entry as fallback) and ignore it here.
+   */
+  csp?: never;
+  /**
+   * `permissions` belongs on the UI **resource** (see {@link McpUiResourceMeta}),
+   * not the tool. Hosts ignore it here.
+   */
+  permissions?: never;
 }
 
 /**

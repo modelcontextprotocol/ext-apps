@@ -558,6 +558,24 @@ export const McpUiHostCapabilitiesSchema = z.object({
   message: McpUiSupportedContentBlockModalitiesSchema.optional().describe(
     "Host supports receiving content messages (ui/message) from the view.",
   ),
+  /**
+   * @description Host supports LLM sampling (sampling/createMessage) from the view.
+   * Mirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.
+   */
+  sampling: z
+    .object({
+      /** @description Host supports tool use via `tools` and `toolChoice` parameters. */
+      tools: z
+        .object({})
+        .optional()
+        .describe(
+          "Host supports tool use via `tools` and `toolChoice` parameters.",
+        ),
+    })
+    .optional()
+    .describe(
+      "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
+    ),
 });
 
 /**
@@ -693,7 +711,6 @@ export const McpUiToolVisibilitySchema = z
 export const McpUiToolMetaSchema = z.object({
   /**
    * URI of the UI resource to display for this tool, if any.
-   * This is converted to `_meta["ui/resourceUri"]`.
    *
    * @example
    * ```ts
@@ -712,6 +729,17 @@ export const McpUiToolMetaSchema = z.object({
     .describe(
       'Who can access this tool. Default: ["model", "app"]\n- "model": Tool visible to and callable by the agent\n- "app": Tool callable by the app from this server only',
     ),
+  /**
+   * `csp` belongs on the UI **resource** (see {@link McpUiResourceMeta}),
+   * not the tool. Hosts read it from the `resources/read` content item
+   * (with `resources/list` entry as fallback) and ignore it here.
+   */
+  csp: z.never().optional(),
+  /**
+   * `permissions` belongs on the UI **resource** (see {@link McpUiResourceMeta}),
+   * not the tool. Hosts ignore it here.
+   */
+  permissions: z.never().optional(),
 });
 
 /**

@@ -200,6 +200,12 @@ export default function ThreeJSApp({
   toolInputs,
   toolInputsPartial,
   hostContext,
+  callServerTool: _callServerTool,
+  sendMessage: _sendMessage,
+  openLink: _openLink,
+  sendLog: _sendLog,
+  onSceneError,
+  onSceneRendering,
 }: ThreeJSAppProps) {
   const [error, setError] = useState<string | null>(null);
   const [currentDisplayMode, setCurrentDisplayMode] = useState<
@@ -304,6 +310,9 @@ export default function ThreeJSApp({
     animControllerRef.current = createAnimationController();
 
     setError(null);
+    onSceneError(null);
+    onSceneRendering(true);
+
     const w = containerWidth || containerRef.current.offsetWidth || 800;
     const h = isFullscreen && hostHeight > 0 ? hostHeight : height;
     executeThreeCode(
@@ -312,12 +321,18 @@ export default function ThreeJSApp({
       w,
       h,
       animControllerRef.current.visibilityAwareRAF,
-    ).catch((e) => setError(e instanceof Error ? e.message : "Unknown error"));
+    ).catch((e) => {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      setError(msg);
+      onSceneError(msg);
+      onSceneRendering(false);
+    });
 
     return () => {
       canvas.removeEventListener("touchstart", preventDefault);
       canvas.removeEventListener("touchmove", preventDefault);
       animControllerRef.current?.cleanup();
+      onSceneRendering(false);
     };
   }, [code, height, containerWidth, isFullscreen, hostHeight]);
 

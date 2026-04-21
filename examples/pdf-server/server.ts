@@ -1366,7 +1366,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       description: disableInteract
         ? `Show and render a PDF in a read-only viewer.
 
-Use this tool when the user wants to view or read a PDF. The renderer displays the document for viewing.
+Use this tool when the user wants to view or read a PDF. The renderer displays the document for viewing. The widget exposes app-registered tools for page navigation, text extraction, searching, and zoom control.
 
 Accepts local files (use list_pdfs), client MCP root directories, or any HTTPS URL.`
         : `Open a PDF in an interactive viewer. Call this ONCE per PDF.

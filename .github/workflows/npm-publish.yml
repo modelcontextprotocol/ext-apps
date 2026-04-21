@@ -42,6 +42,10 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  # All publish jobs depend directly on [build, test] (not on each other) so
+  # they all enter "waiting for approval" together and can be approved in a
+  # single "Review deployments" click.
+
   publish:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
@@ -88,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     environment: Release
-    needs: [publish]
+    needs: [build, test]
 
     permissions:
       contents: read
@@ -134,8 +138,18 @@ jobs:
       - name: Build example
         run: npm run build --workspace examples/${{ matrix.example }}
 
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "tag=--tag beta" >> $GITHUB_OUTPUT
+          else
+            echo "tag=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish example
-        run: npm publish --workspace examples/${{ matrix.example }} --provenance --access public
+        run: npm publish --workspace examples/${{ matrix.example }} --provenance --access public ${{ steps.npm-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
 
@@ -143,7 +157,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     environment: Release
-    needs: [publish-examples]
+    needs: [build, test]
 
     permissions:
       contents: write
