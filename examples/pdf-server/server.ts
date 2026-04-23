@@ -34,6 +34,7 @@ import {
   VerbosityLevel,
   version as PDFJS_VERSION,
 } from "pdfjs-dist/legacy/build/pdf.mjs";
+import type { PDFDocumentProxy } from "pdfjs-dist/types/src/display/api.js";
 
 /**
  * PDF Standard-14 fonts from CDN. Used by both server and viewer so we
@@ -943,112 +944,69 @@ interface FormFieldInfo {
  * from a PDF. Bounding boxes are converted to model coordinates (top-left origin).
  */
 async function extractFormFieldInfo(
-  url: string,
-  readRange: (
-    url: string,
-    offset: number,
-    byteCount: number,
-  ) => Promise<{ data: Uint8Array; totalBytes: number }>,
+  pdfDoc: PDFDocumentProxy,
 ): Promise<FormFieldInfo[]> {
-  const { totalBytes } = await readRange(url, 0, 1);
-  const { data } = await readRange(url, 0, totalBytes);
-
-  const loadingTask = getDocument({
-    data,
-    standardFontDataUrl: STANDARD_FONT_DATA_URL,
-    StandardFontDataFactory: FetchStandardFontDataFactory,
-    // We only introspect form fields (never render) — silence residual
-    // warnings like "Unimplemented border style: inset".
-    verbosity: VerbosityLevel.ERRORS,
-  });
-  const pdfDoc = await loadingTask.promise;
-
   const fields: FormFieldInfo[] = [];
-  try {
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
-      const page = await pdfDoc.getPage(i);
-      const pageHeight = page.getViewport({ scale: 1.0 }).height;
-      const annotations = await page.getAnnotations();
-      for (const ann of annotations) {
-        // Only include form widgets (annotationType 20)
-        if (ann.annotationType !== 20) continue;
-        if (!ann.rect) continue;
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const pageHeight = page.getViewport({ scale: 1.0 }).height;
+    const annotations = await page.getAnnotations();
+    for (const ann of annotations) {
+      // Only include form widgets (annotationType 20)
+      if (ann.annotationType !== 20) continue;
+      if (!ann.rect) continue;
 
-        const fieldName = ann.fieldName || "";
-        const fieldType = ann.fieldType || "unknown";
+      const fieldName = ann.fieldName || "";
+      const fieldType = ann.fieldType || "unknown";
 
-        // PDF rect is [x1, y1, x2, y2] in bottom-left origin
-        const x1 = Math.min(ann.rect[0], ann.rect[2]);
-        const y1 = Math.min(ann.rect[1], ann.rect[3]);
-        const x2 = Math.max(ann.rect[0], ann.rect[2]);
-        const y2 = Math.max(ann.rect[1], ann.rect[3]);
-        const width = x2 - x1;
-        const height = y2 - y1;
+      // PDF rect is [x1, y1, x2, y2] in bottom-left origin
+      const x1 = Math.min(ann.rect[0], ann.rect[2]);
+      const y1 = Math.min(ann.rect[1], ann.rect[3]);
+      const x2 = Math.max(ann.rect[0], ann.rect[2]);
+      const y2 = Math.max(ann.rect[1], ann.rect[3]);
+      const width = x2 - x1;
+      const height = y2 - y1;
 
-        // Convert to model coords (top-left origin): modelY = pageHeight - pdfY - height
-        const modelY = pageHeight - y2;
+      // Convert to model coords (top-left origin): modelY = pageHeight - pdfY - height
+      const modelY = pageHeight - y2;
 
-        // Choice widgets (combo/listbox) carry `options` as
-        // [{exportValue, displayValue}]. Expose export values — that's
-        // what fill_form needs.
-        let options: string[] | undefined;
-        if (Array.isArray(ann.options) && ann.options.length > 0) {
-          options = ann.options
-            .map((o: { exportValue?: string }) => o?.exportValue)
-            .filter((v: unknown): v is string => typeof v === "string");
-        }
-
-        fields.push({
-          name: fieldName,
-          type: fieldType,
-          page: i,
-          x: Math.round(x1),
-          y: Math.round(modelY),
-          width: Math.round(width),
-          height: Math.round(height),
-          ...(ann.alternativeText ? { label: ann.alternativeText } : undefined),
-          // Radio: buttonValue is the per-widget export value — the only
-          // thing distinguishing three `size [Btn]` lines from each other.
-          ...(ann.radioButton && ann.buttonValue != null
-            ? { exportValue: String(ann.buttonValue) }
-            : undefined),
-          ...(options?.length ? { options } : undefined),
-        });
+      // Choice widgets (combo/listbox) carry `options` as
+      // [{exportValue, displayValue}]. Expose export values — that's
+      // what fill_form needs.
+      let options: string[] | undefined;
+      if (Array.isArray(ann.options) && ann.options.length > 0) {
+        options = ann.options
+          .map((o: { exportValue?: string }) => o?.exportValue)
+          .filter((v: unknown): v is string => typeof v === "string");
       }
+
+      fields.push({
+        name: fieldName,
+        type: fieldType,
+        page: i,
+        x: Math.round(x1),
+        y: Math.round(modelY),
+        width: Math.round(width),
+        height: Math.round(height),
+        ...(ann.alternativeText ? { label: ann.alternativeText } : undefined),
+        // Radio: buttonValue is the per-widget export value — the only
+        // thing distinguishing three `size [Btn]` lines from each other.
+        ...(ann.radioButton && ann.buttonValue != null
+          ? { exportValue: String(ann.buttonValue) }
+          : undefined),
+        ...(options?.length ? { options } : undefined),
+      });
     }
-  } finally {
-    pdfDoc.destroy();
   }
 
   return fields;
 }
 
-async function extractFormSchema(
-  url: string,
-  readRange: (
-    url: string,
-    offset: number,
-    byteCount: number,
-  ) => Promise<{ data: Uint8Array; totalBytes: number }>,
-): Promise<{
+async function extractFormSchema(pdfDoc: PDFDocumentProxy): Promise<{
   type: "object";
   properties: Record<string, PrimitiveSchemaDefinition>;
   required?: string[];
 } | null> {
-  // Read full PDF bytes
-  const { totalBytes } = await readRange(url, 0, 1);
-  const { data } = await readRange(url, 0, totalBytes);
-
-  const loadingTask = getDocument({
-    data,
-    standardFontDataUrl: STANDARD_FONT_DATA_URL,
-    StandardFontDataFactory: FetchStandardFontDataFactory,
-    // We only introspect form fields (never render) — silence residual
-    // warnings like "Unimplemented border style: inset".
-    verbosity: VerbosityLevel.ERRORS,
-  });
-  const pdfDoc = await loadingTask.promise;
-
   let fieldObjects: Record<string, PdfJsFieldObject[]> | null;
   try {
     fieldObjects = (await pdfDoc.getFieldObjects()) as Record<
@@ -1056,11 +1014,9 @@ async function extractFormSchema(
       PdfJsFieldObject[]
     > | null;
   } catch {
-    pdfDoc.destroy();
     return null;
   }
   if (!fieldObjects || Object.keys(fieldObjects).length === 0) {
-    pdfDoc.destroy();
     return null;
   }
 
@@ -1131,7 +1087,6 @@ async function extractFormSchema(
     return /[[\]().]/.test(name) || /^[A-Z0-9_]+$/.test(name);
   });
 
-  pdfDoc.destroy();
   if (Object.keys(properties).length === 0) return null;
   if (hasMechanicalNames) return null;
 
@@ -1178,6 +1133,12 @@ export interface CreateServerOptions {
   debug?: boolean;
 }
 
+// Module-level singletons so they survive across createServer() calls — in
+// stateless HTTP deployments a fresh server is created per request, and
+// per-instance caches are discarded immediately.
+const sharedPdfCache = createPdfCache();
+let cachedAppHtml: string | undefined;
+
 export function createServer(options: CreateServerOptions = {}): McpServer {
   const { enableInteract = false, useClientRoots = false } = options;
   const debug = options.debug ?? false;
@@ -1197,8 +1158,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     );
   }
 
-  // Create session-local cache (isolated per server instance)
-  const { readPdfRange } = createPdfCache();
+  const { readPdfRange } = sharedPdfCache;
 
   // Tool: list_pdfs - List available PDFs
   server.tool(
@@ -1484,33 +1444,38 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
         }
       }
 
-      // Extract form field schema (used for elicitation and field name validation)
+      // Extract form field schema + detailed field info from a single
+      // download/parse pass.
       let formSchema: Awaited<ReturnType<typeof extractFormSchema>> = null;
+      let fieldInfo: FormFieldInfo[] = [];
       try {
-        formSchema = await extractFormSchema(normalized, readPdfRange);
+        const { data } = await readPdfRange(normalized, 0, totalBytes);
+        const pdfDoc = await getDocument({
+          data,
+          standardFontDataUrl: STANDARD_FONT_DATA_URL,
+          StandardFontDataFactory: FetchStandardFontDataFactory,
+          verbosity: VerbosityLevel.ERRORS,
+        }).promise;
+        try {
+          formSchema = await extractFormSchema(pdfDoc);
+          fieldInfo = await extractFormFieldInfo(pdfDoc);
+        } finally {
+          pdfDoc.destroy();
+        }
       } catch {
-        // Non-fatal — PDF may not have form fields
+        // Non-fatal — PDF may not have form fields or may fail to parse
       }
       if (formSchema) {
         viewFieldNames.set(uuid, new Set(Object.keys(formSchema.properties)));
       }
-
-      // Extract detailed form field info (page, bounding box, label)
-      let fieldInfo: FormFieldInfo[] = [];
-      try {
-        fieldInfo = await extractFormFieldInfo(normalized, readPdfRange);
-        if (fieldInfo.length > 0) {
-          viewFieldInfo.set(uuid, fieldInfo);
-          // Also populate viewFieldNames from field info if not already set
-          if (!viewFieldNames.has(uuid)) {
-            viewFieldNames.set(
-              uuid,
-              new Set(fieldInfo.map((f) => f.name).filter(Boolean)),
-            );
-          }
+      if (fieldInfo.length > 0) {
+        viewFieldInfo.set(uuid, fieldInfo);
+        if (!viewFieldNames.has(uuid)) {
+          viewFieldNames.set(
+            uuid,
+            new Set(fieldInfo.map((f) => f.name).filter(Boolean)),
+          );
         }
-      } catch {
-        // Non-fatal
       }
 
       // Elicit form field values if requested and client supports it
@@ -2833,10 +2798,10 @@ Example — add a signature image and a stamp, then screenshot to verify:
     RESOURCE_URI,
     { mimeType: RESOURCE_MIME_TYPE },
     async (): Promise<ReadResourceResult> => {
-      const html = await fs.promises.readFile(
+      const html = (cachedAppHtml ??= await fs.promises.readFile(
         path.join(DIST_DIR, "mcp-app.html"),
         "utf-8",
-      );
+      ));
       return {
         contents: [
           {
