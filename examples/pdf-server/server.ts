@@ -84,6 +84,9 @@ export const CACHE_MAX_LIFETIME_MS = 60_000; // 60 seconds
 /** Max size for cached PDFs (defensive limit to prevent memory exhaustion) */
 export const CACHE_MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 
+/** Max total bytes across all cache entries; oldest evicted first when exceeded. */
+export const CACHE_MAX_TOTAL_BYTES = 256 * 1024 * 1024; // 256MB
+
 /** Allowed local file paths (CLI args + file roots — read access). */
 export const allowedLocalFiles = new Set<string>();
 
@@ -696,8 +699,11 @@ export interface PdfCache {
  * - CACHE_INACTIVITY_TIMEOUT_MS of no access (resets on each access)
  * - CACHE_MAX_LIFETIME_MS from creation (absolute timeout)
  */
-export function createPdfCache(): PdfCache {
+export function createPdfCache(
+  maxTotalBytes: number = CACHE_MAX_TOTAL_BYTES,
+): PdfCache {
   const cache = new Map<string, CacheEntry>();
+  let totalBytes = 0;
 
   /** Delete a cache entry and clear its timers */
   function deleteCacheEntry(url: string): void {
@@ -705,6 +711,7 @@ export function createPdfCache(): PdfCache {
     if (entry) {
       clearTimeout(entry.inactivityTimer);
       clearTimeout(entry.maxLifetimeTimer);
+      totalBytes -= entry.data.length;
       cache.delete(url);
     }
   }
@@ -720,6 +727,10 @@ export function createPdfCache(): PdfCache {
       deleteCacheEntry(url);
     }, CACHE_INACTIVITY_TIMEOUT_MS);
 
+    // Move to end of insertion order so size-cap eviction is LRU.
+    cache.delete(url);
+    cache.set(url, entry);
+
     return entry.data;
   }
 
@@ -727,6 +738,12 @@ export function createPdfCache(): PdfCache {
   function setCacheEntry(url: string, data: Uint8Array): void {
     // Clear any existing entry first
     deleteCacheEntry(url);
+
+    // Evict least-recently-used entries until under the byte cap.
+    for (const oldest of cache.keys()) {
+      if (totalBytes + data.length <= maxTotalBytes) break;
+      deleteCacheEntry(oldest);
+    }
 
     const entry: CacheEntry = {
       data,
@@ -740,6 +757,7 @@ export function createPdfCache(): PdfCache {
     };
 
     cache.set(url, entry);
+    totalBytes += data.length;
   }
 
   /** Slice a cached or freshly-fetched full body to the requested range. */

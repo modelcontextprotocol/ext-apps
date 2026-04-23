@@ -71,6 +71,72 @@ describe("PDF Cache with Timeouts", () => {
     });
   });
 
+  describe("byte-cap LRU eviction", () => {
+    const tenBytes = new Uint8Array(10);
+
+    async function fill(cache: PdfCache, url: string): Promise<void> {
+      const m = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(tenBytes, { status: 200 }),
+      );
+      try {
+        await cache.readPdfRange(url, 0, 1024);
+      } finally {
+        m.mockRestore();
+      }
+    }
+
+    it("evicts least-recently-used entry when total exceeds cap", async () => {
+      const cache = createPdfCache(25);
+      try {
+        await fill(cache, "https://arxiv.org/pdf/a");
+        await fill(cache, "https://arxiv.org/pdf/b");
+        expect(cache.getCacheSize()).toBe(2);
+
+        // Touch A so B becomes least-recently-used
+        await cache.readPdfRange("https://arxiv.org/pdf/a", 0, 1);
+
+        // Inserting C (10B) pushes total to 30 > 25 → evict LRU (B)
+        await fill(cache, "https://arxiv.org/pdf/c");
+        expect(cache.getCacheSize()).toBe(2);
+
+        // A and C still served from cache; B re-fetches
+        const m = spyOn(globalThis, "fetch").mockResolvedValue(
+          new Response(tenBytes, { status: 200 }),
+        );
+        try {
+          await cache.readPdfRange("https://arxiv.org/pdf/a", 0, 1);
+          await cache.readPdfRange("https://arxiv.org/pdf/c", 0, 1);
+          expect(m).toHaveBeenCalledTimes(0);
+          await cache.readPdfRange("https://arxiv.org/pdf/b", 0, 1);
+          expect(m).toHaveBeenCalledTimes(1);
+        } finally {
+          m.mockRestore();
+        }
+      } finally {
+        cache.clearCache();
+      }
+    });
+
+    it("evicts multiple entries if a single insert exceeds the cap", async () => {
+      const cache = createPdfCache(25);
+      try {
+        await fill(cache, "https://arxiv.org/pdf/a");
+        await fill(cache, "https://arxiv.org/pdf/b");
+        const big = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+          new Response(new Uint8Array(20), { status: 200 }),
+        );
+        try {
+          await cache.readPdfRange("https://arxiv.org/pdf/big", 0, 1024);
+        } finally {
+          big.mockRestore();
+        }
+        expect(cache.getCacheSize()).toBe(1);
+      } finally {
+        cache.clearCache();
+      }
+    });
+  });
+
   describe("readPdfRange caching behavior", () => {
     const testUrl = "https://arxiv.org/pdf/test-pdf";
     const testData = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // %PDF header
