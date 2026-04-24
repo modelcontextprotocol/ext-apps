@@ -134,6 +134,11 @@ function generateSelfSignedCert(): { key: Buffer; cert: Buffer } {
 }
 
 export async function startRangeServer(): Promise<RangeServer> {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "range-counting-server is a test fixture; refusing to start with NODE_ENV=production",
+    );
+  }
   const files: Record<string, Uint8Array> = {
     "/noforms.pdf": await buildNoFormsPdf(),
     "/forms.pdf": await buildFormsPdf(),
@@ -227,12 +232,17 @@ export async function startRangeServer(): Promise<RangeServer> {
     resetStats() {
       requests = [];
       initHits();
+      // Unblock any handlers parked on the previous stall before re-arming,
+      // otherwise they hold sockets open forever and close() hangs.
+      releaseResolve?.();
       releasePromise = new Promise<void>((r) => (releaseResolve = r));
     },
     release() {
       releaseResolve?.();
     },
     close() {
+      releaseResolve?.();
+      server.closeAllConnections?.();
       return new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };

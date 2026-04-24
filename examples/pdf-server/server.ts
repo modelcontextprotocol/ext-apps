@@ -884,20 +884,50 @@ export function createPdfCache(
  * getDocument() fetch only the byte ranges it needs (xref, /AcroForm dict)
  * instead of the whole file. With disableAutoFetch, a PDF without form
  * fields is opened with ~5% of bytes fetched.
+ *
+ * pdf.js has no upstream error channel on PDFDataRangeTransport (its
+ * `abort()` is a no-op stub it calls *on* us, not the other way). Callers
+ * must `Promise.race` their pdf.js awaits against {@link failed}, which
+ * rejects on the first fetch error.
  */
 export class PdfCacheRangeTransport extends PDFDataRangeTransport {
+  /** Rejects on the first range-fetch error; never resolves. */
+  readonly failed: Promise<never>;
+  private fail!: (e: unknown) => void;
+
   constructor(
     private url: string,
     length: number,
     private readPdfRange: PdfCache["readPdfRange"],
   ) {
     super(length, null);
+    this.failed = new Promise<never>((_, reject) => {
+      this.fail = reject;
+    });
+    // Don't crash the process if no one is racing yet.
+    this.failed.catch(() => {});
   }
+
   override requestDataRange(begin: number, end: number): void {
-    this.readPdfRange(this.url, begin, end - begin).then(
-      ({ data }) => this.onDataRange(begin, data),
-      () => this.abort(),
-    );
+    void this.deliver(begin, end).catch((e) => this.fail(e));
+  }
+
+  /**
+   * pdf.js coalesces adjacent missing chunks into one unbounded request, but
+   * readPdfRange clamps each call to MAX_CHUNK_BYTES. Deliver in slices so
+   * the worker marks every requested chunk as loaded.
+   */
+  private async deliver(begin: number, end: number): Promise<void> {
+    let off = begin;
+    while (off < end) {
+      const want = Math.min(end - off, MAX_CHUNK_BYTES);
+      const { data } = await this.readPdfRange(this.url, off, want);
+      if (data.length === 0) {
+        throw new Error(`empty range at ${off} for ${this.url}`);
+      }
+      this.onDataRange(off, data);
+      off += data.length;
+    }
   }
 }
 
@@ -1496,28 +1526,32 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
       let formSchema: Awaited<ReturnType<typeof extractFormSchema>> = null;
       let fieldInfo: FormFieldInfo[] = [];
       try {
-        const pdfDoc = await getDocument({
-          range: new PdfCacheRangeTransport(
-            normalized,
-            totalBytes,
-            readPdfRange,
-          ),
-          length: totalBytes,
-          disableAutoFetch: true,
-          disableStream: true,
-          rangeChunkSize: 64 * 1024,
-          standardFontDataUrl: STANDARD_FONT_DATA_URL,
-          StandardFontDataFactory: FetchStandardFontDataFactory,
-          verbosity: VerbosityLevel.ERRORS,
-        }).promise;
+        const transport = new PdfCacheRangeTransport(
+          normalized,
+          totalBytes,
+          readPdfRange,
+        );
+        const orFail = <T>(p: Promise<T>): Promise<T> =>
+          Promise.race([p, transport.failed]);
+        const pdfDoc = await orFail(
+          getDocument({
+            range: transport,
+            length: totalBytes,
+            disableAutoFetch: true,
+            disableStream: true,
+            rangeChunkSize: 64 * 1024,
+            standardFontDataUrl: STANDARD_FONT_DATA_URL,
+            StandardFontDataFactory: FetchStandardFontDataFactory,
+            verbosity: VerbosityLevel.ERRORS,
+          }).promise,
+        );
         try {
-          const fieldObjects = (await pdfDoc.getFieldObjects()) as Record<
-            string,
-            PdfJsFieldObject[]
-          > | null;
+          const fieldObjects = (await orFail(
+            pdfDoc.getFieldObjects(),
+          )) as Record<string, PdfJsFieldObject[]> | null;
           if (fieldObjects && Object.keys(fieldObjects).length > 0) {
-            formSchema = await extractFormSchema(pdfDoc, fieldObjects);
-            fieldInfo = await extractFormFieldInfo(pdfDoc);
+            formSchema = await orFail(extractFormSchema(pdfDoc, fieldObjects));
+            fieldInfo = await orFail(extractFormFieldInfo(pdfDoc));
           }
         } finally {
           pdfDoc.destroy();

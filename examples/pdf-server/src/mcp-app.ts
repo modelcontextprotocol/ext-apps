@@ -2742,6 +2742,17 @@ function persistAnnotations(): void {
     pdfBaselineFormValues,
   );
 
+  // computeDiff only sees baseline ids from pages we've already scanned.
+  // Carry forward restored tombstones for unvisited pages so the first
+  // persist after restore doesn't drop them. Once the page is scanned the id
+  // appears in pdfBaselineAnnotations and computeDiff produces it itself,
+  // hence the includes() guard.
+  for (const id of restoredRemovedIds) {
+    if (!annotationMap.has(id) && !diff.removed.includes(id)) {
+      diff.removed.push(id);
+    }
+  }
+
   // Dirty tracks whether there are unsaved changes. Undoing back to baseline
   // yields an empty diff → clean again → save button disables.
   if (!isRestoring) setDirty(!isDiffEmpty(diff));
@@ -3087,11 +3098,19 @@ async function getAnnotatedPdfBytes(): Promise<Uint8Array> {
   }
 
   // Baseline annotations the user deleted: strip their refs from /Annots so
-  // they don't reappear on reload. Ids without a recoverable ref (page-index
-  // fallback) can't be removed by-ref and are skipped.
-  const removedRefs = pdfBaselineAnnotations
-    .filter((a) => !annotationMap.has(a.id))
-    .map((a) => parseAnnotationRef(a.id))
+  // they don't reappear on reload. Include restored tombstones for pages we
+  // haven't scanned yet — those ids aren't in pdfBaselineAnnotations but the
+  // ref is still parseable from the id string. Ids without a recoverable ref
+  // (page-index fallback) can't be removed by-ref and are skipped.
+  const removedIds = new Set<string>();
+  for (const a of pdfBaselineAnnotations) {
+    if (!annotationMap.has(a.id)) removedIds.add(a.id);
+  }
+  for (const id of restoredRemovedIds) {
+    if (!annotationMap.has(id)) removedIds.add(id);
+  }
+  const removedRefs = [...removedIds]
+    .map(parseAnnotationRef)
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
   // Only write fields that actually changed vs. what's already in the PDF.

@@ -10,6 +10,8 @@ import {
   createPdfCache,
   createServer,
   extractFormSchema,
+  PdfCacheRangeTransport,
+  MAX_CHUNK_BYTES,
   validateUrl,
   isAncestorDir,
   allowedLocalFiles,
@@ -290,6 +292,53 @@ describe("PDF Cache with Timeouts", () => {
   // using fake timers which can be complex with async code.
   // The timeout behavior is straightforward and can be verified
   // through manual testing or E2E tests.
+});
+
+describe("PdfCacheRangeTransport", () => {
+  it("delivers ranges larger than MAX_CHUNK_BYTES in multiple onDataRange calls", async () => {
+    const big = MAX_CHUNK_BYTES * 2 + 100;
+    const reads: Array<[number, number]> = [];
+    const t = new PdfCacheRangeTransport("u", big, async (_u, off, n) => {
+      reads.push([off, n]);
+      return {
+        data: new Uint8Array(Math.min(n, MAX_CHUNK_BYTES)),
+        totalBytes: big,
+      };
+    });
+    const delivered: Array<[number, number]> = [];
+    t.addRangeListener((begin: number, chunk: Uint8Array) =>
+      delivered.push([begin, chunk.length]),
+    );
+    t.requestDataRange(0, big);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(delivered).toEqual([
+      [0, MAX_CHUNK_BYTES],
+      [MAX_CHUNK_BYTES, MAX_CHUNK_BYTES],
+      [MAX_CHUNK_BYTES * 2, 100],
+    ]);
+  });
+
+  it("rejects .failed when a range fetch errors instead of hanging", async () => {
+    const t = new PdfCacheRangeTransport("u", 1000, async () => {
+      throw new Error("network down");
+    });
+    t.requestDataRange(0, 100);
+    await expect(
+      Promise.race([
+        t.failed,
+        new Promise((r) => setTimeout(() => r("timeout"), 200)),
+      ]),
+    ).rejects.toThrow("network down");
+  });
+
+  it("rejects .failed on zero-length response (would otherwise spin)", async () => {
+    const t = new PdfCacheRangeTransport("u", 1000, async () => ({
+      data: new Uint8Array(0),
+      totalBytes: 1000,
+    }));
+    t.requestDataRange(0, 100);
+    await expect(t.failed).rejects.toThrow(/empty range/);
+  });
 });
 
 describe("extractFormSchema field-tree handling", () => {
