@@ -41,14 +41,21 @@ async function waitForAppLoad(page: Page) {
   await expect(outerFrame.locator("iframe")).toBeVisible({ timeout: 30_000 });
 }
 
-/** Load basic-host, select PDF Server, call display_pdf with a custom URL. */
+/**
+ * Load basic-host, select PDF Server, call display_pdf with a custom URL.
+ * Resolves once the tool result panel appears (server-side display_pdf done);
+ * does NOT wait for the viewer iframe — call waitForAppLoad separately so
+ * byte-count assertions can isolate server-side fetches from viewer fetches.
+ */
 async function displayPdf(page: Page, url: string) {
   await page.goto("/?theme=hide");
   await expect(page.locator("select").first()).toBeEnabled({ timeout: 30_000 });
   await page.locator("select").first().selectOption({ label: "PDF Server" });
   await page.locator("textarea").fill(JSON.stringify({ url }));
   await page.click('button:has-text("Call Tool")');
-  await waitForAppLoad(page);
+  await expect(page.locator('text="📤 Tool Result"').first()).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 /** Read and parse the most recent tool result's structuredContent. */
@@ -78,6 +85,7 @@ test.describe("PDF Server — incremental loading", () => {
     page,
   }) => {
     await displayPdf(page, `${rangeServer.baseUrl}/forms.pdf`);
+    await waitForAppLoad(page);
     const sc = await readStructuredContent(page);
     const fields = sc.formFields as Array<{ name: string }> | undefined;
     expect(fields?.map((f) => f.name).sort()).toEqual([
@@ -94,12 +102,15 @@ test.describe("PDF Server — incremental loading", () => {
   }) => {
     const fileSize = rangeServer.fileSizes["/noforms.pdf"];
     await displayPdf(page, `${rangeServer.baseUrl}/noforms.pdf`);
+
+    // Measure before the viewer iframe loads so the count reflects only the
+    // server-side display_pdf range fetches.
+    const { totalBytesServed } = rangeServer.stats();
+    expect(totalBytesServed).toBeLessThan(fileSize * 0.3);
+
+    await waitForAppLoad(page);
     const sc = await readStructuredContent(page);
     expect(sc.formFields).toBeUndefined();
-
-    const { totalBytesServed } = rangeServer.stats();
-    // Guard against display_pdf downloading the whole file for form analysis.
-    expect(totalBytesServed).toBeLessThan(fileSize * 0.3);
   });
 
   test("first page renders while later ranges are stalled", async ({
@@ -113,6 +124,7 @@ test.describe("PDF Server — incremental loading", () => {
       page,
       `${rangeServer.baseUrl}/noforms.pdf?stallAfterBytes=${budget}`,
     );
+    await waitForAppLoad(page);
     await waitForFirstPageRendered(page);
 
     const { totalBytesServed } = rangeServer.stats();
@@ -121,11 +133,50 @@ test.describe("PDF Server — incremental loading", () => {
     rangeServer.release();
   });
 
+  test("page 2 renders after stall release (>512KB object via chunked delivery)", async ({
+    page,
+  }) => {
+    const fileSize = rangeServer.fileSizes["/noforms.pdf"];
+    const budget = Math.floor(fileSize * 0.4);
+    await displayPdf(
+      page,
+      `${rangeServer.baseUrl}/noforms.pdf?stallAfterBytes=${budget}`,
+    );
+    await waitForAppLoad(page);
+    await waitForFirstPageRendered(page);
+
+    rangeServer.release();
+    const app = getAppFrame(page);
+    await app.locator("#next-btn").click();
+    await expect(app.locator("#page-input")).toHaveValue("2", {
+      timeout: 30_000,
+    });
+    // Page 2 references the ~500KB embedded JPEG; rendering it requires the
+    // server-side range transport to deliver a >MAX_CHUNK_BYTES coalesced
+    // request in slices. If chunked delivery were broken this would hang.
+    await waitForFirstPageRendered(page);
+    expect(rangeServer.stats().totalBytesServed).toBeGreaterThan(
+      fileSize * 0.9,
+    );
+  });
+
+  test("display_pdf returns gracefully when origin fails mid-load", async ({
+    page,
+  }) => {
+    await displayPdf(page, `${rangeServer.baseUrl}/error.pdf`);
+    // The tool result appearing (asserted inside displayPdf) is the hang
+    // guard: pre-fix, a mid-load fetch error left getDocument() pending and
+    // the result never arrived.
+    const sc = await readStructuredContent(page);
+    expect(sc.formFields).toBeUndefined();
+  });
+
   test("byte ranges are not redundantly fetched during initial render", async ({
     page,
   }) => {
     const fileSize = rangeServer.fileSizes["/noforms.pdf"];
     await displayPdf(page, `${rangeServer.baseUrl}/noforms.pdf`);
+    await waitForAppLoad(page);
     await waitForFirstPageRendered(page);
 
     // Server-side display_pdf and the viewer each open the document

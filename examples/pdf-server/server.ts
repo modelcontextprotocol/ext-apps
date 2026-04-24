@@ -641,10 +641,19 @@ export function validateUrl(url: string): {
   // Remote URL - require HTTPS
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "https:") {
-      return { valid: false, error: `Only HTTPS URLs are allowed: ${url}` };
+    if (parsed.protocol === "https:") return { valid: true };
+    // Loopback HTTP is opt-in (test fixtures, local dev). Off by default so a
+    // remotely-deployed server can't be made to probe its own internal ports.
+    if (
+      process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP &&
+      parsed.protocol === "http:" &&
+      (parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "localhost" ||
+        parsed.hostname === "[::1]")
+    ) {
+      return { valid: true };
     }
-    return { valid: true };
+    return { valid: false, error: `Only HTTPS URLs are allowed: ${url}` };
   } catch {
     return { valid: false, error: `Invalid URL: ${url}` };
   }
@@ -914,20 +923,23 @@ export class PdfCacheRangeTransport extends PDFDataRangeTransport {
 
   /**
    * pdf.js coalesces adjacent missing chunks into one unbounded request, but
-   * readPdfRange clamps each call to MAX_CHUNK_BYTES. Deliver in slices so
-   * the worker marks every requested chunk as loaded.
+   * readPdfRange clamps each call to MAX_CHUNK_BYTES. Its reader is keyed by
+   * the original `begin` and removed after one delivery, so we must accumulate
+   * slices and call onDataRange exactly once with the full buffer.
    */
   private async deliver(begin: number, end: number): Promise<void> {
-    let off = begin;
-    while (off < end) {
-      const want = Math.min(end - off, MAX_CHUNK_BYTES);
-      const { data } = await this.readPdfRange(this.url, off, want);
+    const buf = new Uint8Array(end - begin);
+    let off = 0;
+    while (off < buf.length) {
+      const want = Math.min(buf.length - off, MAX_CHUNK_BYTES);
+      const { data } = await this.readPdfRange(this.url, begin + off, want);
       if (data.length === 0) {
-        throw new Error(`empty range at ${off} for ${this.url}`);
+        throw new Error(`empty range at ${begin + off} for ${this.url}`);
       }
-      this.onDataRange(off, data);
+      buf.set(data.subarray(0, Math.min(data.length, buf.length - off)), off);
       off += data.length;
     }
+    this.onDataRange(begin, buf);
   }
 }
 

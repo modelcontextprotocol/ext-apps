@@ -295,7 +295,7 @@ describe("PDF Cache with Timeouts", () => {
 });
 
 describe("PdfCacheRangeTransport", () => {
-  it("delivers ranges larger than MAX_CHUNK_BYTES in multiple onDataRange calls", async () => {
+  it("accumulates ranges larger than MAX_CHUNK_BYTES into one onDataRange call", async () => {
     const big = MAX_CHUNK_BYTES * 2 + 100;
     const reads: Array<[number, number]> = [];
     const t = new PdfCacheRangeTransport("u", big, async (_u, off, n) => {
@@ -311,7 +311,11 @@ describe("PdfCacheRangeTransport", () => {
     );
     t.requestDataRange(0, big);
     await new Promise((r) => setTimeout(r, 10));
-    expect(delivered).toEqual([
+    // pdf.js's reader is keyed by the original begin and removed after one
+    // delivery, so deliver() must call onDataRange exactly once with the
+    // accumulated buffer — multiple calls would throw inside pdfjs.
+    expect(delivered).toEqual([[0, big]]);
+    expect(reads).toEqual([
       [0, MAX_CHUNK_BYTES],
       [MAX_CHUNK_BYTES, MAX_CHUNK_BYTES],
       [MAX_CHUNK_BYTES * 2, 100],
@@ -338,6 +342,127 @@ describe("PdfCacheRangeTransport", () => {
     }));
     t.requestDataRange(0, 100);
     await expect(t.failed).rejects.toThrow(/empty range/);
+  });
+
+  it("getDocument resolves on a >1MB PDF when readPdfRange clamps to MAX_CHUNK_BYTES", async () => {
+    // pdfjs coalesces adjacent missing chunks into one requestDataRange that
+    // can exceed MAX_CHUNK_BYTES. deliver() must accumulate clamped reads and
+    // hand pdfjs a single onDataRange(begin, fullBuffer). This test fails if
+    // deliver() either truncates or calls onDataRange more than once per
+    // requestDataRange (pdf.mjs _onReceiveData matches by exact begin).
+    function makeRandomJpeg(len: number): Uint8Array {
+      const header = Uint8Array.from([
+        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+        0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x0b,
+        0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00, 0xff, 0xc4, 0x00,
+        0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xda, 0x00, 0x08, 0x01,
+        0x01, 0x00, 0x00, 0x3f, 0x00,
+      ]);
+      const scan = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        const b = (i * 1103515245 + 12345) & 0xff;
+        scan[i] = b === 0xff ? 0xfe : b;
+      }
+      const eoi = Uint8Array.from([0xff, 0xd9]);
+      const out = new Uint8Array(header.length + len + 2);
+      out.set(header, 0);
+      out.set(scan, header.length);
+      out.set(eoi, header.length + len);
+      return out;
+    }
+
+    const d = await PDFDocument.create();
+    const img = await d.embedJpg(makeRandomJpeg(1_100_000));
+    const page = d.addPage([612, 792]);
+    page.drawImage(img, { x: 36, y: 36, width: 540, height: 720 });
+    const bytes = await d.save();
+    expect(bytes.length).toBeGreaterThan(2 * MAX_CHUNK_BYTES);
+
+    let maxReadLen = 0;
+    const readClamped: PdfCache["readPdfRange"] = async (_u, off, n) => {
+      const len = Math.min(n, MAX_CHUNK_BYTES, bytes.length - off);
+      maxReadLen = Math.max(maxReadLen, len);
+      return { data: bytes.slice(off, off + len), totalBytes: bytes.length };
+    };
+    const transport = new PdfCacheRangeTransport(
+      "mem://big",
+      bytes.length,
+      readClamped,
+    );
+
+    const doc = await Promise.race([
+      getDocument({
+        range: transport,
+        length: bytes.length,
+        disableAutoFetch: true,
+        disableStream: true,
+        rangeChunkSize: 64 * 1024,
+      }).promise,
+      transport.failed,
+      new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("getDocument hung")), 5000),
+      ),
+    ]);
+    const p1 = await Promise.race([
+      doc.getPage(1),
+      transport.failed,
+      new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("getPage hung")), 5000),
+      ),
+    ]);
+    expect(p1).toBeDefined();
+    expect(maxReadLen).toBeLessThanOrEqual(MAX_CHUNK_BYTES);
+    doc.destroy();
+  });
+});
+
+describe("display_pdf transport-error handling", () => {
+  it("returns (does not hang) when range fetches fail mid-load", async () => {
+    // First fetch = the 1-byte size probe → 206 with Content-Range so
+    // display_pdf gets totalBytes. Every subsequent fetch (made by
+    // PdfCacheRangeTransport via readPdfRange) rejects, which must surface
+    // through transport.failed → orFail() → outer catch, not hang.
+    let calls = 0;
+    const mockFetch = spyOn(globalThis, "fetch").mockImplementation(
+      async () => {
+        if (calls++ === 0) {
+          return new Response(new Uint8Array(1), {
+            status: 206,
+            headers: { "Content-Range": "bytes 0-0/50000" },
+          });
+        }
+        throw new Error("network down");
+      },
+    );
+
+    const server = createServer();
+    const client = new Client({ name: "t", version: "1" });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(st), client.connect(ct)]);
+
+    try {
+      const result = await Promise.race([
+        client.callTool({
+          name: "display_pdf",
+          arguments: { url: "https://arxiv.org/pdf/err-test" },
+        }),
+        new Promise<never>((_, rej) =>
+          setTimeout(
+            () => rej(new Error("display_pdf hung on transport error")),
+            3000,
+          ),
+        ),
+      ]);
+      expect(result.isError).toBeFalsy();
+      const sc = result.structuredContent as { formFields?: unknown };
+      expect(sc.formFields).toBeUndefined();
+      expect(calls).toBeGreaterThan(1);
+    } finally {
+      mockFetch.mockRestore();
+      await client.close();
+      await server.close();
+    }
   });
 });
 
@@ -416,6 +541,24 @@ describe("extractFormSchema field-tree handling", () => {
     d.addPage([612, 792]);
     const schema = await schemaFor(await d.save());
     expect(schema).toBeNull();
+  });
+});
+
+describe("validateUrl loopback HTTP allow (PDF_SERVER_ALLOW_LOOPBACK_HTTP)", () => {
+  it("rejects http://127.0.0.1 by default", () => {
+    expect(validateUrl("http://127.0.0.1:9999/x.pdf").valid).toBe(false);
+  });
+
+  it("accepts http://127.0.0.1 only when the env gate is set, and never non-loopback http", () => {
+    const prev = process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP;
+    process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP = "1";
+    try {
+      expect(validateUrl("http://127.0.0.1:9999/x.pdf").valid).toBe(true);
+      expect(validateUrl("http://169.254.169.254/").valid).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP;
+      else process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP = prev;
+    }
   });
 });
 

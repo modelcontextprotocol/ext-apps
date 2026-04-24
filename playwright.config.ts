@@ -47,14 +47,10 @@ export default defineConfig({
     env: {
       ...process.env,
       EXAMPLE: process.env.EXAMPLE ?? "",
-      // pdf-incremental-load.spec.ts serves test PDFs over self-signed HTTPS
-      // and pdf-server's outbound fetch must accept that cert. This disables
-      // TLS verification for the entire e2e webServer process tree (all
-      // example servers launched by examples:start), not just pdf-server —
-      // run-all.ts inherits env to every child. Acceptable for the e2e
-      // sandbox; never set in production. Tightening to pdf-server alone
-      // requires a validateUrl localhost allow (tracked separately).
-      NODE_TLS_REJECT_UNAUTHORIZED: "0",
+      // Let pdf-server fetch from the http://127.0.0.1 range-counting fixture
+      // (validateUrl rejects loopback HTTP unless this is set). Scoped to this
+      // server's check only — does not touch Node's TLS verification.
+      PDF_SERVER_ALLOW_LOOPBACK_HTTP: "1",
     },
   },
   // Snapshot configuration

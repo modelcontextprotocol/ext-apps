@@ -1,13 +1,12 @@
 /**
- * HTTPS test fixture serving programmatically-generated PDFs with byte-range
+ * HTTP test fixture serving programmatically-generated PDFs with byte-range
  * accounting. Used by pdf-incremental-load.spec.ts to assert that display_pdf
  * doesn't pull the whole file before the viewer starts streaming.
+ *
+ * Plain HTTP on loopback — validateUrl allows http://127.0.0.1/localhost so
+ * no self-signed cert / TLS-bypass env var is needed.
  */
-import https from "node:https";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
@@ -94,6 +93,9 @@ function makeRandomJpeg(len: number): Uint8Array {
   return out;
 }
 
+/** Threshold after which /error.pdf starts returning 500. */
+export const ERROR_AFTER_BYTES = 50_000;
+
 async function buildFormsPdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const form = doc.getForm();
@@ -107,41 +109,19 @@ async function buildFormsPdf(): Promise<Uint8Array> {
   return doc.save();
 }
 
-function generateSelfSignedCert(): { key: Buffer; cert: Buffer } {
-  const dir = mkdtempSync(path.join(tmpdir(), "range-server-cert-"));
-  const keyPath = path.join(dir, "key.pem");
-  const certPath = path.join(dir, "cert.pem");
-  execFileSync(
-    "openssl",
-    [
-      "req",
-      "-x509",
-      "-newkey",
-      "rsa:2048",
-      "-nodes",
-      "-keyout",
-      keyPath,
-      "-out",
-      certPath,
-      "-days",
-      "1",
-      "-subj",
-      "/CN=localhost",
-    ],
-    { stdio: "pipe" },
-  );
-  return { key: readFileSync(keyPath), cert: readFileSync(certPath) };
-}
-
 export async function startRangeServer(): Promise<RangeServer> {
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "range-counting-server is a test fixture; refusing to start with NODE_ENV=production",
     );
   }
+  const noforms = await buildNoFormsPdf();
   const files: Record<string, Uint8Array> = {
-    "/noforms.pdf": await buildNoFormsPdf(),
+    "/noforms.pdf": noforms,
     "/forms.pdf": await buildFormsPdf(),
+    // Same bytes as noforms.pdf, but the route 500s after ERROR_AFTER_BYTES
+    // total have been served — exercises display_pdf's transport.failed path.
+    "/error.pdf": noforms,
   };
   const fileSizes = Object.fromEntries(
     Object.entries(files).map(([k, v]) => [k, v.length]),
@@ -160,10 +140,10 @@ export async function startRangeServer(): Promise<RangeServer> {
   let releaseResolve: (() => void) | undefined;
   let releasePromise = new Promise<void>((r) => (releaseResolve = r));
 
-  const { key, cert } = generateSelfSignedCert();
+  const totalServed = () => requests.reduce((s, r) => s + r.bytes, 0);
 
-  const server = https.createServer({ key, cert }, async (req, res) => {
-    const url = new URL(req.url ?? "/", "https://localhost");
+  const server = http.createServer(async (req, res) => {
+    const url = new URL(req.url ?? "/", "http://127.0.0.1");
     const body = files[url.pathname];
     if (!body) {
       res.writeHead(404).end();
@@ -192,8 +172,12 @@ export async function startRangeServer(): Promise<RangeServer> {
     // header/trailer/xref (scattered across the file) before blocking the
     // bulk content streams.
     if (stallAfterBytes !== null) {
-      const served = requests.reduce((s, r) => s + r.bytes, 0);
-      if (served >= parseInt(stallAfterBytes, 10)) await releasePromise;
+      if (totalServed() >= parseInt(stallAfterBytes, 10)) await releasePromise;
+    }
+
+    if (url.pathname === "/error.pdf" && totalServed() > ERROR_AFTER_BYTES) {
+      res.writeHead(500).end("simulated origin failure");
+      return;
     }
 
     const slice = body.subarray(begin, end);
@@ -218,7 +202,7 @@ export async function startRangeServer(): Promise<RangeServer> {
 
   return {
     port,
-    baseUrl: `https://localhost:${port}`,
+    baseUrl: `http://127.0.0.1:${port}`,
     fileSizes,
     stats() {
       let totalBytesServed = 0;
