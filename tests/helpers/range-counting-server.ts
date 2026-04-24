@@ -5,10 +5,9 @@
  */
 import https from "node:https";
 import { execFileSync } from "node:child_process";
-import fs, { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
@@ -96,13 +95,16 @@ function makeRandomJpeg(len: number): Uint8Array {
 }
 
 async function buildFormsPdf(): Promise<Uint8Array> {
-  // pdf-lib generates a separated field/widget tree that pdfjs's
-  // getFieldObjects() reports without type/editable, so extractFormSchema
-  // skips them. Use a real-world form PDF (IRS W-9) instead — it's the same
-  // asset the server is expected to handle in production.
-  return fs.readFileSync(
-    path.join(path.dirname(fileURLToPath(import.meta.url)), "assets/fw9.pdf"),
-  );
+  const doc = await PDFDocument.create();
+  const form = doc.getForm();
+  for (let p = 0; p < 2; p++) doc.addPage([612, 792]);
+  const [page1] = doc.getPages();
+  const fields = ["name", "email", "phone", "city", "notes"];
+  fields.forEach((name, i) => {
+    const f = form.createTextField(name);
+    f.addToPage(page1, { x: 100, y: 650 - i * 60, width: 300, height: 24 });
+  });
+  return doc.save();
 }
 
 function generateSelfSignedCert(): { key: Buffer; cert: Buffer } {

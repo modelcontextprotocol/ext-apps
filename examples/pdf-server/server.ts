@@ -1039,7 +1039,7 @@ async function extractFormFieldInfo(
   return fields;
 }
 
-async function extractFormSchema(
+export async function extractFormSchema(
   pdfDoc: PDFDocumentProxy,
   fieldObjects?: Record<string, PdfJsFieldObject[]> | null,
 ): Promise<{
@@ -1063,7 +1063,11 @@ async function extractFormSchema(
 
   const properties: Record<string, PrimitiveSchemaDefinition> = {};
   for (const [name, fields] of Object.entries(fieldObjects)) {
-    const field = fields[0]; // first widget determines the type
+    // pdfjs returns the full field-tree array: for separated structures
+    // (pdf-lib) the typed widget is at [1+] behind a container at [0]; for
+    // merged/leaf entries (W-9, most authoring tools) it's at [0]. Pick the
+    // first entry that actually has a field type.
+    const field = fields.find((f) => f.type) ?? fields[0];
     if (!field.editable) continue;
 
     switch (field.type) {

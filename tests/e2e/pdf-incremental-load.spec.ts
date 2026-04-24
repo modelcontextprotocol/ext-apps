@@ -79,12 +79,14 @@ test.describe("PDF Server — incremental loading", () => {
   }) => {
     await displayPdf(page, `${rangeServer.baseUrl}/forms.pdf`);
     const sc = await readStructuredContent(page);
-    // formSchema may be null when field names are mechanical (W-9 uses
-    // f1_01[0]-style names), but formFields (bounding boxes) is always
-    // populated when the PDF has an AcroForm.
-    const fields = sc.formFields as unknown[] | undefined;
-    expect(fields).toBeDefined();
-    expect(fields!.length).toBeGreaterThanOrEqual(10);
+    const fields = sc.formFields as Array<{ name: string }> | undefined;
+    expect(fields?.map((f) => f.name).sort()).toEqual([
+      "city",
+      "email",
+      "name",
+      "notes",
+      "phone",
+    ]);
   });
 
   test("display_pdf on a no-forms PDF fetches <30% of the file", async ({
@@ -93,7 +95,7 @@ test.describe("PDF Server — incremental loading", () => {
     const fileSize = rangeServer.fileSizes["/noforms.pdf"];
     await displayPdf(page, `${rangeServer.baseUrl}/noforms.pdf`);
     const sc = await readStructuredContent(page);
-    expect(sc.formSchema ?? null).toBeNull();
+    expect(sc.formFields).toBeUndefined();
 
     const { totalBytesServed } = rangeServer.stats();
     // Guard against display_pdf downloading the whole file for form analysis.

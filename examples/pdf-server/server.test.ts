@@ -4,9 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { PDFDocument } from "pdf-lib";
 import {
   createPdfCache,
   createServer,
+  extractFormSchema,
   validateUrl,
   isAncestorDir,
   allowedLocalFiles,
@@ -287,6 +290,84 @@ describe("PDF Cache with Timeouts", () => {
   // using fake timers which can be complex with async code.
   // The timeout behavior is straightforward and can be verified
   // through manual testing or E2E tests.
+});
+
+describe("extractFormSchema field-tree handling", () => {
+  async function schemaFor(bytes: Uint8Array) {
+    const doc = await getDocument({ data: bytes }).promise;
+    try {
+      return await extractFormSchema(doc);
+    } finally {
+      doc.destroy();
+    }
+  }
+
+  it("handles pdf-lib separated field/widget structure", async () => {
+    const d = await PDFDocument.create();
+    const form = d.getForm();
+    d.addPage([612, 792]);
+    form
+      .createTextField("alpha")
+      .addToPage(d.getPage(0), { x: 50, y: 700, width: 200, height: 20 });
+    form
+      .createCheckBox("agree")
+      .addToPage(d.getPage(0), { x: 50, y: 660, width: 20, height: 20 });
+    form
+      .createDropdown("choice")
+      .addToPage(d.getPage(0), { x: 50, y: 620, width: 100, height: 20 });
+
+    const schema = await schemaFor(await d.save());
+    expect(schema).not.toBeNull();
+    expect(schema!.properties.alpha).toEqual({
+      type: "string",
+      title: "alpha",
+    });
+    expect(schema!.properties.agree).toEqual({
+      type: "boolean",
+      title: "agree",
+    });
+    expect(schema!.properties.choice.type).toBe("string");
+  });
+
+  it("handles fields with multiple widgets across pages", async () => {
+    const d = await PDFDocument.create();
+    const form = d.getForm();
+    d.addPage([612, 792]);
+    d.addPage([612, 792]);
+    const tf = form.createTextField("shared");
+    tf.addToPage(d.getPage(0), { x: 50, y: 700, width: 200, height: 20 });
+    tf.addToPage(d.getPage(1), { x: 50, y: 700, width: 200, height: 20 });
+
+    const schema = await schemaFor(await d.save());
+    expect(schema?.properties.shared).toEqual({
+      type: "string",
+      title: "shared",
+    });
+  });
+
+  it("skips container nodes and finds leaf fields (W-9 style)", async () => {
+    const bytes = fs.readFileSync(
+      path.join(__dirname, "../../tests/helpers/assets/fw9.pdf"),
+    );
+    const doc = await getDocument({ data: new Uint8Array(bytes) }).promise;
+    try {
+      const fo = (await doc.getFieldObjects()) as Record<string, unknown[]>;
+      // Container nodes (no leaf type) should not crash extraction
+      expect(fo["topmostSubform[0]"]).toBeDefined();
+      // Schema is null for W-9 (mechanical names), but extraction must not throw
+      const schema = await extractFormSchema(doc);
+      expect(schema).toBeNull();
+    } finally {
+      doc.destroy();
+    }
+  });
+
+  it("returns null when no AcroForm present", async () => {
+    const d = await PDFDocument.create();
+    d.addPage([612, 792]);
+    const schema = await schemaFor(await d.save());
+    expect(schema).toBeNull();
+  });
 });
 
 describe("validateUrl with MCP roots (allowedLocalDirs)", () => {
