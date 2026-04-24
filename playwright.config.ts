@@ -47,6 +47,9 @@ export default defineConfig({
     env: {
       ...process.env,
       EXAMPLE: process.env.EXAMPLE ?? "",
+      // pdf-incremental-load.spec.ts serves test PDFs over self-signed HTTPS;
+      // the pdf-server's upstream fetch must accept that cert.
+      NODE_TLS_REJECT_UNAUTHORIZED: "0",
     },
   },
   // Snapshot configuration

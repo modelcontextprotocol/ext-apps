@@ -31,6 +31,7 @@ import {
 import "./pdfjs-polyfill.js";
 import {
   getDocument,
+  PDFDataRangeTransport,
   VerbosityLevel,
   version as PDFJS_VERSION,
 } from "pdfjs-dist/legacy/build/pdf.mjs";
@@ -368,9 +369,6 @@ export const viewSourcePaths = new Map<string, string>();
 /** Valid form field names per viewer UUID (populated during display_pdf) */
 const viewFieldNames = new Map<string, Set<string>>();
 
-/** Detailed form field info per viewer UUID (populated during display_pdf) */
-const viewFieldInfo = new Map<string, FormFieldInfo[]>();
-
 /**
  * Active fs.watch per view. Only created for local files when interact is
  * enabled (stdio). Watcher is re-established on `rename` events to survive
@@ -387,7 +385,7 @@ const viewFileWatches = new Map<string, ViewFileWatch>();
 /**
  * Per-view heartbeat. THIS is what the sweep iterates — not commandQueues.
  *
- * Why not commandQueues: display_pdf populates viewFieldNames/viewFieldInfo/
+ * Why not commandQueues: display_pdf populates viewFieldNames/
  * viewFileWatches but never touches commandQueues (only enqueueCommand does,
  * and it's triply gated). And dequeueCommands deletes the entry on every poll,
  * so even when it exists the sweep's TTL window is ~200ms wide. Net effect:
@@ -409,7 +407,6 @@ function pruneStaleQueues(): void {
       viewLastActivity.delete(uuid);
       commandQueues.delete(uuid);
       viewFieldNames.delete(uuid);
-      viewFieldInfo.delete(uuid);
       viewsPolled.delete(uuid);
       viewSourcePaths.delete(uuid);
       stopFileWatch(uuid);
@@ -882,6 +879,28 @@ export function createPdfCache(
   };
 }
 
+/**
+ * pdf.js range transport backed by {@link PdfCache.readPdfRange}. Lets
+ * getDocument() fetch only the byte ranges it needs (xref, /AcroForm dict)
+ * instead of the whole file. With disableAutoFetch, a PDF without form
+ * fields is opened with ~5% of bytes fetched.
+ */
+export class PdfCacheRangeTransport extends PDFDataRangeTransport {
+  constructor(
+    private url: string,
+    length: number,
+    private readPdfRange: PdfCache["readPdfRange"],
+  ) {
+    super(length, null);
+  }
+  override requestDataRange(begin: number, end: number): void {
+    this.readPdfRange(this.url, begin, end - begin).then(
+      ({ data }) => this.onDataRange(begin, data),
+      () => this.abort(),
+    );
+  }
+}
+
 // =============================================================================
 // MCP Roots
 // =============================================================================
@@ -1020,19 +1039,23 @@ async function extractFormFieldInfo(
   return fields;
 }
 
-async function extractFormSchema(pdfDoc: PDFDocumentProxy): Promise<{
+async function extractFormSchema(
+  pdfDoc: PDFDocumentProxy,
+  fieldObjects?: Record<string, PdfJsFieldObject[]> | null,
+): Promise<{
   type: "object";
   properties: Record<string, PrimitiveSchemaDefinition>;
   required?: string[];
 } | null> {
-  let fieldObjects: Record<string, PdfJsFieldObject[]> | null;
-  try {
-    fieldObjects = (await pdfDoc.getFieldObjects()) as Record<
-      string,
-      PdfJsFieldObject[]
-    > | null;
-  } catch {
-    return null;
+  if (fieldObjects === undefined) {
+    try {
+      fieldObjects = (await pdfDoc.getFieldObjects()) as Record<
+        string,
+        PdfJsFieldObject[]
+      > | null;
+    } catch {
+      return null;
+    }
   }
   if (!fieldObjects || Object.keys(fieldObjects).length === 0) {
     return null;
@@ -1434,7 +1457,7 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
       const { totalBytes } = await readPdfRange(normalized, 0, 1);
       const uuid = randomUUID();
       // Start the heartbeat now so the sweep can clean up viewFieldNames/
-      // viewFieldInfo/viewFileWatches even if no interact calls ever happen.
+      // viewFileWatches even if no interact calls ever happen.
       if (!disableInteract) touchView(uuid);
 
       // Check writability (governs save button; see isWritablePath doc).
@@ -1462,21 +1485,36 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
         }
       }
 
-      // Extract form field schema + detailed field info from a single
-      // download/parse pass.
+      // Extract form field schema + detailed field info via range transport so
+      // PDFs without forms only fetch the trailer/xref/catalog (~5% of bytes).
+      // PDFs with forms still pull most of the file once getAnnotations walks
+      // every page, but those are typically small.
       let formSchema: Awaited<ReturnType<typeof extractFormSchema>> = null;
       let fieldInfo: FormFieldInfo[] = [];
       try {
-        const { data } = await readPdfRange(normalized, 0, totalBytes);
         const pdfDoc = await getDocument({
-          data,
+          range: new PdfCacheRangeTransport(
+            normalized,
+            totalBytes,
+            readPdfRange,
+          ),
+          length: totalBytes,
+          disableAutoFetch: true,
+          disableStream: true,
+          rangeChunkSize: 64 * 1024,
           standardFontDataUrl: STANDARD_FONT_DATA_URL,
           StandardFontDataFactory: FetchStandardFontDataFactory,
           verbosity: VerbosityLevel.ERRORS,
         }).promise;
         try {
-          formSchema = await extractFormSchema(pdfDoc);
-          fieldInfo = await extractFormFieldInfo(pdfDoc);
+          const fieldObjects = (await pdfDoc.getFieldObjects()) as Record<
+            string,
+            PdfJsFieldObject[]
+          > | null;
+          if (fieldObjects && Object.keys(fieldObjects).length > 0) {
+            formSchema = await extractFormSchema(pdfDoc, fieldObjects);
+            fieldInfo = await extractFormFieldInfo(pdfDoc);
+          }
         } finally {
           pdfDoc.destroy();
         }
@@ -1486,14 +1524,11 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
       if (formSchema) {
         viewFieldNames.set(uuid, new Set(Object.keys(formSchema.properties)));
       }
-      if (fieldInfo.length > 0) {
-        viewFieldInfo.set(uuid, fieldInfo);
-        if (!viewFieldNames.has(uuid)) {
-          viewFieldNames.set(
-            uuid,
-            new Set(fieldInfo.map((f) => f.name).filter(Boolean)),
-          );
-        }
+      if (fieldInfo.length > 0 && !viewFieldNames.has(uuid)) {
+        viewFieldNames.set(
+          uuid,
+          new Set(fieldInfo.map((f) => f.name).filter(Boolean)),
+        );
       }
 
       // Elicit form field values if requested and client supports it
