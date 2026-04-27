@@ -1019,6 +1019,58 @@ interface FormFieldInfo {
 }
 
 /**
+ * Open `url` via {@link PdfCacheRangeTransport} and return form metadata.
+ * Uses `disableAutoFetch` so PDFs without an AcroForm are probed with only
+ * the trailer/xref/catalog (~5-25% of bytes); PDFs with forms still walk
+ * every page via {@link extractFormFieldInfo} but those are typically small.
+ * All errors (including range-fetch failures surfaced via
+ * {@link PdfCacheRangeTransport.failed}) resolve to empty results.
+ */
+async function probeFormFields(
+  url: string,
+  totalBytes: number,
+  readPdfRange: PdfCache["readPdfRange"],
+): Promise<{
+  formSchema: Awaited<ReturnType<typeof extractFormSchema>>;
+  fieldInfo: FormFieldInfo[];
+}> {
+  try {
+    const transport = new PdfCacheRangeTransport(url, totalBytes, readPdfRange);
+    const orFail = <T>(p: Promise<T>): Promise<T> =>
+      Promise.race([p, transport.failed]);
+    const pdfDoc = await orFail(
+      getDocument({
+        range: transport,
+        length: totalBytes,
+        disableAutoFetch: true,
+        disableStream: true,
+        rangeChunkSize: 64 * 1024,
+        standardFontDataUrl: STANDARD_FONT_DATA_URL,
+        StandardFontDataFactory: FetchStandardFontDataFactory,
+        verbosity: VerbosityLevel.ERRORS,
+      }).promise,
+    );
+    try {
+      const fieldObjects = (await orFail(pdfDoc.getFieldObjects())) as Record<
+        string,
+        PdfJsFieldObject[]
+      > | null;
+      if (!fieldObjects || Object.keys(fieldObjects).length === 0) {
+        return { formSchema: null, fieldInfo: [] };
+      }
+      return {
+        formSchema: await orFail(extractFormSchema(pdfDoc, fieldObjects)),
+        fieldInfo: await orFail(extractFormFieldInfo(pdfDoc)),
+      };
+    } finally {
+      pdfDoc.destroy();
+    }
+  } catch {
+    return { formSchema: null, fieldInfo: [] };
+  }
+}
+
+/**
  * Extract detailed form field info (name, type, page, bounding box, label)
  * from a PDF. Bounding boxes are converted to model coordinates (top-left origin).
  */
@@ -1083,22 +1135,12 @@ async function extractFormFieldInfo(
 
 export async function extractFormSchema(
   pdfDoc: PDFDocumentProxy,
-  fieldObjects?: Record<string, PdfJsFieldObject[]> | null,
+  fieldObjects: Record<string, PdfJsFieldObject[]> | null,
 ): Promise<{
   type: "object";
   properties: Record<string, PrimitiveSchemaDefinition>;
   required?: string[];
 } | null> {
-  if (fieldObjects === undefined) {
-    try {
-      fieldObjects = (await pdfDoc.getFieldObjects()) as Record<
-        string,
-        PdfJsFieldObject[]
-      > | null;
-    } catch {
-      return null;
-    }
-  }
   if (!fieldObjects || Object.keys(fieldObjects).length === 0) {
     return null;
   }
@@ -1531,46 +1573,11 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
         }
       }
 
-      // Extract form field schema + detailed field info via range transport so
-      // PDFs without forms only fetch the trailer/xref/catalog (~5% of bytes).
-      // PDFs with forms still pull most of the file once getAnnotations walks
-      // every page, but those are typically small.
-      let formSchema: Awaited<ReturnType<typeof extractFormSchema>> = null;
-      let fieldInfo: FormFieldInfo[] = [];
-      try {
-        const transport = new PdfCacheRangeTransport(
-          normalized,
-          totalBytes,
-          readPdfRange,
-        );
-        const orFail = <T>(p: Promise<T>): Promise<T> =>
-          Promise.race([p, transport.failed]);
-        const pdfDoc = await orFail(
-          getDocument({
-            range: transport,
-            length: totalBytes,
-            disableAutoFetch: true,
-            disableStream: true,
-            rangeChunkSize: 64 * 1024,
-            standardFontDataUrl: STANDARD_FONT_DATA_URL,
-            StandardFontDataFactory: FetchStandardFontDataFactory,
-            verbosity: VerbosityLevel.ERRORS,
-          }).promise,
-        );
-        try {
-          const fieldObjects = (await orFail(
-            pdfDoc.getFieldObjects(),
-          )) as Record<string, PdfJsFieldObject[]> | null;
-          if (fieldObjects && Object.keys(fieldObjects).length > 0) {
-            formSchema = await orFail(extractFormSchema(pdfDoc, fieldObjects));
-            fieldInfo = await orFail(extractFormFieldInfo(pdfDoc));
-          }
-        } finally {
-          pdfDoc.destroy();
-        }
-      } catch {
-        // Non-fatal — PDF may not have form fields or may fail to parse
-      }
+      const { formSchema, fieldInfo } = await probeFormFields(
+        normalized,
+        totalBytes,
+        readPdfRange,
+      );
       if (formSchema) {
         viewFieldNames.set(uuid, new Set(Object.keys(formSchema.properties)));
       }

@@ -3,22 +3,14 @@
  * accounting. Used by pdf-incremental-load.spec.ts to assert that display_pdf
  * doesn't pull the whole file before the viewer starts streaming.
  *
- * Plain HTTP on loopback — validateUrl allows http://127.0.0.1/localhost so
- * no self-signed cert / TLS-bypass env var is needed.
+ * Plain HTTP on loopback — playwright.config.ts sets
+ * PDF_SERVER_ALLOW_LOOPBACK_HTTP=1 so validateUrl accepts http://127.0.0.1.
  */
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { PDFDocument, PDFName, PDFString, StandardFonts } from "pdf-lib";
 
-export interface RangeRequest {
-  path: string;
-  begin: number;
-  end: number; // exclusive
-  bytes: number;
-}
-
 export interface RangeServerStats {
-  requests: RangeRequest[];
   /** Total bytes written across all responses (sum of slice lengths). */
   totalBytesServed: number;
   /** Bytes that were served more than once for the same path. */
@@ -32,7 +24,7 @@ export interface RangeServer {
   fileSizes: Record<string, number>;
   stats(): RangeServerStats;
   resetStats(): void;
-  /** Resolve any requests currently stalled by ?stallAfter=N. */
+  /** Resolve any requests currently stalled by ?stallAfterBytes=N. */
   release(): void;
   close(): Promise<void>;
 }
@@ -49,8 +41,9 @@ async function buildNoFormsPdf(): Promise<Uint8Array> {
   // Page 1 is text-only (small) so first paint needs minimal bytes. Pages 2+
   // each reference a large embedded JPEG so the bulk of the file is in image
   // streams page 1 doesn't need. The stallAfterBytes test holds those back
-  // and asserts page 1 still renders.
-  const big = await doc.embedJpg(makeRandomJpeg(500 * 1024));
+  // and asserts page 1 still renders. The image is >MAX_CHUNK_BYTES (512KB)
+  // so rendering page 2 also exercises the viewer's >512KB range path.
+  const big = await doc.embedJpg(makeRandomJpeg(1_100 * 1024));
   const page1 = doc.addPage([612, 792]);
   for (let line = 0; line < 30; line++) {
     page1.drawText(`1.${line + 1} ${LOREM}`, {
@@ -69,7 +62,7 @@ async function buildNoFormsPdf(): Promise<Uint8Array> {
 }
 
 /** Minimal valid JPEG with `len` bytes of incompressible scan data. */
-function makeRandomJpeg(len: number): Uint8Array {
+export function makeRandomJpeg(len: number): Uint8Array {
   // SOI, APP0 (JFIF), SOF0 (baseline 8x8 1-component), DHT (minimal),
   // SOS, <random scan data>, EOI. pdf-lib only needs to parse the headers
   // to embed; the scan data is opaque.
@@ -92,9 +85,6 @@ function makeRandomJpeg(len: number): Uint8Array {
   out.set(eoi, header.length + scan.length);
   return out;
 }
-
-/** Threshold after which /error.pdf starts returning 500. */
-export const ERROR_AFTER_BYTES = 50_000;
 
 /**
  * Two pages, page 1 text-only, page 2 carries one native /Text (sticky-note)
@@ -151,14 +141,10 @@ export async function startRangeServer(): Promise<RangeServer> {
       "range-counting-server is a test fixture; refusing to start with NODE_ENV=production",
     );
   }
-  const noforms = await buildNoFormsPdf();
   const files: Record<string, Uint8Array> = {
-    "/noforms.pdf": noforms,
+    "/noforms.pdf": await buildNoFormsPdf(),
     "/forms.pdf": await buildFormsPdf(),
     "/with-native-annot.pdf": await buildWithNativeAnnotPdf(),
-    // Same bytes as noforms.pdf, but the route 500s after ERROR_AFTER_BYTES
-    // total have been served — exercises display_pdf's transport.failed path.
-    "/error.pdf": noforms,
   };
   const fileSizes = Object.fromEntries(
     Object.entries(files).map(([k, v]) => [k, v.length]),
@@ -173,11 +159,9 @@ export async function startRangeServer(): Promise<RangeServer> {
   };
   initHits();
 
-  let requests: RangeRequest[] = [];
+  let totalBytesServed = 0;
   let releaseResolve: (() => void) | undefined;
   let releasePromise = new Promise<void>((r) => (releaseResolve = r));
-
-  const totalServed = () => requests.reduce((s, r) => s + r.bytes, 0);
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -209,16 +193,13 @@ export async function startRangeServer(): Promise<RangeServer> {
     // header/trailer/xref (scattered across the file) before blocking the
     // bulk content streams.
     if (stallAfterBytes !== null) {
-      if (totalServed() >= parseInt(stallAfterBytes, 10)) await releasePromise;
-    }
-
-    if (url.pathname === "/error.pdf" && totalServed() > ERROR_AFTER_BYTES) {
-      res.writeHead(500).end("simulated origin failure");
-      return;
+      if (totalBytesServed >= parseInt(stallAfterBytes, 10)) {
+        await releasePromise;
+      }
     }
 
     const slice = body.subarray(begin, end);
-    requests.push({ path: url.pathname, begin, end, bytes: slice.length });
+    totalBytesServed += slice.length;
     const hits = hitCounts[url.pathname];
     for (let i = begin; i < end; i++) hits[i]++;
 
@@ -242,16 +223,14 @@ export async function startRangeServer(): Promise<RangeServer> {
     baseUrl: `http://127.0.0.1:${port}`,
     fileSizes,
     stats() {
-      let totalBytesServed = 0;
       let overlapBytes = 0;
-      for (const r of requests) totalBytesServed += r.bytes;
       for (const hits of Object.values(hitCounts)) {
         for (let i = 0; i < hits.length; i++) if (hits[i] > 1) overlapBytes++;
       }
-      return { requests: [...requests], totalBytesServed, overlapBytes };
+      return { totalBytesServed, overlapBytes };
     },
     resetStats() {
-      requests = [];
+      totalBytesServed = 0;
       initHits();
       // Unblock any handlers parked on the previous stall before re-arming,
       // otherwise they hold sockets open forever and close() hangs.

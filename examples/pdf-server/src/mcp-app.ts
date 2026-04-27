@@ -2696,36 +2696,47 @@ function scanPageBaselineAnnotations(
   baselineScannedPages.add(pageNum);
   let imported = 0;
   for (let i = 0; i < annotations.length; i++) {
-    const ann = annotations[i] as {
-      annotationType?: number;
-      subtype?: string;
-      name?: string;
-      rect?: number[];
-    };
-    const def = importPdfjsAnnotation(ann, pageNum, i);
-    if (def) {
-      pdfBaselineAnnotations.push(def);
-      imported++;
-      if (!annotationMap.has(def.id) && !restoredRemovedIds.has(def.id)) {
-        annotationMap.set(def.id, { def, elements: [] });
+    // Isolate each annotation: a malformed one must not bubble up to the
+    // caller's form-layer try in renderPage() (which would skip
+    // AnnotationLayer.render and hide form widgets for the whole page).
+    try {
+      const ann = annotations[i] as {
+        annotationType?: number;
+        subtype?: string;
+        name?: string;
+        rect?: number[];
+      };
+      const def = importPdfjsAnnotation(ann, pageNum, i);
+      if (def) {
+        pdfBaselineAnnotations.push(def);
+        imported++;
+        if (!annotationMap.has(def.id) && !restoredRemovedIds.has(def.id)) {
+          annotationMap.set(def.id, { def, elements: [] });
+        }
+      } else if (ann.annotationType !== 20) {
+        // Widget (type 20) is expected to be skipped; anything else we
+        // don't import will still be painted by page.render() onto the
+        // canvas as unselectable pixels. Log so we can diagnose
+        // "ghost annotations" (visible but not in panel, not clickable).
+        log.info(
+          `[WARN] Baseline: skipped PDF annotation on page ${pageNum}`,
+          `type=${ann.annotationType}`,
+          `subtype=${ann.subtype ?? "?"}`,
+          `name=${ann.name ?? "?"}`,
+          `rect=${ann.rect ? JSON.stringify(ann.rect) : "none"}`,
+        );
       }
-    } else if (ann.annotationType !== 20) {
-      // Widget (type 20) is expected to be skipped; anything else we
-      // don't import will still be painted by page.render() onto the
-      // canvas as unselectable pixels. Log so we can diagnose
-      // "ghost annotations" (visible but not in panel, not clickable).
-      log.info(
-        `[WARN] Baseline: skipped PDF annotation on page ${pageNum}`,
-        `type=${ann.annotationType}`,
-        `subtype=${ann.subtype ?? "?"}`,
-        `name=${ann.name ?? "?"}`,
-        `rect=${ann.rect ? JSON.stringify(ann.rect) : "none"}`,
-      );
+    } catch (err) {
+      log.info(`Baseline: page ${pageNum} annotation import failed`, err);
     }
   }
   if (imported > 0) {
-    updateAnnotationsBadge();
-    renderAnnotationPanel();
+    try {
+      updateAnnotationsBadge();
+      renderAnnotationPanel();
+    } catch (err) {
+      log.info(`Baseline: page ${pageNum} panel update failed`, err);
+    }
   }
 }
 
@@ -2744,12 +2755,15 @@ function persistAnnotations(): void {
 
   // computeDiff only sees baseline ids from pages we've already scanned.
   // Carry forward restored tombstones for unvisited pages so the first
-  // persist after restore doesn't drop them. Once the page is scanned the id
-  // appears in pdfBaselineAnnotations and computeDiff produces it itself,
-  // hence the includes() guard.
-  for (const id of restoredRemovedIds) {
-    if (!annotationMap.has(id) && !diff.removed.includes(id)) {
-      diff.removed.push(id);
+  // persist after restore doesn't drop them. Once every page is scanned the
+  // baseline is complete and computeDiff is authoritative on its own —
+  // dropping the carry-forward then also stops a stale id (no longer in the
+  // file) from pinning dirty=true forever.
+  if (baselineScannedPages.size < totalPages) {
+    for (const id of restoredRemovedIds) {
+      if (!annotationMap.has(id) && !diff.removed.includes(id)) {
+        diff.removed.push(id);
+      }
     }
   }
 

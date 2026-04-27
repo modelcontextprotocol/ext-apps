@@ -97,7 +97,7 @@ test.describe("PDF Server — incremental loading", () => {
     ]);
   });
 
-  test("display_pdf on a no-forms PDF fetches <30% of the file", async ({
+  test("display_pdf on a no-forms PDF stays under byte budget and bounded overlap", async ({
     page,
   }) => {
     const fileSize = rangeServer.fileSizes["/noforms.pdf"];
@@ -105,20 +105,27 @@ test.describe("PDF Server — incremental loading", () => {
 
     // Measure before the viewer iframe loads so the count reflects only the
     // server-side display_pdf range fetches.
-    const { totalBytesServed } = rangeServer.stats();
-    expect(totalBytesServed).toBeLessThan(fileSize * 0.3);
+    expect(rangeServer.stats().totalBytesServed).toBeLessThan(fileSize * 0.3);
 
     await waitForAppLoad(page);
     const sc = await readStructuredContent(page);
     expect(sc.formFields).toBeUndefined();
+
+    await waitForFirstPageRendered(page);
+    // Server-side display_pdf and the viewer each open the document
+    // independently, so the xref/trailer/catalog is fetched twice (≈25%).
+    // This guards against the pre-range-transport behavior where the server
+    // alone pulled 100% (then 200% with the double-parse), giving overlap >>
+    // file size once the viewer also loaded.
+    expect(rangeServer.stats().overlapBytes).toBeLessThan(fileSize * 0.5);
   });
 
-  test("first page renders while later ranges are stalled", async ({
+  test("first page renders under stall, then page 2 renders the >512KB image after release", async ({
     page,
   }) => {
     const fileSize = rangeServer.fileSizes["/noforms.pdf"];
     // Allow ~40% through (header + trailer/xref + page-1 content) then stall.
-    // The 500KB image stream referenced only by pages 2+ is the bulk.
+    // The 1.1MB image stream referenced only by pages 2+ is the bulk.
     const budget = Math.floor(fileSize * 0.4);
     await displayPdf(
       page,
@@ -126,24 +133,7 @@ test.describe("PDF Server — incremental loading", () => {
     );
     await waitForAppLoad(page);
     await waitForFirstPageRendered(page);
-
-    const { totalBytesServed } = rangeServer.stats();
-    expect(totalBytesServed).toBeLessThan(fileSize);
-
-    rangeServer.release();
-  });
-
-  test("page 2 renders after stall release (>512KB object via chunked delivery)", async ({
-    page,
-  }) => {
-    const fileSize = rangeServer.fileSizes["/noforms.pdf"];
-    const budget = Math.floor(fileSize * 0.4);
-    await displayPdf(
-      page,
-      `${rangeServer.baseUrl}/noforms.pdf?stallAfterBytes=${budget}`,
-    );
-    await waitForAppLoad(page);
-    await waitForFirstPageRendered(page);
+    expect(rangeServer.stats().totalBytesServed).toBeLessThan(fileSize);
 
     rangeServer.release();
     const app = getAppFrame(page);
@@ -151,43 +141,23 @@ test.describe("PDF Server — incremental loading", () => {
     await expect(app.locator("#page-input")).toHaveValue("2", {
       timeout: 30_000,
     });
-    // Page 2 references the ~500KB embedded JPEG; rendering it requires the
-    // server-side range transport to deliver a >MAX_CHUNK_BYTES coalesced
-    // request in slices. If chunked delivery were broken this would hang.
+    // Page 2 references the ~1.1MB embedded JPEG. Rendering it exercises the
+    // viewer's range transport on a >MAX_CHUNK_BYTES object after the stall
+    // is released. (The server-side PdfCacheRangeTransport accumulate-once
+    // path is covered by the unit test in server.test.ts; on noforms.pdf
+    // display_pdf bails at the empty getFieldObjects() check before touching
+    // the image stream, so this test does not exercise it.)
     await waitForFirstPageRendered(page);
     expect(rangeServer.stats().totalBytesServed).toBeGreaterThan(
       fileSize * 0.9,
     );
   });
+});
 
-  test("display_pdf returns gracefully when origin fails mid-load", async ({
-    page,
-  }) => {
-    await displayPdf(page, `${rangeServer.baseUrl}/error.pdf`);
-    // The tool result appearing (asserted inside displayPdf) is the hang
-    // guard: pre-fix, a mid-load fetch error left getDocument() pending and
-    // the result never arrived.
-    const sc = await readStructuredContent(page);
-    expect(sc.formFields).toBeUndefined();
-  });
-
-  test("byte ranges are not redundantly fetched during initial render", async ({
-    page,
-  }) => {
-    const fileSize = rangeServer.fileSizes["/noforms.pdf"];
-    await displayPdf(page, `${rangeServer.baseUrl}/noforms.pdf`);
-    await waitForAppLoad(page);
-    await waitForFirstPageRendered(page);
-
-    // Server-side display_pdf and the viewer each open the document
-    // independently, so the xref/trailer/catalog is fetched twice (≈25%).
-    // This guards against the pre-range-transport behavior where the server
-    // alone pulled 100% (then 200% with the double-parse), giving overlap >>
-    // file size once the viewer also loaded.
-    const { overlapBytes } = rangeServer.stats();
-    expect(overlapBytes).toBeLessThan(fileSize * 0.5);
-  });
-
+// Kept in this spec because the test needs an HTTP-served PDF and the
+// range-counting fixture is the convenient place; it does not use any
+// byte-accounting features.
+test.describe("PDF Server — annotation tombstone preservation", () => {
   test("deleted native annotation tombstone survives a persist before its page is scanned", async ({
     page,
   }) => {

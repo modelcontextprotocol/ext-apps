@@ -6,6 +6,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { PDFDocument } from "pdf-lib";
+import { makeRandomJpeg } from "../../tests/helpers/range-counting-server";
 import {
   createPdfCache,
   createServer,
@@ -350,28 +351,6 @@ describe("PdfCacheRangeTransport", () => {
     // hand pdfjs a single onDataRange(begin, fullBuffer). This test fails if
     // deliver() either truncates or calls onDataRange more than once per
     // requestDataRange (pdf.mjs _onReceiveData matches by exact begin).
-    function makeRandomJpeg(len: number): Uint8Array {
-      const header = Uint8Array.from([
-        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
-        0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x0b,
-        0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00, 0xff, 0xc4, 0x00,
-        0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xda, 0x00, 0x08, 0x01,
-        0x01, 0x00, 0x00, 0x3f, 0x00,
-      ]);
-      const scan = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        const b = (i * 1103515245 + 12345) & 0xff;
-        scan[i] = b === 0xff ? 0xfe : b;
-      }
-      const eoi = Uint8Array.from([0xff, 0xd9]);
-      const out = new Uint8Array(header.length + len + 2);
-      out.set(header, 0);
-      out.set(scan, header.length);
-      out.set(eoi, header.length + len);
-      return out;
-    }
-
     const d = await PDFDocument.create();
     const img = await d.embedJpg(makeRandomJpeg(1_100_000));
     const page = d.addPage([612, 792]);
@@ -379,19 +358,35 @@ describe("PdfCacheRangeTransport", () => {
     const bytes = await d.save();
     expect(bytes.length).toBeGreaterThan(2 * MAX_CHUNK_BYTES);
 
-    let maxReadLen = 0;
     const readClamped: PdfCache["readPdfRange"] = async (_u, off, n) => {
       const len = Math.min(n, MAX_CHUNK_BYTES, bytes.length - off);
-      maxReadLen = Math.max(maxReadLen, len);
       return { data: bytes.slice(off, off + len), totalBytes: bytes.length };
     };
-    const transport = new PdfCacheRangeTransport(
+    // Record the spans pdfjs actually requests so the test fails fast if it
+    // never asks for >MAX_CHUNK_BYTES (i.e. can't go vacuously green).
+    const spans: number[] = [];
+    class RecordingTransport extends PdfCacheRangeTransport {
+      override requestDataRange(begin: number, end: number): void {
+        spans.push(end - begin);
+        super.requestDataRange(begin, end);
+      }
+    }
+    const transport = new RecordingTransport(
       "mem://big",
       bytes.length,
       readClamped,
     );
 
-    const doc = await Promise.race([
+    const orHang = <T>(p: Promise<T>, what: string): Promise<T> =>
+      Promise.race([
+        p,
+        transport.failed,
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error(`${what} hung`)), 5000),
+        ),
+      ]);
+
+    const doc = await orHang(
       getDocument({
         range: transport,
         length: bytes.length,
@@ -399,20 +394,13 @@ describe("PdfCacheRangeTransport", () => {
         disableStream: true,
         rangeChunkSize: 64 * 1024,
       }).promise,
-      transport.failed,
-      new Promise<never>((_, rej) =>
-        setTimeout(() => rej(new Error("getDocument hung")), 5000),
-      ),
-    ]);
-    const p1 = await Promise.race([
-      doc.getPage(1),
-      transport.failed,
-      new Promise<never>((_, rej) =>
-        setTimeout(() => rej(new Error("getPage hung")), 5000),
-      ),
-    ]);
-    expect(p1).toBeDefined();
-    expect(maxReadLen).toBeLessThanOrEqual(MAX_CHUNK_BYTES);
+      "getDocument",
+    );
+    const p1 = await orHang(doc.getPage(1), "getPage");
+    // getPage() alone doesn't decode the image XObject; getOperatorList() does,
+    // which is what triggers the >512KB coalesced range request.
+    await orHang(p1.getOperatorList(), "getOperatorList");
+    expect(Math.max(...spans)).toBeGreaterThan(MAX_CHUNK_BYTES);
     doc.destroy();
   });
 });
@@ -470,7 +458,10 @@ describe("extractFormSchema field-tree handling", () => {
   async function schemaFor(bytes: Uint8Array) {
     const doc = await getDocument({ data: bytes }).promise;
     try {
-      return await extractFormSchema(doc);
+      const fo = (await doc.getFieldObjects()) as Parameters<
+        typeof extractFormSchema
+      >[1];
+      return await extractFormSchema(doc, fo);
     } finally {
       doc.destroy();
     }
@@ -525,11 +516,13 @@ describe("extractFormSchema field-tree handling", () => {
     );
     const doc = await getDocument({ data: new Uint8Array(bytes) }).promise;
     try {
-      const fo = (await doc.getFieldObjects()) as Record<string, unknown[]>;
+      const fo = (await doc.getFieldObjects()) as Parameters<
+        typeof extractFormSchema
+      >[1];
       // Container nodes (no leaf type) should not crash extraction
-      expect(fo["topmostSubform[0]"]).toBeDefined();
+      expect(fo!["topmostSubform[0]"]).toBeDefined();
       // Schema is null for W-9 (mechanical names), but extraction must not throw
-      const schema = await extractFormSchema(doc);
+      const schema = await extractFormSchema(doc, fo);
       expect(schema).toBeNull();
     } finally {
       doc.destroy();
