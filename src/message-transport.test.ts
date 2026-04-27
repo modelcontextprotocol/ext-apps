@@ -392,9 +392,6 @@ describe("PostMessageTransport", () => {
   // forHostIframe() — static factory for host-side transport
   // ==========================================================================
   describe("forHostIframe()", () => {
-    // These tests require a real DOM environment. We create minimal fakes
-    // that satisfy the checks in forHostIframe().
-
     it("throws when iframe is not connected to the document", () => {
       const iframe = {
         isConnected: false,
@@ -404,14 +401,6 @@ describe("PostMessageTransport", () => {
       expect(() => PostMessageTransport.forHostIframe(iframe)).toThrow(
         /iframe must be in the document/,
       );
-    });
-
-    it("error message mentions appendChild", () => {
-      const iframe = {
-        isConnected: false,
-        contentWindow: {},
-      } as unknown as HTMLIFrameElement;
-
       expect(() => PostMessageTransport.forHostIframe(iframe)).toThrow(
         /appendChild/,
       );

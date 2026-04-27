@@ -58,10 +58,7 @@ function PostMessageTransport_constructor_host() {
 }
 
 /**
- * Example: Host using forHostIframe helper (recommended).
- *
- * The helper validates the iframe is connected and returns a transport bound
- * to its contentWindow. Connect before setting srcdoc/src.
+ * Example: Host using forHostIframe helper.
  */
 async function PostMessageTransport_forHostIframe(bridge: AppBridge) {
   //#region PostMessageTransport_forHostIframe

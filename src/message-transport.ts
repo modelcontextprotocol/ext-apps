@@ -204,20 +204,6 @@ export class PostMessageTransport implements Transport {
    * @returns A PostMessageTransport configured for host→iframe communication
    * @throws Error if the iframe is not connected to the document
    * @throws Error if contentWindow is unavailable
-   *
-   * @example Correct host construction order
-   * ```ts source="./message-transport.examples.ts#PostMessageTransport_forHostIframe"
-   * const iframe = document.createElement("iframe");
-   * iframe.sandbox.add("allow-scripts");
-   * document.body.appendChild(iframe);
-   *
-   * // Create transport BEFORE loading content
-   * const transport = PostMessageTransport.forHostIframe(iframe);
-   * await bridge.connect(transport);
-   *
-   * // NOW load the view — ui/initialize will be received
-   * iframe.srcdoc = "<html>...</html>";
-   * ```
    */
   static forHostIframe(iframe: HTMLIFrameElement): PostMessageTransport {
     if (!iframe.isConnected) {

@@ -2,6 +2,7 @@ import {
   type RequestOptions,
   mergeCapabilities,
   ProtocolOptions,
+  DEFAULT_REQUEST_TIMEOUT_MSEC,
 } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 import {
@@ -1989,11 +1990,8 @@ export class App extends ProtocolWithEvents<
       // Disconnect if initialization fails.
       void this.close();
 
-      // Improve timeout message with actionable diagnosis for host developers.
-      // This commonly happens when the host loads the View before connecting
-      // its transport, causing the ui/initialize message to be lost.
-      if (isInitializationTimeoutError(error)) {
-        const timeoutMs = options?.timeout ?? 60000;
+      if (App.isInitializationTimeoutError(error)) {
+        const timeoutMs = options?.timeout ?? DEFAULT_REQUEST_TIMEOUT_MSEC;
         const timeoutSec = Math.round(timeoutMs / 1000);
         throw new Error(
           `ui/initialize: no response within ${timeoutSec}s — ` +
@@ -2005,22 +2003,19 @@ export class App extends ProtocolWithEvents<
       throw error;
     }
   }
-}
 
-/**
- * Check if an error indicates the ui/initialize request timed out.
- */
-function isInitializationTimeoutError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
+  private static isInitializationTimeoutError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    const message = error.message.toLowerCase();
+    const name = error.name.toLowerCase();
+    return (
+      message.includes("timeout") ||
+      message.includes("timed out") ||
+      message.includes("requesttimeout") ||
+      name.includes("timeout") ||
+      name === "aborterror"
+    );
   }
-  const message = error.message.toLowerCase();
-  const name = error.name.toLowerCase();
-  return (
-    message.includes("timeout") ||
-    message.includes("timed out") ||
-    message.includes("requesttimeout") ||
-    name.includes("timeout") ||
-    name === "aborterror"
-  );
 }
