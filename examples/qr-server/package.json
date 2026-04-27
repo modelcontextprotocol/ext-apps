@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-qr",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": true,
   "scripts": {
     "start": "uv run server.py",
