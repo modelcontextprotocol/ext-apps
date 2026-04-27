@@ -8,7 +8,7 @@
  */
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFName, PDFString, StandardFonts } from "pdf-lib";
 
 export interface RangeRequest {
   path: string;
@@ -96,6 +96,42 @@ function makeRandomJpeg(len: number): Uint8Array {
 /** Threshold after which /error.pdf starts returning 500. */
 export const ERROR_AFTER_BYTES = 50_000;
 
+/**
+ * Two pages, page 1 text-only, page 2 carries one native /Text (sticky-note)
+ * annotation. Used by the tombstone-preservation e2e: the viewer's lazy
+ * baseline scan must not have visited page 2 when persistAnnotations runs.
+ */
+async function buildWithNativeAnnotPdf(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page1 = doc.addPage([612, 792]);
+  page1.drawText("Page 1 — no native annotations here.", {
+    x: 36,
+    y: 740,
+    size: 12,
+    font,
+  });
+  const page2 = doc.addPage([612, 792]);
+  page2.drawText("Page 2 — has one native /Text annot.", {
+    x: 36,
+    y: 740,
+    size: 12,
+    font,
+  });
+  const annotRef = doc.context.register(
+    doc.context.obj({
+      Type: "Annot",
+      Subtype: "Text",
+      Rect: [100, 700, 120, 720],
+      Contents: PDFString.of("native sticky note"),
+      Open: false,
+      Name: "Comment",
+    }),
+  );
+  page2.node.set(PDFName.of("Annots"), doc.context.obj([annotRef]));
+  return doc.save();
+}
+
 async function buildFormsPdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const form = doc.getForm();
@@ -119,6 +155,7 @@ export async function startRangeServer(): Promise<RangeServer> {
   const files: Record<string, Uint8Array> = {
     "/noforms.pdf": noforms,
     "/forms.pdf": await buildFormsPdf(),
+    "/with-native-annot.pdf": await buildWithNativeAnnotPdf(),
     // Same bytes as noforms.pdf, but the route 500s after ERROR_AFTER_BYTES
     // total have been served — exercises display_pdf's transport.failed path.
     "/error.pdf": noforms,

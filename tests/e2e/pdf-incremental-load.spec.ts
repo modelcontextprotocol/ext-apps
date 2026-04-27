@@ -187,4 +187,105 @@ test.describe("PDF Server — incremental loading", () => {
     const { overlapBytes } = rangeServer.stats();
     expect(overlapBytes).toBeLessThan(fileSize * 0.5);
   });
+
+  test("deleted native annotation tombstone survives a persist before its page is scanned", async ({
+    page,
+  }) => {
+    // Regression for the lazy baseline scan: restoredRemovedIds must be
+    // unioned into persistAnnotations() and getAnnotatedPdfBytes() so a
+    // delete on page 2 isn't silently dropped when an unrelated edit on
+    // page 1 triggers a persist before page 2 has been re-scanned.
+
+    await displayPdf(page, `${rangeServer.baseUrl}/with-native-annot.pdf`);
+    await waitForAppLoad(page);
+    await waitForFirstPageRendered(page);
+    const sc = await readStructuredContent(page);
+    const viewUUID = sc.viewUUID as string;
+    expect(viewUUID).toBeTruthy();
+
+    const app = getAppFrame(page);
+
+    // 1. Go to page 2, open the panel, delete the native annotation via UI.
+    await app.locator("#next-btn").click();
+    await expect(app.locator("#page-input")).toHaveValue("2");
+    await app.locator("#annotations-btn").click();
+    const nativeCard = app.locator(
+      '.annotation-card[data-annotation-id^="pdf-"]',
+    );
+    await expect(nativeCard).toBeVisible({ timeout: 10_000 });
+    const nativeId = await nativeCard.getAttribute("data-annotation-id");
+    expect(nativeId).toMatch(/^pdf-\d+R?$/);
+    await nativeCard.locator(".annotation-card-delete").click();
+    await expect(nativeCard).toHaveCount(0);
+
+    // 2. Back to page 1 so the post-reload viewer restores there (page 2
+    //    must stay unscanned until the very end).
+    await app.locator("#page-input").fill("1");
+    await app.locator("#page-input").press("Enter");
+    await expect(app.locator("#page-input")).toHaveValue("1");
+
+    // 3. Capture the annotation localStorage key and confirm the delete was
+    //    persisted.
+    const storageKey = await app
+      .locator("body")
+      .evaluate(
+        () =>
+          Object.keys(localStorage).find(
+            (k) => k.startsWith("pdf-annot:") || k.endsWith(":annotations"),
+          ) ?? null,
+      );
+    expect(storageKey).toBeTruthy();
+    const diffBefore = await app
+      .locator("body")
+      .evaluate((_, k) => localStorage.getItem(k), storageKey!);
+    expect(JSON.parse(diffBefore!).removed).toContain(nativeId);
+
+    // 4. Reload the inner viewer iframe ONLY (basic-host keeps the same
+    //    cached tool result → same viewUUID/toolId → same storage key).
+    //    restoreAnnotations() now seeds restoredRemovedIds from localStorage
+    //    while the lazy scan has only seen page 1.
+    await app.locator("body").evaluate(() => location.reload());
+    await waitForFirstPageRendered(page);
+    await expect(app.locator("#page-input")).toHaveValue("1");
+
+    // 5. Trigger persistAnnotations() via an unrelated edit on page 1 — the
+    //    bug scenario: page 2 has not been scanned yet.
+    const toolSelect = page.locator("select").nth(1);
+    await toolSelect.selectOption("interact");
+    await page.locator("textarea").fill(
+      JSON.stringify({
+        viewUUID,
+        action: "add_annotations",
+        annotations: [
+          {
+            id: "probe-on-page-1",
+            type: "highlight",
+            page: 1,
+            rects: [{ x: 50, y: 700, width: 100, height: 12 }],
+          },
+        ],
+      }),
+    );
+    await page.click('button:has-text("Call Tool")');
+    await expect(
+      app.locator('[data-annotation-id="probe-on-page-1"]'),
+    ).toHaveCount(1, { timeout: 10_000 });
+
+    // 6. Load-bearing assertion: the persisted diff still carries the
+    //    tombstone. Pre-fix, computeDiff() over the page-1-only baseline
+    //    yielded removed=[], overwriting it.
+    const diffAfter = await app
+      .locator("body")
+      .evaluate((_, k) => localStorage.getItem(k), storageKey!);
+    const removedAfter: string[] = JSON.parse(diffAfter!).removed;
+    expect(removedAfter).toContain(nativeId);
+
+    // 7. Belt-and-suspenders: navigate to page 2 and confirm the native
+    //    annotation has not resurrected in the panel.
+    await app.locator("#next-btn").click();
+    await expect(app.locator("#page-input")).toHaveValue("2");
+    await expect(
+      app.locator(`.annotation-card[data-annotation-id="${nativeId}"]`),
+    ).toHaveCount(0);
+  });
 });
