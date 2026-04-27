@@ -1988,7 +1988,39 @@ export class App extends ProtocolWithEvents<
     } catch (error) {
       // Disconnect if initialization fails.
       void this.close();
+
+      // Improve timeout message with actionable diagnosis for host developers.
+      // This commonly happens when the host loads the View before connecting
+      // its transport, causing the ui/initialize message to be lost.
+      if (isInitializationTimeoutError(error)) {
+        const timeoutMs = options?.timeout ?? 60000;
+        const timeoutSec = Math.round(timeoutMs / 1000);
+        throw new Error(
+          `ui/initialize: no response within ${timeoutSec}s — ` +
+            `host may have loaded the View before connecting its transport.`,
+          { cause: error },
+        );
+      }
+
       throw error;
     }
   }
+}
+
+/**
+ * Check if an error indicates the ui/initialize request timed out.
+ */
+function isInitializationTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  const name = error.name.toLowerCase();
+  return (
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("requesttimeout") ||
+    name.includes("timeout") ||
+    name === "aborterror"
+  );
 }

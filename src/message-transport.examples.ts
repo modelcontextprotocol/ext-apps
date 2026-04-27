@@ -56,3 +56,24 @@ function PostMessageTransport_constructor_host() {
   );
   //#endregion PostMessageTransport_constructor_host
 }
+
+/**
+ * Example: Host using forHostIframe helper (recommended).
+ *
+ * The helper validates the iframe is connected and returns a transport bound
+ * to its contentWindow. Connect before setting srcdoc/src.
+ */
+async function PostMessageTransport_forHostIframe(bridge: AppBridge) {
+  //#region PostMessageTransport_forHostIframe
+  const iframe = document.createElement("iframe");
+  iframe.sandbox.add("allow-scripts");
+  document.body.appendChild(iframe);
+
+  // Create transport BEFORE loading content
+  const transport = PostMessageTransport.forHostIframe(iframe);
+  await bridge.connect(transport);
+
+  // NOW load the view — ui/initialize will be received
+  iframe.srcdoc = "<html>...</html>";
+  //#endregion PostMessageTransport_forHostIframe
+}

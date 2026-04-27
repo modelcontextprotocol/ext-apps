@@ -476,6 +476,55 @@ Open http://localhost:8080 in your browser:
 
 You've built your first MCP App!
 
+## Host Construction Order
+
+When building your own host (instead of using an existing MCP client), the order of operations matters. The host must start listening for messages **before** the View begins executing, otherwise the View's `ui/initialize` request will be lost.
+
+### Correct Order
+
+1. **Create and attach the iframe** to the document
+2. **Create the transport** using `PostMessageTransport.forHostIframe(iframe)`
+3. **Connect the bridge** with `await bridge.connect(transport)`
+4. **Then** set `iframe.srcdoc` or `iframe.src` to load the View
+
+```ts
+import {
+  AppBridge,
+  PostMessageTransport,
+} from "@modelcontextprotocol/ext-apps/app-bridge";
+
+const iframe = document.createElement("iframe");
+iframe.sandbox.add("allow-scripts");
+document.body.appendChild(iframe);
+
+// Create transport — contentWindow exists once iframe is in DOM
+const transport = PostMessageTransport.forHostIframe(iframe);
+
+// Connect bridge — now listening for messages
+const bridge = new AppBridge(mcpClient, hostInfo, hostCapabilities);
+await bridge.connect(transport);
+
+// NOW load the content — ui/initialize will be received
+iframe.srcdoc = htmlContent;
+```
+
+The `iframe.contentWindow` reference is available as soon as the iframe is in the DOM (it points to the initial `about:blank` document). You do **not** need to wait for `onload` to create the transport.
+
+### Anti-Pattern
+
+```ts
+// ❌ WRONG: Setting srcdoc before connecting
+iframe.srcdoc = htmlContent; // View sends ui/initialize immediately!
+const transport = PostMessageTransport.forHostIframe(iframe);
+await bridge.connect(transport); // Too late — message was already lost
+```
+
+If you see a timeout error like:
+
+> `ui/initialize: no response within 60s — host may have loaded the View before connecting its transport`
+
+This is the likely cause. Reorder your code to connect the transport first.
+
 ## Next Steps
 
 - **Continue learning**: The [`basic-server-vanillajs`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) example builds on this quickstart with host communication, theming, and lifecycle handlers
