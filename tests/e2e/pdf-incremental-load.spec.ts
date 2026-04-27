@@ -158,7 +158,16 @@ test.describe("PDF Server — incremental loading", () => {
 // range-counting fixture is the convenient place; it does not use any
 // byte-accounting features.
 test.describe("PDF Server — annotation tombstone preservation", () => {
-  test("deleted native annotation tombstone survives a persist before its page is scanned", async ({
+  // FIXME: the load-bearing scenario requires the viewer to re-seed
+  // restoredRemovedIds from localStorage with page 2 unscanned, which means
+  // an iframe reload that keeps the same toolId. basic-host doesn't re-supply
+  // the cached tool result on inner-iframe reload, so the viewer never gets
+  // data and the canvas never appears. A fresh display_pdf call gets a new
+  // toolId → new storage key → restore misses. Unblocking needs either a
+  // basic-host hook to replay the tool result, or a URL-keyed (not
+  // toolId-keyed) annotation store. The fix itself is covered by the
+  // computeDiff/serializeDiff contract tests in src/pdf-annotations.test.ts.
+  test.fixme("deleted native annotation tombstone survives a persist before its page is scanned", async ({
     page,
   }) => {
     // Regression for the lazy baseline scan: restoredRemovedIds must be
