@@ -186,7 +186,10 @@ test.describe("PDF Server — annotation tombstone preservation", () => {
     const nativeId = await nativeCard.getAttribute("data-annotation-id");
     expect(nativeId).toMatch(/^pdf-\d+R?$/);
     await nativeCard.locator(".annotation-card-delete").click();
-    await expect(nativeCard).toHaveCount(0);
+    // Deleting a native annotation re-renders the card as a crossed-out
+    // tombstone (annotation-panel.ts createRemovedAnnotationCard) with the
+    // same data-annotation-id — it doesn't disappear from the DOM.
+    await expect(nativeCard).toHaveClass(/annotation-card-cleared/);
 
     // 2. Back to page 1 so the post-reload viewer restores there (page 2
     //    must stay unscanned until the very end).
@@ -250,12 +253,13 @@ test.describe("PDF Server — annotation tombstone preservation", () => {
     const removedAfter: string[] = JSON.parse(diffAfter!).removed;
     expect(removedAfter).toContain(nativeId);
 
-    // 7. Belt-and-suspenders: navigate to page 2 and confirm the native
-    //    annotation has not resurrected in the panel.
+    // 7. Belt-and-suspenders: navigate to page 2 (lazy scan now sees the
+    //    native annotation) and confirm the panel shows it as a cleared
+    //    tombstone, not a live (resurrected) card.
     await app.locator("#next-btn").click();
     await expect(app.locator("#page-input")).toHaveValue("2");
     await expect(
       app.locator(`.annotation-card[data-annotation-id="${nativeId}"]`),
-    ).toHaveCount(0);
+    ).toHaveClass(/annotation-card-cleared/);
   });
 });
