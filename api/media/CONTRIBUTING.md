@@ -573,7 +573,7 @@ To release a patch for an older version:
 
 ### Testing Pre-releases
 
-Every commit and PR automatically publishes a preview package via [pkg-pr-new](https://github.com/pkg-pr-new/pkg-pr-new). Check the PR comments or workflow logs for the install command.
+Every commit and PR automatically publishes a preview package via [pkg-pr-new](https://github.com/stackblitz-labs/pkg.pr.new). Check the PR comments or workflow logs for the install command.
 
 ---
 
