@@ -1034,6 +1034,10 @@ async function probeFormFields(
   formSchema: Awaited<ReturnType<typeof extractFormSchema>>;
   fieldInfo: FormFieldInfo[];
 }> {
+  // Assigned sequentially below so a throw in extractFormFieldInfo (no per-page
+  // guard, unlike extractFormSchema) doesn't discard an already-computed schema.
+  let formSchema: Awaited<ReturnType<typeof extractFormSchema>> = null;
+  let fieldInfo: FormFieldInfo[] = [];
   try {
     const transport = new PdfCacheRangeTransport(url, totalBytes, readPdfRange);
     const orFail = <T>(p: Promise<T>): Promise<T> =>
@@ -1055,19 +1059,17 @@ async function probeFormFields(
         string,
         PdfJsFieldObject[]
       > | null;
-      if (!fieldObjects || Object.keys(fieldObjects).length === 0) {
-        return { formSchema: null, fieldInfo: [] };
+      if (fieldObjects && Object.keys(fieldObjects).length > 0) {
+        formSchema = await orFail(extractFormSchema(pdfDoc, fieldObjects));
+        fieldInfo = await orFail(extractFormFieldInfo(pdfDoc));
       }
-      return {
-        formSchema: await orFail(extractFormSchema(pdfDoc, fieldObjects)),
-        fieldInfo: await orFail(extractFormFieldInfo(pdfDoc)),
-      };
     } finally {
       pdfDoc.destroy();
     }
   } catch {
-    return { formSchema: null, fieldInfo: [] };
+    // Non-fatal — return whatever was assigned before the throw.
   }
+  return { formSchema, fieldInfo };
 }
 
 /**
