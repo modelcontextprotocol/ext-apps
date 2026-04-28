@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/modelcontextprotocol-ext-apps-badge.png)](https://mseep.ai/app/modelcontextprotocol-ext-apps)
+
 <!-- LOGO -->
 <div align="center">
   <picture>
