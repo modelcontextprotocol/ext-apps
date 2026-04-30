@@ -31,9 +31,11 @@ import {
 import "./pdfjs-polyfill.js";
 import {
   getDocument,
+  PDFDataRangeTransport,
   VerbosityLevel,
   version as PDFJS_VERSION,
 } from "pdfjs-dist/legacy/build/pdf.mjs";
+import type { PDFDocumentProxy } from "pdfjs-dist/types/src/display/api.js";
 
 /**
  * PDF Standard-14 fonts from CDN. Used by both server and viewer so we
@@ -82,6 +84,9 @@ export const CACHE_MAX_LIFETIME_MS = 60_000; // 60 seconds
 
 /** Max size for cached PDFs (defensive limit to prevent memory exhaustion) */
 export const CACHE_MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+
+/** Max total bytes across all cache entries; oldest evicted first when exceeded. */
+export const CACHE_MAX_TOTAL_BYTES = 256 * 1024 * 1024; // 256MB
 
 /** Allowed local file paths (CLI args + file roots — read access). */
 export const allowedLocalFiles = new Set<string>();
@@ -364,9 +369,6 @@ export const viewSourcePaths = new Map<string, string>();
 /** Valid form field names per viewer UUID (populated during display_pdf) */
 const viewFieldNames = new Map<string, Set<string>>();
 
-/** Detailed form field info per viewer UUID (populated during display_pdf) */
-const viewFieldInfo = new Map<string, FormFieldInfo[]>();
-
 /**
  * Active fs.watch per view. Only created for local files when interact is
  * enabled (stdio). Watcher is re-established on `rename` events to survive
@@ -383,7 +385,7 @@ const viewFileWatches = new Map<string, ViewFileWatch>();
 /**
  * Per-view heartbeat. THIS is what the sweep iterates — not commandQueues.
  *
- * Why not commandQueues: display_pdf populates viewFieldNames/viewFieldInfo/
+ * Why not commandQueues: display_pdf populates viewFieldNames/
  * viewFileWatches but never touches commandQueues (only enqueueCommand does,
  * and it's triply gated). And dequeueCommands deletes the entry on every poll,
  * so even when it exists the sweep's TTL window is ~200ms wide. Net effect:
@@ -405,7 +407,6 @@ function pruneStaleQueues(): void {
       viewLastActivity.delete(uuid);
       commandQueues.delete(uuid);
       viewFieldNames.delete(uuid);
-      viewFieldInfo.delete(uuid);
       viewsPolled.delete(uuid);
       viewSourcePaths.delete(uuid);
       stopFileWatch(uuid);
@@ -640,10 +641,19 @@ export function validateUrl(url: string): {
   // Remote URL - require HTTPS
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "https:") {
-      return { valid: false, error: `Only HTTPS URLs are allowed: ${url}` };
+    if (parsed.protocol === "https:") return { valid: true };
+    // Loopback HTTP is opt-in (test fixtures, local dev). Off by default so a
+    // remotely-deployed server can't be made to probe its own internal ports.
+    if (
+      process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP &&
+      parsed.protocol === "http:" &&
+      (parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "localhost" ||
+        parsed.hostname === "[::1]")
+    ) {
+      return { valid: true };
     }
-    return { valid: true };
+    return { valid: false, error: `Only HTTPS URLs are allowed: ${url}` };
   } catch {
     return { valid: false, error: `Invalid URL: ${url}` };
   }
@@ -695,8 +705,11 @@ export interface PdfCache {
  * - CACHE_INACTIVITY_TIMEOUT_MS of no access (resets on each access)
  * - CACHE_MAX_LIFETIME_MS from creation (absolute timeout)
  */
-export function createPdfCache(): PdfCache {
+export function createPdfCache(
+  maxTotalBytes: number = CACHE_MAX_TOTAL_BYTES,
+): PdfCache {
   const cache = new Map<string, CacheEntry>();
+  let totalBytes = 0;
 
   /** Delete a cache entry and clear its timers */
   function deleteCacheEntry(url: string): void {
@@ -704,6 +717,7 @@ export function createPdfCache(): PdfCache {
     if (entry) {
       clearTimeout(entry.inactivityTimer);
       clearTimeout(entry.maxLifetimeTimer);
+      totalBytes -= entry.data.length;
       cache.delete(url);
     }
   }
@@ -719,6 +733,10 @@ export function createPdfCache(): PdfCache {
       deleteCacheEntry(url);
     }, CACHE_INACTIVITY_TIMEOUT_MS);
 
+    // Move to end of insertion order so size-cap eviction is LRU.
+    cache.delete(url);
+    cache.set(url, entry);
+
     return entry.data;
   }
 
@@ -726,6 +744,12 @@ export function createPdfCache(): PdfCache {
   function setCacheEntry(url: string, data: Uint8Array): void {
     // Clear any existing entry first
     deleteCacheEntry(url);
+
+    // Evict least-recently-used entries until under the byte cap.
+    for (const oldest of cache.keys()) {
+      if (totalBytes + data.length <= maxTotalBytes) break;
+      deleteCacheEntry(oldest);
+    }
 
     const entry: CacheEntry = {
       data,
@@ -739,6 +763,7 @@ export function createPdfCache(): PdfCache {
     };
 
     cache.set(url, entry);
+    totalBytes += data.length;
   }
 
   /** Slice a cached or freshly-fetched full body to the requested range. */
@@ -863,6 +888,61 @@ export function createPdfCache(): PdfCache {
   };
 }
 
+/**
+ * pdf.js range transport backed by {@link PdfCache.readPdfRange}. Lets
+ * getDocument() fetch only the byte ranges it needs (xref, /AcroForm dict)
+ * instead of the whole file. With disableAutoFetch, a PDF without form
+ * fields is opened with ~5% of bytes fetched.
+ *
+ * pdf.js has no upstream error channel on PDFDataRangeTransport (its
+ * `abort()` is a no-op stub it calls *on* us, not the other way). Callers
+ * must `Promise.race` their pdf.js awaits against {@link failed}, which
+ * rejects on the first fetch error.
+ */
+export class PdfCacheRangeTransport extends PDFDataRangeTransport {
+  /** Rejects on the first range-fetch error; never resolves. */
+  readonly failed: Promise<never>;
+  private fail!: (e: unknown) => void;
+
+  constructor(
+    private url: string,
+    length: number,
+    private readPdfRange: PdfCache["readPdfRange"],
+  ) {
+    super(length, null);
+    this.failed = new Promise<never>((_, reject) => {
+      this.fail = reject;
+    });
+    // Don't crash the process if no one is racing yet.
+    this.failed.catch(() => {});
+  }
+
+  override requestDataRange(begin: number, end: number): void {
+    void this.deliver(begin, end).catch((e) => this.fail(e));
+  }
+
+  /**
+   * pdf.js coalesces adjacent missing chunks into one unbounded request, but
+   * readPdfRange clamps each call to MAX_CHUNK_BYTES. Its reader is keyed by
+   * the original `begin` and removed after one delivery, so we must accumulate
+   * slices and call onDataRange exactly once with the full buffer.
+   */
+  private async deliver(begin: number, end: number): Promise<void> {
+    const buf = new Uint8Array(end - begin);
+    let off = 0;
+    while (off < buf.length) {
+      const want = Math.min(buf.length - off, MAX_CHUNK_BYTES);
+      const { data } = await this.readPdfRange(this.url, begin + off, want);
+      if (data.length === 0) {
+        throw new Error(`empty range at ${begin + off} for ${this.url}`);
+      }
+      buf.set(data.subarray(0, Math.min(data.length, buf.length - off)), off);
+      off += data.length;
+    }
+    this.onDataRange(begin, buf);
+  }
+}
+
 // =============================================================================
 // MCP Roots
 // =============================================================================
@@ -939,134 +1019,141 @@ interface FormFieldInfo {
 }
 
 /**
+ * Open `url` via {@link PdfCacheRangeTransport} and return form metadata.
+ * Uses `disableAutoFetch` so PDFs without an AcroForm are probed with only
+ * the trailer/xref/catalog (~5-25% of bytes); PDFs with forms still walk
+ * every page via {@link extractFormFieldInfo} but those are typically small.
+ * All errors (including range-fetch failures surfaced via
+ * {@link PdfCacheRangeTransport.failed}) resolve to empty results.
+ */
+async function probeFormFields(
+  url: string,
+  totalBytes: number,
+  readPdfRange: PdfCache["readPdfRange"],
+): Promise<{
+  formSchema: Awaited<ReturnType<typeof extractFormSchema>>;
+  fieldInfo: FormFieldInfo[];
+}> {
+  // Assigned sequentially below so a throw in extractFormFieldInfo (no per-page
+  // guard, unlike extractFormSchema) doesn't discard an already-computed schema.
+  let formSchema: Awaited<ReturnType<typeof extractFormSchema>> = null;
+  let fieldInfo: FormFieldInfo[] = [];
+  try {
+    const transport = new PdfCacheRangeTransport(url, totalBytes, readPdfRange);
+    const orFail = <T>(p: Promise<T>): Promise<T> =>
+      Promise.race([p, transport.failed]);
+    const pdfDoc = await orFail(
+      getDocument({
+        range: transport,
+        length: totalBytes,
+        disableAutoFetch: true,
+        disableStream: true,
+        rangeChunkSize: 64 * 1024,
+        standardFontDataUrl: STANDARD_FONT_DATA_URL,
+        StandardFontDataFactory: FetchStandardFontDataFactory,
+        verbosity: VerbosityLevel.ERRORS,
+      }).promise,
+    );
+    try {
+      const fieldObjects = (await orFail(pdfDoc.getFieldObjects())) as Record<
+        string,
+        PdfJsFieldObject[]
+      > | null;
+      if (fieldObjects && Object.keys(fieldObjects).length > 0) {
+        formSchema = await orFail(extractFormSchema(pdfDoc, fieldObjects));
+        fieldInfo = await orFail(extractFormFieldInfo(pdfDoc));
+      }
+    } finally {
+      pdfDoc.destroy();
+    }
+  } catch {
+    // Non-fatal — return whatever was assigned before the throw.
+  }
+  return { formSchema, fieldInfo };
+}
+
+/**
  * Extract detailed form field info (name, type, page, bounding box, label)
  * from a PDF. Bounding boxes are converted to model coordinates (top-left origin).
  */
 async function extractFormFieldInfo(
-  url: string,
-  readRange: (
-    url: string,
-    offset: number,
-    byteCount: number,
-  ) => Promise<{ data: Uint8Array; totalBytes: number }>,
+  pdfDoc: PDFDocumentProxy,
 ): Promise<FormFieldInfo[]> {
-  const { totalBytes } = await readRange(url, 0, 1);
-  const { data } = await readRange(url, 0, totalBytes);
-
-  const loadingTask = getDocument({
-    data,
-    standardFontDataUrl: STANDARD_FONT_DATA_URL,
-    StandardFontDataFactory: FetchStandardFontDataFactory,
-    // We only introspect form fields (never render) — silence residual
-    // warnings like "Unimplemented border style: inset".
-    verbosity: VerbosityLevel.ERRORS,
-  });
-  const pdfDoc = await loadingTask.promise;
-
   const fields: FormFieldInfo[] = [];
-  try {
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
-      const page = await pdfDoc.getPage(i);
-      const pageHeight = page.getViewport({ scale: 1.0 }).height;
-      const annotations = await page.getAnnotations();
-      for (const ann of annotations) {
-        // Only include form widgets (annotationType 20)
-        if (ann.annotationType !== 20) continue;
-        if (!ann.rect) continue;
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const pageHeight = page.getViewport({ scale: 1.0 }).height;
+    const annotations = await page.getAnnotations();
+    for (const ann of annotations) {
+      // Only include form widgets (annotationType 20)
+      if (ann.annotationType !== 20) continue;
+      if (!ann.rect) continue;
 
-        const fieldName = ann.fieldName || "";
-        const fieldType = ann.fieldType || "unknown";
+      const fieldName = ann.fieldName || "";
+      const fieldType = ann.fieldType || "unknown";
 
-        // PDF rect is [x1, y1, x2, y2] in bottom-left origin
-        const x1 = Math.min(ann.rect[0], ann.rect[2]);
-        const y1 = Math.min(ann.rect[1], ann.rect[3]);
-        const x2 = Math.max(ann.rect[0], ann.rect[2]);
-        const y2 = Math.max(ann.rect[1], ann.rect[3]);
-        const width = x2 - x1;
-        const height = y2 - y1;
+      // PDF rect is [x1, y1, x2, y2] in bottom-left origin
+      const x1 = Math.min(ann.rect[0], ann.rect[2]);
+      const y1 = Math.min(ann.rect[1], ann.rect[3]);
+      const x2 = Math.max(ann.rect[0], ann.rect[2]);
+      const y2 = Math.max(ann.rect[1], ann.rect[3]);
+      const width = x2 - x1;
+      const height = y2 - y1;
 
-        // Convert to model coords (top-left origin): modelY = pageHeight - pdfY - height
-        const modelY = pageHeight - y2;
+      // Convert to model coords (top-left origin): modelY = pageHeight - pdfY - height
+      const modelY = pageHeight - y2;
 
-        // Choice widgets (combo/listbox) carry `options` as
-        // [{exportValue, displayValue}]. Expose export values — that's
-        // what fill_form needs.
-        let options: string[] | undefined;
-        if (Array.isArray(ann.options) && ann.options.length > 0) {
-          options = ann.options
-            .map((o: { exportValue?: string }) => o?.exportValue)
-            .filter((v: unknown): v is string => typeof v === "string");
-        }
-
-        fields.push({
-          name: fieldName,
-          type: fieldType,
-          page: i,
-          x: Math.round(x1),
-          y: Math.round(modelY),
-          width: Math.round(width),
-          height: Math.round(height),
-          ...(ann.alternativeText ? { label: ann.alternativeText } : undefined),
-          // Radio: buttonValue is the per-widget export value — the only
-          // thing distinguishing three `size [Btn]` lines from each other.
-          ...(ann.radioButton && ann.buttonValue != null
-            ? { exportValue: String(ann.buttonValue) }
-            : undefined),
-          ...(options?.length ? { options } : undefined),
-        });
+      // Choice widgets (combo/listbox) carry `options` as
+      // [{exportValue, displayValue}]. Expose export values — that's
+      // what fill_form needs.
+      let options: string[] | undefined;
+      if (Array.isArray(ann.options) && ann.options.length > 0) {
+        options = ann.options
+          .map((o: { exportValue?: string }) => o?.exportValue)
+          .filter((v: unknown): v is string => typeof v === "string");
       }
+
+      fields.push({
+        name: fieldName,
+        type: fieldType,
+        page: i,
+        x: Math.round(x1),
+        y: Math.round(modelY),
+        width: Math.round(width),
+        height: Math.round(height),
+        ...(ann.alternativeText ? { label: ann.alternativeText } : undefined),
+        // Radio: buttonValue is the per-widget export value — the only
+        // thing distinguishing three `size [Btn]` lines from each other.
+        ...(ann.radioButton && ann.buttonValue != null
+          ? { exportValue: String(ann.buttonValue) }
+          : undefined),
+        ...(options?.length ? { options } : undefined),
+      });
     }
-  } finally {
-    pdfDoc.destroy();
   }
 
   return fields;
 }
 
-async function extractFormSchema(
-  url: string,
-  readRange: (
-    url: string,
-    offset: number,
-    byteCount: number,
-  ) => Promise<{ data: Uint8Array; totalBytes: number }>,
+export async function extractFormSchema(
+  pdfDoc: PDFDocumentProxy,
+  fieldObjects: Record<string, PdfJsFieldObject[]> | null,
 ): Promise<{
   type: "object";
   properties: Record<string, PrimitiveSchemaDefinition>;
   required?: string[];
 } | null> {
-  // Read full PDF bytes
-  const { totalBytes } = await readRange(url, 0, 1);
-  const { data } = await readRange(url, 0, totalBytes);
-
-  const loadingTask = getDocument({
-    data,
-    standardFontDataUrl: STANDARD_FONT_DATA_URL,
-    StandardFontDataFactory: FetchStandardFontDataFactory,
-    // We only introspect form fields (never render) — silence residual
-    // warnings like "Unimplemented border style: inset".
-    verbosity: VerbosityLevel.ERRORS,
-  });
-  const pdfDoc = await loadingTask.promise;
-
-  let fieldObjects: Record<string, PdfJsFieldObject[]> | null;
-  try {
-    fieldObjects = (await pdfDoc.getFieldObjects()) as Record<
-      string,
-      PdfJsFieldObject[]
-    > | null;
-  } catch {
-    pdfDoc.destroy();
-    return null;
-  }
   if (!fieldObjects || Object.keys(fieldObjects).length === 0) {
-    pdfDoc.destroy();
     return null;
   }
 
   const properties: Record<string, PrimitiveSchemaDefinition> = {};
   for (const [name, fields] of Object.entries(fieldObjects)) {
-    const field = fields[0]; // first widget determines the type
+    // pdfjs returns the full field-tree array: for separated structures
+    // (pdf-lib) the typed widget is at [1+] behind a container at [0]; for
+    // merged/leaf entries (W-9, most authoring tools) it's at [0]. Pick the
+    // first entry that actually has a field type.
+    const field = fields.find((f) => f.type) ?? fields[0];
     if (!field.editable) continue;
 
     switch (field.type) {
@@ -1131,7 +1218,6 @@ async function extractFormSchema(
     return /[[\]().]/.test(name) || /^[A-Z0-9_]+$/.test(name);
   });
 
-  pdfDoc.destroy();
   if (Object.keys(properties).length === 0) return null;
   if (hasMechanicalNames) return null;
 
@@ -1178,6 +1264,12 @@ export interface CreateServerOptions {
   debug?: boolean;
 }
 
+// Module-level singletons so they survive across createServer() calls — in
+// stateless HTTP deployments a fresh server is created per request, and
+// per-instance caches are discarded immediately.
+const sharedPdfCache = createPdfCache();
+let cachedAppHtml: string | undefined;
+
 export function createServer(options: CreateServerOptions = {}): McpServer {
   const { enableInteract = false, useClientRoots = false } = options;
   const debug = options.debug ?? false;
@@ -1197,8 +1289,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     );
   }
 
-  // Create session-local cache (isolated per server instance)
-  const { readPdfRange } = createPdfCache();
+  const { readPdfRange } = sharedPdfCache;
 
   // Tool: list_pdfs - List available PDFs
   server.tool(
@@ -1456,7 +1547,7 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
       const { totalBytes } = await readPdfRange(normalized, 0, 1);
       const uuid = randomUUID();
       // Start the heartbeat now so the sweep can clean up viewFieldNames/
-      // viewFieldInfo/viewFileWatches even if no interact calls ever happen.
+      // viewFileWatches even if no interact calls ever happen.
       if (!disableInteract) touchView(uuid);
 
       // Check writability (governs save button; see isWritablePath doc).
@@ -1484,33 +1575,19 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
         }
       }
 
-      // Extract form field schema (used for elicitation and field name validation)
-      let formSchema: Awaited<ReturnType<typeof extractFormSchema>> = null;
-      try {
-        formSchema = await extractFormSchema(normalized, readPdfRange);
-      } catch {
-        // Non-fatal — PDF may not have form fields
-      }
+      const { formSchema, fieldInfo } = await probeFormFields(
+        normalized,
+        totalBytes,
+        readPdfRange,
+      );
       if (formSchema) {
         viewFieldNames.set(uuid, new Set(Object.keys(formSchema.properties)));
       }
-
-      // Extract detailed form field info (page, bounding box, label)
-      let fieldInfo: FormFieldInfo[] = [];
-      try {
-        fieldInfo = await extractFormFieldInfo(normalized, readPdfRange);
-        if (fieldInfo.length > 0) {
-          viewFieldInfo.set(uuid, fieldInfo);
-          // Also populate viewFieldNames from field info if not already set
-          if (!viewFieldNames.has(uuid)) {
-            viewFieldNames.set(
-              uuid,
-              new Set(fieldInfo.map((f) => f.name).filter(Boolean)),
-            );
-          }
-        }
-      } catch {
-        // Non-fatal
+      if (fieldInfo.length > 0 && !viewFieldNames.has(uuid)) {
+        viewFieldNames.set(
+          uuid,
+          new Set(fieldInfo.map((f) => f.name).filter(Boolean)),
+        );
       }
 
       // Elicit form field values if requested and client supports it
@@ -2833,10 +2910,10 @@ Example — add a signature image and a stamp, then screenshot to verify:
     RESOURCE_URI,
     { mimeType: RESOURCE_MIME_TYPE },
     async (): Promise<ReadResourceResult> => {
-      const html = await fs.promises.readFile(
+      const html = (cachedAppHtml ??= await fs.promises.readFile(
         path.join(DIST_DIR, "mcp-app.html"),
         "utf-8",
-      );
+      ));
       return {
         contents: [
           {

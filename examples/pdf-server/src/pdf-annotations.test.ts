@@ -367,6 +367,92 @@ describe("computeDiff", () => {
       current.map((a) => a.id).sort(),
     );
   });
+
+  // Backs the post-computeDiff union step in mcp-app.ts persistAnnotations /
+  // getAnnotatedPdfBytes: with the lazy per-page baseline scan, computeDiff
+  // alone cannot produce `removed` for natives on pages not yet visited, so
+  // callers must union restoredRemovedIds. These tests pin the contract those
+  // call sites depend on.
+  describe("partial baseline (lazy-scan tombstone preservation)", () => {
+    const tombstoned = "pdf-5-0";
+    const userNote: PdfAnnotationDef = {
+      type: "note",
+      id: "u1",
+      page: 1,
+      x: 10,
+      y: 10,
+      content: "unrelated edit",
+    };
+
+    /** Mirrors the union loop in mcp-app.ts persistAnnotations. */
+    function unionRestored(
+      diff: AnnotationDiff,
+      restored: Iterable<string>,
+      currentIds: Set<string>,
+    ): void {
+      for (const id of restored) {
+        if (!currentIds.has(id) && !diff.removed.includes(id)) {
+          diff.removed.push(id);
+        }
+      }
+    }
+
+    it("computeDiff alone drops tombstones for unscanned pages; the union step preserves them", () => {
+      const baseline: PdfAnnotationDef[] = []; // page with the native not yet scanned
+      const current = [userNote];
+      const diff = computeDiff(baseline, current, new Map());
+      expect(diff.removed).toEqual([]); // proves the union step is load-bearing
+
+      unionRestored(diff, [tombstoned], new Set(current.map((a) => a.id)));
+
+      expect(diff.removed).toEqual([tombstoned]);
+      expect(isDiffEmpty(diff)).toBe(false);
+      expect(deserializeDiff(serializeDiff(diff)).removed).toEqual([
+        tombstoned,
+      ]);
+    });
+
+    it("a tombstone the user re-added is excluded from the union", () => {
+      const reAdded: PdfAnnotationDef = {
+        type: "note",
+        id: tombstoned,
+        page: 3,
+        x: 0,
+        y: 0,
+        content: "back",
+      };
+      const current = [userNote, reAdded];
+      const diff = computeDiff([], current, new Map());
+      unionRestored(diff, [tombstoned], new Set(current.map((a) => a.id)));
+      expect(diff.removed).toEqual([]);
+    });
+
+    it("union does not duplicate ids once the page is scanned and computeDiff produces them", () => {
+      const native: PdfAnnotationDef = {
+        type: "note",
+        id: tombstoned,
+        page: 3,
+        x: 0,
+        y: 0,
+        content: "native",
+      };
+      const diff = computeDiff([native], [userNote], new Map());
+      expect(diff.removed).toEqual([tombstoned]);
+      unionRestored(diff, [tombstoned], new Set([userNote.id]));
+      expect(diff.removed).toEqual([tombstoned]);
+    });
+
+    it("removedRefs from restored tombstones parse for buildAnnotatedPdfBytes; non-ref ids are skipped", () => {
+      const restored = new Set(["pdf-5-0", "pdf-12R", "pdf-2-idx-7"]);
+      const removedRefs = [...restored]
+        .map(parseAnnotationRef)
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+      expect(removedRefs).toEqual([
+        { objectNumber: 5, generationNumber: 0 },
+        { objectNumber: 12, generationNumber: 0 },
+      ]);
+    });
+  });
 });
 
 // =============================================================================

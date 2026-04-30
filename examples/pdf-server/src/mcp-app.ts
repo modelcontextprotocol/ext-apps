@@ -150,6 +150,11 @@ const imageCache = new Map<string, HTMLImageElement>();
 
 /** Annotations imported from the PDF file (baseline for diff computation). */
 let pdfBaselineAnnotations: PdfAnnotationDef[] = [];
+/** Pages whose native annotations have already been imported into the baseline. */
+const baselineScannedPages = new Set<number>();
+/** Native-annotation ids the user deleted (from restored localStorage diff) —
+ * the lazy per-page scan must NOT re-add these to annotationMap. */
+const restoredRemovedIds = new Set<string>();
 
 // Dirty flag — tracks unsaved local changes
 let isDirty = false;
@@ -2679,52 +2684,60 @@ function annotationStorageKey(): string | null {
 }
 
 /**
- * Import annotations from the loaded PDF to establish the baseline.
- * These are the annotations that exist in the PDF file itself.
+ * Import one page's native annotations into the baseline. Called lazily from
+ * renderPage() so we don't walk every page (and pull most of the file via
+ * range requests) before the user sees anything. Idempotent per page.
  */
-async function loadBaselineAnnotations(
-  doc: pdfjsLib.PDFDocumentProxy,
-): Promise<void> {
-  pdfBaselineAnnotations = [];
-  for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+function scanPageBaselineAnnotations(
+  pageNum: number,
+  annotations: unknown[],
+): void {
+  if (baselineScannedPages.has(pageNum)) return;
+  baselineScannedPages.add(pageNum);
+  let imported = 0;
+  for (let i = 0; i < annotations.length; i++) {
+    // Isolate each annotation: a malformed one must not bubble up to the
+    // caller's form-layer try in renderPage() (which would skip
+    // AnnotationLayer.render and hide form widgets for the whole page).
     try {
-      const page = await doc.getPage(pageNum);
-      const annotations = await page.getAnnotations();
-      for (let i = 0; i < annotations.length; i++) {
-        const ann = annotations[i];
-        const def = importPdfjsAnnotation(ann, pageNum, i);
-        if (def) {
-          pdfBaselineAnnotations.push(def);
-          // Add to annotationMap if not already present (from localStorage restore)
-          if (!annotationMap.has(def.id)) {
-            annotationMap.set(def.id, { def, elements: [] });
-          }
-        } else if (ann.annotationType !== 20) {
-          // Widget (type 20) is expected to be skipped; anything else we
-          // don't import will still be painted by page.render() onto the
-          // canvas as unselectable pixels. Log so we can diagnose
-          // "ghost annotations" (visible but not in panel, not clickable).
-          log.info(
-            `[WARN] Baseline: skipped PDF annotation on page ${pageNum}`,
-            `type=${ann.annotationType}`,
-            `subtype=${ann.subtype ?? "?"}`,
-            `name=${ann.name ?? "?"}`,
-            `rect=${ann.rect ? JSON.stringify(ann.rect) : "none"}`,
-          );
+      const ann = annotations[i] as {
+        annotationType?: number;
+        subtype?: string;
+        name?: string;
+        rect?: number[];
+      };
+      const def = importPdfjsAnnotation(ann, pageNum, i);
+      if (def) {
+        pdfBaselineAnnotations.push(def);
+        imported++;
+        if (!annotationMap.has(def.id) && !restoredRemovedIds.has(def.id)) {
+          annotationMap.set(def.id, { def, elements: [] });
         }
+      } else if (ann.annotationType !== 20) {
+        // Widget (type 20) is expected to be skipped; anything else we
+        // don't import will still be painted by page.render() onto the
+        // canvas as unselectable pixels. Log so we can diagnose
+        // "ghost annotations" (visible but not in panel, not clickable).
+        log.info(
+          `[WARN] Baseline: skipped PDF annotation on page ${pageNum}`,
+          `type=${ann.annotationType}`,
+          `subtype=${ann.subtype ?? "?"}`,
+          `name=${ann.name ?? "?"}`,
+          `rect=${ann.rect ? JSON.stringify(ann.rect) : "none"}`,
+        );
       }
     } catch (err) {
-      // Log the error — a thrown import for one annotation silently
-      // drops the REST of that page's annotations too.
-      log.info(
-        `[WARN] Baseline: page ${pageNum} annotation import failed:`,
-        err,
-      );
+      log.info(`Baseline: page ${pageNum} annotation import failed`, err);
     }
   }
-  log.info(
-    `Loaded ${pdfBaselineAnnotations.length} baseline annotations from PDF`,
-  );
+  if (imported > 0) {
+    try {
+      updateAnnotationsBadge();
+      renderAnnotationPanel();
+    } catch (err) {
+      log.info(`Baseline: page ${pageNum} panel update failed`, err);
+    }
+  }
 }
 
 function persistAnnotations(): void {
@@ -2739,6 +2752,20 @@ function persistAnnotations(): void {
     formFieldValues,
     pdfBaselineFormValues,
   );
+
+  // computeDiff only sees baseline ids from pages we've already scanned.
+  // Carry forward restored tombstones for unvisited pages so the first
+  // persist after restore doesn't drop them. Once every page is scanned the
+  // baseline is complete and computeDiff is authoritative on its own —
+  // dropping the carry-forward then also stops a stale id (no longer in the
+  // file) from pinning dirty=true forever.
+  if (baselineScannedPages.size < totalPages) {
+    for (const id of restoredRemovedIds) {
+      if (!annotationMap.has(id) && !diff.removed.includes(id)) {
+        diff.removed.push(id);
+      }
+    }
+  }
 
   // Dirty tracks whether there are unsaved changes. Undoing back to baseline
   // yields an empty diff → clean again → save button disables.
@@ -2765,11 +2792,11 @@ function restoreAnnotations(): void {
     const diff = deserializeDiff(raw);
 
     // Merge baseline + diff. The loop below is add-only, so we MUST also
-    // delete: loadBaselineAnnotations() runs between the two restore calls
-    // and re-seeds annotationMap with every baseline id — including the
-    // ones in diff.removed. Without this, the zombie survives the restore,
-    // and the next persistAnnotations() sees it in currentIds → computeDiff
-    // produces removed=[] → the deletion is permanently lost from storage.
+    // delete: the per-page baseline scan re-seeds annotationMap with every
+    // native id it encounters — including ones in diff.removed. Without the
+    // deletes here AND the restoredRemovedIds tombstones below, the zombie
+    // survives, and the next persistAnnotations() sees it in currentIds →
+    // computeDiff produces removed=[] → the deletion is permanently lost.
     const merged = mergeAnnotations(pdfBaselineAnnotations, diff);
     for (const def of merged) {
       if (!annotationMap.has(def.id)) {
@@ -2778,6 +2805,9 @@ function restoreAnnotations(): void {
     }
     for (const id of diff.removed) {
       annotationMap.delete(id);
+      // Tombstone so the lazy per-page baseline scan (which runs AFTER this
+      // restore) doesn't resurrect it.
+      restoredRemovedIds.add(id);
     }
 
     // Restore form fields
@@ -2867,6 +2897,14 @@ async function buildFieldNameMap(
       ((await doc.getFieldObjects()) as Record<string, any[]> | null) ?? null;
   } catch {
     // getFieldObjects may fail on some PDFs
+  }
+
+  // No AcroForm → nothing to map. Skip the per-page widget walk so form-free
+  // PDFs (the common large case) don't pull every page after first paint.
+  // getFieldObjects() itself only reads the catalog/AcroForm dict via range
+  // transport, so this gate is cheap.
+  if (!cachedFieldObjects || Object.keys(cachedFieldObjects).length === 0) {
+    return false;
   }
 
   // Scan every page's widget annotations to collect the CORRECT storage keys,
@@ -3074,11 +3112,19 @@ async function getAnnotatedPdfBytes(): Promise<Uint8Array> {
   }
 
   // Baseline annotations the user deleted: strip their refs from /Annots so
-  // they don't reappear on reload. Ids without a recoverable ref (page-index
-  // fallback) can't be removed by-ref and are skipped.
-  const removedRefs = pdfBaselineAnnotations
-    .filter((a) => !annotationMap.has(a.id))
-    .map((a) => parseAnnotationRef(a.id))
+  // they don't reappear on reload. Include restored tombstones for pages we
+  // haven't scanned yet — those ids aren't in pdfBaselineAnnotations but the
+  // ref is still parseable from the id string. Ids without a recoverable ref
+  // (page-index fallback) can't be removed by-ref and are skipped.
+  const removedIds = new Set<string>();
+  for (const a of pdfBaselineAnnotations) {
+    if (!annotationMap.has(a.id)) removedIds.add(a.id);
+  }
+  for (const id of restoredRemovedIds) {
+    if (!annotationMap.has(id)) removedIds.add(id);
+  }
+  const removedRefs = [...removedIds]
+    .map(parseAnnotationRef)
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
   // Only write fields that actually changed vs. what's already in the PDF.
@@ -3362,6 +3408,9 @@ async function renderPage() {
     formLayerEl.style.setProperty("--total-scale-factor", `${scale}`);
     try {
       const annotations = await page.getAnnotations();
+      // Lazy baseline import — piggyback on the annotations we just fetched
+      // for this page instead of walking all pages upfront.
+      scanPageBaselineAnnotations(pageToRender, annotations);
       if (annotations.length > 0) {
         const linkService = {
           getDestinationHash: () => "#",
@@ -4406,6 +4455,8 @@ async function reloadPdf(): Promise<void> {
   undoStack.length = 0;
   redoStack.length = 0;
   pdfBaselineAnnotations = [];
+  baselineScannedPages.clear();
+  restoredRemovedIds.clear();
   pdfBaselineFormValues.clear();
   pageTextCache.clear();
   pageTextItemsCache.clear();
@@ -4449,11 +4500,11 @@ async function reloadPdf(): Promise<void> {
     log.info("PDF reloaded:", totalPages, "pages,", totalBytes, "bytes");
 
     showViewer();
-    // Render immediately — annotation/form scans below are O(numPages) and
-    // do NOT block the canvas. See same pattern in the initial-load path.
+    // Render immediately — baseline-annotation scan now happens per-page
+    // inside renderPage(); buildFieldNameMap below early-returns when no
+    // AcroForm is present. See same pattern in the initial-load path.
     await renderPage();
 
-    await loadBaselineAnnotations(document);
     const seeded = await buildFieldNameMap(document);
     syncFormValuesToStorage();
     if (seeded) await renderPage();
@@ -4509,6 +4560,11 @@ async function loadPdfProgressively(urlToLoad: string): Promise<{
   const loadingTask = pdfjsLib.getDocument({
     range: transport,
     standardFontDataUrl: STANDARD_FONT_DATA_URL,
+    // Only fetch ranges renderPage()/getFieldObjects() actually ask for.
+    // Without these pdfjs background-prefetches the whole file regardless of
+    // the per-page lazy scans below.
+    disableAutoFetch: true,
+    disableStream: true,
   });
 
   try {
@@ -4673,12 +4729,13 @@ app.ontoolresult = async (result: CallToolResult) => {
       scale = fitScale;
       log.info("Initial fit scale:", scale);
     }
-    await renderPage();
-
-    // Import annotations from the PDF to establish baseline
-    await loadBaselineAnnotations(document);
-    // Restore any persisted user diff
+    // Restore any persisted user diff BEFORE first render so the per-page
+    // baseline scan inside renderPage() can honour the removed-id tombstones
+    // and not resurrect annotations the user deleted last session.
+    // restoreAnnotations is sync (localStorage read) so first paint is not
+    // delayed.
     restoreAnnotations();
+    await renderPage();
 
     // Build field name → annotation ID mapping for form filling
     const seeded = await buildFieldNameMap(document);

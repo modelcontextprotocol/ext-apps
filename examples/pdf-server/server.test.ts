@@ -4,9 +4,15 @@ import os from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { PDFDocument } from "pdf-lib";
+import { makeRandomJpeg } from "../../tests/helpers/range-counting-server";
 import {
   createPdfCache,
   createServer,
+  extractFormSchema,
+  PdfCacheRangeTransport,
+  MAX_CHUNK_BYTES,
   validateUrl,
   isAncestorDir,
   allowedLocalFiles,
@@ -68,6 +74,72 @@ describe("PDF Cache with Timeouts", () => {
       // They should be independent (both start empty)
       expect(cache1.getCacheSize()).toBe(0);
       expect(cache2.getCacheSize()).toBe(0);
+    });
+  });
+
+  describe("byte-cap LRU eviction", () => {
+    const tenBytes = new Uint8Array(10);
+
+    async function fill(cache: PdfCache, url: string): Promise<void> {
+      const m = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(tenBytes, { status: 200 }),
+      );
+      try {
+        await cache.readPdfRange(url, 0, 1024);
+      } finally {
+        m.mockRestore();
+      }
+    }
+
+    it("evicts least-recently-used entry when total exceeds cap", async () => {
+      const cache = createPdfCache(25);
+      try {
+        await fill(cache, "https://arxiv.org/pdf/a");
+        await fill(cache, "https://arxiv.org/pdf/b");
+        expect(cache.getCacheSize()).toBe(2);
+
+        // Touch A so B becomes least-recently-used
+        await cache.readPdfRange("https://arxiv.org/pdf/a", 0, 1);
+
+        // Inserting C (10B) pushes total to 30 > 25 → evict LRU (B)
+        await fill(cache, "https://arxiv.org/pdf/c");
+        expect(cache.getCacheSize()).toBe(2);
+
+        // A and C still served from cache; B re-fetches
+        const m = spyOn(globalThis, "fetch").mockResolvedValue(
+          new Response(tenBytes, { status: 200 }),
+        );
+        try {
+          await cache.readPdfRange("https://arxiv.org/pdf/a", 0, 1);
+          await cache.readPdfRange("https://arxiv.org/pdf/c", 0, 1);
+          expect(m).toHaveBeenCalledTimes(0);
+          await cache.readPdfRange("https://arxiv.org/pdf/b", 0, 1);
+          expect(m).toHaveBeenCalledTimes(1);
+        } finally {
+          m.mockRestore();
+        }
+      } finally {
+        cache.clearCache();
+      }
+    });
+
+    it("evicts multiple entries if a single insert exceeds the cap", async () => {
+      const cache = createPdfCache(25);
+      try {
+        await fill(cache, "https://arxiv.org/pdf/a");
+        await fill(cache, "https://arxiv.org/pdf/b");
+        const big = spyOn(globalThis, "fetch").mockResolvedValueOnce(
+          new Response(new Uint8Array(20), { status: 200 }),
+        );
+        try {
+          await cache.readPdfRange("https://arxiv.org/pdf/big", 0, 1024);
+        } finally {
+          big.mockRestore();
+        }
+        expect(cache.getCacheSize()).toBe(1);
+      } finally {
+        cache.clearCache();
+      }
     });
   });
 
@@ -221,6 +293,266 @@ describe("PDF Cache with Timeouts", () => {
   // using fake timers which can be complex with async code.
   // The timeout behavior is straightforward and can be verified
   // through manual testing or E2E tests.
+});
+
+describe("PdfCacheRangeTransport", () => {
+  it("accumulates ranges larger than MAX_CHUNK_BYTES into one onDataRange call", async () => {
+    const big = MAX_CHUNK_BYTES * 2 + 100;
+    const reads: Array<[number, number]> = [];
+    const t = new PdfCacheRangeTransport("u", big, async (_u, off, n) => {
+      reads.push([off, n]);
+      return {
+        data: new Uint8Array(Math.min(n, MAX_CHUNK_BYTES)),
+        totalBytes: big,
+      };
+    });
+    const delivered: Array<[number, number]> = [];
+    t.addRangeListener((begin: number, chunk: Uint8Array) =>
+      delivered.push([begin, chunk.length]),
+    );
+    t.requestDataRange(0, big);
+    await new Promise((r) => setTimeout(r, 10));
+    // pdf.js's reader is keyed by the original begin and removed after one
+    // delivery, so deliver() must call onDataRange exactly once with the
+    // accumulated buffer — multiple calls would throw inside pdfjs.
+    expect(delivered).toEqual([[0, big]]);
+    expect(reads).toEqual([
+      [0, MAX_CHUNK_BYTES],
+      [MAX_CHUNK_BYTES, MAX_CHUNK_BYTES],
+      [MAX_CHUNK_BYTES * 2, 100],
+    ]);
+  });
+
+  it("rejects .failed when a range fetch errors instead of hanging", async () => {
+    const t = new PdfCacheRangeTransport("u", 1000, async () => {
+      throw new Error("network down");
+    });
+    t.requestDataRange(0, 100);
+    await expect(
+      Promise.race([
+        t.failed,
+        new Promise((r) => setTimeout(() => r("timeout"), 200)),
+      ]),
+    ).rejects.toThrow("network down");
+  });
+
+  it("rejects .failed on zero-length response (would otherwise spin)", async () => {
+    const t = new PdfCacheRangeTransport("u", 1000, async () => ({
+      data: new Uint8Array(0),
+      totalBytes: 1000,
+    }));
+    t.requestDataRange(0, 100);
+    await expect(t.failed).rejects.toThrow(/empty range/);
+  });
+
+  it("getDocument resolves on a >1MB PDF when readPdfRange clamps to MAX_CHUNK_BYTES", async () => {
+    // pdfjs coalesces adjacent missing chunks into one requestDataRange that
+    // can exceed MAX_CHUNK_BYTES. deliver() must accumulate clamped reads and
+    // hand pdfjs a single onDataRange(begin, fullBuffer). This test fails if
+    // deliver() either truncates or calls onDataRange more than once per
+    // requestDataRange (pdf.mjs _onReceiveData matches by exact begin).
+    const d = await PDFDocument.create();
+    const img = await d.embedJpg(makeRandomJpeg(1_100_000));
+    const page = d.addPage([612, 792]);
+    page.drawImage(img, { x: 36, y: 36, width: 540, height: 720 });
+    const bytes = await d.save();
+    expect(bytes.length).toBeGreaterThan(2 * MAX_CHUNK_BYTES);
+
+    const readClamped: PdfCache["readPdfRange"] = async (_u, off, n) => {
+      const len = Math.min(n, MAX_CHUNK_BYTES, bytes.length - off);
+      return { data: bytes.slice(off, off + len), totalBytes: bytes.length };
+    };
+    // Record the spans pdfjs actually requests so the test fails fast if it
+    // never asks for >MAX_CHUNK_BYTES (i.e. can't go vacuously green).
+    const spans: number[] = [];
+    class RecordingTransport extends PdfCacheRangeTransport {
+      override requestDataRange(begin: number, end: number): void {
+        spans.push(end - begin);
+        super.requestDataRange(begin, end);
+      }
+    }
+    const transport = new RecordingTransport(
+      "mem://big",
+      bytes.length,
+      readClamped,
+    );
+
+    const orHang = <T>(p: Promise<T>, what: string): Promise<T> =>
+      Promise.race([
+        p,
+        transport.failed,
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error(`${what} hung`)), 5000),
+        ),
+      ]);
+
+    const doc = await orHang(
+      getDocument({
+        range: transport,
+        length: bytes.length,
+        disableAutoFetch: true,
+        disableStream: true,
+        rangeChunkSize: 64 * 1024,
+      }).promise,
+      "getDocument",
+    );
+    const p1 = await orHang(doc.getPage(1), "getPage");
+    // getPage() alone doesn't decode the image XObject; getOperatorList() does,
+    // which is what triggers the >512KB coalesced range request.
+    await orHang(p1.getOperatorList(), "getOperatorList");
+    expect(Math.max(...spans)).toBeGreaterThan(MAX_CHUNK_BYTES);
+    doc.destroy();
+  });
+});
+
+describe("display_pdf transport-error handling", () => {
+  it("returns (does not hang) when range fetches fail mid-load", async () => {
+    // First fetch = the 1-byte size probe → 206 with Content-Range so
+    // display_pdf gets totalBytes. Every subsequent fetch (made by
+    // PdfCacheRangeTransport via readPdfRange) rejects, which must surface
+    // through transport.failed → orFail() → outer catch, not hang.
+    let calls = 0;
+    const mockFetch = spyOn(globalThis, "fetch").mockImplementation(
+      async () => {
+        if (calls++ === 0) {
+          return new Response(new Uint8Array(1), {
+            status: 206,
+            headers: { "Content-Range": "bytes 0-0/50000" },
+          });
+        }
+        throw new Error("network down");
+      },
+    );
+
+    const server = createServer();
+    const client = new Client({ name: "t", version: "1" });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(st), client.connect(ct)]);
+
+    try {
+      const result = await Promise.race([
+        client.callTool({
+          name: "display_pdf",
+          arguments: { url: "https://arxiv.org/pdf/err-test" },
+        }),
+        new Promise<never>((_, rej) =>
+          setTimeout(
+            () => rej(new Error("display_pdf hung on transport error")),
+            3000,
+          ),
+        ),
+      ]);
+      expect(result.isError).toBeFalsy();
+      const sc = result.structuredContent as { formFields?: unknown };
+      expect(sc.formFields).toBeUndefined();
+      expect(calls).toBeGreaterThan(1);
+    } finally {
+      mockFetch.mockRestore();
+      await client.close();
+      await server.close();
+    }
+  });
+});
+
+describe("extractFormSchema field-tree handling", () => {
+  async function schemaFor(bytes: Uint8Array) {
+    const doc = await getDocument({ data: bytes }).promise;
+    try {
+      const fo = (await doc.getFieldObjects()) as Parameters<
+        typeof extractFormSchema
+      >[1];
+      return await extractFormSchema(doc, fo);
+    } finally {
+      doc.destroy();
+    }
+  }
+
+  it("handles pdf-lib separated field/widget structure", async () => {
+    const d = await PDFDocument.create();
+    const form = d.getForm();
+    d.addPage([612, 792]);
+    form
+      .createTextField("alpha")
+      .addToPage(d.getPage(0), { x: 50, y: 700, width: 200, height: 20 });
+    form
+      .createCheckBox("agree")
+      .addToPage(d.getPage(0), { x: 50, y: 660, width: 20, height: 20 });
+    form
+      .createDropdown("choice")
+      .addToPage(d.getPage(0), { x: 50, y: 620, width: 100, height: 20 });
+
+    const schema = await schemaFor(await d.save());
+    expect(schema).not.toBeNull();
+    expect(schema!.properties.alpha).toEqual({
+      type: "string",
+      title: "alpha",
+    });
+    expect(schema!.properties.agree).toEqual({
+      type: "boolean",
+      title: "agree",
+    });
+    expect(schema!.properties.choice.type).toBe("string");
+  });
+
+  it("handles fields with multiple widgets across pages", async () => {
+    const d = await PDFDocument.create();
+    const form = d.getForm();
+    d.addPage([612, 792]);
+    d.addPage([612, 792]);
+    const tf = form.createTextField("shared");
+    tf.addToPage(d.getPage(0), { x: 50, y: 700, width: 200, height: 20 });
+    tf.addToPage(d.getPage(1), { x: 50, y: 700, width: 200, height: 20 });
+
+    const schema = await schemaFor(await d.save());
+    expect(schema?.properties.shared).toEqual({
+      type: "string",
+      title: "shared",
+    });
+  });
+
+  it("skips container nodes and finds leaf fields (W-9 style)", async () => {
+    const bytes = fs.readFileSync(
+      path.join(__dirname, "../../tests/helpers/assets/fw9.pdf"),
+    );
+    const doc = await getDocument({ data: new Uint8Array(bytes) }).promise;
+    try {
+      const fo = (await doc.getFieldObjects()) as Parameters<
+        typeof extractFormSchema
+      >[1];
+      // Container nodes (no leaf type) should not crash extraction
+      expect(fo!["topmostSubform[0]"]).toBeDefined();
+      // Schema is null for W-9 (mechanical names), but extraction must not throw
+      const schema = await extractFormSchema(doc, fo);
+      expect(schema).toBeNull();
+    } finally {
+      doc.destroy();
+    }
+  });
+
+  it("returns null when no AcroForm present", async () => {
+    const d = await PDFDocument.create();
+    d.addPage([612, 792]);
+    const schema = await schemaFor(await d.save());
+    expect(schema).toBeNull();
+  });
+});
+
+describe("validateUrl loopback HTTP allow (PDF_SERVER_ALLOW_LOOPBACK_HTTP)", () => {
+  it("rejects http://127.0.0.1 by default", () => {
+    expect(validateUrl("http://127.0.0.1:9999/x.pdf").valid).toBe(false);
+  });
+
+  it("accepts http://127.0.0.1 only when the env gate is set, and never non-loopback http", () => {
+    const prev = process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP;
+    process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP = "1";
+    try {
+      expect(validateUrl("http://127.0.0.1:9999/x.pdf").valid).toBe(true);
+      expect(validateUrl("http://169.254.169.254/").valid).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP;
+      else process.env.PDF_SERVER_ALLOW_LOOPBACK_HTTP = prev;
+    }
+  });
 });
 
 describe("validateUrl with MCP roots (allowedLocalDirs)", () => {

@@ -26,7 +26,7 @@ VIEW_URI = "ui://qr-server/view.html"
 HOST = os.environ.get("HOST", "0.0.0.0")  # 0.0.0.0 for Docker compatibility
 PORT = int(os.environ.get("PORT", "3001"))
 
-mcp = FastMCP("QR Code Server", stateless_http=True)
+mcp = FastMCP("QR Code Server", stateless_http=True, host=HOST, port=PORT)
 
 # Embedded View HTML for self-contained usage (uv run <url> or unbundled)
 EMBEDDED_VIEW_HTML = """<!DOCTYPE html>

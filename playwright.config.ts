@@ -47,6 +47,10 @@ export default defineConfig({
     env: {
       ...process.env,
       EXAMPLE: process.env.EXAMPLE ?? "",
+      // Let pdf-server fetch from the http://127.0.0.1 range-counting fixture
+      // (validateUrl rejects loopback HTTP unless this is set). Scoped to this
+      // server's check only — does not touch Node's TLS verification.
+      PDF_SERVER_ALLOW_LOOPBACK_HTTP: "1",
     },
   },
   // Snapshot configuration
