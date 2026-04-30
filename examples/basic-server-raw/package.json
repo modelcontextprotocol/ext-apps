@@ -1,0 +1,28 @@
+{
+  "name": "@modelcontextprotocol/server-basic-raw",
+  "version": "1.7.1",
+  "type": "module",
+  "private": true,
+  "description": "Zero-dependency MCP App example using raw JSON-RPC over stdio/HTTP and postMessage",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "directory": "examples/basic-server-raw"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc --noEmit && bun build main.ts --outfile dist/index.js --target node --banner \"#!/usr/bin/env node\"",
+    "serve": "bun --watch main.ts",
+    "serve:stdio": "bun main.ts --stdio",
+    "start": "npm run build && npm run serve",
+    "start:stdio": "npm run build 1>&2 && npm run serve:stdio",
+    "dev": "npm run serve"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.0",
+    "typescript": "^5.9.3"
+  },
+  "bin": {
+    "mcp-server-basic-raw": "dist/index.js"
+  }
+}
