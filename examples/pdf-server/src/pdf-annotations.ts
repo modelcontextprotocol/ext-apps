@@ -24,7 +24,7 @@ import {
   PDFOptionList,
   PDFRadioGroup,
   type PDFForm,
-} from "pdf-lib";
+} from "@cantoo/pdf-lib";
 
 // =============================================================================
 // Types

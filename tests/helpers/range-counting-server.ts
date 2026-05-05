@@ -8,7 +8,12 @@
  */
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { PDFDocument, PDFName, PDFString, StandardFonts } from "pdf-lib";
+import {
+  PDFDocument,
+  PDFName,
+  PDFString,
+  StandardFonts,
+} from "@cantoo/pdf-lib";
 
 export interface RangeServerStats {
   /** Total bytes written across all responses (sum of slice lengths). */

@@ -25,11 +25,11 @@
     "build:mcpb": "npm run build && node build-mcpb.mjs"
   },
   "dependencies": {
+    "@cantoo/pdf-lib": "^2.6.5",
     "@modelcontextprotocol/ext-apps": "^1.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.0.0",
     "zod": "^4.1.13"
   },

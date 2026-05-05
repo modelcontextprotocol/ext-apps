@@ -18,7 +18,13 @@ import {
   type PdfAnnotationDef,
   type AnnotationDiff,
 } from "./pdf-annotations";
-import { PDFDocument, PDFDict, PDFName, PDFArray, PDFNumber } from "pdf-lib";
+import {
+  PDFDocument,
+  PDFDict,
+  PDFName,
+  PDFArray,
+  PDFNumber,
+} from "@cantoo/pdf-lib";
 
 // =============================================================================
 // Diff Model
@@ -1074,16 +1080,16 @@ describe("buildAnnotatedPdfBytes", () => {
     // Check /C (stroke color) = [1, 0, 0] for #ff0000
     const cArr = annotDict.get(PDFName.of("C")) as PDFArray;
     expect(cArr).toBeDefined();
-    expect((cArr.get(0) as PDFNumber).value()).toBe(1); // r
-    expect((cArr.get(1) as PDFNumber).value()).toBe(0); // g
-    expect((cArr.get(2) as PDFNumber).value()).toBe(0); // b
+    expect((cArr.get(0) as PDFNumber).asNumber()).toBe(1); // r
+    expect((cArr.get(1) as PDFNumber).asNumber()).toBe(0); // g
+    expect((cArr.get(2) as PDFNumber).asNumber()).toBe(0); // b
 
     // Check /IC (fill color) = [0, 1, 0] for #00ff00
     const icArr = annotDict.get(PDFName.of("IC")) as PDFArray;
     expect(icArr).toBeDefined();
-    expect((icArr.get(0) as PDFNumber).value()).toBe(0); // r
-    expect((icArr.get(1) as PDFNumber).value()).toBe(1); // g
-    expect((icArr.get(2) as PDFNumber).value()).toBe(0); // b
+    expect((icArr.get(0) as PDFNumber).asNumber()).toBe(0); // r
+    expect((icArr.get(1) as PDFNumber).asNumber()).toBe(1); // g
+    expect((icArr.get(2) as PDFNumber).asNumber()).toBe(0); // b
   });
 
   it("adds freetext annotation to PDF", async () => {
@@ -1159,9 +1165,9 @@ describe("buildAnnotatedPdfBytes", () => {
     // Check /C color
     const cArr = annotDict.get(PDFName.of("C")) as PDFArray;
     expect(cArr).toBeDefined();
-    expect((cArr.get(0) as PDFNumber).value()).toBe(0);
-    expect((cArr.get(1) as PDFNumber).value()).toBe(1);
-    expect((cArr.get(2) as PDFNumber).value()).toBe(0);
+    expect((cArr.get(0) as PDFNumber).asNumber()).toBe(0);
+    expect((cArr.get(1) as PDFNumber).asNumber()).toBe(1);
+    expect((cArr.get(2) as PDFNumber).asNumber()).toBe(0);
 
     // Check appearance stream exists and contains the color
     const ap = annotDict.get(PDFName.of("AP")) as PDFDict;

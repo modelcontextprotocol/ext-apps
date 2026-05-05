@@ -5,7 +5,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument } from "@cantoo/pdf-lib";
 import { makeRandomJpeg } from "../../tests/helpers/range-counting-server";
 import {
   createPdfCache,
