@@ -660,6 +660,18 @@ interface HostCapabilities {
     /** Host supports resources/list_changed notifications. */
     listChanged?: boolean;
   };
+  /**
+   * Host supports calling tools declared by the app (oncalltool/onlisttools).
+   * When present, the host MUST:
+   * 1. Call tools/list on the app after connect and surface results to the LLM.
+   * 2. Route LLM tool calls matching app-declared tool names back to the app via tools/call.
+   * 3. If listChanged is true: re-query tools/list when it receives a
+   *    notifications/tools/list_changed notification from the app.
+   */
+  tools?: {
+    /** Host will re-query tools/list when it receives notifications/tools/list_changed from the app. */
+    listChanged?: boolean;
+  };
   /** Host accepts log messages. */
   logging?: {};
   /** Sandbox configuration applied by the host. */
