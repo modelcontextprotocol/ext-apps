@@ -502,7 +502,7 @@ Alternatively, use the [workflow dispatch](https://github.com/modelcontextprotoc
 
 ## Code of Conduct
 
-This project follows our [Code of Conduct](CODE_OF_CONDUCT.md). Please review it before contributing.
+This project follows our [Code of Conduct](https://github.com/modelcontextprotocol/.github/blob/main/CODE_OF_CONDUCT.md). Please review it before contributing.
 
 ## Reporting Issues
 
