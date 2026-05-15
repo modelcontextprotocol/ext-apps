@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-system-monitor",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "type": "module",
   "description": "System monitor MCP App Server with real-time stats",
   "repository": {
