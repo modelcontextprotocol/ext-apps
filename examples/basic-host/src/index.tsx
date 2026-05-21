@@ -55,7 +55,9 @@ interface HostProps {
 type ToolCallEntry = ToolCallInfo & { id: number };
 let nextToolCallId = 0;
 
-// Parse URL query params for debugging: ?server=name&tool=name&call=true&theme=hide
+// Parse URL query params for debugging:
+//   ?server=name&tool=name&call=true&theme=hide
+//   &input={"question":"..."} (URL-encoded JSON to pre-fill tool arguments)
 function getQueryParams() {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -63,6 +65,7 @@ function getQueryParams() {
     tool: params.get("tool"),
     call: params.get("call") === "true",
     hideThemeToggle: params.get("theme") === "hide",
+    input: params.get("input"),
   };
 }
 
@@ -123,6 +126,7 @@ function Host({ serversPromise }: HostProps) {
         addToolCall={(info) => setToolCalls([...toolCalls, { ...info, id: nextToolCallId++ }])}
         initialServer={queryParams.server}
         initialTool={queryParams.tool}
+        initialInput={queryParams.input}
         autoCall={queryParams.call}
       />
     </>
@@ -136,12 +140,13 @@ interface CallToolPanelProps {
   addToolCall: (info: ToolCallInfo) => void;
   initialServer?: string | null;
   initialTool?: string | null;
+  initialInput?: string | null;
   autoCall?: boolean;
 }
-function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool, autoCall }: CallToolPanelProps) {
+function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool, initialInput, autoCall }: CallToolPanelProps) {
   const [selectedServer, setSelectedServer] = useState<ServerInfo | null>(null);
   const [selectedTool, setSelectedTool] = useState("");
-  const [inputJson, setInputJson] = useState("{}");
+  const [inputJson, setInputJson] = useState(initialInput ?? "{}");
   const [hasAutoCalledRef] = useState({ called: false });
 
   // Filter out app-only tools, prioritize tools with UIs
@@ -174,8 +179,9 @@ function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool
       : visibleTools[0]?.name ?? "";
 
     setSelectedTool(targetTool);
-    // Set input JSON to tool defaults (if any)
-    setInputJson(getToolDefaults(server.tools.get(targetTool)));
+    if (!initialInput) {
+      setInputJson(getToolDefaults(server.tools.get(targetTool)));
+    }
   };
 
   const handleToolSelect = (toolName: string) => {
@@ -197,7 +203,8 @@ function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool
     const url = new URL(window.location.href);
     url.searchParams.set("server", server.name);
     url.searchParams.set("tool", tool);
-    url.searchParams.set("call", "true"); // Auto-call on refresh
+    url.searchParams.set("call", "true");
+    url.searchParams.set("input", inputJson);
     history.replaceState(null, "", url.toString());
   };
 
