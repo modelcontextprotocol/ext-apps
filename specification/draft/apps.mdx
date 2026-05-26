@@ -132,6 +132,13 @@ interface McpUiResourceCsp {
      */
     resourceDomains?: string[],
     /**
+     * Whether the UI requires WebAssembly compilation
+     *
+     * - Empty or false = WebAssembly compilation remains blocked by default
+     * - Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`
+     */
+    wasmUnsafeEval?: boolean,
+    /**
      * Origins for nested iframes
      *
      * - Empty or omitted = no nested iframes allowed (`frame-src 'none'`)
@@ -2514,10 +2521,11 @@ Hosts MUST enforce Content Security Policies based on resource metadata.
 const uiMeta = resource._meta?.ui ?? listingResource._meta?.ui;
 const csp = uiMeta?.csp;
 const permissions = uiMeta?.permissions;
+const wasmUnsafeEval = csp?.wasmUnsafeEval ? "'wasm-unsafe-eval'" : "";
 
 const cspValue = `
   default-src 'none';
-  script-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
+  script-src 'self' 'unsafe-inline' ${wasmUnsafeEval} ${csp?.resourceDomains?.join(' ') || ''};
   style-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
   connect-src 'self' ${csp?.connectDomains?.join(' ') || ''};
   img-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};

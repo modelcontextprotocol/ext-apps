@@ -396,6 +396,10 @@
                     "type": "string"
                   }
                 },
+                "wasmUnsafeEval": {
+                  "description": "Whether the UI requires WebAssembly compilation.\n\n- Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`\n- Empty or false → WebAssembly compilation remains blocked by default",
+                  "type": "boolean"
+                },
                 "frameDomains": {
                   "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
                   "type": "array",
@@ -2749,6 +2753,10 @@
                         "type": "string"
                       }
                     },
+                    "wasmUnsafeEval": {
+                      "description": "Whether the UI requires WebAssembly compilation.\n\n- Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`\n- Empty or false → WebAssembly compilation remains blocked by default",
+                      "type": "boolean"
+                    },
                     "frameDomains": {
                       "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
                       "type": "array",
@@ -4141,6 +4149,10 @@
             "type": "string"
           }
         },
+        "wasmUnsafeEval": {
+          "description": "Whether the UI requires WebAssembly compilation.\n\n- Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`\n- Empty or false → WebAssembly compilation remains blocked by default",
+          "type": "boolean"
+        },
         "frameDomains": {
           "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
           "type": "array",
@@ -4179,6 +4191,10 @@
               "items": {
                 "type": "string"
               }
+            },
+            "wasmUnsafeEval": {
+              "description": "Whether the UI requires WebAssembly compilation.\n\n- Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`\n- Empty or false → WebAssembly compilation remains blocked by default",
+              "type": "boolean"
             },
             "frameDomains": {
               "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
@@ -4348,6 +4364,10 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "wasmUnsafeEval": {
+                  "description": "Whether the UI requires WebAssembly compilation.\n\n- Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`\n- Empty or false → WebAssembly compilation remains blocked by default",
+                  "type": "boolean"
                 },
                 "frameDomains": {
                   "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
