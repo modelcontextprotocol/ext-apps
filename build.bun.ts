@@ -61,4 +61,8 @@ await Promise.all([
     outdir: "dist/src/server",
     external: PEER_EXTERNALS,
   }),
+  buildJs("src/probe/index.ts", {
+    outdir: "dist/src/probe",
+    external: PEER_EXTERNALS,
+  }),
 ]);

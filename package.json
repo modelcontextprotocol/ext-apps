@@ -38,6 +38,10 @@
       "types": "./dist/src/server/index.d.ts",
       "default": "./dist/src/server/index.js"
     },
+    "./probe": {
+      "types": "./dist/src/probe/index.d.ts",
+      "default": "./dist/src/probe/index.js"
+    },
     "./schema.json": "./dist/src/generated/schema.json"
   },
   "files": [
