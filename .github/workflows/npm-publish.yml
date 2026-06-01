@@ -112,6 +112,7 @@ jobs:
           - cohort-heatmap-server
           - customer-segmentation-server
           - debug-server
+          - lazy-auth-server
           - map-server
           - pdf-server
           - scenario-modeler-server
