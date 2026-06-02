@@ -88,25 +88,35 @@ function isLoopbackHostname(hostname: string): boolean {
  * explicitly.
  */
 function resolvePublicUrl(req?: Request): URL {
+  // Mount path when this app is mounted inside another Express app
+  // (e.g. app.use("/lazy-auth", createApp())). Empty when standalone.
+  // PUBLIC_URL, when set, must already include any mount path.
+  const basePath = req?.baseUrl ?? "";
   const envUrl = process.env.PUBLIC_URL;
   if (envUrl) return new URL(envUrl.endsWith("/") ? envUrl : envUrl + "/");
   const host = req?.headers.host;
   if (host) {
     try {
-      const url = new URL(`http://${host}/`);
+      const url = new URL(`http://${host}${basePath}/`);
       if (isLoopbackHostname(url.hostname)) return url;
     } catch {
       // Malformed Host header → fall through to the localhost default.
     }
   }
-  return new URL(`http://localhost:${PORT}/`);
+  return new URL(`http://localhost:${PORT}${basePath}/`);
+}
+
+/** Public base URL as a string with no trailing slash (may include a base path). */
+function publicBaseHref(req?: Request): string {
+  const href = resolvePublicUrl(req).href;
+  return href.endsWith("/") ? href.slice(0, -1) : href;
 }
 
 /** OAuth issuer. In REACTIVE_AUTH_ONLY mode, uses a /auth subpath so root well-known 404s.
- *  Otherwise uses the root origin (standard). */
+ *  Otherwise uses the public base URL (origin + any mount path). */
 const ISSUER_SUFFIX = REACTIVE_AUTH_ONLY ? "/auth" : "";
 function resolveIssuer(req?: Request): string {
-  return resolvePublicUrl(req).origin + ISSUER_SUFFIX;
+  return publicBaseHref(req) + ISSUER_SUFFIX;
 }
 
 // ─── Mock OAuth (HS256, stateless codes) ─────────────────────────────────────
@@ -390,7 +400,7 @@ async function handleAuthorize(req: Request, res: Response) {
 
   if (approved !== "1") {
     // Show consent page. Keeps the OAuth popup visible so users can see the flow.
-    const approveUrl = new URL(resolvePublicUrl(req).origin + "/authorize");
+    const approveUrl = new URL(publicBaseHref(req) + "/authorize");
     for (const [k, v] of Object.entries(req.query))
       if (v) approveUrl.searchParams.set(k, String(v));
     approveUrl.searchParams.set("approved", "1");
@@ -695,9 +705,9 @@ export function createServer(authInfo?: AuthInfo, req?: Request): McpServer {
   // Public tools — no auth. Used to exercise a host's URL-elicitation flow
   // end-to-end over Streamable HTTP.
 
-  const base = resolvePublicUrl(req);
+  const base = publicBaseHref(req);
   const callbackUrl = (eid: string) =>
-    `${base.origin}/elicitation-callback?id=${encodeURIComponent(eid)}`;
+    `${base}/elicitation-callback?id=${encodeURIComponent(eid)}`;
 
   server.registerTool(
     "elicit_url",
@@ -850,11 +860,11 @@ export function createApp(): Express {
   const PRM_PATH = "/auth/prm";
 
   function buildAsMetadata(req: Request) {
-    const base = resolvePublicUrl(req);
+    const base = publicBaseHref(req);
     return {
       issuer: resolveIssuer(req), // subpath issuer → well-known at /.well-known/.../auth
-      authorization_endpoint: `${base.origin}/authorize`,
-      token_endpoint: `${base.origin}/token`,
+      authorization_endpoint: `${base}/authorize`,
+      token_endpoint: `${base}/token`,
       response_types_supported: ["code"],
       grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256"],
@@ -888,9 +898,9 @@ export function createApp(): Express {
 
   // PRM: full version at custom path (referenced via WWW-Authenticate on 401).
   function buildPrm(req: Request, includeAuth: boolean, resourcePath = "/mcp") {
-    const base = resolvePublicUrl(req);
+    const base = publicBaseHref(req);
     return {
-      resource: `${base.origin}${resourcePath}`,
+      resource: `${base}${resourcePath}`,
       ...(includeAuth
         ? {
             authorization_servers: [resolveIssuer(req)],
@@ -959,11 +969,11 @@ export function createApp(): Express {
     res: Response,
     pathTtl: number | undefined,
   ) {
-    const base = resolvePublicUrl(req);
+    const base = publicBaseHref(req);
     const resourceMetadataUrl =
       pathTtl !== undefined
-        ? `${base.origin}${PRM_PATH}/ttl/${pathTtl}`
-        : `${base.origin}${PRM_PATH}`;
+        ? `${base}${PRM_PATH}/ttl/${pathTtl}`
+        : `${base}${PRM_PATH}`;
 
     const body = req.body;
     const messages = Array.isArray(body) ? body : body ? [body] : [];
@@ -1080,15 +1090,15 @@ export function createApp(): Express {
 
   // Simple landing page
   app.get("/", (req, res) => {
-    const base = resolvePublicUrl(req);
+    const base = publicBaseHref(req);
     res
       .type("text/plain")
       .send(
         `Lazy Auth Demo — MCP server\n\n` +
-          `  MCP endpoint:  ${base.origin}/mcp\n` +
-          `                 ${base.origin}/ttl/<seconds>/mcp  (custom token TTL, e.g. /ttl/3600/mcp)\n` +
-          `  AS metadata:   ${base.origin}/.well-known/oauth-authorization-server${ISSUER_SUFFIX}\n` +
-          `  PRM metadata:  ${base.origin}${PRM_PATH}\n\n` +
+          `  MCP endpoint:  ${base}/mcp\n` +
+          `                 ${base}/ttl/<seconds>/mcp  (custom token TTL, e.g. /ttl/3600/mcp)\n` +
+          `  AS metadata:   ${base}/.well-known/oauth-authorization-server${ISSUER_SUFFIX}\n` +
+          `  PRM metadata:  ${base}${PRM_PATH}\n\n` +
           `Tools:\n` +
           `  - show_auth_button  (public)\n` +
           `  - get_secret        (protected, requires Bearer token)\n` +

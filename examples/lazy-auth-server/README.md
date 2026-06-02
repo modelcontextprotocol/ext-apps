@@ -51,6 +51,33 @@ https://<host>/ttl/3600/mcp     ← tokens for this connection live 1 hour
 
 This works through [RFC 8707 resource indicators](https://www.rfc-editor.org/rfc/rfc8707): MCP hosts send the MCP server URL as the `resource` parameter in OAuth authorization and token requests, and this server issues tokens for that grant with the lifetime encoded in the path (refresh tokens are extended to at least match). The TTL is a _path_ segment rather than a query param because hosts canonicalize resource indicators and strip query strings. Each TTL endpoint also enforces its value as a maximum token age, so connecting to a path with a _lower_ TTL than a token's issued lifetime forces the refresh flow. To exercise the full **re-auth** flow, call the `revoke_auth_token` tool.
 
+## Mounting under a base path
+
+`createApp()` can also be mounted inside another Express app, so an existing server can host this example at a sub-path of its own origin:
+
+```ts
+import { createApp } from "@modelcontextprotocol/server-lazy-auth";
+
+hostApp.use("/lazy-auth", createApp());
+// → MCP endpoint at https://<host>/lazy-auth/mcp
+```
+
+All advertised URLs (OAuth metadata, `WWW-Authenticate` `resource_metadata`, PRM `resource`, elicitation callbacks) include the mount path automatically, derived from Express's `req.baseUrl`. When `PUBLIC_URL` is set, it must include the mount path (e.g. `https://example.com/lazy-auth`).
+
+One thing the mounted app cannot do for itself: [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414#section-3) / [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) put well-known discovery documents at the _root_ of the origin with the path inserted after the well-known prefix (`/.well-known/oauth-authorization-server/lazy-auth`), and MCP SDK clients only try that insertion form. The host app must rewrite those root paths into the mount before its other routes:
+
+```ts
+hostApp.use((req, _res, next) => {
+  const m = req.url.match(
+    /^\/\.well-known\/(oauth-authorization-server|oauth-protected-resource)\/lazy-auth(\/.*)?$/,
+  );
+  if (m) req.url = `/lazy-auth/.well-known/${m[1]}${m[2] ?? ""}`;
+  next();
+});
+```
+
+Rewriting into the mount (rather than calling the sub-app directly) keeps `req.baseUrl` — and therefore every advertised URL — consistent.
+
 ## How It Works
 
 1. **Connect without auth** — `initialize`, `tools/list`, and public tool calls succeed with no `Authorization` header.
