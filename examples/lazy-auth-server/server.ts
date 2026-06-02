@@ -366,6 +366,16 @@ async function handleAuthorize(req: Request, res: Response) {
     });
     return;
   }
+  // PKCE is mandatory (the MCP auth spec requires it of clients, and this AS
+  // only advertises S256). Rejecting up front keeps stolen-code attacks out of
+  // the demo even though it has no real data to protect.
+  if (!code_challenge || code_challenge_method !== "S256") {
+    res.status(400).json({
+      error: "invalid_request",
+      error_description: "PKCE with S256 code_challenge is required",
+    });
+    return;
+  }
   const issuer = resolveIssuer(req);
 
   if (approved !== "1") {
@@ -475,25 +485,34 @@ async function handleToken(req: Request, res: Response) {
     });
     return;
   }
-  if (stored.code_challenge) {
-    if (!code_verifier) {
-      res.status(400).json({
-        error: "invalid_grant",
-        error_description: "Missing code_verifier",
-      });
-      return;
-    }
-    const hash = crypto
-      .createHash("sha256")
-      .update(code_verifier)
-      .digest("base64url");
-    if (hash !== stored.code_challenge) {
-      res.status(400).json({
-        error: "invalid_grant",
-        error_description: "PKCE verification failed",
-      });
-      return;
-    }
+  // PKCE verification (challenges are always present — /authorize requires them).
+  if (!code_verifier) {
+    res.status(400).json({
+      error: "invalid_grant",
+      error_description: "Missing code_verifier",
+    });
+    return;
+  }
+  const hash = crypto
+    .createHash("sha256")
+    .update(code_verifier)
+    .digest("base64url");
+  if (hash !== stored.code_challenge) {
+    res.status(400).json({
+      error: "invalid_grant",
+      error_description: "PKCE verification failed",
+    });
+    return;
+  }
+  // RFC 6749 §4.1.3 redirect_uri binding: if the client includes redirect_uri
+  // in the token request it must match the one from the authorization request.
+  // (OAuth 2.1 clients may omit it and rely on PKCE, which is enforced above.)
+  if (req.body.redirect_uri && req.body.redirect_uri !== stored.redirect_uri) {
+    res.status(400).json({
+      error: "invalid_grant",
+      error_description: "redirect_uri does not match authorization request",
+    });
+    return;
   }
   const scope = stored.scope ?? "read:secret";
   const sid = crypto.randomBytes(16).toString("hex"); // new session per authorization_code grant
