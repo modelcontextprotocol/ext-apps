@@ -273,10 +273,15 @@ async function signAuthCode(
   return new SignJWT({ ...payload, typ: "code" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
+    .setJti(crypto.randomUUID())
     .setIssuer(issuer)
     .setExpirationTime("5m")
     .sign(JWT_SECRET);
 }
+
+// Authorization codes are single-use (RFC 6749 §4.1.2): remember redeemed code
+// IDs until the code's own 5-minute expiry makes replay impossible anyway.
+const redeemedCodeJtis = new Map<string, number>(); // jti → unix GC time
 
 async function verifyAuthCode(
   code: string,
@@ -284,7 +289,12 @@ async function verifyAuthCode(
 ): Promise<CodePayload | undefined> {
   try {
     const { payload } = await jwtVerify(code, JWT_SECRET, { issuer });
-    if (payload.typ !== "code") return undefined;
+    if (payload.typ !== "code" || !payload.jti) return undefined;
+    const now = Math.floor(Date.now() / 1000);
+    for (const [k, gc] of redeemedCodeJtis)
+      if (gc < now) redeemedCodeJtis.delete(k);
+    if (redeemedCodeJtis.has(payload.jti)) return undefined; // already redeemed
+    redeemedCodeJtis.set(payload.jti, now + 5 * 60 + 10);
     return payload as unknown as CodePayload;
   } catch {
     return undefined;
@@ -808,6 +818,11 @@ export function createServer(authInfo?: AuthInfo, req?: Request): McpServer {
  */
 export function createApp(): Express {
   const app = express();
+  // Wildcard CORS is deliberate: browser-based MCP hosts connect to this demo
+  // from arbitrary origins and must read WWW-Authenticate to drive the lazy
+  // auth flow. There are no cookies or ambient credentials to protect — all
+  // auth is an explicit Bearer header, and /token is a credential-less PKCE
+  // exchange — so cross-origin reads expose nothing a direct request wouldn't.
   app.use(cors({ exposedHeaders: ["WWW-Authenticate"] }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
