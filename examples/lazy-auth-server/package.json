@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-lazy-auth",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "type": "module",
   "description": "MCP App example demonstrating lazy (on-demand) OAuth: public tools work unauthenticated, protected tools return 401 + WWW-Authenticate so the host runs the OAuth flow only when needed",
   "repository": {
