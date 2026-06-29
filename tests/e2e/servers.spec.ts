@@ -116,6 +116,11 @@ const ALL_SERVERS = [
     name: "Customer Segmentation Server",
     dir: "customer-segmentation-server",
   },
+  {
+    key: "conformance-server",
+    name: "MCP Apps Conformance Server",
+    dir: "conformance-server",
+  },
   { key: "debug-server", name: "Debug MCP App Server", dir: "debug-server" },
   { key: "map-server", name: "CesiumJS Map Server", dir: "map-server" },
   { key: "pdf-server", name: "PDF Server", dir: "pdf-server" },

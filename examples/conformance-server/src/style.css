@@ -1,0 +1,296 @@
+:root {
+  /* Plain hex + a dark-mode media query rather than light-dark(): the CSS
+     minifier mangles light-dark() into an invalid value (e.g. "#fff#14171d"),
+     which made var(--bg)/var(--ink) resolve to transparent. */
+  --bg: #ffffff;
+  --ink: #171a1f;
+  --muted: #5b6573;
+  --line: #e6e8ec;
+  --pass: #1a9c63;
+  --fail: #d6492f;
+  --timeout: #c98a1e;
+  --notrun: #8a93a3;
+  --accent: #3b82f6;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171d;
+    --ink: #e7ecf3;
+    --muted: #97a3b6;
+    --line: #262d39;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+}
+.wrap {
+  padding: 18px 20px;
+}
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+h1 {
+  font-size: 17px;
+  margin: 0 0 2px;
+  letter-spacing: -0.01em;
+}
+.sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.mono {
+  font-family: var(--mono);
+}
+.summary {
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.summary.ok {
+  color: var(--pass);
+  border-color: var(--pass);
+}
+.summary.bad {
+  color: var(--fail);
+  border-color: var(--fail);
+}
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.run-btn {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+.run-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+th {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.msg {
+  color: var(--fail);
+  font-family: var(--mono);
+  font-size: 11px;
+  margin-top: 4px;
+  white-space: pre-wrap;
+}
+.caveat {
+  color: var(--timeout);
+  font-size: 11px;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.vantage {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+}
+.st {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.st-pass {
+  color: var(--pass);
+  background: color-mix(in srgb, var(--pass) 14%, transparent);
+}
+.st-fail {
+  color: var(--fail);
+  background: color-mix(in srgb, var(--fail) 14%, transparent);
+}
+.st-timeout {
+  color: var(--timeout);
+  background: color-mix(in srgb, var(--timeout) 14%, transparent);
+}
+.st-notrun {
+  color: var(--notrun);
+  background: color-mix(in srgb, var(--notrun) 14%, transparent);
+}
+.st-info {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.st-running {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* live run progress + the currently-running row */
+.progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+  margin: 0 0 14px;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+tr.running {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  display: inline-block;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* human-in-the-loop interaction panel */
+.interaction-scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 50;
+}
+.interaction-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  animation: pop 0.16s ease-out;
+}
+@keyframes pop {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.interaction-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.interaction-prompt {
+  margin: 8px 0 18px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.interaction-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.trigger-btn {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+.verdict-btn {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.verdict-btn.ok {
+  color: var(--pass);
+  border-color: color-mix(in srgb, var(--pass) 55%, var(--line));
+}
+.verdict-btn.no {
+  color: var(--fail);
+  border-color: color-mix(in srgb, var(--fail) 55%, var(--line));
+}
+.verdict-btn:hover,
+.trigger-btn:hover {
+  filter: brightness(1.05);
+}
+.interaction-actions .verdict-btn.ok {
+  margin-left: auto;
+}
+.awaiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  margin-right: auto;
+}

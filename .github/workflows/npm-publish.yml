@@ -111,6 +111,7 @@ jobs:
           - budget-allocator-server
           - cohort-heatmap-server
           - customer-segmentation-server
+          - conformance-server
           - debug-server
           - lazy-auth-server
           - map-server
