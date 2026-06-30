@@ -670,6 +670,7 @@ export class AppBridge extends ProtocolWithEvents<
    *
    * The host MAY:
    * - Show a confirmation dialog before opening
+   * - Consider skipping user confirmation
    * - Block URLs based on a security policy or allowlist
    * - Log the request for audit purposes
    * - Reject the request entirely
@@ -682,9 +683,16 @@ export class AppBridge extends ProtocolWithEvents<
    * @example
    * ```ts source="./app-bridge.examples.ts#AppBridge_onopenlink_handleRequest"
    * bridge.onopenlink = async ({ url }, extra) => {
+   *   // The host's own policy always wins, regardless of server-declared trust.
    *   if (!isAllowedDomain(url)) {
    *     console.warn("Blocked external link:", url);
    *     return { isError: true };
+   *   }
+   *
+   *   // Destinations the server declared as trusted skip the confirmation prompt.
+   *   if (matchesLinkTrustedDomains(url, linkTrustedDomains)) {
+   *     window.open(url, "_blank", "noopener,noreferrer");
+   *     return {};
    *   }
    *
    *   const confirmed = await showDialog({
