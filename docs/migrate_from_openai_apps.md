@@ -53,13 +53,13 @@ The server-side changes involve updating metadata structure and using helper fun
 
 ### CSP Field Mapping
 
-| OpenAI             | MCP Apps          | Notes                                                      |
-| ------------------ | ----------------- | ---------------------------------------------------------- |
-| `resource_domains` | `resourceDomains` | Origins for static assets (images, fonts, styles, scripts) |
-| `connect_domains`  | `connectDomains`  | Origins for fetch/XHR/WebSocket requests                   |
-| `frame_domains`    | `frameDomains`    | Origins for nested iframes                                 |
-| `redirect_domains` | —                 | OpenAI-only: origins for `openExternal` redirects          |
-| —                  | `baseUriDomains`  | MCP-only: `base-uri` CSP directive                         |
+| OpenAI             | MCP Apps                      | Notes                                                                                                                                     |
+| ------------------ | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `resource_domains` | `resourceDomains`             | Origins for static assets (images, fonts, styles, scripts)                                                                                |
+| `connect_domains`  | `connectDomains`              | Origins for fetch/XHR/WebSocket requests                                                                                                  |
+| `frame_domains`    | `frameDomains`                | Origins for nested iframes                                                                                                                |
+| `redirect_domains` | `_meta.ui.linkTrustedDomains` | Origins `ui/open-link` may skip confirmation for. Note: this lives on `_meta.ui`, a sibling of `_meta.ui.csp`, not inside the CSP object. |
+| —                  | `baseUriDomains`              | MCP-only: `base-uri` CSP directive                                                                                                        |
 
 ### Server-Side Migration Example
 
@@ -255,9 +255,10 @@ Client-side migration involves replacing the implicit `window.openai` global wit
 
 ### External Links
 
-| OpenAI                                       | MCP Apps                            | Notes                                |
-| -------------------------------------------- | ----------------------------------- | ------------------------------------ |
-| `await window.openai.openExternal({ href })` | `await app.openLink({ url: href })` | Different param name: `href` → `url` |
+| OpenAI                                       | MCP Apps                            | Notes                                                                        |
+| -------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| `await window.openai.openExternal({ href })` | `await app.openLink({ url: href })` | Different param name: `href` → `url`                                         |
+| `_meta["openai/widgetCSP"].redirect_domains` | `_meta.ui.linkTrustedDomains`       | Origins that skip the host's link confirmation. Declared on the UI resource. |
 
 ### Display Mode
 
