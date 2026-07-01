@@ -434,7 +434,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
 
     // First get CSP and permissions from resource, then load sandbox
     // CSP is set via HTTP headers (tamper-proof), permissions via iframe allow attribute
-    toolCallInfo.appResourcePromise.then(({ csp, permissions }) => {
+    toolCallInfo.appResourcePromise.then(({ csp, permissions, linkTrustedDomains }) => {
       loadSandboxProxy(iframe, csp, permissions).then((firstTime) => {
         // The `firstTime` check guards against React Strict Mode's double
         // invocation (mount → unmount → remount simulation in development).
@@ -449,6 +449,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
             // Provide container dimensions - maxHeight for flexible sizing
             containerDimensions: { maxHeight: 6000 },
             displayMode: "inline",
+            linkTrustedDomains,
           });
           appBridgeRef.current = appBridge;
           initializeApp(iframe, appBridge, toolCallInfo);

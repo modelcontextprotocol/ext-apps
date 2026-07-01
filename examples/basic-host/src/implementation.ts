@@ -72,6 +72,7 @@ interface UiResourceData {
   html: string;
   csp?: McpUiResourceCsp;
   permissions?: McpUiResourcePermissions;
+  linkTrustedDomains?: string[];
 }
 
 export interface ToolCallInfo {
@@ -151,8 +152,9 @@ async function getUiResource(serverInfo: ServerInfo, uri: string): Promise<UiRes
   const uiMeta = contentMeta?.ui ?? listingMeta?.ui;
   const csp = uiMeta?.csp;
   const permissions = uiMeta?.permissions;
+  const linkTrustedDomains = uiMeta?.linkTrustedDomains;
 
-  return { html, csp, permissions };
+  return { html, csp, permissions, linkTrustedDomains };
 }
 
 
@@ -271,6 +273,7 @@ export interface AppBridgeCallbacks {
 export interface AppBridgeOptions {
   containerDimensions?: { maxHeight?: number; width?: number } | { height: number; width?: number };
   displayMode?: "inline" | "fullscreen";
+  linkTrustedDomains?: string[];
 }
 
 export function newAppBridge(
@@ -340,8 +343,24 @@ export function newAppBridge(
 
   appBridge.onopenlink = async (params, _extra) => {
     log.info("Open link request:", params);
-    window.open(params.url, "_blank", "noopener,noreferrer");
-    return {};
+
+    const HOST_OPENLINK_DENYLIST = [new URL("https://malicious.com")];
+    if (HOST_OPENLINK_DENYLIST.some(({ origin }) => origin === new URL(params.url).origin)) {
+      log.info("Blocked link by host denylist:", params.url);
+      return { isError: true };
+    }
+
+    const isTrustedByApp = options?.linkTrustedDomains?.some((trustedDomain) =>
+      new URLPattern(trustedDomain).test(params.url)
+    );
+    const shouldOpen = isTrustedByApp || window.confirm(`Open external link?\n${params.url}`);
+    if (shouldOpen) {
+      window.open(params.url, "_blank", "noopener,noreferrer");
+      return {};
+    }
+
+    log.info("User declined to open link:", params.url);
+    return { isError: true };
   };
 
   appBridge.onloggingmessage = (params) => {
