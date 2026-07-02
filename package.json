@@ -64,7 +64,7 @@
     "examples:start": "NODE_ENV=development npm run build && bun examples/run-all.ts start",
     "examples:dev": "NODE_ENV=development bun examples/run-all.ts dev",
     "watch": "nodemon --watch src --ext ts,tsx --exec 'bun build.bun.ts'",
-    "prepare": "npm run build && husky",
+    "prepare": "node scripts/prepare.mjs",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
     "generate:screenshots": "npm run build:all && docker run --rm -e EXAMPLE -e GENERATE_SCREENSHOTS=1 -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble sh -c 'apt-get update -qq && apt-get install -qq -y python3-venv curl > /dev/null && curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.local/bin:$PATH\" && npm i -g bun && npm ci && npx playwright test tests/e2e/generate-grid-screenshots.spec.ts'",
