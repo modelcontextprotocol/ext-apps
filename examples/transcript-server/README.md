@@ -61,7 +61,10 @@ To test local modifications, use this configuration (replace `~/code/ext-apps` w
 
 ### Installation
 
+The examples are npm workspaces that share the SDK built at the repository root, so install from there first:
+
 ```bash
+# from the repository root
 npm install
 ```
 
