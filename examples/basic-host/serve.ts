@@ -124,7 +124,10 @@ sandboxApp.get(["/", "/sandbox.html"], (req, res) => {
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
 
-  res.sendFile(join(DIRECTORY, "sandbox.html"));
+  // Pass the file relative to `root` — with an absolute path, express applies
+  // its dotfiles="ignore" rule to every segment and 404s when the repo checkout
+  // lives under a dot-directory (e.g. git worktrees in .claude/worktrees).
+  res.sendFile("sandbox.html", { root: DIRECTORY });
 });
 
 sandboxApp.use((_req, res) => {

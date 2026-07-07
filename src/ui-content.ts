@@ -162,7 +162,9 @@ export type GetViewContentBlocksOptions = {
  *   });
  *   renderA2ui(
  *     payloads.map((block) =>
- *       "text" in block.resource ? block.resource.text : atob(block.resource.blob),
+ *       "text" in block.resource
+ *         ? block.resource.text
+ *         : atob(block.resource.blob),
  *     ),
  *   );
  * };
