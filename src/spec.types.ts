@@ -728,6 +728,21 @@ export interface McpUiResourceMeta {
    * - omitted: host decides border
    */
   prefersBorder?: boolean;
+  /**
+   * @description MIME types of dynamic content payloads this view renders.
+   *
+   * When present, the view acts as a renderer for typed payloads returned by
+   * its associated tools as embedded resources marked with `_meta.ui.content`
+   * (see {@link McpUiContentBlockMeta `McpUiContentBlockMeta`}). Does not
+   * affect the resource's own `mimeType`, which remains
+   * `"text/html;profile=mcp-app"`.
+   *
+   * @example
+   * ```ts
+   * ["application/a2ui+json"]
+   * ```
+   */
+  contentMimeTypes?: string[];
 }
 
 /**
@@ -796,6 +811,27 @@ export interface McpUiToolMeta {
 }
 
 /**
+ * @description Metadata marking an embedded resource content block in a tool
+ * result as a dynamic view content payload.
+ *
+ * Placed at `_meta.ui.content` on `type: "resource"` content blocks within
+ * `CallToolResult.content`. Marked payloads are presentation data for the
+ * tool's view: hosts forward them unmodified to the view (via
+ * `ui/notifications/tool-result` and proxied `tools/call` responses) and
+ * exclude them from model context. The payload's `mimeType` must be declared
+ * in the target view's {@link McpUiResourceMeta.contentMimeTypes `contentMimeTypes`}.
+ */
+export interface McpUiContentBlockMeta {
+  /**
+   * @description URI of the `ui://` renderer resource this payload targets.
+   *
+   * If omitted, the payload targets the calling tool's `_meta.ui.resourceUri`.
+   * Explicit targeting supports future multi-view tool results.
+   */
+  rendererUri?: string;
+}
+
+/**
  * Method string constants for MCP Apps protocol messages.
  *
  * These constants provide a type-safe way to check message methods without
@@ -855,4 +891,15 @@ export interface McpUiClientCapabilities {
    * Must include `"text/html;profile=mcp-app"` for MCP Apps support.
    */
   mimeTypes?: string[];
+  /**
+   * @description Dynamic content payload MIME types the host will forward to
+   * views (see {@link McpUiContentBlockMeta `McpUiContentBlockMeta`}).
+   *
+   * Hosts may advertise `["*"]` to indicate they forward any payload type
+   * declared by a view's `contentMimeTypes` — hosts never need to interpret
+   * payloads, only route them into the sandboxed view. Servers should check
+   * this setting before registering renderer-pattern tools and degrade to
+   * text-only or `structuredContent`-driven variants when absent.
+   */
+  contentMimeTypes?: string[];
 }

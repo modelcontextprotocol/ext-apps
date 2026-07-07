@@ -59,6 +59,23 @@
           "items": {
             "type": "string"
           }
+        },
+        "contentMimeTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "McpUiContentBlockMeta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "rendererUri": {
+          "description": "URI of the `ui://` renderer resource this payload targets.\n\nIf omitted, the payload targets the calling tool's `_meta.ui.resourceUri`.\nExplicit targeting supports future multi-view tool results.",
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -4235,6 +4252,12 @@
         "prefersBorder": {
           "description": "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
           "type": "boolean"
+        },
+        "contentMimeTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false

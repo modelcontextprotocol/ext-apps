@@ -669,6 +669,21 @@ export const McpUiResourceMetaSchema = z.object({
     .describe(
       "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
     ),
+  /**
+   * @description MIME types of dynamic content payloads this view renders.
+   *
+   * When present, the view acts as a renderer for typed payloads returned by
+   * its associated tools as embedded resources marked with `_meta.ui.content`
+   * (see {@link McpUiContentBlockMeta `McpUiContentBlockMeta`}). Does not
+   * affect the resource's own `mimeType`, which remains
+   * `"text/html;profile=mcp-app"`.
+   *
+   * @example
+   * ```ts
+   * ["application/a2ui+json"]
+   * ```
+   */
+  contentMimeTypes: z.array(z.string()).optional(),
 });
 
 /**
@@ -743,6 +758,32 @@ export const McpUiToolMetaSchema = z.object({
 });
 
 /**
+ * @description Metadata marking an embedded resource content block in a tool
+ * result as a dynamic view content payload.
+ *
+ * Placed at `_meta.ui.content` on `type: "resource"` content blocks within
+ * `CallToolResult.content`. Marked payloads are presentation data for the
+ * tool's view: hosts forward them unmodified to the view (via
+ * `ui/notifications/tool-result` and proxied `tools/call` responses) and
+ * exclude them from model context. The payload's `mimeType` must be declared
+ * in the target view's {@link McpUiResourceMeta.contentMimeTypes `contentMimeTypes`}.
+ */
+export const McpUiContentBlockMetaSchema = z.object({
+  /**
+   * @description URI of the `ui://` renderer resource this payload targets.
+   *
+   * If omitted, the payload targets the calling tool's `_meta.ui.resourceUri`.
+   * Explicit targeting supports future multi-view tool results.
+   */
+  rendererUri: z
+    .string()
+    .optional()
+    .describe(
+      "URI of the `ui://` renderer resource this payload targets.\n\nIf omitted, the payload targets the calling tool's `_meta.ui.resourceUri`.\nExplicit targeting supports future multi-view tool results.",
+    ),
+});
+
+/**
  * @description MCP Apps capability settings advertised by clients to servers.
  *
  * Clients advertise these capabilities via the `extensions` field in their
@@ -760,6 +801,17 @@ export const McpUiClientCapabilitiesSchema = z.object({
     .describe(
       'Array of supported MIME types for UI resources.\nMust include `"text/html;profile=mcp-app"` for MCP Apps support.',
     ),
+  /**
+   * @description Dynamic content payload MIME types the host will forward to
+   * views (see {@link McpUiContentBlockMeta `McpUiContentBlockMeta`}).
+   *
+   * Hosts may advertise `["*"]` to indicate they forward any payload type
+   * declared by a view's `contentMimeTypes` — hosts never need to interpret
+   * payloads, only route them into the sandboxed view. Servers should check
+   * this setting before registering renderer-pattern tools and degrade to
+   * text-only or `structuredContent`-driven variants when absent.
+   */
+  contentMimeTypes: z.array(z.string()).optional(),
 });
 
 /**
