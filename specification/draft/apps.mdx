@@ -225,6 +225,18 @@ interface UIResourceMeta {
    * - omitted: host decides border
    */
   prefersBorder?: boolean,
+  /**
+   * MIME types of dynamic content payloads this View renders
+   *
+   * When present, the View acts as a renderer for typed payloads returned
+   * by its associated tools as embedded resources (see Data Passing:
+   * Dynamic View Content). Does not affect the resource's own `mimeType`,
+   * which remains `text/html;profile=mcp-app`.
+   *
+   * @example
+   * ["application/a2ui+json"]
+   */
+  contentMimeTypes?: string[],
 }
 ```
 
@@ -254,6 +266,7 @@ The resource content is returned via `resources/read`:
         };
         domain?: string;
         prefersBorder?: boolean;
+        contentMimeTypes?: string[]; // Dynamic content payload types this View renders
       };
     };
   }];
@@ -262,7 +275,7 @@ The resource content is returned via `resources/read`:
 
 #### Metadata Location
 
-`UIResourceMeta` (CSP, permissions, domain, prefersBorder) may be provided on either or both:
+`UIResourceMeta` (CSP, permissions, domain, prefersBorder, contentMimeTypes) may be provided on either or both:
 
 - **`resources/list`:** On the resource entry's `_meta.ui` field. Useful as a static default that hosts can review at connection time.
 - **`resources/read`:** On each content item's `_meta.ui` field. Useful for per-response overrides or dynamic metadata that is only known at read time.
@@ -1377,6 +1390,8 @@ View behavior (optional):
 
 Host MUST send this notification when tool execution completes (if the View is displayed during tool execution).
 
+When the host has negotiated dynamic content support (see Client\<\>Server Capability Negotiation), the delivered `CallToolResult` MUST include, unmodified, any embedded resource content blocks marked with `_meta.ui.content` (see Data Passing: Dynamic View Content). Hosts MAY omit unmarked content blocks per their existing policies.
+
 `ui/notifications/tool-cancelled` - Tool execution was cancelled
 
 ```typescript
@@ -1718,6 +1733,7 @@ The tool's execution result:
 
 - `content`: Text representation for model context and text-only hosts
 - `structuredContent`: Structured data optimized for UI rendering (not added to model context)
+- Marked embedded resources: Typed dynamic content payloads for the View (not added to model context; see Dynamic View Content below)
 - `_meta`: Additional metadata (timestamps, version info, etc.) not intended for model context
 
 #### 3. Interactive Updates
@@ -1734,6 +1750,90 @@ await client.callTool("get_weather", { location: "New York" });
 This pattern enables interactive, self-updating views.
 
 Note: Tools with `visibility: ["app"]` are hidden from the agent but remain callable by apps via `tools/call`. This enables UI-only interactions (refresh buttons, form submissions) without exposing implementation details to the model. See the Visibility section under Resource Discovery for details.
+
+#### 4. Dynamic View Content (via embedded resources)
+
+Some UI systems are generative in nature: the server produces a declarative, typed UI description at tool-call time (a document, not code), and a generic predeclared View renders it. [A2UI](https://a2ui.org) (`application/a2ui+json`) is the primary example. `structuredContent` is a poor fit for these payloads: it is untyped (no MIME type), single-valued, bound to the tool's `outputSchema`, and offers no interoperability path for non-MCP-Apps hosts that natively render the payload format.
+
+For these cases, tool results MAY carry dynamic content payloads as standard MCP embedded resource content blocks, marked for View consumption:
+
+```typescript
+interface McpUiContentBlockMeta {
+  /**
+   * URI of the ui:// renderer this payload targets.
+   *
+   * OPTIONAL. If omitted, the payload targets the calling tool's
+   * `_meta.ui.resourceUri`. Explicit targeting supports future
+   * multi-view tool results.
+   */
+  rendererUri?: string;
+}
+
+// Embedded resource content block within CallToolResult.content:
+{
+  type: "resource",
+  resource: {
+    uri: string,        // Ephemeral payload identifier (any scheme except ui://)
+    mimeType: string,   // MUST match a declared contentMimeTypes entry
+    text?: string,      // Payload as string
+    blob?: string       // OR base64-encoded payload
+  },
+  _meta: {
+    ui: {
+      content: McpUiContentBlockMeta
+    }
+  }
+}
+```
+
+**Requirements:**
+
+- The target View MUST declare the payload's `mimeType` in its `contentMimeTypes` (see UI Resource Format)
+- Payload URIs are ephemeral identifiers per RFC 3986; servers are NOT required to serve them via `resources/read`. The `ui://` scheme MUST NOT be used for payload URIs; it remains reserved for renderable UI resources
+- A tool result MAY contain multiple marked payloads; Views SHOULD process them in array order
+- Marked payloads are presentation data. Consistent with `structuredContent`, servers SHOULD still return a meaningful text `content` block for model context and text-only hosts
+
+**Host behavior** (when dynamic content support is negotiated, for tools linked to a View declaring `contentMimeTypes`):
+
+- Host MUST deliver marked embedded resource blocks, unmodified, in the `CallToolResult` sent via `ui/notifications/tool-result`
+- Host MUST deliver marked embedded resource blocks, unmodified, in `tools/call` responses returned to Views during the interactive phase
+- Host SHOULD NOT add marked payloads to model context (they are presentation data, analogous to `structuredContent`). Host MAY note their presence to the model
+- Host MAY drop marked blocks whose `mimeType` is not declared in the target View's `contentMimeTypes`, and SHOULD log such drops
+- Host MAY enforce payload size limits; when dropping a payload, Host SHOULD deliver the remainder of the result rather than failing
+
+No new messages are introduced: the existing `ui/notifications/tool-result` notification and proxied `tools/call` responses are the delivery channel. The View extracts marked payloads from the delivered result and renders them; interactive updates return new payloads through the same loop.
+
+**Example (A2UI renderer):**
+
+```json
+// Renderer resource (predeclared, prefetchable, reviewable)
+{
+  "uri": "ui://a2ui-server/renderer",
+  "name": "a2ui_renderer",
+  "mimeType": "text/html;profile=mcp-app",
+  "_meta": {
+    "ui": { "contentMimeTypes": ["application/a2ui+json"] }
+  }
+}
+
+// Tool result
+{
+  "content": [
+    { "type": "text", "text": "Found 3 flights TLV→SFO. Best: UA954, $1,240." },
+    {
+      "type": "resource",
+      "resource": {
+        "uri": "a2ui://a2ui-server/surfaces/flight-search-8f3a",
+        "mimeType": "application/a2ui+json",
+        "text": "{\"beginRendering\":{...}}"
+      },
+      "_meta": { "ui": { "content": {} } }
+    }
+  ]
+}
+```
+
+The renderer translates payload-level events into `tools/call` requests (typically to tools with `visibility: ["app"]`); responses carry new marked payloads (e.g., incremental A2UI updates), which the renderer applies. A host that natively renders a payload format MAY instead advertise that format in the top-level `mimeTypes` extension setting, render marked payloads directly, and skip instantiating the HTML renderer — allowing servers to serve a single tool response to MCP Apps hosts, native hosts, and text-only hosts.
 
 ### App-Provided Tools
 
@@ -2191,7 +2291,8 @@ Clients advertise MCP Apps support in the initialize request using the extension
     "capabilities": {
       "extensions": {
         "io.modelcontextprotocol/ui": {
-          "mimeTypes": ["text/html;profile=mcp-app"]
+          "mimeTypes": ["text/html;profile=mcp-app"],
+          "contentMimeTypes": ["application/a2ui+json"]
         }
       }
     },
@@ -2206,6 +2307,7 @@ Clients advertise MCP Apps support in the initialize request using the extension
 **Extension Settings:**
 
 - `mimeTypes`: Array of supported content types (REQUIRED, e.g., `["text/html;profile=mcp-app"]`)
+- `contentMimeTypes`: Array of dynamic content payload types the host will forward to Views per Data Passing: Dynamic View Content (OPTIONAL). Hosts MAY advertise `["*"]` to indicate they forward any payload type declared by a View's `contentMimeTypes` — hosts never need to interpret payloads, only route them into the sandboxed View. Servers SHOULD check this setting before registering renderer-pattern tools and SHOULD degrade to text-only or `structuredContent`-driven variants when absent. A host that natively renders a payload format (without an HTML renderer) advertises that format in `mimeTypes` instead.
 
 Future versions may add additional settings:
 
@@ -2473,6 +2575,25 @@ Apps are forward-deployed emanations of server tools, running in the client cont
 
 See [Security Implications: App-Provided Tools Security](#5-app-provided-tools-security) for detailed considerations.
 
+#### 7. Dynamic View Content via Embedded Resources
+
+**Decision:** Allow tool results to carry typed dynamic content payloads as marked embedded resources, delivered to the tool's predeclared View through existing channels.
+
+**Rationale:**
+
+- Enables generative UI formats (e.g., A2UI) where the server emits a declarative UI document at call time and a generic predeclared renderer interprets it
+- Embedded resources are typed (MIME), multi-valued, URI-addressed, and part of core MCP — unlike `structuredContent`, which remains the channel for template-bound data
+- Non-MCP-Apps hosts that natively render a payload format can consume the same tool response by reading the marked embedded resource directly, enabling one server response across host classes
+- Requires no new messages: delivery rides on `ui/notifications/tool-result` and proxied `tools/call` responses
+
+This does not revisit decision #1 (Predeclared Resources vs. Inline Embedding): the renderer remains a predeclared, prefetchable, reviewable `ui://` resource. Embedded resources here carry only data payloads consumed by that renderer — the same template/data split as `structuredContent`, extended with typed, self-describing documents.
+
+**Alternatives considered:**
+
+- **`structuredContent`:** Untyped, single-valued, `outputSchema`-bound, and invisible to native payload-format hosts
+- **Dedicated `ui/notifications/content` message:** Duplicates delivery semantics, complicates ordering relative to `tool-result`, and grows host surface area for no expressive gain. Server-push content injection outside tool calls can be added later as a separate message
+- **MIME-type inference without a marker:** Servers legitimately return embedded resources for other purposes (files, records); the explicit `_meta.ui.content` marker makes routing intent unambiguous and provides a forward-compatible `rendererUri` slot for multi-view results
+
 ### Backward Compatibility
 
 The proposal builds on the existing core protocol. There are no incompatibilities.
@@ -2642,6 +2763,20 @@ App tools MUST be tied to the app's lifecycle:
 - Hosts MUST NOT persist app tool registrations across sessions
 - Calling a tool from a closed app MUST return an error
 
+#### 6. Dynamic Content Payloads
+
+Dynamic View Content payloads are data, not code: they are interpreted by a renderer that is itself sandboxed, CSP-constrained, and reviewable under this specification's existing model. Declarative formats narrow the attack surface relative to arbitrary HTML precisely because the executable component (the renderer) is static and predeclared.
+
+**View behavior:**
+
+- Renderers MUST treat payloads as untrusted input (no `eval` or direct `innerHTML` of payload-derived strings)
+- Payload-referenced network and media origins remain subject to the renderer's declared CSP; a payload cannot expand the View's network reach
+
+**Host behavior:**
+
+- Payloads flow through auditable JSON-RPC with declared MIME types; hosts MAY log, size-limit, and type-filter them
+- Marked payloads are excluded from model context by default, limiting prompt injection surface
+
 ### Other risks
 
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
@@ -2651,3 +2786,5 @@ App tools MUST be tied to the app's lifecycle:
 
 - The resource prefix `ui://` will be reserved for MCP Apps
 - The label `io.modelcontextprotocol/ui` is reserved
+- The `_meta.ui.content` key on tool result content blocks is reserved for Dynamic View Content
+- The `contentMimeTypes` field is reserved in `UIResourceMeta` and in the `io.modelcontextprotocol/ui` extension settings
