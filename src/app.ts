@@ -83,6 +83,7 @@ export type {
 
 export { PostMessageTransport } from "./message-transport";
 export * from "./types";
+export * from "./ui-content";
 export {
   applyHostStyleVariables,
   applyHostFonts,
