@@ -139,7 +139,7 @@ UI metadata.
 | `@modelcontextprotocol/ext-apps`            | Build interactive Views (App class, PostMessageTransport) | [API Docs →](https://apps.extensions.modelcontextprotocol.io/api/modules/app.html)                                  |
 | `@modelcontextprotocol/ext-apps/react`      | React hooks for Views (useApp, useHostStyles, etc.)       | [API Docs →](https://apps.extensions.modelcontextprotocol.io/api/modules/_modelcontextprotocol_ext-apps_react.html) |
 | `@modelcontextprotocol/ext-apps/app-bridge` | Embed and communicate with Views in your chat client      | [API Docs →](https://apps.extensions.modelcontextprotocol.io/api/modules/app-bridge.html)                           |
-| `@modelcontextprotocol/ext-apps/server`     | Register tools and resources on your MCP server           | [API Docs →](https://apps.extensions.modelcontextprotocol.io/api/modules/server.html)                               |
+| `@modelcontextprotocol/ext-apps/server`     | Register tools and resources on your MCP server           | [API Docs →](https://apps.extensions.modelcontextprotocol.io/api/modules/server-helpers.html)                               |
 
 There's no _supported_ host implementation in this repo (beyond the
 [examples/basic-host](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host)
