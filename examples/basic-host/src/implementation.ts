@@ -344,22 +344,30 @@ export function newAppBridge(
   appBridge.onopenlink = async (params, _extra) => {
     log.info("Open link request:", params);
 
+    let url: URL;
+    try {
+      url = new URL(params.url);
+    } catch {
+      log.warn("Invalid URL:", params.url);
+      return { isError: true };
+    }
+
     const HOST_OPENLINK_DENYLIST = [new URL("https://malicious.com")];
-    if (HOST_OPENLINK_DENYLIST.some(({ origin }) => origin === new URL(params.url).origin)) {
+    if (HOST_OPENLINK_DENYLIST.some(({ origin }) => origin === url.origin)) {
       log.info("Blocked link by host denylist:", params.url);
       return { isError: true };
     }
 
     const isTrustedByApp = options?.linkTrustedDomains?.some((trustedDomain) =>
-      new URLPattern(trustedDomain).test(params.url)
+      new URLPattern(trustedDomain).test(url)
     );
-    const shouldOpen = isTrustedByApp || window.confirm(`Open external link?\n${params.url}`);
+    const shouldOpen = isTrustedByApp || window.confirm(`Open external link?\n${url}`);
     if (shouldOpen) {
-      window.open(params.url, "_blank", "noopener,noreferrer");
+      window.open(url, "_blank", "noopener,noreferrer");
       return {};
     }
 
-    log.info("User declined to open link:", params.url);
+    log.info("User declined to open link:", url);
     return { isError: true };
   };
 
