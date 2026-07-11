@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 
-import { PostMessageTransport } from "./message-transport";
+import { PostMessageTransport } from "./message-transport.js";
 
 /**
  * Minimal `window` stub for bun's DOM-less test environment.

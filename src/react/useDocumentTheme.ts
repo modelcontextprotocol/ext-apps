@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getDocumentTheme } from "../styles";
-import { McpUiTheme } from "../types";
+import { getDocumentTheme } from "../styles.js";
+import { McpUiTheme } from "../types.js";
 
 /**
  * React hook that provides the current document theme reactively.

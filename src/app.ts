@@ -31,10 +31,10 @@ import {
   ToolAnnotations,
   ToolListChangedNotification,
 } from "@modelcontextprotocol/sdk/types.js";
-import { AppNotification, AppRequest, AppResult } from "./types";
-import { ProtocolWithEvents } from "./events";
+import { AppNotification, AppRequest, AppResult } from "./types.js";
+import { ProtocolWithEvents } from "./events.js";
 export { ProtocolWithEvents };
-import { PostMessageTransport } from "./message-transport";
+import { PostMessageTransport } from "./message-transport.js";
 import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
@@ -67,28 +67,28 @@ import {
   McpUiToolResultNotificationSchema,
   McpUiRequestDisplayModeRequest,
   McpUiRequestDisplayModeResultSchema,
-} from "./types";
+} from "./types.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   StandardSchemaV1,
   standardSchemaToJsonSchema,
   validateStandardSchema,
-} from "./standard-schema";
+} from "./standard-schema.js";
 import { z } from "zod/v4";
 
 export type {
   StandardSchemaV1,
   StandardSchemaWithJSON,
-} from "./standard-schema";
+} from "./standard-schema.js";
 
-export { PostMessageTransport } from "./message-transport";
-export * from "./types";
+export { PostMessageTransport } from "./message-transport.js";
+export * from "./types.js";
 export {
   applyHostStyleVariables,
   applyHostFonts,
   getDocumentTheme,
   applyDocumentTheme,
-} from "./styles";
+} from "./styles.js";
 
 /**
  * Metadata key for associating a UI resource URI with a tool.

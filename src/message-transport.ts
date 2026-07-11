@@ -7,7 +7,7 @@ import {
   Transport,
   TransportSendOptions,
 } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types";
+import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types.js";
 
 /**
  * JSON-RPC transport using `window.postMessage` for iframe↔parent communication.

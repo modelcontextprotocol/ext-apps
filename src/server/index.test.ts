@@ -6,7 +6,7 @@ import {
   RESOURCE_MIME_TYPE,
   getUiCapability,
   EXTENSION_ID,
-} from "./index";
+} from "./index.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 describe("registerAppTool", () => {
