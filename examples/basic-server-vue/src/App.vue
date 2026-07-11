@@ -118,7 +118,7 @@ async function handleOpenLink() {
     <p class="notice">Watch activity in the DevTools console!</p>
 
     <div class="action">
-      <p><strong>Server Time:</strong> <code id="server-time">{{ serverTime }}</code></p>
+      <p><strong>Server Time:</strong> <code class="server-time">{{ serverTime }}</code></p>
       <button @click="handleGetTime">Get Server Time</button>
     </div>
 
@@ -141,10 +141,6 @@ async function handleOpenLink() {
 
 <style scoped>
 .main {
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-notice-bg: #eff6ff;
-
   width: 100%;
   max-width: 425px;
   box-sizing: border-box;
@@ -155,7 +151,7 @@ async function handleOpenLink() {
   }
 
   > * + * {
-    margin-top: 1.5rem;
+    margin-top: var(--spacing-lg);
   }
 }
 
@@ -167,44 +163,49 @@ async function handleOpenLink() {
   }
 
   > * + * {
-    margin-top: 0.5rem;
+    margin-top: var(--spacing-sm);
   }
 
   /* Server time row: flex layout for consistent mask width in E2E tests */
   > p {
     display: flex;
     align-items: baseline;
-    gap: 0.25em;
+    gap: var(--spacing-xs);
   }
 
   textarea,
   input {
+    display: block;
     font-family: inherit;
     font-size: inherit;
   }
 
   button {
-    padding: 0.5rem 1rem;
+    padding: var(--spacing-sm) var(--spacing-md);
     border: none;
-    border-radius: 6px;
-    color: white;
-    font-weight: bold;
-    background-color: var(--color-primary);
+    border-radius: var(--border-radius-md);
+    color: var(--color-text-on-accent);
+    font-weight: var(--font-weight-bold);
+    background-color: var(--color-accent);
     cursor: pointer;
 
-    &:hover,
+    &:hover {
+      background-color: color-mix(in srgb, var(--color-accent) 85%, var(--color-background-inverse));
+    }
+
     &:focus-visible {
-      background-color: var(--color-primary-hover);
+      outline: calc(var(--border-width-regular) * 2) solid var(--color-ring-primary);
+      outline-offset: var(--border-width-regular);
     }
   }
 }
 
 .notice {
-  padding: 0.5rem 0.75rem;
-  color: var(--color-primary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--color-text-info);
   text-align: center;
   font-style: italic;
-  background-color: var(--color-notice-bg);
+  background-color: var(--color-background-info);
 
   &::before {
     content: "ℹ️ ";
@@ -213,7 +214,7 @@ async function handleOpenLink() {
 }
 
 /* Server time fills remaining width for consistent E2E screenshot masking */
-:deep(#server-time) {
+.server-time {
   flex: 1;
   min-width: 0;
 }

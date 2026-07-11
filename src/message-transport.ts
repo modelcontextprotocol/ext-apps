@@ -7,6 +7,7 @@ import {
   Transport,
   TransportSendOptions,
 } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types";
 
 /**
  * JSON-RPC transport using `window.postMessage` for iframe↔parent communication.
@@ -82,7 +83,17 @@ export class PostMessageTransport implements Transport {
       if (parsed.success) {
         console.debug("Parsed message", parsed.data);
         this.onmessage?.(parsed.data);
+      } else if (event.data?.jsonrpc !== "2.0") {
+        // Not a JSON-RPC message at all (e.g. internal frames injected by
+        // the host environment). Ignore silently so the transport stays alive.
+        console.debug(
+          "Ignoring non-JSON-RPC message",
+          parsed.error.message,
+          event,
+        );
       } else {
+        // Has jsonrpc: "2.0" but is otherwise malformed — surface as a real
+        // protocol error.
         console.error("Failed to parse message", parsed.error.message, event);
         this.onerror?.(
           new Error(
@@ -113,7 +124,11 @@ export class PostMessageTransport implements Transport {
    * @param options - Optional send options (currently unused)
    */
   async send(message: JSONRPCMessage, options?: TransportSendOptions) {
-    console.debug("Sending message", message);
+    // Skip debug log for high-frequency streaming notifications — these
+    // can fire dozens of times per second and flood the console.
+    if ((message as { method?: string }).method !== TOOL_INPUT_PARTIAL_METHOD) {
+      console.debug("Sending message", message);
+    }
     this.eventTarget.postMessage(message, "*");
   }
 

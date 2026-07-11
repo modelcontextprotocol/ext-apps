@@ -1,5 +1,5 @@
-import type { McpUiSandboxProxyReadyNotification, McpUiSandboxResourceReadyNotification } from "../../../dist/src/types";
-import { buildAllowAttribute } from "../../../dist/src/app-bridge";
+import type { McpUiSandboxProxyReadyNotification, McpUiSandboxResourceReadyNotification } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { buildAllowAttribute } from "@modelcontextprotocol/ext-apps/app-bridge";
 
 const ALLOWED_REFERRER_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/;
 

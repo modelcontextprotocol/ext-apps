@@ -31,6 +31,17 @@ const sheetMusicEl = document.getElementById("sheet-music")!;
 const audioControlsEl = document.getElementById("audio-controls")!;
 
 // =============================================================================
+// Audio Session
+// =============================================================================
+
+// Declare this app's audio as media playback so the platform can handle it
+// correctly: background audio, lock screen controls, Dynamic Island, and
+// bypassing the iOS silent switch. See https://w3c.github.io/audio-session/
+if ("audioSession" in navigator) {
+  (navigator.audioSession as { type: string }).type = "playback";
+}
+
+// =============================================================================
 // ABC Rendering
 // =============================================================================
 

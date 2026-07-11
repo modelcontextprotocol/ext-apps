@@ -4,9 +4,9 @@ Visualizes Wikipedia link graphs using a force-directed layout. Explore how Wiki
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/wiki-explorer-server/01-zoomed.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/wiki-explorer-server/01-zoomed.png" alt="Zoomed" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/wiki-explorer-server/02-pop-up.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/wiki-explorer-server/02-pop-up.png" alt="Pop-up" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/wiki-explorer-server/03-expanded-graph.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/wiki-explorer-server/03-expanded-graph.png" alt="Expanded graph" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/wiki-explorer-server/01-zoomed.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/wiki-explorer-server/01-zoomed.png" alt="Zoomed" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/wiki-explorer-server/02-pop-up.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/wiki-explorer-server/02-pop-up.png" alt="Pop-up" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/wiki-explorer-server/03-expanded-graph.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/wiki-explorer-server/03-expanded-graph.png" alt="Expanded graph" width="100%"></a></td>
   </tr>
 </table>
 

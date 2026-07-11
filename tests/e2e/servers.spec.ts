@@ -7,14 +7,14 @@ import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 //
 // Note: map-server uses SLOW_SERVERS timeout instead of masking to wait for tiles
 const DYNAMIC_MASKS: Record<string, string[]> = {
-  integration: ["#server-time"], // Server time display
-  "basic-preact": ["#server-time"], // Server time display
-  "basic-react": ["#server-time"], // Server time display
-  "basic-solid": ["#server-time"], // Server time display
-  "basic-svelte": ["#server-time"], // Server time display
+  integration: ['[class*="serverTime"]'], // Server time display [CSS module]
+  "basic-preact": ['[class*="serverTime"]'], // Server time display [CSS module]
+  "basic-react": ['[class*="serverTime"]'], // Server time display [CSS module]
+  "basic-solid": ['[class*="serverTime"]'], // Server time display [CSS module]
+  "basic-svelte": [".server-time"], // Server time display (component-scoped)
   "basic-vanillajs": ["#server-time"], // Server time display
-  "basic-vue": ["#server-time"], // Server time display
-  "cohort-heatmap": ['[class*="heatmapWrapper"]'], // Heatmap grid (random data)
+  "basic-vue": [".server-time"], // Server time display (scoped styles)
+  "cohort-heatmap": ['[class*="heatmapWrapper"]'], // Heatmap grid (random data) [CSS module]
   "customer-segmentation": [".chart-container"], // Scatter plot (random data)
   "debug-server": ["#event-log", "#callback-table-body"], // Event log and callback counts (dynamic)
   quickstart: ["#server-time"], // Server time display
@@ -57,7 +57,6 @@ const HOST_MASKS: Record<string, string[]> = {
 
 // Servers to skip in CI (require special resources like GPU, large ML models)
 const SKIP_SERVERS = new Set<string>([
-  // None currently - say-server view works without TTS model for screenshots
   "qr-server", // TODO
   "say-server", // TTS model download from HuggingFace can be slow
 ]);

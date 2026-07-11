@@ -149,7 +149,7 @@ function GetTimeAppInner(props: GetTimeAppInnerProps) {
 
       <div class={styles.action}>
         <p>
-          <strong>Server Time:</strong> <code id="server-time">{serverTime()}</code>
+          <strong>Server Time:</strong> <code class={styles.serverTime}>{serverTime()}</code>
         </p>
         <button onClick={handleGetTime}>Get Server Time</button>
       </div>

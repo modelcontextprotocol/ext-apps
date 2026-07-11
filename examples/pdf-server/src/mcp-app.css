@@ -13,7 +13,7 @@
   --text200: light-dark(#999999, #888888);
 
   /* Shadows */
-  --shadow-page: light-dark(0 2px 8px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.4));
+  --shadow-page-color: light-dark(rgba(0 0 0 / 0.15), rgba(0 0 0 / 0.4));
   --selection-bg: light-dark(rgba(0, 0, 255, 0.3), rgba(100, 150, 255, 0.4));
 }
 
@@ -65,28 +65,6 @@ body {
   color: var(--text100);
 }
 
-/* Progress Bar */
-.progress-container {
-  width: 100%;
-  max-width: 200px;
-  height: 3px;
-  background: var(--bg200);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  background: var(--text100);
-  width: 0%;
-  transition: width 0.15s ease-out;
-}
-
-.progress-text {
-  font-size: 0.7rem;
-  color: var(--text200);
-}
-
 /* Error State */
 .error {
   display: flex;
@@ -114,6 +92,7 @@ body {
   flex-direction: column;
   flex: 1;
   overflow: visible;
+  position: relative;
 }
 
 /* Toolbar */
@@ -121,19 +100,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.5rem;
   background: var(--bg000);
   border-bottom: 1px solid var(--bg200);
   flex-shrink: 0;
-  gap: 0.5rem;
-  height: 48px;
+  gap: 0.25rem 0.5rem;
+  min-height: 48px;
   box-sizing: border-box;
+  flex-wrap: wrap;
 }
 
 .toolbar-left {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  align-items: center;
 }
 
 .pdf-title {
@@ -238,17 +220,24 @@ body {
 /* Single Page Canvas Container */
 .canvas-container {
   flex: 1;
-  overflow: visible;
+  overflow-x: auto; /* Allow horizontal scrolling when zoomed in inline mode */
+  overflow-y: visible;
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding: 1rem;
   background: var(--bg200);
+  /* JS owns pinch (inline pinch-in → fullscreen). pan-x/pan-y keeps native
+   * scrolling; the fullscreen rule below repeats this with a comment on the
+   * iOS-Safari preventDefault backstop. */
+  touch-action: pan-x pan-y;
 }
 
 .page-wrapper {
   position: relative;
-  box-shadow: var(--shadow-page);
+  box-shadow:
+    0 1px 4px var(--shadow-page-color),
+    0 4px 16px var(--shadow-page-color);
   background: white;
 }
 
@@ -256,7 +245,10 @@ body {
   display: block;
 }
 
-/* Text Layer for Selection */
+/* Text Layer for Selection
+ * Critical: must include font-size and transform rules that PDF.js TextLayer
+ * relies on via CSS custom properties (--font-height, --scale-x, --rotate).
+ * Without these, text layer spans won't align with the canvas rendering. */
 .text-layer {
   position: absolute;
   left: 0;
@@ -270,15 +262,33 @@ body {
   forced-color-adjust: none;
   transform-origin: 0 0;
   z-index: 2;
+  /* PDF.js TextLayer sets --min-font-size on container */
+  --min-font-size-inv: calc(1 / var(--min-font-size, 1));
 }
 
-.text-layer span,
-.text-layer br {
+.text-layer :is(span, br) {
   color: transparent;
   position: absolute;
   white-space: pre;
   cursor: text;
   transform-origin: 0% 0%;
+}
+
+/* PDF.js sets --font-height, --scale-x, --rotate as inline styles on each span.
+ * These rules apply proper font size and transforms to match the canvas. */
+.text-layer > :not(.markedContent),
+.text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--scale-factor, 1) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv, 1));
+}
+
+.text-layer .markedContent {
+  display: contents;
 }
 
 .text-layer ::selection {
@@ -300,13 +310,940 @@ body {
   overflow: hidden; /* No scrolling on main - only canvas-container scrolls */
   border-radius: 0;
   border: none;
+  padding: 0 !important; /* Background extends edge-to-edge */
+}
+
+.main.fullscreen .toolbar {
+  /* Hosts wrap fullscreen in their own header (title + close), which already
+   * clears the top safe-area — so no --safe-top here, only sides. */
+  padding: 0.25rem calc(0.5rem + var(--safe-right, 0px)) 0.25rem
+    calc(0.5rem + var(--safe-left, 0px));
+  min-height: 40px;
+  /* Inline can wrap (narrow chat bubble); fullscreen has the width, and
+   * wrapping would double the bar height + desync the search-bar offset. */
+  flex-wrap: nowrap;
+}
+
+.main.fullscreen .search-bar {
+  /* -1px overlaps the toolbar border so the dropdown looks attached. */
+  top: 39px;
+  right: calc(var(--safe-right, 0px) - 1px);
 }
 
 .main.fullscreen .viewer {
   min-height: 0; /* Allow flex item to shrink below content size */
 }
 
+.main.fullscreen .viewer-body {
+  min-height: 0;
+}
+
 .main.fullscreen .canvas-container {
   min-height: 0; /* Allow flex item to shrink below content size */
   overflow: auto; /* Scroll within the document area only */
+  /* Let JS own pinch-zoom (we re-render the PDF, not the viewport).
+   * pan-x pan-y keeps native scrolling/panning working. iOS Safari only
+   * partially honours this — preventDefault on touchmove backs it up. */
+  touch-action: pan-x pan-y;
+  /* Keep the page clear of host overlays (chat input, home indicator).
+   * computeFitScale subtracts padding, so fit-to-page lands above these.
+   * The container background still extends edge-to-edge (.main.fullscreen
+   * has padding:0). Top inset is on the toolbar; the rest land here. */
+  padding-bottom: calc(1rem + var(--safe-bottom, 0px));
+  padding-left: calc(1rem + var(--safe-left, 0px));
+  padding-right: calc(1rem + var(--safe-right, 0px));
+}
+
+/* Search Button */
+.search-btn,
+.nav-btn,
+.zoom-btn,
+.fullscreen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bg200);
+  border-radius: 4px;
+  background: var(--bg000);
+  color: var(--text000);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+}
+
+.search-btn:hover,
+.nav-btn:hover:not(:disabled),
+.zoom-btn:hover:not(:disabled),
+.fullscreen-btn:hover {
+  background: var(--bg100);
+  border-color: var(--bg300);
+}
+
+/* Search Bar */
+.search-bar {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  top: 47px; /* below toolbar (48px - 1px border overlap) */
+  right: -1px; /* align with outer border */
+  padding: 0.375rem 0.5rem;
+  background: var(--bg000);
+  border: 1px solid var(--bg200);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+.search-input {
+  width: 200px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--bg200);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: var(--bg000);
+  color: var(--text000);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--text100);
+}
+
+.search-match-count {
+  font-size: 0.8rem;
+  color: var(--text100);
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.search-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--bg200);
+  border-radius: 4px;
+  background: var(--bg000);
+  color: var(--text000);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+}
+
+.search-nav-btn:hover:not(:disabled) {
+  background: var(--bg100);
+  border-color: var(--bg300);
+}
+
+.search-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Annotation Layer */
+.annotation-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 3; /* above text-layer (z-index: 2) so notes are clickable */
+}
+
+.annotation-highlight {
+  position: absolute;
+  background: rgba(255, 255, 0, 0.35);
+  mix-blend-mode: multiply;
+  border-radius: 1px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.annotation-underline {
+  position: absolute;
+  border-bottom: 2px solid #ff0000;
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.annotation-strikethrough {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.annotation-strikethrough::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 2px solid #ff0000;
+}
+
+.annotation-note {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.annotation-note::after {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='black'%3E%3Cpath d='M3 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V5l-4-4H3zm7 1.5L13.5 6H11a1 1 0 0 1-1-1V2.5zM5 8.5h6v1H5v-1zm0 2.5h4v1H5v-1z'/%3E%3C/svg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='black'%3E%3Cpath d='M3 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V5l-4-4H3zm7 1.5L13.5 6H11a1 1 0 0 1-1-1V2.5zM5 8.5h6v1H5v-1zm0 2.5h4v1H5v-1z'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+.annotation-note .annotation-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: var(--bg000, #fff);
+  color: var(--text000, #000);
+  border: 1px solid var(--bg200, #ccc);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  max-width: 200px;
+  z-index: 100; /* Must float above all sibling annotation elements */
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.annotation-note:hover .annotation-tooltip {
+  display: block;
+}
+
+/* When hovering a note, raise the entire annotation layer above the form
+   layer so the tooltip isn't clipped by the z-index:4 form overlay. */
+.annotation-layer:has(.annotation-note:hover) {
+  z-index: 5;
+}
+
+.annotation-rectangle {
+  position: absolute;
+  border: 2px solid #0066cc;
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+
+.annotation-circle {
+  position: absolute;
+  border: 2px solid #0066cc;
+  border-radius: 50%;
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+
+.annotation-line {
+  position: absolute;
+  height: 0;
+  border-top: 2px solid #333;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+
+.annotation-freetext {
+  position: absolute;
+  font-family: Helvetica, Arial, sans-serif;
+  white-space: pre-wrap;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+
+.annotation-stamp {
+  position: absolute;
+  font-family: Helvetica, Arial, sans-serif;
+  font-weight: bold;
+  font-size: 24px;
+  border: 3px solid currentColor;
+  padding: 4px 12px;
+  opacity: 0.6;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+
+.annotation-image {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+
+/* Annotation imported verbatim from the PDF (Stamp/Ink/etc. via
+ * annotationCanvasMap). The body is the rasterized appearance canvas;
+ * if pdf.js didn't divert it (no hasOwnCanvas), the box stays transparent
+ * over the main-canvas pixel and just captures clicks. */
+.annotation-imported {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+.annotation-imported:hover {
+  outline: 1px dashed var(--accent, #2563eb);
+  outline-offset: 1px;
+}
+
+/* Selection visuals */
+.annotation-selected {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 2px;
+  z-index: 10;
+}
+
+.annotation-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border: 2px solid var(--accent, #2563eb);
+  border-radius: 50%;
+  z-index: 11;
+  pointer-events: auto;
+}
+.annotation-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.annotation-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.annotation-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.annotation-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+.annotation-handle-rotate {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  background: white;
+  border: 2px solid var(--accent, #2563eb);
+  border-radius: 50%;
+  z-index: 11;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.annotation-card.selected {
+  background: var(--accent-bg, rgba(37, 99, 235, 0.08));
+  border-left-color: var(--accent, #2563eb);
+}
+
+.annotation-dragging {
+  cursor: grabbing !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .annotation-highlight {
+    background: rgba(255, 255, 0, 0.3);
+    mix-blend-mode: screen;
+  }
+}
+
+/* Save / Download Buttons */
+.save-btn,
+.download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bg200);
+  border-radius: 4px;
+  background: var(--bg000);
+  color: var(--text000);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+}
+
+.save-btn:hover:not(:disabled),
+.download-btn:hover:not(:disabled) {
+  background: var(--bg100);
+  border-color: var(--bg300);
+}
+
+.save-btn:disabled,
+.download-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/*
+ * Confirmation Dialog
+ *
+ * Styled to match the host's native dialogs (e.g. the downloadFile prompt).
+ * Uses host-provided CSS variables (set via applyHostStyleVariables) with
+ * local fallbacks so it still looks reasonable in standalone dev.
+ */
+.confirm-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: light-dark(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
+  font-family: var(--font-sans, inherit);
+}
+
+.confirm-box {
+  background: var(--color-background-primary, var(--bg000));
+  border-radius: var(--border-radius-xl, 20px);
+  padding: 1.75rem;
+  min-width: 360px;
+  max-width: 520px;
+  box-shadow: var(--shadow-lg, 0 20px 50px rgba(0, 0, 0, 0.3));
+}
+
+.confirm-title {
+  font-weight: var(--font-weight-bold, 700);
+  font-size: var(--font-heading-md-size, 1.5rem);
+  line-height: var(--font-heading-md-line-height, 1.25);
+  margin-bottom: 0.5rem;
+  color: var(--color-text-primary, var(--text000));
+}
+
+.confirm-body {
+  font-size: var(--font-text-md-size, 1rem);
+  line-height: var(--font-text-md-line-height, 1.5);
+  color: var(--color-text-secondary, var(--text100));
+  margin-bottom: 1.5rem;
+  word-break: break-word;
+}
+
+/* Optional monospace detail box (filename, path, etc.) */
+.confirm-detail {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--font-text-sm-size, 0.9rem);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  border: var(--border-width-regular, 1px) solid
+    var(--color-border-secondary, var(--bg200));
+  border-radius: var(--border-radius-md, 8px);
+  background: var(--color-background-secondary, var(--bg100));
+  color: var(--color-text-primary, var(--text000));
+  word-break: break-all;
+}
+
+.confirm-detail:empty {
+  display: none;
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.confirm-btn {
+  padding: 0.625rem 1.25rem;
+  border: var(--border-width-regular, 1px) solid
+    var(--color-border-primary, var(--bg200));
+  border-radius: var(--border-radius-md, 8px);
+  background: var(--color-background-primary, var(--bg000));
+  color: var(--color-text-primary, var(--text000));
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-text-md-size, 0.95rem);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.confirm-btn:hover {
+  background: var(--color-background-secondary, var(--bg100));
+}
+
+.confirm-btn-primary {
+  /* Host's native primary buttons use inverse colors (dark bg, light text) */
+  background: var(--color-background-inverse, var(--text000));
+  border-color: var(--color-background-inverse, var(--text000));
+  color: var(--color-text-inverse, var(--bg000));
+}
+
+.confirm-btn-primary:hover {
+  /* .confirm-btn:hover above would otherwise reset background */
+  background: var(--color-background-inverse, var(--text000));
+  filter: brightness(1.15);
+}
+
+/* Form Layer (PDF.js AnnotationLayer for interactive form widgets) */
+#form-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4; /* above annotation-layer (z-index: 3) so form inputs are clickable */
+}
+
+/*
+ * PDF.js AnnotationLayer renders interactive form inputs on top of the canvas.
+ * When the widget is transparent the canvas's static appearance bleeds through,
+ * causing double-text (the widget font never matches the PDF's font metrics).
+ * Fix: force widgets opaque. PDF.js also reads the annotation's /BC entry and
+ * writes it as an inline `background-color` on the element (typically
+ * `transparent` for unstyled forms) — inline style beats any selector, hence
+ * !important.
+ */
+#form-layer .textWidgetAnnotation :is(input, textarea),
+#form-layer .choiceWidgetAnnotation select {
+  background-image: none !important;
+  background-color: light-dark(#fff, #2a2a2a) !important;
+}
+
+#form-layer select option:checked {
+  background: light-dark(#d0e0ff, #335);
+}
+
+
+/* Highlight Layer */
+.highlight-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.search-highlight {
+  background: rgba(255, 255, 0, 0.4);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.search-highlight.current {
+  background: rgba(255, 165, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-highlight {
+    background: rgba(255, 255, 0, 0.3);
+    mix-blend-mode: screen;
+  }
+
+  .search-highlight.current {
+    background: rgba(255, 165, 0, 0.5);
+    mix-blend-mode: screen;
+  }
+}
+
+/* Viewer Body (flex row for canvas + panel) */
+.viewer-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: visible;
+  position: relative; /* Anchor for floating annotation panel */
+}
+
+/* Annotations Toolbar Button */
+.annotations-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bg200);
+  border-radius: 4px;
+  background: var(--bg000);
+  color: var(--text000);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.annotations-btn:hover {
+  background: var(--bg100);
+  border-color: var(--bg300);
+}
+.annotations-btn.active {
+  background: var(--bg200);
+  border-color: var(--bg300);
+}
+
+.annotations-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  background: var(--accent, #2563eb);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+/* Annotation Side Panel */
+.annotation-panel {
+  width: 500px;
+  min-width: 180px;
+  max-width: 50vw;
+  background: var(--bg000);
+  border-left: 1px solid var(--bg200);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Resize handle on left edge */
+.annotation-panel-resize {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 10;
+}
+.annotation-panel-resize:hover,
+.annotation-panel-resize.dragging {
+  background: var(--text100);
+  opacity: 0.3;
+}
+
+.annotation-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--bg200);
+  flex-shrink: 0;
+}
+
+.annotation-panel-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text000);
+}
+
+.annotation-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.annotation-panel-reset,
+.annotation-panel-clear-all {
+  border: none;
+  background: transparent;
+  color: var(--text100);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.annotation-panel-reset:hover {
+  color: var(--text000);
+  background: var(--bg100);
+}
+.annotation-panel-clear-all:hover {
+  color: #e74c3c;
+  background: var(--bg100);
+}
+.annotation-panel-reset:disabled,
+.annotation-panel-clear-all:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.annotation-panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text100);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+}
+.annotation-panel-close:hover {
+  background: var(--bg100);
+  color: var(--text000);
+}
+
+.annotation-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+/* Floating annotation panel (used in both inline and fullscreen) */
+.annotation-panel.floating {
+  position: absolute;
+  z-index: 20;
+  border: 1px solid var(--bg200);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-height: 60%;
+  width: 135px;
+  transition: top 0.15s ease, left 0.15s ease, right 0.15s ease, bottom 0.15s ease;
+}
+.annotation-panel.floating .annotation-panel-header {
+  cursor: grab;
+}
+.annotation-panel.floating.dragging .annotation-panel-header {
+  cursor: grabbing;
+}
+
+/* Accordion section headers */
+.annotation-section-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text100);
+  padding: 0.3rem 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--bg200);
+  user-select: none;
+  transition: background 0.1s ease;
+}
+.annotation-section-header:hover {
+  background: var(--bg100);
+}
+.annotation-section-header.current-page {
+  color: var(--text000);
+}
+.annotation-section-header.open {
+  color: var(--text000);
+}
+.annotation-section-chevron {
+  font-size: 0.55rem;
+  transition: transform 0.15s ease;
+}
+.annotation-section-body {
+  display: none;
+}
+.annotation-section-body.open {
+  display: block;
+}
+
+/* Legacy page group headers (fullscreen mode) */
+.annotation-page-group {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text100);
+  padding: 0.5rem 0.75rem 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.annotation-page-group.current-page {
+  color: var(--text000);
+}
+
+/* Annotation cards */
+.annotation-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  border-left: 3px solid transparent;
+}
+.annotation-card:hover {
+  background: var(--bg100);
+}
+.annotation-card.highlighted {
+  background: var(--bg100);
+  border-left-color: var(--text100);
+}
+
+.annotation-card-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 24px;
+}
+
+.annotation-card-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* Swatch for baseline items the user cleared — outlined with a cross
+   instead of solid fill, so the panel still shows "this existed in the
+   file and you removed it" rather than vanishing. */
+.annotation-card-swatch-cleared {
+  background: transparent;
+  border-color: #4a90d9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.annotation-card-cleared .annotation-card-type,
+.annotation-card-cleared .annotation-card-preview {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.annotation-card-type {
+  font-size: 0.7rem;
+  color: var(--text200);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.annotation-card-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--text000);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.annotation-card-delete {
+  flex-shrink: 0;
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--text200);
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.1s ease;
+  display: flex;
+  align-items: center;
+}
+.annotation-card:hover .annotation-card-delete {
+  opacity: 1;
+}
+.annotation-card-delete:hover {
+  color: #d32f2f;
+}
+
+.annotation-card-expand {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: var(--text200);
+  transition: transform 0.15s ease;
+}
+.annotation-card.expanded .annotation-card-expand {
+  transform: rotate(180deg);
+}
+
+.annotation-card-content {
+  display: none;
+  font-size: 0.8rem;
+  color: var(--text100);
+  padding: 0.25rem 0 0.25rem 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+.annotation-card.expanded .annotation-card-content {
+  display: block;
+}
+
+/* Pulse animation for annotation elements on PDF */
+@keyframes annotation-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(255, 165, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0); }
+}
+.annotation-pulse {
+  animation: annotation-pulse 0.6s ease-out 2;
+}
+
+/* Loading Indicator (pie) */
+.loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+  transition: opacity 0.3s;
+}
+.loading-indicator-bg {
+  fill: none;
+  stroke: var(--bg200);
+  stroke-width: 3;
+}
+.loading-indicator-arc {
+  fill: none;
+  stroke: var(--text100);
+  stroke-width: 3;
+  stroke-dasharray: 50.27; /* 2*pi*8 */
+  stroke-dashoffset: 50.27;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dashoffset 0.3s;
+}
+.loading-indicator.error .loading-indicator-arc {
+  stroke: #e74c3c;
+}
+
+
+/* Compact toolbar on narrow screens */
+@media (max-width: 480px) {
+  .toolbar-left {
+    display: none;
+  }
+  .toolbar {
+    justify-content: center;
+  }
+  .nav-btn,
+  .zoom-btn,
+  .search-btn,
+  .fullscreen-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+  .page-input {
+    width: 40px;
+    padding: 0.2rem 0.3rem;
+    font-size: 0.8rem;
+  }
+  .total-pages,
+  .zoom-level {
+    font-size: 0.75rem;
+    min-width: 36px;
+  }
+  .toolbar-center,
+  .toolbar-right {
+    gap: 0.2rem;
+  }
 }

@@ -1,6 +1,6 @@
 import {
   type RequestOptions,
-  Protocol,
+  mergeCapabilities,
   ProtocolOptions,
 } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
@@ -9,14 +9,31 @@ import {
   CallToolRequestSchema,
   CallToolResult,
   CallToolResultSchema,
+  CreateMessageRequest,
+  CreateMessageResult,
+  CreateMessageResultSchema,
+  CreateMessageResultWithTools,
+  CreateMessageResultWithToolsSchema,
   EmptyResultSchema,
   Implementation,
+  ListResourcesRequest,
+  ListResourcesResult,
+  ListResourcesResultSchema,
   ListToolsRequest,
   ListToolsRequestSchema,
+  ListToolsResult,
   LoggingMessageNotification,
   PingRequestSchema,
+  ReadResourceRequest,
+  ReadResourceResult,
+  ReadResourceResultSchema,
+  Tool,
+  ToolAnnotations,
+  ToolListChangedNotification,
 } from "@modelcontextprotocol/sdk/types.js";
 import { AppNotification, AppRequest, AppResult } from "./types";
+import { ProtocolWithEvents } from "./events";
+export { ProtocolWithEvents };
 import { PostMessageTransport } from "./message-transport";
 import {
   LATEST_PROTOCOL_VERSION,
@@ -33,9 +50,12 @@ import {
   McpUiMessageResultSchema,
   McpUiOpenLinkRequest,
   McpUiOpenLinkResultSchema,
+  McpUiDownloadFileRequest,
+  McpUiDownloadFileResultSchema,
   McpUiResourceTeardownRequest,
   McpUiResourceTeardownRequestSchema,
   McpUiResourceTeardownResult,
+  McpUiRequestTeardownNotification,
   McpUiSizeChangedNotification,
   McpUiToolCancelledNotification,
   McpUiToolCancelledNotificationSchema,
@@ -49,6 +69,17 @@ import {
   McpUiRequestDisplayModeResultSchema,
 } from "./types";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import {
+  StandardSchemaV1,
+  standardSchemaToJsonSchema,
+  validateStandardSchema,
+} from "./standard-schema";
+import { z } from "zod/v4";
+
+export type {
+  StandardSchemaV1,
+  StandardSchemaWithJSON,
+} from "./standard-schema";
 
 export { PostMessageTransport } from "./message-transport";
 export * from "./types";
@@ -67,12 +98,30 @@ export {
  * When hosts see a tool with this metadata, they fetch and render the
  * corresponding {@link App `App`}.
  *
- * **Note**: This constant is provided for reference. App developers typically
- * don't need to use it directly. Prefer using {@link server-helpers!registerAppTool `registerAppTool`}
- * with the `_meta.ui.resourceUri` format instead.
+ * **Note**: This constant is provided for reference and backwards compatibility.
+ * Server developers should use {@link server-helpers!registerAppTool `registerAppTool`}
+ * with the `_meta.ui.resourceUri` format instead. Host developers must check both
+ * formats for compatibility.
  *
- * @example How MCP servers use this key (server-side, not in Apps)
- * ```ts source="./app.examples.ts#RESOURCE_URI_META_KEY_serverSide"
+ * @example Modern format (server-side, not in Apps)
+ * ```ts source="./app.examples.ts#RESOURCE_URI_META_KEY_modernFormat"
+ * // Preferred: Use registerAppTool with nested ui.resourceUri
+ * registerAppTool(
+ *   server,
+ *   "weather",
+ *   {
+ *     description: "Get weather forecast",
+ *     _meta: {
+ *       ui: { resourceUri: "ui://weather/forecast" },
+ *     },
+ *   },
+ *   handler,
+ * );
+ * ```
+ *
+ * @example Legacy format (deprecated, for backwards compatibility)
+ * ```ts source="./app.examples.ts#RESOURCE_URI_META_KEY_legacyFormat"
+ * // Deprecated: Direct use of RESOURCE_URI_META_KEY
  * server.registerTool(
  *   "weather",
  *   {
@@ -85,10 +134,13 @@ export {
  * );
  * ```
  *
- * @example How hosts check for this metadata (host-side)
+ * @example How hosts check for this metadata (must support both formats)
  * ```ts source="./app.examples.ts#RESOURCE_URI_META_KEY_hostSide"
- * // Check tool definition metadata (from tools/list response):
- * const uiUri = tool._meta?.[RESOURCE_URI_META_KEY];
+ * // Hosts should check both modern and legacy formats
+ * const meta = tool._meta;
+ * const uiMeta = meta?.ui as McpUiToolMeta | undefined;
+ * const legacyUri = meta?.[RESOURCE_URI_META_KEY] as string | undefined;
+ * const uiUri = uiMeta?.resourceUri ?? legacyUri;
  * if (typeof uiUri === "string" && uiUri.startsWith("ui://")) {
  *   // Fetch the resource and display the UI
  * }
@@ -112,7 +164,7 @@ export const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
  *
  * @see `ProtocolOptions` from @modelcontextprotocol/sdk for inherited options
  */
-type AppOptions = ProtocolOptions & {
+export type AppOptions = ProtocolOptions & {
   /**
    * Automatically report size changes to the host using `ResizeObserver`.
    *
@@ -123,11 +175,113 @@ type AppOptions = ProtocolOptions & {
    * @default true
    */
   autoResize?: boolean;
+  /**
+   * Throw on detected misuse instead of logging a console warning.
+   *
+   * Currently this affects calling host-bound methods (e.g.
+   * {@link App.callServerTool `callServerTool`}, {@link App.sendMessage `sendMessage`})
+   * before {@link App.connect `connect`} has completed the `ui/initialize`
+   * handshake. With `strict: false` (default) a `console.warn` is emitted;
+   * with `strict: true` an `Error` is thrown.
+   *
+   * @remarks Throwing will become the default in a future release.
+   * @default false
+   */
+  strict?: boolean;
+  /**
+   * Allow code paths that require CSP `unsafe-eval` (e.g. `new Function()`).
+   *
+   * Views typically run under a strict CSP without `unsafe-eval`. Zod's JIT
+   * object parser uses `new Function()` and throws on the first message parse
+   * under such a policy. By default (`allowUnsafeEval: false`) the
+   * {@link App `App`} constructor sets `z.config({ jitless: true })` so the
+   * SDK works out of the box under the spec's default CSP. Set
+   * `allowUnsafeEval: true` to skip that and keep the faster JIT path when
+   * the host's CSP permits `unsafe-eval`.
+   *
+   * @default false
+   */
+  allowUnsafeEval?: boolean;
 };
 
 type RequestHandlerExtra = Parameters<
   Parameters<App["setRequestHandler"]>[1]
 >[1];
+
+/**
+ * Result of an app-registered tool callback. When `Out` is provided,
+ * `structuredContent` is required and typed (unless `isError: true`).
+ */
+export type AppToolResult<
+  Out extends StandardSchemaV1 | undefined = undefined,
+> = Out extends StandardSchemaV1
+  ?
+      | (CallToolResult & {
+          structuredContent: StandardSchemaV1.InferOutput<Out>;
+          isError?: false;
+        })
+      | (CallToolResult & { isError: true })
+  : CallToolResult;
+
+/**
+ * Callback for an app-registered tool. When `In` is provided, `args` is the
+ * validated/parsed input; when `In` is `undefined`, the callback receives only
+ * `extra`. When `Out` is provided, the return's `structuredContent` is typed.
+ *
+ * Mirrors `ToolCallback` from `@modelcontextprotocol/sdk/server/mcp.js` but is
+ * parameterized over {@link StandardSchemaV1} instead of zod, so any
+ * Standard-Schema-compatible library (Zod, ArkType, Valibot, …) can be used.
+ */
+export type AppToolCallback<
+  In extends StandardSchemaV1 | undefined = undefined,
+  Out extends StandardSchemaV1 | undefined = undefined,
+> = In extends StandardSchemaV1
+  ? (
+      args: StandardSchemaV1.InferOutput<In>,
+      extra: RequestHandlerExtra,
+    ) => AppToolResult<Out> | Promise<AppToolResult<Out>>
+  : (
+      extra: RequestHandlerExtra,
+    ) => AppToolResult<Out> | Promise<AppToolResult<Out>>;
+
+/**
+ * Handle returned by {@link App.registerTool}. Mirrors `RegisteredTool` from
+ * `@modelcontextprotocol/sdk/server/mcp.js` but stores
+ * {@link StandardSchemaV1} schemas.
+ */
+export type RegisteredAppTool = {
+  title?: string;
+  description?: string;
+  inputSchema?: StandardSchemaV1;
+  outputSchema?: StandardSchemaV1;
+  annotations?: ToolAnnotations;
+  _meta?: Record<string, unknown>;
+  enabled: boolean;
+  enable(): void;
+  disable(): void;
+  remove(): void;
+  update(updates: Partial<Omit<RegisteredAppTool, "update">>): void;
+  /** @internal */
+  handler: (
+    args: unknown,
+    extra: RequestHandlerExtra,
+  ) => Promise<CallToolResult>;
+};
+
+/**
+ * Maps DOM-style event names to their notification `params` types.
+ *
+ * Used by {@link App `App`} (which extends {@link ProtocolWithEvents `ProtocolWithEvents`})
+ * to provide type-safe `addEventListener` / `removeEventListener` and
+ * singular `on*` handler support.
+ */
+export type AppEventMap = {
+  toolinput: McpUiToolInputNotification["params"];
+  toolinputpartial: McpUiToolInputPartialNotification["params"];
+  toolresult: McpUiToolResultNotification["params"];
+  toolcancelled: McpUiToolCancelledNotification["params"];
+  hostcontextchanged: McpUiHostContextChangedNotification["params"];
+};
 
 /**
  * Main class for MCP Apps to communicate with their host.
@@ -148,28 +302,30 @@ type RequestHandlerExtra = Parameters<
  * 1. **Create**: Instantiate App with info and capabilities
  * 2. **Connect**: Call `connect()` to establish transport and perform handshake
  * 3. **Interactive**: Send requests, receive notifications, call tools
- * 4. **Cleanup**: Host sends teardown request before unmounting
+ * 4. **Teardown**: Host sends teardown request before unmounting
  *
  * ## Inherited Methods
  *
- * As a subclass of `Protocol`, `App` inherits key methods for handling communication:
+ * As a subclass of {@link ProtocolWithEvents `ProtocolWithEvents`}, `App` inherits:
  * - `setRequestHandler()` - Register handlers for requests from host
  * - `setNotificationHandler()` - Register handlers for notifications from host
+ * - `addEventListener()` - Append a listener for a notification event (multi-listener)
+ * - `removeEventListener()` - Remove a previously added listener
  *
- * @see `Protocol` from @modelcontextprotocol/sdk for all inherited methods
+ * @see {@link ProtocolWithEvents `ProtocolWithEvents`} for the DOM-model event system
  *
- * ## Notification Setters
+ * ## Notification Setters (DOM-model `on*` handlers)
  *
- * For common notifications, the `App` class provides convenient setter properties
- * that simplify handler registration:
+ * For common notifications, the `App` class provides getter/setter properties
+ * that follow DOM-model replace semantics (like `el.onclick`):
  * - `ontoolinput` - Complete tool arguments from host
  * - `ontoolinputpartial` - Streaming partial tool arguments
  * - `ontoolresult` - Tool execution results
  * - `ontoolcancelled` - Tool execution was cancelled by user or host
  * - `onhostcontextchanged` - Host context changes (theme, locale, etc.)
  *
- * These setters are convenience wrappers around `setNotificationHandler()`.
- * Both patterns work; use whichever fits your coding style better.
+ * Assigning replaces the previous handler; assigning `undefined` clears it.
+ * Use `addEventListener` to attach multiple listeners without replacing.
  *
  * @example Basic usage with PostMessageTransport
  * ```ts source="./app.examples.ts#App_basicUsage"
@@ -186,10 +342,115 @@ type RequestHandlerExtra = Parameters<
  * await app.connect();
  * ```
  */
-export class App extends Protocol<AppRequest, AppNotification, AppResult> {
+export class App extends ProtocolWithEvents<
+  AppRequest,
+  AppNotification,
+  AppResult,
+  AppEventMap
+> {
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
+  private _registeredTools: { [name: string]: RegisteredAppTool } = {};
+  private _initializedSent = false;
+
+  /**
+   * Warn if a host-bound method is called before {@link connect `connect`} has
+   * completed the `ui/initialize` → `ui/notifications/initialized` handshake.
+   *
+   * Calling these methods early can race the handshake on strict hosts and
+   * leave the iframe permanently hidden. See
+   * {@link https://github.com/anthropics/claude-ai-mcp/issues/61 claude-ai-mcp#61} /
+   * {@link https://github.com/anthropics/claude-ai-mcp/issues/149 #149}.
+   *
+   * @remarks This will become a thrown `Error` in a future minor release.
+   */
+  private _assertInitialized(method: string): void {
+    if (this._initializedSent) return;
+    const msg =
+      `[ext-apps] App.${method}() called before connect() completed the ` +
+      `ui/initialize handshake. Await app.connect() before calling this ` +
+      `method, or move data loading to an ontoolresult handler.`;
+    if (this.options?.strict) {
+      throw new Error(msg);
+    }
+    // TODO(next-minor): make `strict: true` the default.
+    console.warn(`${msg}. This will throw in a future release.`);
+  }
+
+  protected readonly eventSchemas = {
+    toolinput: McpUiToolInputNotificationSchema,
+    toolinputpartial: McpUiToolInputPartialNotificationSchema,
+    toolresult: McpUiToolResultNotificationSchema,
+    toolcancelled: McpUiToolCancelledNotificationSchema,
+    hostcontextchanged: McpUiHostContextChangedNotificationSchema,
+  };
+
+  /**
+   * Events the host typically sends once, shortly after the handshake.
+   * Registering a handler for one of these *after* {@link connect `connect`}
+   * resolves risks missing the notification entirely.
+   */
+  private static readonly ONE_SHOT_EVENTS: ReadonlySet<keyof AppEventMap> =
+    new Set(["toolinput", "toolinputpartial", "toolresult", "toolcancelled"]);
+
+  /**
+   * One-shot events that have had at least one handler registered (via `on*`
+   * setter or `addEventListener`) at any point. Once an event is in this set,
+   * subsequent late registrations are not flagged — only the *first* handler
+   * matters for the missed-notification race, and re-registration (e.g. React
+   * `useEffect` cleanup → re-add on dep change) is a legitimate pattern.
+   */
+  private readonly _everHadListener = new Set<keyof AppEventMap>();
+
+  /**
+   * Warn (or throw under `strict`) when the *first* handler for a one-shot
+   * event is registered after the `ui/initialize` → `ui/notifications/initialized`
+   * handshake has completed. The host may have already fired the notification
+   * by then. Subsequent registrations for the same event are not flagged.
+   *
+   * Mirrors {@link _assertInitialized `_assertInitialized`} (the outbound-side guard).
+   */
+  private _assertHandlerTiming(event: keyof AppEventMap): void {
+    if (!App.ONE_SHOT_EVENTS.has(event) || this._everHadListener.has(event)) {
+      return;
+    }
+    this._everHadListener.add(event);
+    if (!this._initializedSent) return;
+    const msg =
+      `[ext-apps] "${String(event)}" handler registered after connect() ` +
+      `completed the ui/initialize handshake. The host may have already sent ` +
+      `this notification. Register handlers before calling app.connect().`;
+    if (this.options?.strict) {
+      throw new Error(msg);
+    }
+    console.warn(msg);
+  }
+
+  protected override setEventHandler<K extends keyof AppEventMap>(
+    event: K,
+    handler: ((params: AppEventMap[K]) => void) | undefined,
+  ): void {
+    if (handler) this._assertHandlerTiming(event);
+    super.setEventHandler(event, handler);
+  }
+
+  override addEventListener<K extends keyof AppEventMap>(
+    event: K,
+    handler: (params: AppEventMap[K]) => void,
+  ): void {
+    this._assertHandlerTiming(event);
+    super.addEventListener(event, handler);
+  }
+
+  protected override onEventDispatch<K extends keyof AppEventMap>(
+    event: K,
+    params: AppEventMap[K],
+  ): void {
+    if (event === "hostcontextchanged") {
+      this._hostContext = { ...this._hostContext, ...params };
+    }
+  }
 
   /**
    * Create a new MCP App instance.
@@ -214,14 +475,190 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
   ) {
     super(options);
 
+    if (!options.allowUnsafeEval) {
+      z.config({ jitless: true });
+    }
+
     this.setRequestHandler(PingRequestSchema, (request) => {
       console.log("Received ping:", request.params);
       return {};
     });
 
-    // Set up default handler to update _hostContext when notifications arrive.
-    // Users can override this by setting onhostcontextchanged.
-    this.onhostcontextchanged = () => {};
+    // Eagerly register the hostcontextchanged event slot so that
+    // onEventDispatch (which merges into _hostContext) fires even if the
+    // user never assigns onhostcontextchanged or calls addEventListener.
+    this.setEventHandler("hostcontextchanged", undefined);
+  }
+
+  private registerCapabilities(capabilities: McpUiAppCapabilities): void {
+    if (this.transport) {
+      throw new Error(
+        "Cannot register capabilities after transport is established",
+      );
+    }
+    this._capabilities = mergeCapabilities(this._capabilities, capabilities);
+  }
+
+  registerTool<
+    OutputArgs extends undefined | StandardSchemaV1 = undefined,
+    InputArgs extends undefined | StandardSchemaV1 = undefined,
+  >(
+    name: string,
+    config: {
+      title?: string;
+      description?: string;
+      inputSchema?: InputArgs;
+      outputSchema?: OutputArgs;
+      annotations?: ToolAnnotations;
+      _meta?: Record<string, unknown>;
+    },
+    cb: AppToolCallback<InputArgs, OutputArgs>,
+  ): RegisteredAppTool {
+    if (this._registeredTools[name]) {
+      throw new Error(`Tool ${name} is already registered`);
+    }
+    const app = this;
+    const notify = () => {
+      if (app._initializedSent && app._capabilities.tools?.listChanged) {
+        void app.sendToolListChanged();
+      }
+    };
+    // Arity is fixed at registration time even if inputSchema is later
+    // update()d, since cb's signature can't change.
+    const cbTakesArgs = config.inputSchema !== undefined;
+    const registeredTool: RegisteredAppTool = {
+      title: config.title,
+      description: config.description,
+      inputSchema: config.inputSchema,
+      outputSchema: config.outputSchema,
+      annotations: config.annotations,
+      _meta: config._meta,
+      enabled: true,
+      enable(): void {
+        this.enabled = true;
+        notify();
+      },
+      disable(): void {
+        this.enabled = false;
+        notify();
+      },
+      update(updates) {
+        Object.assign(this, updates);
+        notify();
+      },
+      remove() {
+        if (app._registeredTools[name] !== registeredTool) return;
+        delete app._registeredTools[name];
+        notify();
+      },
+      handler: async (rawArgs, extra) => {
+        if (!registeredTool.enabled) {
+          throw new Error(`Tool ${name} is disabled`);
+        }
+        let result: CallToolResult;
+        if (cbTakesArgs) {
+          const schema = registeredTool.inputSchema;
+          const parsedArgs = schema
+            ? await validateStandardSchema(
+                schema,
+                rawArgs ?? {},
+                `Invalid input for tool ${name}: `,
+              )
+            : (rawArgs ?? {});
+          result = await (
+            cb as AppToolCallback<StandardSchemaV1, StandardSchemaV1>
+          )(parsedArgs, extra);
+        } else {
+          result = await (cb as AppToolCallback<undefined, StandardSchemaV1>)(
+            extra,
+          );
+        }
+        if (registeredTool.outputSchema && !result.isError) {
+          result.structuredContent = (await validateStandardSchema(
+            registeredTool.outputSchema,
+            result.structuredContent,
+            `Invalid output for tool ${name}: `,
+          )) as CallToolResult["structuredContent"];
+        }
+        return result;
+      },
+    };
+
+    this._registeredTools[name] = registeredTool;
+
+    // Auto-register tools capability so setRequestHandler's capability check
+    // passes. Mirrors McpServer.registerTool behavior — callers shouldn't need
+    // to declare { tools: {} } in the constructor just to use registerTool.
+    // Only do this pre-connect; post-connect the capability was already
+    // advertised (or wasn't) and can't change.
+    if (!this._capabilities.tools && !this.transport) {
+      this.registerCapabilities({ tools: { listChanged: true } });
+    }
+
+    this.ensureToolHandlersInitialized();
+    notify();
+    return registeredTool;
+  }
+
+  private _toolHandlersInitialized = false;
+  private ensureToolHandlersInitialized(): void {
+    if (this._toolHandlersInitialized) {
+      return;
+    }
+    this._toolHandlersInitialized = true;
+
+    this.oncalltool = async (params, extra) => {
+      const tool = this._registeredTools[params.name];
+      if (!tool) {
+        throw new Error(`Tool ${params.name} not found`);
+      }
+      return tool.handler(params.arguments, extra);
+    };
+    this.onlisttools = async (_params, _extra) => {
+      const tools: Tool[] = await Promise.all(
+        Object.entries(this._registeredTools)
+          .filter(([_, tool]) => tool.enabled)
+          .map(async ([name, tool]) => {
+            const result: Tool = {
+              name,
+              title: tool.title,
+              description: tool.description,
+              inputSchema: (tool.inputSchema
+                ? await standardSchemaToJsonSchema(tool.inputSchema, "input")
+                : {
+                    type: "object" as const,
+                    properties: {},
+                  }) as Tool["inputSchema"],
+            };
+            // outputSchema is optional in core MCP — only emit when the app
+            // provided one, otherwise hosts would assume structuredContent.
+            if (tool.outputSchema) {
+              result.outputSchema = (await standardSchemaToJsonSchema(
+                tool.outputSchema,
+                "output",
+              )) as Tool["outputSchema"];
+            }
+            if (tool.annotations) {
+              result.annotations = tool.annotations;
+            }
+            if (tool._meta) {
+              result._meta = tool._meta;
+            }
+            return result;
+          }),
+      );
+      return { tools };
+    };
+  }
+
+  async sendToolListChanged(
+    params: ToolListChangedNotification["params"] = {},
+  ): Promise<void> {
+    this._assertInitialized("sendToolListChanged");
+    await this.notification(<ToolListChangedNotification>{
+      method: "notifications/tools/list_changed",
+      params,
+    });
   }
 
   /**
@@ -309,12 +746,11 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * sends a tool's complete arguments. This is sent after a tool call begins
    * and before the tool result is available.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
+   * Use {@link addEventListener `addEventListener`} to attach multiple listeners
+   * without replacing.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
-   *
-   * @param callback - Function called with the tool input params ({@link McpUiToolInputNotification.params `McpUiToolInputNotification.params`})
    *
    * @example
    * ```ts source="./app.examples.ts#App_ontoolinput_setter"
@@ -326,15 +762,20 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * await app.connect();
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @deprecated Use {@link addEventListener `addEventListener("toolinput", handler)`} instead — it composes with other listeners and supports cleanup via {@link removeEventListener `removeEventListener`}.
    * @see {@link McpUiToolInputNotification `McpUiToolInputNotification`} for the notification structure
    */
+  get ontoolinput():
+    | ((params: McpUiToolInputNotification["params"]) => void)
+    | undefined {
+    return this.getEventHandler("toolinput");
+  }
   set ontoolinput(
-    callback: (params: McpUiToolInputNotification["params"]) => void,
+    callback:
+      | ((params: McpUiToolInputNotification["params"]) => void)
+      | undefined,
   ) {
-    this.setNotificationHandler(McpUiToolInputNotificationSchema, (n) =>
-      callback(n.params),
-    );
+    this.setEventHandler("toolinput", callback);
   }
 
   /**
@@ -349,12 +790,11 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * (e.g., the last item in an array may be truncated). Use partial data only
    * for preview UI, not for critical operations.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
+   * Use {@link addEventListener `addEventListener`} to attach multiple listeners
+   * without replacing.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
-   *
-   * @param callback - Function called with each partial tool input update ({@link McpUiToolInputPartialNotification.params `McpUiToolInputPartialNotification.params`})
    *
    * @example Progressive rendering of tool arguments
    * ```ts source="./app.examples.ts#App_ontoolinputpartial_progressiveRendering"
@@ -374,16 +814,21 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @deprecated Use {@link addEventListener `addEventListener("toolinputpartial", handler)`} instead — it composes with other listeners and supports cleanup via {@link removeEventListener `removeEventListener`}.
    * @see {@link McpUiToolInputPartialNotification `McpUiToolInputPartialNotification`} for the notification structure
    * @see {@link ontoolinput `ontoolinput`} for the complete tool input handler
    */
+  get ontoolinputpartial():
+    | ((params: McpUiToolInputPartialNotification["params"]) => void)
+    | undefined {
+    return this.getEventHandler("toolinputpartial");
+  }
   set ontoolinputpartial(
-    callback: (params: McpUiToolInputPartialNotification["params"]) => void,
+    callback:
+      | ((params: McpUiToolInputPartialNotification["params"]) => void)
+      | undefined,
   ) {
-    this.setNotificationHandler(McpUiToolInputPartialNotificationSchema, (n) =>
-      callback(n.params),
-    );
+    this.setEventHandler("toolinputpartial", callback);
   }
 
   /**
@@ -393,12 +838,11 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * sends the result of a tool execution. This is sent after the tool completes
    * on the MCP server, allowing your app to display the results or update its state.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
+   * Use {@link addEventListener `addEventListener`} to attach multiple listeners
+   * without replacing.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
-   *
-   * @param callback - Function called with the tool result ({@link McpUiToolResultNotification.params `McpUiToolResultNotification.params`})
    *
    * @example Display tool execution results
    * ```ts source="./app.examples.ts#App_ontoolresult_displayResults"
@@ -411,16 +855,21 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @deprecated Use {@link addEventListener `addEventListener("toolresult", handler)`} instead — it composes with other listeners and supports cleanup via {@link removeEventListener `removeEventListener`}.
    * @see {@link McpUiToolResultNotification `McpUiToolResultNotification`} for the notification structure
    * @see {@link ontoolinput `ontoolinput`} for the initial tool input handler
    */
+  get ontoolresult():
+    | ((params: McpUiToolResultNotification["params"]) => void)
+    | undefined {
+    return this.getEventHandler("toolresult");
+  }
   set ontoolresult(
-    callback: (params: McpUiToolResultNotification["params"]) => void,
+    callback:
+      | ((params: McpUiToolResultNotification["params"]) => void)
+      | undefined,
   ) {
-    this.setNotificationHandler(McpUiToolResultNotificationSchema, (n) =>
-      callback(n.params),
-    );
+    this.setEventHandler("toolresult", callback);
   }
 
   /**
@@ -431,12 +880,11 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * including user action, sampling error, classifier intervention, or other
    * interruptions. Apps should update their state and display appropriate feedback.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
+   * Use {@link addEventListener `addEventListener`} to attach multiple listeners
+   * without replacing.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
-   *
-   * @param callback - Function called when tool execution is cancelled. Receives optional cancellation reason — see {@link McpUiToolCancelledNotification.params `McpUiToolCancelledNotification.params`}.
    *
    * @example Handle tool cancellation
    * ```ts source="./app.examples.ts#App_ontoolcancelled_handleCancellation"
@@ -446,16 +894,21 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @deprecated Use {@link addEventListener `addEventListener("toolcancelled", handler)`} instead — it composes with other listeners and supports cleanup via {@link removeEventListener `removeEventListener`}.
    * @see {@link McpUiToolCancelledNotification `McpUiToolCancelledNotification`} for the notification structure
    * @see {@link ontoolresult `ontoolresult`} for successful tool completion
    */
+  get ontoolcancelled():
+    | ((params: McpUiToolCancelledNotification["params"]) => void)
+    | undefined {
+    return this.getEventHandler("toolcancelled");
+  }
   set ontoolcancelled(
-    callback: (params: McpUiToolCancelledNotification["params"]) => void,
+    callback:
+      | ((params: McpUiToolCancelledNotification["params"]) => void)
+      | undefined,
   ) {
-    this.setNotificationHandler(McpUiToolCancelledNotificationSchema, (n) =>
-      callback(n.params),
-    );
+    this.setEventHandler("toolcancelled", callback);
   }
 
   /**
@@ -466,16 +919,16 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * other environmental updates. Apps should respond by updating their UI
    * accordingly.
    *
-   * This setter is a convenience wrapper around `setNotificationHandler()` that
-   * automatically handles the notification schema and extracts the params for you.
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
+   * Use {@link addEventListener `addEventListener`} to attach multiple listeners
+   * without replacing.
    *
    * Notification params are automatically merged into the internal host context
-   * before the callback is invoked. This means {@link getHostContext `getHostContext`} will
-   * return the updated values even before your callback runs.
+   * via {@link onEventDispatch `onEventDispatch`} before any handler or listener
+   * fires. This means {@link getHostContext `getHostContext`} will return the
+   * updated values even before your callback runs.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
-   *
-   * @param callback - Function called with the updated host context
    *
    * @example Respond to theme changes
    * ```ts source="./app.examples.ts#App_onhostcontextchanged_respondToTheme"
@@ -488,21 +941,21 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setNotificationHandler `setNotificationHandler`} for the underlying method
+   * @deprecated Use {@link addEventListener `addEventListener("hostcontextchanged", handler)`} instead — it composes with other listeners and supports cleanup via {@link removeEventListener `removeEventListener`}.
    * @see {@link McpUiHostContextChangedNotification `McpUiHostContextChangedNotification`} for the notification structure
    * @see {@link McpUiHostContext `McpUiHostContext`} for the full context structure
    */
+  get onhostcontextchanged():
+    | ((params: McpUiHostContextChangedNotification["params"]) => void)
+    | undefined {
+    return this.getEventHandler("hostcontextchanged");
+  }
   set onhostcontextchanged(
-    callback: (params: McpUiHostContextChangedNotification["params"]) => void,
+    callback:
+      | ((params: McpUiHostContextChangedNotification["params"]) => void)
+      | undefined,
   ) {
-    this.setNotificationHandler(
-      McpUiHostContextChangedNotificationSchema,
-      (n) => {
-        // Merge the partial update into the stored context
-        this._hostContext = { ...this._hostContext, ...n.params };
-        callback(n.params);
-      },
-    );
+    this.setEventHandler("hostcontextchanged", callback);
   }
 
   /**
@@ -515,8 +968,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * The handler can be sync or async. The host will wait for the returned promise
    * to resolve before proceeding with teardown.
    *
-   * This setter is a convenience wrapper around `setRequestHandler()` that
-   * automatically handles the request schema.
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing requests.
    *
@@ -533,18 +985,31 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * };
    * ```
    *
-   * @see {@link setRequestHandler `setRequestHandler`} for the underlying method
    * @see {@link McpUiResourceTeardownRequest `McpUiResourceTeardownRequest`} for the request structure
    */
+  private _onteardown?: (
+    params: McpUiResourceTeardownRequest["params"],
+    extra: RequestHandlerExtra,
+  ) => McpUiResourceTeardownResult | Promise<McpUiResourceTeardownResult>;
+  get onteardown() {
+    return this._onteardown;
+  }
   set onteardown(
-    callback: (
-      params: McpUiResourceTeardownRequest["params"],
-      extra: RequestHandlerExtra,
-    ) => McpUiResourceTeardownResult | Promise<McpUiResourceTeardownResult>,
+    callback:
+      | ((
+          params: McpUiResourceTeardownRequest["params"],
+          extra: RequestHandlerExtra,
+        ) => McpUiResourceTeardownResult | Promise<McpUiResourceTeardownResult>)
+      | undefined,
   ) {
-    this.setRequestHandler(
+    this.warnIfRequestHandlerReplaced("onteardown", this._onteardown, callback);
+    this._onteardown = callback;
+    this.replaceRequestHandler(
       McpUiResourceTeardownRequestSchema,
-      (request, extra) => callback(request.params, extra),
+      (request, extra) => {
+        if (!this._onteardown) throw new Error("No onteardown handler set");
+        return this._onteardown(request.params, extra);
+      },
     );
   }
 
@@ -557,8 +1022,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * The app must declare tool capabilities in the constructor to use this handler.
    *
-   * This setter is a convenience wrapper around `setRequestHandler()` that
-   * automatically handles the request schema and extracts the params for you.
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing requests.
    *
@@ -576,18 +1040,28 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *   throw new Error(`Unknown tool: ${params.name}`);
    * };
    * ```
-   *
-   * @see {@link setRequestHandler `setRequestHandler`} for the underlying method
    */
+  private _oncalltool?: (
+    params: CallToolRequest["params"],
+    extra: RequestHandlerExtra,
+  ) => Promise<CallToolResult>;
+  get oncalltool() {
+    return this._oncalltool;
+  }
   set oncalltool(
-    callback: (
-      params: CallToolRequest["params"],
-      extra: RequestHandlerExtra,
-    ) => Promise<CallToolResult>,
+    callback:
+      | ((
+          params: CallToolRequest["params"],
+          extra: RequestHandlerExtra,
+        ) => Promise<CallToolResult>)
+      | undefined,
   ) {
-    this.setRequestHandler(CallToolRequestSchema, (request, extra) =>
-      callback(request.params, extra),
-    );
+    this.warnIfRequestHandlerReplaced("oncalltool", this._oncalltool, callback);
+    this._oncalltool = callback;
+    this.replaceRequestHandler(CallToolRequestSchema, (request, extra) => {
+      if (!this._oncalltool) throw new Error("No oncalltool handler set");
+      return this._oncalltool(request.params, extra);
+    });
   }
 
   /**
@@ -599,36 +1073,66 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    *
    * The app must declare tool capabilities in the constructor to use this handler.
    *
-   * This setter is a convenience wrapper around `setRequestHandler()` that
-   * automatically handles the request schema and extracts the params for you.
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing requests.
    *
-   * @param callback - Async function that returns tool names as strings (simplified
-   *   from full `ListToolsResult` with `Tool` objects). Registration is always
-   *   allowed; capability validation occurs when handlers are invoked.
+   * @param callback - Async function that returns a {@link ListToolsResult `ListToolsResult`}.
+   *   Registration is always allowed; capability validation occurs when handlers
+   *   are invoked.
    *
    * @example Return available tools
    * ```ts source="./app.examples.ts#App_onlisttools_returnTools"
    * app.onlisttools = async (params, extra) => {
    *   return {
-   *     tools: ["greet", "calculate", "format"],
+   *     tools: [
+   *       {
+   *         name: "greet",
+   *         description: "Greet the user",
+   *         inputSchema: { type: "object" as const },
+   *       },
+   *       {
+   *         name: "calculate",
+   *         description: "Perform a calculation",
+   *         inputSchema: { type: "object" as const },
+   *       },
+   *       {
+   *         name: "format",
+   *         description: "Format text",
+   *         inputSchema: { type: "object" as const },
+   *       },
+   *     ],
    *   };
    * };
    * ```
    *
-   * @see {@link setRequestHandler `setRequestHandler`} for the underlying method
    * @see {@link oncalltool `oncalltool`} for handling tool execution
    */
+  private _onlisttools?: (
+    params: ListToolsRequest["params"],
+    extra: RequestHandlerExtra,
+  ) => Promise<ListToolsResult>;
+  get onlisttools() {
+    return this._onlisttools;
+  }
   set onlisttools(
-    callback: (
-      params: ListToolsRequest["params"],
-      extra: RequestHandlerExtra,
-    ) => Promise<{ tools: string[] }>,
+    callback:
+      | ((
+          params: ListToolsRequest["params"],
+          extra: RequestHandlerExtra,
+        ) => Promise<ListToolsResult>)
+      | undefined,
   ) {
-    this.setRequestHandler(ListToolsRequestSchema, (request, extra) =>
-      callback(request.params, extra),
+    this.warnIfRequestHandlerReplaced(
+      "onlisttools",
+      this._onlisttools,
+      callback,
     );
+    this._onlisttools = callback;
+    this.replaceRequestHandler(ListToolsRequestSchema, (request, extra) => {
+      if (!this._onlisttools) throw new Error("No onlisttools handler set");
+      return this._onlisttools(request.params, extra);
+    });
   }
 
   /**
@@ -636,7 +1140,15 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @internal
    */
   assertCapabilityForMethod(method: AppRequest["method"]): void {
-    // TODO
+    switch (method) {
+      case "sampling/createMessage":
+        if (!this._hostCapabilities?.sampling) {
+          throw new Error(
+            `Host does not support sampling (required for ${method})`,
+          );
+        }
+        break;
+    }
   }
 
   /**
@@ -665,7 +1177,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * Verify that the app supports the capability required for the given notification method.
    * @internal
    */
-  assertNotificationCapability(method: AppNotification["method"]): void {
+  assertNotificationCapability(_method: AppNotification["method"]): void {
     // TODO
   }
 
@@ -724,9 +1236,207 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     params: CallToolRequest["params"],
     options?: RequestOptions,
   ): Promise<CallToolResult> {
+    this._assertInitialized("callServerTool");
+    if (typeof params === "string") {
+      throw new Error(
+        `callServerTool() expects an object as its first argument, but received a string ("${params}"). ` +
+          `Did you mean: callServerTool({ name: "${params}", arguments: { ... } })?`,
+      );
+    }
     return await this.request(
       { method: "tools/call", params },
       CallToolResultSchema,
+      {
+        // Hosts may interpose long-running or user-interactive steps before the
+        // tool result arrives. Opting in here lets a host heartbeat keep the
+        // request alive past the default timeout; callers can still override.
+        onprogress: () => {},
+        resetTimeoutOnProgress: true,
+        ...options,
+      },
+    );
+  }
+
+  /**
+   * Read a resource from the originating MCP server (proxied through the host).
+   *
+   * Apps can read resources to access files, data, or other content provided by
+   * the MCP server. Resources are identified by URI (e.g., `file:///path/to/file`
+   * or custom schemes like `videos://bunny-1mb`). The host proxies the request to
+   * the actual MCP server and returns the resource content.
+   *
+   * @param params - Resource URI to read
+   * @param options - Request options (timeout, etc.)
+   * @returns Resource content with URI, name, description, mimeType, and contents array
+   *
+   * @throws {Error} If the resource does not exist on the server
+   * @throws {Error} If the request times out or the connection is lost
+   * @throws {Error} If the host rejects the request
+   *
+   * @example Read a video resource and play it
+   * ```ts source="./app.examples.ts#App_readServerResource_playVideo"
+   * try {
+   *   const result = await app.readServerResource({
+   *     uri: "videos://bunny-1mb",
+   *   });
+   *   const content = result.contents[0];
+   *   if (content && "blob" in content) {
+   *     const binary = Uint8Array.from(atob(content.blob), (c) =>
+   *       c.charCodeAt(0),
+   *     );
+   *     const url = URL.createObjectURL(
+   *       new Blob([binary], { type: content.mimeType || "video/mp4" }),
+   *     );
+   *     videoElement.src = url;
+   *     videoElement.play();
+   *   }
+   * } catch (error) {
+   *   console.error("Failed to read resource:", error);
+   * }
+   * ```
+   *
+   * @see {@link listServerResources `listServerResources`} to discover available resources
+   */
+  async readServerResource(
+    params: ReadResourceRequest["params"],
+    options?: RequestOptions,
+  ): Promise<ReadResourceResult> {
+    this._assertInitialized("readServerResource");
+    return await this.request(
+      { method: "resources/read", params },
+      ReadResourceResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * List available resources from the originating MCP server (proxied through the host).
+   *
+   * Apps can list resources to discover what content is available on the MCP server.
+   * This enables dynamic resource discovery and building resource browsers or pickers.
+   * The host proxies the request to the actual MCP server and returns the resource list.
+   *
+   * Results may be paginated using the `cursor` parameter for servers with many resources.
+   *
+   * @param params - Optional parameters (omit for all resources, or `{ cursor }` for pagination)
+   * @param options - Request options (timeout, etc.)
+   * @returns List of resources with their URIs, names, descriptions, mimeTypes, and optional pagination cursor
+   *
+   * @throws {Error} If the request times out or the connection is lost
+   * @throws {Error} If the host rejects the request
+   *
+   * @example Discover available videos and build a picker UI
+   * ```ts source="./app.examples.ts#App_listServerResources_buildPicker"
+   * try {
+   *   const result = await app.listServerResources();
+   *   const videoResources = result.resources.filter((r) =>
+   *     r.mimeType?.startsWith("video/"),
+   *   );
+   *   videoResources.forEach((resource) => {
+   *     const option = document.createElement("option");
+   *     option.value = resource.uri;
+   *     option.textContent = resource.description || resource.name;
+   *     selectElement.appendChild(option);
+   *   });
+   * } catch (error) {
+   *   console.error("Failed to list resources:", error);
+   * }
+   * ```
+   *
+   * @see {@link readServerResource `readServerResource`} to read a specific resource
+   */
+  async listServerResources(
+    params?: ListResourcesRequest["params"],
+    options?: RequestOptions,
+  ): Promise<ListResourcesResult> {
+    this._assertInitialized("listServerResources");
+    return await this.request(
+      { method: "resources/list", params },
+      ListResourcesResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * Request an LLM completion from the host (standard MCP `sampling/createMessage`).
+   *
+   * Enables the app to use the host's model connection for completions. The host
+   * has full discretion over which model to select and MAY modify or reject the
+   * request (human-in-the-loop). Check {@link getHostCapabilities `getHostCapabilities`}`()?.sampling`
+   * before calling — hosts without this capability will reject the request.
+   *
+   * This method reuses the stock MCP `CreateMessageRequest` shape. When `params.tools`
+   * is provided, the result is parsed with the extended schema that permits
+   * `stopReason: "toolUse"` and array content containing `tool_use` blocks.
+   *
+   * @param params - Standard MCP `CreateMessageRequest` params (messages, maxTokens,
+   *   systemPrompt, temperature, modelPreferences, tools, toolChoice, etc.)
+   * @param options - Request options (timeout, abort signal)
+   * @returns `CreateMessageResult` (single content block) or `CreateMessageResultWithTools`
+   *   (array content, may include `tool_use` blocks) depending on whether `tools` was set
+   *
+   * @throws {Error} If the host rejects the request or does not support sampling
+   * @throws {Error} If the request times out or the connection is lost
+   *
+   * @example Simple completion
+   * ```ts source="./app.examples.ts#App_createSamplingMessage_simple"
+   * const result = await app.createSamplingMessage({
+   *   messages: [
+   *     {
+   *       role: "user",
+   *       content: { type: "text", text: "Summarize this in one line." },
+   *     },
+   *   ],
+   *   maxTokens: 100,
+   * });
+   * console.log(result.content);
+   * ```
+   *
+   * @example Agentic loop with tools
+   * ```ts source="./app.examples.ts#App_createSamplingMessage_withTools"
+   * if (!app.getHostCapabilities()?.sampling?.tools) return;
+   *
+   * const result = await app.createSamplingMessage({
+   *   messages,
+   *   maxTokens: 1024,
+   *   tools: [
+   *     {
+   *       name: "get_weather",
+   *       description: "Get the current weather",
+   *       inputSchema: {
+   *         type: "object",
+   *         properties: { city: { type: "string" } },
+   *       },
+   *     },
+   *   ],
+   * });
+   * if (result.stopReason === "toolUse") {
+   *   // result.content may be an array containing tool_use blocks
+   * }
+   * ```
+   *
+   * @see `CreateMessageRequest` from @modelcontextprotocol/sdk for the request type
+   * @see `CreateMessageResult` / `CreateMessageResultWithTools` from @modelcontextprotocol/sdk for result types
+   */
+  async createSamplingMessage(
+    params: CreateMessageRequest["params"] & { tools?: undefined },
+    options?: RequestOptions,
+  ): Promise<CreateMessageResult>;
+  async createSamplingMessage(
+    params: CreateMessageRequest["params"],
+    options?: RequestOptions,
+  ): Promise<CreateMessageResultWithTools>;
+  async createSamplingMessage(
+    params: CreateMessageRequest["params"],
+    options?: RequestOptions,
+  ): Promise<CreateMessageResult | CreateMessageResultWithTools> {
+    this._assertInitialized("createSamplingMessage");
+    const resultSchema = params.tools
+      ? CreateMessageResultWithToolsSchema
+      : CreateMessageResultSchema;
+    return await this.request(
+      { method: "sampling/createMessage", params },
+      resultSchema,
       options,
     );
   }
@@ -782,6 +1492,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @see {@link McpUiMessageRequest `McpUiMessageRequest`} for request structure
    */
   sendMessage(params: McpUiMessageRequest["params"], options?: RequestOptions) {
+    this._assertInitialized("sendMessage");
     return this.request(
       <McpUiMessageRequest>{
         method: "ui/message",
@@ -875,6 +1586,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     params: McpUiUpdateModelContextRequest["params"],
     options?: RequestOptions,
   ) {
+    this._assertInitialized("updateModelContext");
     return this.request(
       <McpUiUpdateModelContextRequest>{
         method: "ui/update-model-context",
@@ -911,6 +1623,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
    * @see {@link McpUiOpenLinkResult `McpUiOpenLinkResult`} for result structure
    */
   openLink(params: McpUiOpenLinkRequest["params"], options?: RequestOptions) {
+    this._assertInitialized("openLink");
     return this.request(
       <McpUiOpenLinkRequest>{
         method: "ui/open-link",
@@ -923,6 +1636,128 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
 
   /** @deprecated Use {@link openLink `openLink`} instead */
   sendOpenLink: App["openLink"] = this.openLink;
+
+  /**
+   * Request the host to download a file.
+   *
+   * Since MCP Apps run in sandboxed iframes where direct downloads are blocked,
+   * this provides a host-mediated mechanism for file exports. The host will
+   * typically show a confirmation dialog before initiating the download.
+   *
+   * Uses standard MCP resource types: `EmbeddedResource` for inline content
+   * and `ResourceLink` for content the host can fetch directly.
+   *
+   * @param params - Resource contents to download
+   * @param options - Request options (timeout, etc.)
+   * @returns Result with `isError: true` if the host denied the request (e.g., user cancelled)
+   *
+   * @throws {Error} If the request times out or the connection is lost
+   *
+   * @example Download a JSON file (embedded text resource)
+   * ```ts
+   * const data = JSON.stringify({ items: selectedItems }, null, 2);
+   * const { isError } = await app.downloadFile({
+   *   contents: [{
+   *     type: "resource",
+   *     resource: {
+   *       uri: "file:///export.json",
+   *       mimeType: "application/json",
+   *       text: data,
+   *     },
+   *   }],
+   * });
+   * if (isError) {
+   *   console.warn("Download denied or cancelled");
+   * }
+   * ```
+   *
+   * @example Download binary content (embedded blob resource)
+   * ```ts
+   * const { isError } = await app.downloadFile({
+   *   contents: [{
+   *     type: "resource",
+   *     resource: {
+   *       uri: "file:///image.png",
+   *       mimeType: "image/png",
+   *       blob: base64EncodedPng,
+   *     },
+   *   }],
+   * });
+   * ```
+   *
+   * @example Download via resource link (host fetches)
+   * ```ts
+   * const { isError } = await app.downloadFile({
+   *   contents: [{
+   *     type: "resource_link",
+   *     uri: "https://api.example.com/reports/q4.pdf",
+   *     name: "Q4 Report",
+   *     mimeType: "application/pdf",
+   *   }],
+   * });
+   * ```
+   *
+   * @see {@link McpUiDownloadFileRequest `McpUiDownloadFileRequest`} for request structure
+   * @see {@link McpUiDownloadFileResult `McpUiDownloadFileResult`} for result structure
+   */
+  downloadFile(
+    params: McpUiDownloadFileRequest["params"],
+    options?: RequestOptions,
+  ) {
+    this._assertInitialized("downloadFile");
+    return this.request(
+      <McpUiDownloadFileRequest>{
+        method: "ui/download-file",
+        params,
+      },
+      McpUiDownloadFileResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * Request the host to tear down this app.
+   *
+   * Apps call this method to request that the host tear them down. The host
+   * decides whether to proceed - if approved, the host will send
+   * `ui/resource-teardown` to allow the app to perform gracefull termination before being
+   * unmounted. This piggybacks on the existing teardown mechanism, ensuring
+   * the app only needs a single shutdown procedure (via {@link onteardown `onteardown`})
+   * regardless of whether the teardown was initiated by the app or the host.
+   *
+   * This is a fire-and-forget notification - no response is expected.
+   * If the host approves, the app will receive a `ui/resource-teardown`
+   * request via the {@link onteardown `onteardown`} handler to persist unsaved state.
+   *
+   * @param params - Empty params object (reserved for future use)
+   * @returns Promise that resolves when the notification is sent
+   *
+   * @example App-initiated teardown after user action
+   * ```typescript
+   * // User clicks "Done" button in the app
+   * async function handleDoneClick() {
+   *   // Request the host to tear down the app
+   *   await app.requestTeardown();
+   *   // If host approves, onteardown handler will be called for termination
+   * }
+   *
+   * // Set up teardown handler (called for both app-initiated and host-initiated teardown)
+   * app.onteardown = async () => {
+   *   await saveState();
+   *   closeConnections();
+   *   return {};
+   * };
+   * ```
+   *
+   * @see {@link McpUiRequestTeardownNotification `McpUiRequestTeardownNotification`} for notification structure
+   * @see {@link onteardown `onteardown`} for the graceful termination handler
+   */
+  requestTeardown(params: McpUiRequestTeardownNotification["params"] = {}) {
+    return this.notification(<McpUiRequestTeardownNotification>{
+      method: "ui/notifications/request-teardown",
+      params,
+    });
+  }
 
   /**
    * Request a change to the display mode.
@@ -954,6 +1789,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     params: McpUiRequestDisplayModeRequest["params"],
     options?: RequestOptions,
   ) {
+    this._assertInitialized("requestDisplayMode");
     return this.request(
       <McpUiRequestDisplayModeRequest>{
         method: "ui/request-display-mode",
@@ -1034,23 +1870,22 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
         scheduled = false;
         const html = document.documentElement;
 
-        // Measure actual content size by temporarily setting html to fit-content.
-        // This shrinks html to fit body (including body margins), giving us the
-        // true minimum size needed by the content.
-        const originalWidth = html.style.width;
+        // Measure actual content height by temporarily overriding html sizing.
+        // Height uses max-content because fit-content would clamp to the viewport
+        // height when content is taller than the iframe, causing internal scrolling.
+        //
+        // Width uses window.innerWidth instead of measuring via fit-content.
+        // Setting html.style.width to fit-content forces a synchronous reflow at
+        // 0px width for responsive apps (whose content derives width from the
+        // container rather than having intrinsic width). This causes the browser
+        // to clamp scrollLeft on any horizontal scroll containers to 0, permanently
+        // destroying their scroll positions.
         const originalHeight = html.style.height;
-        html.style.width = "fit-content";
-        html.style.height = "fit-content";
-        const rect = html.getBoundingClientRect();
-        html.style.width = originalWidth;
+        html.style.height = "max-content";
+        const height = Math.ceil(html.getBoundingClientRect().height);
         html.style.height = originalHeight;
 
-        // Compensate for scrollbar width on Linux/Windows where scrollbars consume space.
-        // On systems with overlay scrollbars (macOS), this will be 0.
-        const scrollbarWidth = window.innerWidth - html.clientWidth;
-
-        const width = Math.ceil(rect.width + scrollbarWidth);
-        const height = Math.ceil(rect.height);
+        const width = Math.ceil(window.innerWidth);
 
         // Only send if size actually changed (prevents feedback loops from style changes)
         if (width !== lastWidth || height !== lastHeight) {
@@ -1112,6 +1947,12 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
     ),
     options?: RequestOptions,
   ): Promise<void> {
+    if (this.transport) {
+      throw new Error(
+        "App is already connected. Call close() before connecting again.",
+      );
+    }
+    this._initializedSent = false;
     await super.connect(transport);
 
     try {
@@ -1139,6 +1980,7 @@ export class App extends Protocol<AppRequest, AppNotification, AppResult> {
       await this.notification(<McpUiInitializedNotification>{
         method: "ui/notifications/initialized",
       });
+      this._initializedSent = true;
 
       if (this.options?.autoResize) {
         this.setupSizeChangedNotifications();

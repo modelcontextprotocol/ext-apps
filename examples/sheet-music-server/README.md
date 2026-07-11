@@ -4,8 +4,8 @@ A demo MCP App that renders [ABC notation](https://en.wikipedia.org/wiki/ABC_not
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/sheet-music-server/01-twinkle-twinkle-little-star.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/sheet-music-server/01-twinkle-twinkle-little-star.png" alt="Twinkle, Twinkle Little Star" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/sheet-music-server/02-playing-on-repeat.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/sheet-music-server/02-playing-on-repeat.png" alt="Playing on repeat" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/sheet-music-server/01-twinkle-twinkle-little-star.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/sheet-music-server/01-twinkle-twinkle-little-star.png" alt="Twinkle, Twinkle Little Star" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/sheet-music-server/02-playing-on-repeat.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/sheet-music-server/02-playing-on-repeat.png" alt="Playing on repeat" width="100%"></a></td>
   </tr>
 </table>
 

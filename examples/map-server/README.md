@@ -122,7 +122,7 @@ Vanilla TypeScript app that:
 
 - [`server.ts`](server.ts) - MCP server with geocode and show-map tools
 - [`mcp-app.html`](mcp-app.html) / [`src/mcp-app.ts`](src/mcp-app.ts) - CesiumJS globe UI
-- [`server-utils.ts`](server-utils.ts) - HTTP server utilities
+- [`main.ts`](main.ts) - HTTP and stdio server utilities
 
 ## Notes
 

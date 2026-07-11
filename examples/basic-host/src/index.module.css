@@ -1,7 +1,7 @@
 /* Theme toggle button */
 .themeToggle {
   position: fixed;
-  top: 1rem;
+  bottom: 1rem;
   right: 1rem;
   width: 2.5rem;
   height: 2.5rem;
@@ -165,7 +165,7 @@
     margin: 0;
     padding: 1rem;
     max-width: none;
-    background: white;
+    background: var(--color-bg);
     border: none;
     border-radius: 0;
     display: flex;
@@ -201,29 +201,30 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
   font-size: 1.25rem;
   cursor: pointer;
 
   &:hover {
-    background: #e0e0e0;
+    background: var(--color-bg);
   }
 }
 
 .collapsiblePanel {
   margin: 0.5rem 0;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  background-color: #fafafa;
+  background-color: var(--color-bg-secondary);
   font-size: 0.875rem;
   cursor: pointer;
   transition: background-color 0.15s;
 
   &:hover {
-    background-color: #f0f0f0;
+    background-color: var(--color-bg);
   }
 }
 
@@ -235,23 +236,23 @@
 
 .collapsibleLabel {
   font-weight: 600;
-  color: #555;
+  color: var(--color-text);
 }
 
 .collapsibleSize {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 0.75rem;
 }
 
 .collapsibleToggle {
   margin-left: auto;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 0.75rem;
 }
 
 .collapsiblePreview {
   margin-top: 0.25rem;
-  color: #666;
+  color: var(--color-text-secondary);
   font-family: monospace;
   font-size: 0.8rem;
   white-space: nowrap;
@@ -263,7 +264,8 @@
   margin: 0.5rem 0 0;
   padding: 0.5rem;
   border-radius: 4px;
-  background-color: #f5f5f5;
+  background-color: var(--color-bg);
+  color: var(--color-text);
   font-family: monospace;
   font-size: 0.8rem;
   white-space: pre-wrap;

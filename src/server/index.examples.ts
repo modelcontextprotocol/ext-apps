@@ -7,6 +7,7 @@
  * @module
  */
 
+import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import type {
   McpServer,
@@ -17,6 +18,7 @@ import { z } from "zod";
 import {
   registerAppTool,
   registerAppResource,
+  getUiCapability,
   RESOURCE_MIME_TYPE,
 } from "./index.js";
 
@@ -162,7 +164,7 @@ function registerAppResource_basicUsage(server: McpServer) {
 }
 
 /**
- * Example: registerAppResource with CSP configuration for external domains.
+ * Example: registerAppResource with CSP configuration for network access.
  */
 function registerAppResource_withCsp(
   server: McpServer,
@@ -195,4 +197,95 @@ function registerAppResource_withCsp(
     }),
   );
   //#endregion registerAppResource_withCsp
+}
+
+/**
+ * Example: registerAppResource with stable origin for external API CORS allowlists.
+ */
+function registerAppResource_withDomain(
+  server: McpServer,
+  dashboardHtml: string,
+) {
+  //#region registerAppResource_withDomain
+  // Computes a stable origin from an MCP server URL for hosting in Claude.
+  function computeAppDomainForClaude(mcpServerUrl: string): string {
+    const hash = crypto
+      .createHash("sha256")
+      .update(mcpServerUrl)
+      .digest("hex")
+      .slice(0, 32);
+    return `${hash}.claudemcpcontent.com`;
+  }
+
+  const APP_DOMAIN = computeAppDomainForClaude("https://example.com/mcp");
+
+  registerAppResource(
+    server,
+    "Company Dashboard",
+    "ui://dashboard/view.html",
+    {
+      description: "Internal dashboard with company data",
+    },
+    async () => ({
+      contents: [
+        {
+          uri: "ui://dashboard/view.html",
+          mimeType: RESOURCE_MIME_TYPE,
+          text: dashboardHtml,
+          _meta: {
+            ui: {
+              // CSP: tell browser the app is allowed to make requests
+              csp: {
+                connectDomains: ["https://api.example.com"],
+              },
+              // CORS: give app a stable origin for the API server to allowlist
+              //
+              // (Public APIs that use `Access-Control-Allow-Origin: *` or API
+              // key auth don't need this.)
+              domain: APP_DOMAIN,
+            },
+          },
+        },
+      ],
+    }),
+  );
+  //#endregion registerAppResource_withDomain
+}
+
+/**
+ * Example: Check for MCP Apps support in server initialization.
+ */
+function getUiCapability_checkSupport(
+  server: McpServer,
+  weatherHandler: ToolCallback,
+  textWeatherHandler: ToolCallback,
+) {
+  //#region getUiCapability_checkSupport
+  server.server.oninitialized = () => {
+    const clientCapabilities = server.server.getClientCapabilities();
+    const uiCap = getUiCapability(clientCapabilities);
+
+    if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
+      // App-enhanced tool
+      registerAppTool(
+        server,
+        "weather",
+        {
+          description: "Get weather information with interactive dashboard",
+          _meta: { ui: { resourceUri: "ui://weather/dashboard" } },
+        },
+        weatherHandler,
+      );
+    } else {
+      // Text-only fallback
+      server.registerTool(
+        "weather",
+        {
+          description: "Get weather information",
+        },
+        textWeatherHandler,
+      );
+    }
+  };
+  //#endregion getUiCapability_checkSupport
 }

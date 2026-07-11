@@ -1,5 +1,7 @@
 ---
 title: Overview
+group: Getting Started
+description: MCP Apps extends the Model Context Protocol to let MCP servers deliver interactive UIs — charts, forms, dashboards — rendered securely in iframes inside any compliant host.
 ---
 
 # MCP Apps Overview
@@ -201,7 +203,7 @@ See the [Display Modes](https://github.com/modelcontextprotocol/ext-apps/blob/ma
 
 All Views run in sandboxed iframes with no access to the Host's DOM, cookies, or storage. Communication happens only through [`postMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage), making it auditable.
 
-Servers declare which external domains their UI needs via [CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP) metadata. Hosts enforce these declarations — if no domains are declared, no external connections are allowed. This "restrictive by default" approach prevents data exfiltration to undeclared servers.
+Servers declare which network domains their UI needs via [CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP) metadata. Hosts enforce these declarations — if no domains are declared, no external connections are allowed. This "restrictive by default" approach prevents data exfiltration to undeclared servers.
 
 See the [Security Implications](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#security-implications) section of the specification for the threat model and mitigations.
 

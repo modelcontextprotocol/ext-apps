@@ -4,9 +4,9 @@ A React-based demo MCP App that lets users adjust SaaS business parameters and s
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/01-compare-to.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/01-compare-to.png" alt="Compare to" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/02-bootstrapped-growth.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/02-bootstrapped-growth.png" alt="Bootstrapped growth" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/03-vc-rocketship.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/scenario-modeler-server/03-vc-rocketship.png" alt="VC rocketship" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/01-compare-to.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/01-compare-to.png" alt="Compare to" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/02-bootstrapped-growth.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/02-bootstrapped-growth.png" alt="Bootstrapped growth" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/03-vc-rocketship.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/scenario-modeler-server/03-vc-rocketship.png" alt="VC rocketship" width="100%"></a></td>
   </tr>
 </table>
 

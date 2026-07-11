@@ -16,6 +16,7 @@ const DIST_DIR = import.meta.filename.endsWith(".ts")
   ? path.join(import.meta.dirname, "dist")
   : import.meta.dirname;
 const RESOURCE_URI = "ui://get-time/mcp-app.html";
+const SAMPLE_DOWNLOAD_URI = "resource:///sample-report.txt";
 
 /**
  * Creates a new MCP server instance with tools and resources registered.
@@ -65,6 +66,29 @@ export function createServer(): McpServer {
       return {
         contents: [
           { uri: RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: html },
+        ],
+      };
+    },
+  );
+
+  // Sample downloadable resource — used to demo ResourceLink in ui/download-file
+  server.resource(
+    SAMPLE_DOWNLOAD_URI,
+    SAMPLE_DOWNLOAD_URI,
+    {
+      mimeType: "text/plain",
+    },
+    async (): Promise<ReadResourceResult> => {
+      const content = [
+        "Integration Test Server — Sample Report",
+        `Generated: ${new Date().toISOString()}`,
+        "",
+        "This file was downloaded via MCP ResourceLink.",
+        "The host resolved it by calling resources/read on the server.",
+      ].join("\n");
+      return {
+        contents: [
+          { uri: SAMPLE_DOWNLOAD_URI, mimeType: "text/plain", text: content },
         ],
       };
     },

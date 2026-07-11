@@ -6,7 +6,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   font-size: 1rem;
   margin: 0;
@@ -44,4 +45,72 @@ html, body {
   border-radius: var(--border-radius-md, 8px);
   font-family: var(--font-sans, system-ui);
   padding: 20px;
+}
+
+/* Fullscreen button */
+.fullscreen-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  cursor: pointer;
+  display: none; /* Hidden by default, shown when fullscreen available */
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.2s,
+    opacity 0.2s;
+  opacity: 0; /* Initially invisible, shown on hover */
+  z-index: 100;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  opacity: 1;
+}
+
+.fullscreen-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.fullscreen-btn .collapse-icon {
+  display: none;
+}
+
+.fullscreen-btn.available {
+  display: flex;
+}
+
+/* Show button on container hover */
+.threejs-container:hover .fullscreen-btn.available {
+  opacity: 0.7;
+}
+
+/* Always show button on touch devices */
+.threejs-container.touch-device .fullscreen-btn.available {
+  opacity: 0.7;
+}
+
+/* In fullscreen, canvas goes edge-to-edge; only the button respects safe area */
+.threejs-container.fullscreen {
+  padding: 0 !important;
+}
+
+/* Fullscreen mode: swap icons and remove border radius */
+.threejs-container.fullscreen .fullscreen-btn .expand-icon {
+  display: none;
+}
+
+.threejs-container.fullscreen .fullscreen-btn .collapse-icon {
+  display: block;
+}
+
+.threejs-container.fullscreen canvas {
+  border-radius: 0 !important;
 }

@@ -4,4 +4,6 @@ examples/basic-server-*/**/*.ts
 examples/basic-server-*/**/*.tsx
 examples/quickstart/**/*.ts
 **/vendor/**
+**/.build/**
+**/.claude/**
 SKILL.md

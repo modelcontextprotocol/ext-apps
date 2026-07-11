@@ -4,9 +4,9 @@ An interactive budget allocation tool demonstrating real-time data visualization
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/01-initial.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/01-initial.png" alt="Initial" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/02-over-budget.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/02-over-budget.png" alt="Over budget" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/03-tech-heavy.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/budget-allocator-server/03-tech-heavy.png" alt="Tech-heavy" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/01-initial.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/01-initial.png" alt="Initial" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/02-over-budget.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/02-over-budget.png" alt="Over budget" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/03-tech-heavy.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/budget-allocator-server/03-tech-heavy.png" alt="Tech-heavy" width="100%"></a></td>
   </tr>
 </table>
 

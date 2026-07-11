@@ -86,7 +86,7 @@ export function createServer(): McpServer {
     {
       title: "Get First-Degree Links",
       description:
-        "Returns all Wikipedia pages that the given page links to directly.",
+        "Returns all Wikipedia pages that the given page links to directly. The widget is interactive and exposes tools for exploring the graph (expanding nodes to see their links), searching for articles, and querying visible nodes.",
       inputSchema: z.object({
         url: z
           .string()

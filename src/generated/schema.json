@@ -81,6 +81,218 @@
       ],
       "description": "Display mode for UI presentation."
     },
+    "McpUiDownloadFileRequest": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/download-file"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "contents": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "resource"
+                      },
+                      "resource": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "uri": {
+                                "type": "string"
+                              },
+                              "mimeType": {
+                                "type": "string"
+                              },
+                              "_meta": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["uri", "text"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "uri": {
+                                "type": "string"
+                              },
+                              "mimeType": {
+                                "type": "string"
+                              },
+                              "_meta": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              },
+                              "blob": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["uri", "blob"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "annotations": {
+                        "type": "object",
+                        "properties": {
+                          "audience": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": ["user", "assistant"]
+                            }
+                          },
+                          "priority": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "lastModified": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "_meta": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": ["type", "resource"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "icons": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "src": {
+                              "type": "string"
+                            },
+                            "mimeType": {
+                              "type": "string"
+                            },
+                            "sizes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "theme": {
+                              "type": "string",
+                              "enum": ["light", "dark"]
+                            }
+                          },
+                          "required": ["src"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "uri": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "mimeType": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "number"
+                      },
+                      "annotations": {
+                        "type": "object",
+                        "properties": {
+                          "audience": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": ["user", "assistant"]
+                            }
+                          },
+                          "priority": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "lastModified": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "_meta": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": {}
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "resource_link"
+                      }
+                    },
+                    "required": ["name", "uri", "type"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "description": "Resource contents to download — embedded (inline data) or linked (host fetches). Uses standard MCP resource types."
+            }
+          },
+          "required": ["contents"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiDownloadFileResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "isError": {
+          "description": "True if the download failed (e.g., user cancelled or host denied).",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": {}
+    },
     "McpUiHostCapabilities": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -93,6 +305,12 @@
         },
         "openLinks": {
           "description": "Host supports opening external URLs.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "downloadFile": {
+          "description": "Host supports file downloads via ui/download-file.",
           "type": "object",
           "properties": {},
           "additionalProperties": false
@@ -134,25 +352,25 @@
               "type": "object",
               "properties": {
                 "camera": {
-                  "description": "Request camera access (Permission Policy `camera` feature).",
+                  "description": "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
                 },
                 "microphone": {
-                  "description": "Request microphone access (Permission Policy `microphone` feature).",
+                  "description": "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
                 },
                 "geolocation": {
-                  "description": "Request geolocation access (Permission Policy `geolocation` feature).",
+                  "description": "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
                 },
                 "clipboardWrite": {
-                  "description": "Request clipboard write access (Permission Policy `clipboard-write` feature).",
+                  "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
@@ -165,28 +383,28 @@
               "type": "object",
               "properties": {
                 "connectDomains": {
-                  "description": "Origins for network requests (fetch/XHR/WebSocket).",
+                  "description": "Origins for network requests (fetch/XHR/WebSocket).\n\n- Maps to CSP `connect-src` directive\n- Empty or omitted → no network connections (secure default)",
                   "type": "array",
                   "items": {
                     "type": "string"
                   }
                 },
                 "resourceDomains": {
-                  "description": "Origins for static resources (scripts, images, styles, fonts).",
+                  "description": "Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted → no network resources (secure default)",
                   "type": "array",
                   "items": {
                     "type": "string"
                   }
                 },
                 "frameDomains": {
-                  "description": "Origins for nested iframes (frame-src directive).",
+                  "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
                   "type": "array",
                   "items": {
                     "type": "string"
                   }
                 },
                 "baseUriDomains": {
-                  "description": "Allowed base URIs for the document (base-uri directive).",
+                  "description": "Allowed base URIs for the document.\n\n- Maps to CSP `base-uri` directive\n- Empty or omitted → only same origin allowed (`base-uri 'self'`)",
                   "type": "array",
                   "items": {
                     "type": "string"
@@ -277,6 +495,19 @@
             },
             "structuredContent": {
               "description": "Host supports structured content.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "sampling": {
+          "description": "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
+          "type": "object",
+          "properties": {
+            "tools": {
+              "description": "Host supports tool use via `tools` and `toolChoice` parameters.",
               "type": "object",
               "properties": {},
               "additionalProperties": false
@@ -549,10 +780,6 @@
                       {
                         "type": "string",
                         "const": "--color-text-disabled"
-                      },
-                      {
-                        "type": "string",
-                        "const": "--color-text-ghost"
                       },
                       {
                         "type": "string",
@@ -1319,10 +1546,6 @@
                   },
                   {
                     "type": "string",
-                    "const": "--color-text-ghost"
-                  },
-                  {
-                    "type": "string",
                     "const": "--color-border-primary"
                   },
                   {
@@ -1924,10 +2147,6 @@
               },
               {
                 "type": "string",
-                "const": "--color-text-ghost"
-              },
-              {
-                "type": "string",
                 "const": "--color-border-primary"
               },
               {
@@ -2443,6 +2662,12 @@
               "properties": {},
               "additionalProperties": false
             },
+            "downloadFile": {
+              "description": "Host supports file downloads via ui/download-file.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
             "serverTools": {
               "description": "Host can proxy tool calls to the MCP server.",
               "type": "object",
@@ -2480,25 +2705,25 @@
                   "type": "object",
                   "properties": {
                     "camera": {
-                      "description": "Request camera access (Permission Policy `camera` feature).",
+                      "description": "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
                       "type": "object",
                       "properties": {},
                       "additionalProperties": false
                     },
                     "microphone": {
-                      "description": "Request microphone access (Permission Policy `microphone` feature).",
+                      "description": "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
                       "type": "object",
                       "properties": {},
                       "additionalProperties": false
                     },
                     "geolocation": {
-                      "description": "Request geolocation access (Permission Policy `geolocation` feature).",
+                      "description": "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
                       "type": "object",
                       "properties": {},
                       "additionalProperties": false
                     },
                     "clipboardWrite": {
-                      "description": "Request clipboard write access (Permission Policy `clipboard-write` feature).",
+                      "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
                       "type": "object",
                       "properties": {},
                       "additionalProperties": false
@@ -2511,28 +2736,28 @@
                   "type": "object",
                   "properties": {
                     "connectDomains": {
-                      "description": "Origins for network requests (fetch/XHR/WebSocket).",
+                      "description": "Origins for network requests (fetch/XHR/WebSocket).\n\n- Maps to CSP `connect-src` directive\n- Empty or omitted → no network connections (secure default)",
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
                     "resourceDomains": {
-                      "description": "Origins for static resources (scripts, images, styles, fonts).",
+                      "description": "Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted → no network resources (secure default)",
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
                     "frameDomains": {
-                      "description": "Origins for nested iframes (frame-src directive).",
+                      "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
                     "baseUriDomains": {
-                      "description": "Allowed base URIs for the document (base-uri directive).",
+                      "description": "Allowed base URIs for the document.\n\n- Maps to CSP `base-uri` directive\n- Empty or omitted → only same origin allowed (`base-uri 'self'`)",
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -2623,6 +2848,19 @@
                 },
                 "structuredContent": {
                   "description": "Host supports structured content.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "sampling": {
+              "description": "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
+              "type": "object",
+              "properties": {
+                "tools": {
+                  "description": "Host supports tool use via `tools` and `toolChoice` parameters.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
@@ -2888,10 +3126,6 @@
                       {
                         "type": "string",
                         "const": "--color-text-disabled"
-                      },
-                      {
-                        "type": "string",
-                        "const": "--color-text-ghost"
                       },
                       {
                         "type": "string",
@@ -3624,6 +3858,9 @@
                       "mimeType": {
                         "type": "string"
                       },
+                      "size": {
+                        "type": "number"
+                      },
                       "annotations": {
                         "type": "object",
                         "properties": {
@@ -3869,33 +4106,50 @@
       "required": ["mode"],
       "additionalProperties": {}
     },
+    "McpUiRequestTeardownNotification": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/notifications/request-teardown"
+        },
+        "params": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      "required": ["method"],
+      "additionalProperties": false
+    },
     "McpUiResourceCsp": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "connectDomains": {
-          "description": "Origins for network requests (fetch/XHR/WebSocket).",
+          "description": "Origins for network requests (fetch/XHR/WebSocket).\n\n- Maps to CSP `connect-src` directive\n- Empty or omitted → no network connections (secure default)",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "resourceDomains": {
-          "description": "Origins for static resources (scripts, images, styles, fonts).",
+          "description": "Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted → no network resources (secure default)",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "frameDomains": {
-          "description": "Origins for nested iframes (frame-src directive).",
+          "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "baseUriDomains": {
-          "description": "Allowed base URIs for the document (base-uri directive).",
+          "description": "Allowed base URIs for the document.\n\n- Maps to CSP `base-uri` directive\n- Empty or omitted → only same origin allowed (`base-uri 'self'`)",
           "type": "array",
           "items": {
             "type": "string"
@@ -3909,32 +4163,32 @@
       "type": "object",
       "properties": {
         "csp": {
-          "description": "Content Security Policy configuration.",
+          "description": "Content Security Policy configuration for UI resources.",
           "type": "object",
           "properties": {
             "connectDomains": {
-              "description": "Origins for network requests (fetch/XHR/WebSocket).",
+              "description": "Origins for network requests (fetch/XHR/WebSocket).\n\n- Maps to CSP `connect-src` directive\n- Empty or omitted → no network connections (secure default)",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "resourceDomains": {
-              "description": "Origins for static resources (scripts, images, styles, fonts).",
+              "description": "Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted → no network resources (secure default)",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "frameDomains": {
-              "description": "Origins for nested iframes (frame-src directive).",
+              "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "baseUriDomains": {
-              "description": "Allowed base URIs for the document (base-uri directive).",
+              "description": "Allowed base URIs for the document.\n\n- Maps to CSP `base-uri` directive\n- Empty or omitted → only same origin allowed (`base-uri 'self'`)",
               "type": "array",
               "items": {
                 "type": "string"
@@ -3944,29 +4198,29 @@
           "additionalProperties": false
         },
         "permissions": {
-          "description": "Sandbox permissions requested by the UI.",
+          "description": "Sandbox permissions requested by the UI resource.",
           "type": "object",
           "properties": {
             "camera": {
-              "description": "Request camera access (Permission Policy `camera` feature).",
+              "description": "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
               "type": "object",
               "properties": {},
               "additionalProperties": false
             },
             "microphone": {
-              "description": "Request microphone access (Permission Policy `microphone` feature).",
+              "description": "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
               "type": "object",
               "properties": {},
               "additionalProperties": false
             },
             "geolocation": {
-              "description": "Request geolocation access (Permission Policy `geolocation` feature).",
+              "description": "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
               "type": "object",
               "properties": {},
               "additionalProperties": false
             },
             "clipboardWrite": {
-              "description": "Request clipboard write access (Permission Policy `clipboard-write` feature).",
+              "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
               "type": "object",
               "properties": {},
               "additionalProperties": false
@@ -3975,11 +4229,11 @@
           "additionalProperties": false
         },
         "domain": {
-          "description": "Dedicated origin for view sandbox.",
+          "description": "Dedicated origin for view sandbox.\n\nUseful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.\n\n**Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:\n- Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)\n- URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)\n\nIf omitted, host uses default sandbox origin (typically per-conversation).",
           "type": "string"
         },
         "prefersBorder": {
-          "description": "Visual boundary preference - true if UI prefers a visible border.",
+          "description": "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
           "type": "boolean"
         }
       },
@@ -3990,25 +4244,25 @@
       "type": "object",
       "properties": {
         "camera": {
-          "description": "Request camera access (Permission Policy `camera` feature).",
+          "description": "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
           "type": "object",
           "properties": {},
           "additionalProperties": false
         },
         "microphone": {
-          "description": "Request microphone access (Permission Policy `microphone` feature).",
+          "description": "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
           "type": "object",
           "properties": {},
           "additionalProperties": false
         },
         "geolocation": {
-          "description": "Request geolocation access (Permission Policy `geolocation` feature).",
+          "description": "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
           "type": "object",
           "properties": {},
           "additionalProperties": false
         },
         "clipboardWrite": {
-          "description": "Request clipboard write access (Permission Policy `clipboard-write` feature).",
+          "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
           "type": "object",
           "properties": {},
           "additionalProperties": false
@@ -4082,28 +4336,28 @@
               "type": "object",
               "properties": {
                 "connectDomains": {
-                  "description": "Origins for network requests (fetch/XHR/WebSocket).",
+                  "description": "Origins for network requests (fetch/XHR/WebSocket).\n\n- Maps to CSP `connect-src` directive\n- Empty or omitted → no network connections (secure default)",
                   "type": "array",
                   "items": {
                     "type": "string"
                   }
                 },
                 "resourceDomains": {
-                  "description": "Origins for static resources (scripts, images, styles, fonts).",
+                  "description": "Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted → no network resources (secure default)",
                   "type": "array",
                   "items": {
                     "type": "string"
                   }
                 },
                 "frameDomains": {
-                  "description": "Origins for nested iframes (frame-src directive).",
+                  "description": "Origins for nested iframes.\n\n- Maps to CSP `frame-src` directive\n- Empty or omitted → no nested iframes allowed (`frame-src 'none'`)",
                   "type": "array",
                   "items": {
                     "type": "string"
                   }
                 },
                 "baseUriDomains": {
-                  "description": "Allowed base URIs for the document (base-uri directive).",
+                  "description": "Allowed base URIs for the document.\n\n- Maps to CSP `base-uri` directive\n- Empty or omitted → only same origin allowed (`base-uri 'self'`)",
                   "type": "array",
                   "items": {
                     "type": "string"
@@ -4117,25 +4371,25 @@
               "type": "object",
               "properties": {
                 "camera": {
-                  "description": "Request camera access (Permission Policy `camera` feature).",
+                  "description": "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
                 },
                 "microphone": {
-                  "description": "Request microphone access (Permission Policy `microphone` feature).",
+                  "description": "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
                 },
                 "geolocation": {
-                  "description": "Request geolocation access (Permission Policy `geolocation` feature).",
+                  "description": "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
                 },
                 "clipboardWrite": {
-                  "description": "Request clipboard write access (Permission Policy `clipboard-write` feature).",
+                  "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
@@ -4259,10 +4513,6 @@
         {
           "type": "string",
           "const": "--color-text-disabled"
-        },
-        {
-          "type": "string",
-          "const": "--color-text-ghost"
         },
         {
           "type": "string",
@@ -4575,10 +4825,6 @@
           {
             "type": "string",
             "const": "--color-text-disabled"
-          },
-          {
-            "type": "string",
-            "const": "--color-text-ghost"
           },
           {
             "type": "string",
@@ -5054,6 +5300,12 @@
             ],
             "description": "Tool visibility scope - who can access the tool."
           }
+        },
+        "csp": {
+          "not": {}
+        },
+        "permissions": {
+          "not": {}
         }
       },
       "additionalProperties": false
@@ -5283,6 +5535,9 @@
                       },
                       "mimeType": {
                         "type": "string"
+                      },
+                      "size": {
+                        "type": "number"
                       },
                       "annotations": {
                         "type": "object",
@@ -5644,6 +5899,9 @@
                       },
                       "mimeType": {
                         "type": "string"
+                      },
+                      "size": {
+                        "type": "number"
                       },
                       "annotations": {
                         "type": "object",

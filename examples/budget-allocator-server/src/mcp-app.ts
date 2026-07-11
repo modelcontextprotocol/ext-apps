@@ -3,6 +3,7 @@
  */
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { Chart, registerables } from "chart.js";
+import { z } from "zod";
 import "./global.css";
 import "./mcp-app.css";
 
@@ -625,6 +626,295 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
 }
 
 app.onhostcontextchanged = handleHostContextChanged;
+
+// Register tools for model interaction
+app.registerTool(
+  "get-allocations",
+  {
+    title: "Get Budget Allocations",
+    description:
+      "Get the current budget allocations including total budget, percentages, and amounts per category",
+  },
+  async () => {
+    if (!state.config) {
+      return {
+        content: [
+          { type: "text" as const, text: "Error: Configuration not loaded" },
+        ],
+        isError: true,
+      };
+    }
+
+    const allocations: Record<string, { percent: number; amount: number }> = {};
+    for (const category of state.config.categories) {
+      const percent = state.allocations.get(category.id) ?? 0;
+      allocations[category.id] = {
+        percent,
+        amount: (percent / 100) * state.totalBudget,
+      };
+    }
+
+    const result = {
+      totalBudget: state.totalBudget,
+      currency: state.config.currency,
+      currencySymbol: state.config.currencySymbol,
+      selectedStage: state.selectedStage,
+      allocations,
+      categories: state.config.categories.map((c) => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+      })),
+    };
+
+    return {
+      content: [
+        { type: "text" as const, text: JSON.stringify(result, null, 2) },
+      ],
+      structuredContent: result,
+    };
+  },
+);
+
+app.registerTool(
+  "set-allocation",
+  {
+    title: "Set Category Allocation",
+    description: "Set the allocation percentage for a specific budget category",
+    inputSchema: z.object({
+      categoryId: z
+        .string()
+        .describe(
+          "Category ID (e.g., 'marketing', 'engineering', 'operations', 'sales', 'rd')",
+        ),
+      percent: z
+        .number()
+        .min(0)
+        .max(100)
+        .describe("Allocation percentage (0-100)"),
+    }),
+  },
+  async (args) => {
+    if (!state.config) {
+      return {
+        content: [
+          { type: "text" as const, text: "Error: Configuration not loaded" },
+        ],
+        isError: true,
+      };
+    }
+
+    const category = state.config.categories.find(
+      (c) => c.id === args.categoryId,
+    );
+    if (!category) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: Category "${args.categoryId}" not found. Available: ${state.config.categories.map((c) => c.id).join(", ")}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    handleSliderChange(args.categoryId, args.percent);
+
+    // Also update the slider UI
+    const slider = document.querySelector(
+      `.slider-row[data-category-id="${args.categoryId}"] .slider`,
+    ) as HTMLInputElement | null;
+    if (slider) {
+      slider.value = String(args.percent);
+    }
+
+    const amount = (args.percent / 100) * state.totalBudget;
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Set ${category.name} allocation to ${args.percent.toFixed(1)}% (${state.config.currencySymbol}${amount.toLocaleString()})`,
+        },
+      ],
+    };
+  },
+);
+
+app.registerTool(
+  "set-total-budget",
+  {
+    title: "Set Total Budget",
+    description: "Set the total budget amount",
+    inputSchema: z.object({
+      amount: z.number().positive().describe("Total budget amount"),
+    }),
+  },
+  async (args) => {
+    if (!state.config) {
+      return {
+        content: [
+          { type: "text" as const, text: "Error: Configuration not loaded" },
+        ],
+        isError: true,
+      };
+    }
+
+    state.totalBudget = args.amount;
+
+    // Update the budget selector if this amount is a preset
+    const budgetSelector = document.getElementById(
+      "budget-selector",
+    ) as HTMLSelectElement | null;
+    if (budgetSelector) {
+      const option = Array.from(budgetSelector.options).find(
+        (opt) => parseInt(opt.value) === args.amount,
+      );
+      if (option) {
+        budgetSelector.value = String(args.amount);
+      }
+    }
+
+    updateAllSliderAmounts();
+    updateStatusBar();
+    updateComparisonSummary();
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Total budget set to ${state.config.currencySymbol}${args.amount.toLocaleString()}`,
+        },
+      ],
+    };
+  },
+);
+
+app.registerTool(
+  "set-company-stage",
+  {
+    title: "Set Company Stage",
+    description:
+      "Set the company stage for benchmark comparison (e.g., 'Seed', 'Series A', 'Series B', 'Growth')",
+    inputSchema: z.object({
+      stage: z.string().describe("Company stage ID"),
+    }),
+  },
+  async (args) => {
+    if (!state.analytics) {
+      return {
+        content: [
+          { type: "text" as const, text: "Error: Analytics not loaded" },
+        ],
+        isError: true,
+      };
+    }
+
+    if (!state.analytics.stages.includes(args.stage)) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: Stage "${args.stage}" not found. Available: ${state.analytics.stages.join(", ")}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    state.selectedStage = args.stage;
+
+    // Update the stage selector UI
+    const stageSelector = document.getElementById(
+      "stage-selector",
+    ) as HTMLSelectElement | null;
+    if (stageSelector) {
+      stageSelector.value = args.stage;
+    }
+
+    // Update all badges and summary
+    if (state.config) {
+      for (const category of state.config.categories) {
+        updatePercentileBadge(category.id);
+      }
+      updateComparisonSummary();
+    }
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Company stage set to "${args.stage}"`,
+        },
+      ],
+    };
+  },
+);
+
+app.registerTool(
+  "get-benchmark-comparison",
+  {
+    title: "Get Benchmark Comparison",
+    description:
+      "Compare current allocations against industry benchmarks for the selected stage",
+  },
+  async () => {
+    if (!state.config || !state.analytics) {
+      return {
+        content: [{ type: "text" as const, text: "Error: Data not loaded" }],
+        isError: true,
+      };
+    }
+
+    const benchmark = state.analytics.benchmarks.find(
+      (b) => b.stage === state.selectedStage,
+    );
+    if (!benchmark) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: No benchmark data for stage "${state.selectedStage}"`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const comparison: Record<
+      string,
+      { current: number; p25: number; p50: number; p75: number; status: string }
+    > = {};
+
+    for (const category of state.config.categories) {
+      const current = state.allocations.get(category.id) ?? 0;
+      const benchmarkData = benchmark.categoryBenchmarks[category.id];
+      let status = "within range";
+      if (current < benchmarkData.p25) status = "below p25";
+      else if (current > benchmarkData.p75) status = "above p75";
+
+      comparison[category.id] = {
+        current,
+        p25: benchmarkData.p25,
+        p50: benchmarkData.p50,
+        p75: benchmarkData.p75,
+        status,
+      };
+    }
+
+    const result = {
+      stage: state.selectedStage,
+      comparison,
+    };
+
+    return {
+      content: [
+        { type: "text" as const, text: JSON.stringify(result, null, 2) },
+      ],
+      structuredContent: result,
+    };
+  },
+);
 
 // Handle theme changes
 window

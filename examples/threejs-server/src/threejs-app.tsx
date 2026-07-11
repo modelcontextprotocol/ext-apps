@@ -4,7 +4,7 @@
  * Renders interactive 3D scenes using Three.js with streaming code preview.
  * Receives all MCP App props from the wrapper.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
@@ -85,6 +85,7 @@ function LoadingShimmer({ height, code }: { height: number; code?: string }) {
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        touchAction: "none",
         background:
           "linear-gradient(135deg, var(--color-background-secondary, light-dark(#f0f0f5, #2a2a3c)) 0%, var(--color-background-tertiary, light-dark(#e5e5ed, #1e1e2e)) 100%)",
       }}
@@ -195,16 +196,21 @@ async function executeThreeCode(
 // =============================================================================
 
 export default function ThreeJSApp({
+  app,
   toolInputs,
   toolInputsPartial,
-  toolResult: _toolResult,
   hostContext,
   callServerTool: _callServerTool,
   sendMessage: _sendMessage,
   openLink: _openLink,
   sendLog: _sendLog,
+  onSceneError,
+  onSceneRendering,
 }: ThreeJSAppProps) {
   const [error, setError] = useState<string | null>(null);
+  const [currentDisplayMode, setCurrentDisplayMode] = useState<
+    "inline" | "fullscreen"
+  >("inline");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animControllerRef = useRef<ReturnType<
@@ -224,6 +230,43 @@ export default function ThreeJSApp({
     paddingLeft: safeAreaInsets?.left,
   };
 
+  const canFullscreen =
+    hostContext?.availableDisplayModes?.includes("fullscreen") ?? false;
+  const isFullscreen = currentDisplayMode === "fullscreen";
+  const dims = hostContext?.containerDimensions;
+  const hostHeight = dims && "height" in dims ? dims.height : 0;
+
+  // Sync display mode from host context
+  useEffect(() => {
+    if (
+      hostContext?.displayMode === "inline" ||
+      hostContext?.displayMode === "fullscreen"
+    ) {
+      setCurrentDisplayMode(hostContext.displayMode);
+    }
+  }, [hostContext?.displayMode]);
+
+  const toggleFullscreen = useCallback(async () => {
+    const newMode = isFullscreen ? "inline" : "fullscreen";
+    try {
+      const result = await app.requestDisplayMode({ mode: newMode });
+      if (result.mode === newMode) {
+        setCurrentDisplayMode(result.mode);
+      }
+    } catch {
+      // ignore
+    }
+  }, [isFullscreen, app]);
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) toggleFullscreen();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isFullscreen, toggleFullscreen]);
+
   // Visibility-based pause/play
   useEffect(() => {
     if (!containerRef.current) return;
@@ -238,25 +281,60 @@ export default function ThreeJSApp({
     return () => observer.disconnect();
   }, []);
 
+  // Track container width for resize handling
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (w > 0) setContainerWidth(w);
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!code || !canvasRef.current || !containerRef.current) return;
+
+    // Prevent touch events from propagating to the parent scroll view.
+    // Three.js OrbitControls uses pointer events, which don't suppress native
+    // scroll gesture recognition on touch devices.
+    const canvas = canvasRef.current;
+    const preventDefault = (e: TouchEvent) => e.preventDefault();
+    canvas.addEventListener("touchstart", preventDefault, { passive: false });
+    canvas.addEventListener("touchmove", preventDefault, { passive: false });
 
     // Cleanup previous animation
     animControllerRef.current?.cleanup();
     animControllerRef.current = createAnimationController();
 
     setError(null);
-    const width = containerRef.current.offsetWidth || 800;
+    onSceneError(null);
+    onSceneRendering(true);
+
+    const w = containerWidth || containerRef.current.offsetWidth || 800;
+    const h = isFullscreen && hostHeight > 0 ? hostHeight : height;
     executeThreeCode(
       code,
       canvasRef.current,
-      width,
-      height,
+      w,
+      h,
       animControllerRef.current.visibilityAwareRAF,
-    ).catch((e) => setError(e instanceof Error ? e.message : "Unknown error"));
+    ).catch((e) => {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      setError(msg);
+      onSceneError(msg);
+      onSceneRendering(false);
+    });
 
-    return () => animControllerRef.current?.cleanup();
-  }, [code, height]);
+    return () => {
+      canvas.removeEventListener("touchstart", preventDefault);
+      canvas.removeEventListener("touchmove", preventDefault);
+      animControllerRef.current?.cleanup();
+      onSceneRendering(false);
+    };
+  }, [code, height, containerWidth, isFullscreen, hostHeight]);
 
   if (isStreaming || !code) {
     return (
@@ -269,7 +347,7 @@ export default function ThreeJSApp({
   return (
     <div
       ref={containerRef}
-      className="threejs-container"
+      className={`threejs-container${isFullscreen ? " fullscreen" : ""}${hostContext?.deviceCapabilities?.touch ? " touch-device" : ""}`}
       style={containerStyle}
     >
       <canvas
@@ -277,12 +355,41 @@ export default function ThreeJSApp({
         ref={canvasRef}
         style={{
           width: "100%",
-          height,
-          borderRadius: "var(--border-radius-lg, 8px)",
+          height: isFullscreen && hostHeight > 0 ? hostHeight : height,
+          borderRadius: isFullscreen ? 0 : "var(--border-radius-lg, 8px)",
           display: "block",
+          touchAction: "none",
         }}
       />
       {error && <div className="error-overlay">Error: {error}</div>}
+      <button
+        className={`fullscreen-btn${canFullscreen ? " available" : ""}`}
+        title={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
+        onClick={toggleFullscreen}
+        style={{
+          top: 10 + (safeAreaInsets?.top ?? 0),
+          right: 10 + (safeAreaInsets?.right ?? 0),
+        }}
+      >
+        <svg
+          className="expand-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+        </svg>
+        <svg
+          className="collapse-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+        </svg>
+      </button>
     </div>
   );
 }

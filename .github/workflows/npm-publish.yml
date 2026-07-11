@@ -14,11 +14,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -31,16 +31,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
       - run: npm ci
       - run: npm test
+
+  # All publish jobs depend directly on [build, test] (not on each other) so
+  # they all enter "waiting for approval" together and can be approved in a
+  # single "Review deployments" click.
 
   publish:
     runs-on: ubuntu-latest
@@ -53,11 +57,11 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -88,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     environment: Release
-    needs: [publish]
+    needs: [build, test]
 
     permissions:
       contents: read
@@ -107,6 +111,8 @@ jobs:
           - budget-allocator-server
           - cohort-heatmap-server
           - customer-segmentation-server
+          - debug-server
+          - lazy-auth-server
           - map-server
           - pdf-server
           - scenario-modeler-server
@@ -119,11 +125,11 @@ jobs:
           - wiki-explorer-server
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -133,7 +139,45 @@ jobs:
       - name: Build example
         run: npm run build --workspace examples/${{ matrix.example }}
 
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "tag=--tag beta" >> $GITHUB_OUTPUT
+          else
+            echo "tag=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish example
-        run: npm publish --workspace examples/${{ matrix.example }} --provenance --access public
+        run: npm publish --workspace examples/${{ matrix.example }} --provenance --access public ${{ steps.npm-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
+
+  publish-mcpb:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    environment: Release
+    needs: [build, test]
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Build pdf-server + MCPB bundle
+        run: npm run build:mcpb --workspace examples/pdf-server
+
+      - name: Upload MCPB to release
+        run: gh release upload "${{ github.event.release.tag_name }}" examples/pdf-server/*.mcpb --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

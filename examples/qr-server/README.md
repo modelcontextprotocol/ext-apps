@@ -2,7 +2,7 @@
 
 A minimal Python MCP server that generates customizable QR codes with an interactive view UI.
 
-![Screenshot](https://modelcontextprotocol.github.io/ext-apps/screenshots/qr-server/screenshot.png)
+![Screenshot](https://apps.extensions.modelcontextprotocol.io/screenshots/qr-server/screenshot.png)
 
 ## MCP Client Configuration
 

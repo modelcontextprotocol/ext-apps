@@ -11,10 +11,6 @@
       <div id="loading" class="loading">
         <div class="spinner"></div>
         <p id="loading-text">Loading PDF...</p>
-        <div id="progress-container" class="progress-container" style="display: none">
-          <div id="progress-bar" class="progress-bar"></div>
-        </div>
-        <p id="progress-text" class="progress-text"></p>
       </div>
 
       <!-- Error State -->
@@ -23,12 +19,29 @@
         <p id="error-message">An error occurred</p>
       </div>
 
+      <!-- Confirmation Dialog Overlay -->
+      <div id="confirm-dialog" class="confirm-dialog" style="display: none">
+        <div class="confirm-box">
+          <div id="confirm-title" class="confirm-title"></div>
+          <div id="confirm-body" class="confirm-body"></div>
+          <div id="confirm-detail" class="confirm-detail"></div>
+          <div id="confirm-buttons" class="confirm-buttons"></div>
+        </div>
+      </div>
+
       <!-- PDF Viewer -->
       <div id="viewer" class="viewer" style="display: none">
         <!-- Toolbar -->
         <div class="toolbar">
           <div class="toolbar-left">
             <span id="pdf-title" class="pdf-title">Document</span>
+            <div id="loading-indicator" class="loading-indicator" style="display: none"
+                 title="Loading pages...">
+              <svg viewBox="0 0 20 20" width="14" height="14">
+                <circle class="loading-indicator-bg" cx="10" cy="10" r="8"/>
+                <circle class="loading-indicator-arc" cx="10" cy="10" r="8"/>
+              </svg>
+            </div>
           </div>
           <div class="toolbar-center">
             <button id="prev-btn" class="nav-btn" title="Previous page (←)">
@@ -57,17 +70,104 @@
             <button id="zoom-in-btn" class="zoom-btn" title="Zoom in (+)">
               +
             </button>
-            <button id="fullscreen-btn" class="fullscreen-btn" title="Toggle fullscreen">
-              ⛶
+            <button
+              id="save-btn"
+              class="save-btn"
+              title="Save to file (overwrites original)"
+              style="display: none"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 14H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h7l3 3v9a1 1 0 0 1-1 1z"/><path d="M11 14V9H5v5"/><path d="M5 2v3h5"/></svg>
+            </button>
+            <button
+              id="download-btn"
+              class="download-btn"
+              title="Download PDF"
+              style="display: none"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0l-3-3m3 3l3-3"/><path d="M2 12v2h12v-2"/></svg>
+            </button>
+            <button
+              id="annotations-btn"
+              class="annotations-btn"
+              title="Toggle annotations panel"
+              style="display: none"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="9" y2="11"/></svg>
+              <span id="annotations-badge" class="annotations-badge" style="display: none"></span>
+            </button>
+            <button
+              id="search-btn"
+              class="search-btn"
+              title="Search (Ctrl+F)"
+            ></button>
+            <button
+              id="fullscreen-btn"
+              class="fullscreen-btn"
+              title="Toggle fullscreen (⌘Enter)"
+            >
+              <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+              <svg class="collapse-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
             </button>
           </div>
         </div>
+        <!-- Search bar below toolbar, right-aligned -->
+        <div id="search-bar" class="search-bar" style="display: none">
+          <input
+            id="search-input"
+            class="search-input"
+            type="text"
+            placeholder="Search..."
+            autocomplete="off"
+          />
+          <span id="search-match-count" class="search-match-count"></span>
+          <button
+            id="search-prev-btn"
+            class="search-nav-btn"
+            title="Previous (Shift+Enter)"
+          >
+            &#x25B2;
+          </button>
+          <button
+            id="search-next-btn"
+            class="search-nav-btn"
+            title="Next (Enter)"
+          >
+            &#x25BC;
+          </button>
+          <button
+            id="search-close-btn"
+            class="search-nav-btn"
+            title="Close (Esc)"
+          >
+            &#x2715;
+          </button>
+        </div>
 
-        <!-- Single Page Canvas Container -->
-        <div class="canvas-container">
-          <div class="page-wrapper">
-            <canvas id="pdf-canvas"></canvas>
-            <div id="text-layer" class="text-layer"></div>
+        <!-- Canvas + Annotation Panel Row -->
+        <div class="viewer-body">
+          <!-- Single Page Canvas Container -->
+          <div class="canvas-container">
+            <div class="page-wrapper">
+              <canvas id="pdf-canvas"></canvas>
+              <div id="annotation-layer" class="annotation-layer"></div>
+              <div id="highlight-layer" class="highlight-layer"></div>
+              <div id="text-layer" class="text-layer"></div>
+              <div id="form-layer" class="annotationLayer"></div>
+            </div>
+          </div>
+
+          <!-- Annotation Side Panel -->
+          <div id="annotation-panel" class="annotation-panel" style="display: none">
+            <div id="annotation-panel-resize" class="annotation-panel-resize"></div>
+            <div class="annotation-panel-header">
+              <span class="annotation-panel-title">Annotations (<span id="annotation-panel-count">0</span>)</span>
+              <div class="annotation-panel-header-actions">
+                <button id="annotation-panel-reset" class="annotation-panel-reset" title="Revert to what's in the PDF file"><svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6a4 4 0 1 1 1.2 2.85"/><path d="M2 9V6h3"/></svg></button>
+                <button id="annotation-panel-clear-all" class="annotation-panel-clear-all" title="Remove everything, including items from the PDF file"><svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 3h8M4.5 3V2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M5 5.5v3M7 5.5v3M3 3l.5 7a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1L9 3"/></svg></button>
+                <button id="annotation-panel-close" class="annotation-panel-close" title="Close panel">&#x2715;</button>
+              </div>
+            </div>
+            <div id="annotation-panel-list" class="annotation-panel-list"></div>
           </div>
         </div>
       </div>

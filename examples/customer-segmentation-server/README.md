@@ -4,9 +4,9 @@ A demo MCP App that displays customer data as an interactive scatter/bubble char
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/01-account-age-revenue.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/01-account-age-revenue.png" alt="Account age vs revenue" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/02-tickets-nps-engagement.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/02-tickets-nps-engagement.png" alt="Tickets, NPS, engagement" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/07-age-engagement-revenue.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/customer-segmentation-server/07-age-engagement-revenue.png" alt="Age, engagement, revenue" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/01-account-age-revenue.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/01-account-age-revenue.png" alt="Account age vs revenue" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/02-tickets-nps-engagement.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/02-tickets-nps-engagement.png" alt="Tickets, NPS, engagement" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/07-age-engagement-revenue.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/customer-segmentation-server/07-age-engagement-revenue.png" alt="Age, engagement, revenue" width="100%"></a></td>
   </tr>
 </table>
 

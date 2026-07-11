@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-wiki-explorer",
-  "version": "1.0.1",
+  "version": "1.7.4",
   "type": "module",
   "description": "Wikipedia link explorer MCP App Server with graph visualization",
   "repository": {
@@ -17,17 +17,17 @@
     "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && bun build server.ts --outdir dist --target node && bun build main.ts --outfile dist/index.js --target node --external \"./server.js\" --banner \"#!/usr/bin/env node\"",
     "watch": "cross-env INPUT=mcp-app.html vite build --watch",
     "serve:http": "bun --watch main.ts",
-    "serve:stdio": "bun server.ts --stdio",
+    "serve:stdio": "bun main.ts --stdio",
     "start": "npm run start:http",
     "start:http": "cross-env NODE_ENV=development npm run build && npm run serve:http",
-    "start:stdio": "cross-env NODE_ENV=development npm run build && npm run serve:stdio",
-    "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve:http'",
+    "start:stdio": "cross-env NODE_ENV=development npm run build 1>&2 && npm run serve:stdio",
+    "dev": "cross-env NODE_ENV=development concurrently \"npm run watch\" \"npm run serve:http\"",
     "prepublishOnly": "npm run build",
     "serve": "bun --watch main.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.0.0",
-    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cheerio": "^1.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",

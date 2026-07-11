@@ -1,5 +1,7 @@
 ---
 title: Quickstart
+group: Getting Started
+description: Build your first MCP App step by step — create an MCP server with an interactive View that renders inside Claude Desktop and other MCP hosts.
 ---
 
 # Build Your First MCP App
@@ -44,8 +46,11 @@ Configure your [`package.json`](https://github.com/modelcontextprotocol/ext-apps
 ```bash
 npm pkg set type=module
 npm pkg set scripts.build="tsc --noEmit && tsc -p tsconfig.server.json && cross-env INPUT=mcp-app.html vite build"
-npm pkg set scripts.start="concurrently 'cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch' 'tsx watch main.ts'"
+npm pkg set scripts.start='concurrently --raw "cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch" "tsx watch main.ts"'
 ```
+
+> [!NOTE]
+> Windows `cmd.exe` users will need to convert quotes in the above command: `npm pkg set scripts.start="concurrently --raw ""cross-env NODE_ENV=development INPUT=mcp-app.html vite build --watch"" ""tsx watch main.ts"""`.
 
 <details>
 <summary>Create <a href="https://github.com/modelcontextprotocol/ext-apps/blob/main/examples/quickstart/tsconfig.json"><code>tsconfig.json</code></a>:</summary>
@@ -108,7 +113,7 @@ npm pkg set scripts.start="concurrently 'cross-env NODE_ENV=development INPUT=mc
 
 <!-- prettier-ignore -->
 ```ts source="../examples/quickstart/vite.config.ts"
-import { defineConfig } from "vite";
+import { createLogger, defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
 const INPUT = process.env.INPUT;
@@ -118,7 +123,14 @@ if (!INPUT) {
 
 const isDevelopment = process.env.NODE_ENV === "development";
 
+const prefixedLogger = createLogger();
+for (const level of ["info", "warn", "error"] as const) {
+  const fn = prefixedLogger[level];
+  prefixedLogger[level] = (msg, opts) => fn(msg.replace(/^/mg, "[vite] "), opts);
+}
+
 export default defineConfig({
+  customLogger: prefixedLogger,
   plugins: [viteSingleFile()],
   build: {
     sourcemap: isDevelopment ? "inline" : undefined,
@@ -447,8 +459,9 @@ MCP server listening on http://localhost:3001/mcp
 
 ```bash
 git clone https://github.com/modelcontextprotocol/ext-apps.git
-cd ext-apps/examples/basic-host
+cd ext-apps
 npm install
+cd examples/basic-host
 npm start
 ```
 
@@ -468,4 +481,4 @@ You've built your first MCP App!
 - **Continue learning**: The [`basic-server-vanillajs`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) example builds on this quickstart with host communication, theming, and lifecycle handlers
 - **React version**: Compare with [`basic-server-react`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react) for a React-based UI
 - **Other frameworks**: See also [Vue](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vue), [Svelte](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-svelte), [Preact](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-preact), and [Solid](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-solid) examples
-- **API reference**: See the full [API documentation](https://modelcontextprotocol.github.io/ext-apps/api/)
+- **API reference**: See the full [API documentation](https://apps.extensions.modelcontextprotocol.io/api/)

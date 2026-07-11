@@ -260,6 +260,17 @@ The resource content is returned via `resources/read`:
 }
 ```
 
+#### Metadata Location
+
+`UIResourceMeta` (CSP, permissions, domain, prefersBorder) may be provided on either or both:
+
+- **`resources/list`:** On the resource entry's `_meta.ui` field. Useful as a static default that hosts can review at connection time.
+- **`resources/read`:** On each content item's `_meta.ui` field. Useful for per-response overrides or dynamic metadata that is only known at read time.
+
+When `_meta.ui` is present on **both**, the content-item value takes precedence. Hosts MUST check both locations, preferring the content item and falling back to the listing entry.
+
+> **Server guidance:** Prefer placing `_meta.ui` on the content item in `resources/read`, especially when metadata is dynamic or varies per-response. Use the listing-level `_meta.ui` (via `registerAppResource` config) when metadata is static and you want hosts to be able to review security configuration at connection time without fetching the resource.
+
 #### Content Requirements:
 
 - URI MUST start with `ui://` scheme
@@ -287,15 +298,24 @@ The resource content is returned via `resources/read`:
 Example:
 
 ```json
-// Resource declaration
+// Resource declaration (resources/list) — static defaults for host review
 {
   "uri": "ui://weather-server/dashboard-template",
   "name": "weather_dashboard",
   "description": "Interactive weather dashboard view",
-  "mimeType": "text/html;profile=mcp-app"
+  "mimeType": "text/html;profile=mcp-app",
+  "_meta": {
+    "ui": {
+      "csp": {
+        "connectDomains": ["https://api.openweathermap.org"],
+        "resourceDomains": ["https://cdn.jsdelivr.net"]
+      },
+      "prefersBorder": true
+    }
+  }
 }
 
-// Resource content with metadata
+// Resource content (resources/read) — takes precedence when present
 {
   "contents": [{
     "uri": "ui://weather-server/dashboard-template",
@@ -471,8 +491,8 @@ If the Host is a web page, it MUST wrap the View and communicate with it through
 
 1. The Host and the Sandbox MUST have different origins.
 2. The Sandbox MUST have the following permissions: `allow-scripts`, `allow-same-origin`.
-3. The Sandbox MUST send a `ui/notifications/sandbox-proxy-ready` notification to the host when it's ready to process an `ui/notifications/sandbox-resource-ready` notification.
-4. Once the Sandbox is ready, the Host MUST send the raw HTML resource to load in a `ui/notifications/sandbox-resource-ready` notification.
+3. The Sandbox SHOULD send a `ui/notifications/sandbox-proxy-ready` notification to the host when it's ready to process an `ui/notifications/sandbox-resource-ready` notification.
+4. Once the Sandbox is ready, the Host SHOULD send the raw HTML resource to load in a `ui/notifications/sandbox-resource-ready` notification.
 5. The Sandbox MUST load the raw HTML of the View with CSP settings that:
    - Enforce the domains declared in `ui.csp` metadata
    - If `frameDomains` is provided, allow nested iframes from declared origins; otherwise use `frame-src 'none'`
@@ -486,15 +506,31 @@ If the Host is a web page, it MUST wrap the View and communicate with it through
 
 ### Standard MCP Messages
 
-UI iframes can use the following subset of standard MCP protocol messages:
+UI iframes can use the following subset of standard MCP protocol messages.
+
+Note that `tools/call` and `tools/list` flow **bidirectionally**:
+- **App → Host → Server**: Apps call server tools (requires host `serverTools` capability)
+- **Host → App**: Host calls app-registered tools (requires app `tools` capability)
 
 **Tools:**
 
-- `tools/call` - Execute a tool on the MCP server
+- `tools/call` - Execute a tool (bidirectional)
+  - **App → Host**: Call server tool via host proxy
+  - **Host → App**: Call app-registered tool
+- `tools/list` - List available tools (bidirectional)
+  - **App → Host**: List server tools
+  - **Host → App**: List app-registered tools
+- `notifications/tools/list_changed` - Notify when tool list changes (bidirectional)
+  - **Server → Host → App**: Server tools changed
+  - **App → Host**: App-registered tools changed
 
 **Resources:**
 
 - `resources/read` - Read resource content
+
+**Sampling:**
+
+- `sampling/createMessage` - Request an LLM completion from the host (uses the standard MCP [`CreateMessageRequest`](https://modelcontextprotocol.io/specification/2025-11-25/client/sampling) / `CreateMessageResult` types, including SEP-1577 `tools` / `toolChoice` / `tool_use` content blocks). The host has full discretion over model selection and SHOULD apply rate limiting, cost controls, and user approval (human-in-the-loop). Apps MUST check `hostCapabilities.sampling` before sending this request, and `hostCapabilities.sampling.tools` before including `tools` in the request params.
 
 **Notifications:**
 
@@ -623,11 +659,29 @@ Example:
 They describe the features and capabilities that the Host supports.
 
 ```typescript
+/** Content block modalities that the host supports for a given capability. */
+interface SupportedContentBlockModalities {
+  /** Host supports text content blocks. */
+  text?: {};
+  /** Host supports image content blocks. */
+  image?: {};
+  /** Host supports audio content blocks. */
+  audio?: {};
+  /** Host supports resource content blocks. */
+  resource?: {};
+  /** Host supports resource link content blocks. */
+  resourceLink?: {};
+  /** Host supports structured content. */
+  structuredContent?: {};
+}
+
 interface HostCapabilities {
   /** Experimental features (structure TBD). */
   experimental?: {};
   /** Host supports opening external URLs. */
   openLinks?: {};
+  /** Host supports file downloads via ui/download-file. */
+  downloadFile?: {};
   /** Host can proxy tool calls to the MCP server. */
   serverTools?: {
     /** Host supports tools/list_changed notifications. */
@@ -660,6 +714,21 @@ interface HostCapabilities {
       /** Approved base URIs for the document (base-uri directive). */
       baseUriDomains?: string[];
     };
+  };
+  /**
+   * Host accepts context updates (ui/update-model-context) to be included in
+   * the model's context for future turns.
+   */
+  updateModelContext?: SupportedContentBlockModalities;
+  /** Host supports receiving content messages (ui/message) from the view. */
+  message?: SupportedContentBlockModalities;
+  /**
+   * Host supports LLM sampling (sampling/createMessage) from the view.
+   * Mirrors MCP ClientCapabilities.sampling so hosts can pass it through.
+   */
+  sampling?: {
+    /** Host supports tool use via `tools` and `toolChoice` params (SEP-1577). */
+    tools?: {};
   };
 }
 ```
@@ -993,6 +1062,73 @@ MCP Apps introduces additional JSON-RPC methods for UI-specific functionality:
 
 Host SHOULD open the URL in the user's default browser or a new tab.
 
+`ui/download-file` - Request host to download a file
+
+```typescript
+// Request (EmbeddedResource — inline content)
+{
+  jsonrpc: "2.0",
+  id: 1,
+  method: "ui/download-file",
+  params: {
+    contents: [
+      {
+        type: "resource",
+        resource: {
+          uri: "file:///export.json",       // Used for suggested filename
+          mimeType: "application/json",
+          text: "{ ... }"                   // Text content (or `blob` for base64 binary)
+        }
+      }
+    ]
+  }
+}
+
+// Request (ResourceLink — host fetches)
+{
+  jsonrpc: "2.0",
+  id: 1,
+  method: "ui/download-file",
+  params: {
+    contents: [
+      {
+        type: "resource_link",
+        uri: "https://api.example.com/reports/q4.pdf",
+        name: "Q4 Report",
+        mimeType: "application/pdf"
+      }
+    ]
+  }
+}
+
+// Success Response
+{
+  jsonrpc: "2.0",
+  id: 1,
+  result: {}  // Empty result on success
+}
+
+// Error Response (if denied or failed)
+{
+  jsonrpc: "2.0",
+  id: 1,
+  error: {
+    code: -32000,  // Implementation-defined error
+    message: "Download denied by user" | "Invalid content" | "Policy violation"
+  }
+}
+```
+
+MCP Apps run in sandboxed iframes where direct file downloads are blocked (`allow-downloads` is not set). `ui/download-file` provides a host-mediated mechanism for apps to offer file exports — useful for visualization tools (SVG/PNG export), document editors, data analysis tools, and any app that produces downloadable artifacts.
+
+The `contents` array uses standard MCP resource types (`EmbeddedResource` and `ResourceLink`), avoiding custom content formats. For `EmbeddedResource`, content is inline via `text` (UTF-8) or `blob` (base64). For `ResourceLink`, the host can retrieve the content directly from the URI.
+
+Host behavior:
+* Host SHOULD show a confirmation dialog before initiating the download.
+* For `EmbeddedResource`, host SHOULD derive the filename from the last segment of `resource.uri`.
+* Host MAY reject the download based on security policy, file size limits, or user preferences.
+* Host SHOULD sanitize filenames to prevent path traversal.
+
 `ui/message` - Send message content to the host's chat interface
 
 ```typescript
@@ -1099,6 +1235,95 @@ Host behavior:
 - If multiple updates are received before the next user message, Host SHOULD only send the last update to the model
 - MAY display context updates to the user
 
+#### Requests (Host → App)
+
+When Apps declare the `tools` capability, the Host can send standard MCP tool requests to the App:
+
+`tools/call` - Execute an App-registered tool
+
+```typescript
+// Request (Host → App)
+{
+  jsonrpc: "2.0",
+  id: 1,
+  method: "tools/call",
+  params: {
+    name: string,        // Name of app-registered tool to execute
+    arguments?: object   // Tool arguments (validated against inputSchema)
+  }
+}
+
+// Success Response (App → Host)
+{
+  jsonrpc: "2.0",
+  id: 1,
+  result: {
+    content: Array<ContentBlock>,  // Result for model context
+    structuredContent?: object,    // Optional structured data for UI
+    isError?: boolean,             // True if tool execution failed
+    _meta?: object                 // Optional metadata
+  }
+}
+
+// Error Response
+{
+  jsonrpc: "2.0",
+  id: 1,
+  error: {
+    code: number,
+    message: string
+  }
+}
+```
+
+**App Behavior:**
+- Apps MUST implement `oncalltool` handler if they declare `tools` capability
+- Apps SHOULD validate tool names and arguments
+- Apps MAY use `app.registerTool()` SDK helper for automatic validation
+- Apps SHOULD return `isError: true` for tool execution failures
+
+`tools/list` - List App-registered tools
+
+```typescript
+// Request (Host → App)
+{
+  jsonrpc: "2.0",
+  id: 2,
+  method: "tools/list",
+  params: {
+    cursor?: string  // Optional pagination cursor
+  }
+}
+
+// Response (App → Host)
+{
+  jsonrpc: "2.0",
+  id: 2,
+  result: {
+    tools: Array<Tool>,  // List of available tools
+    nextCursor?: string  // Pagination cursor if more tools exist
+  }
+}
+```
+
+**Tool Structure** (identical to [core MCP `Tool`](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool)):
+```typescript
+interface Tool {
+  name: string;                    // Unique tool identifier
+  title?: string;                  // Display name
+  description?: string;            // Human-readable description
+  inputSchema: object;             // JSON Schema for arguments
+  outputSchema?: object;           // JSON Schema for structuredContent
+  annotations?: ToolAnnotations;   // MCP tool annotations (e.g., readOnlyHint)
+  _meta?: object;
+}
+```
+
+**App Behavior:**
+- Apps MUST implement `onlisttools` handler if they declare `tools` capability
+- Apps SHOULD return complete tool metadata including schemas
+- Apps MAY filter tools based on context or permissions
+
 #### Notifications (Host → View)
 
 `ui/notifications/tool-input` - Host MUST send this notification with the complete tool arguments after the View's initialize request completes.
@@ -1196,8 +1421,10 @@ Host MUST send this notification if the tool execution was cancelled, for any re
 }
 ```
 
-Host MUST send this notification before tearing down the UI resource, for any reason, including user action, resource re-allocation, etc. The Host MAY specify the reason.
+Host MUST send this notification before tearing down the UI resource, for any reason, including user action, view-initiated teardown, resource re-allocation, etc. The Host MAY specify the reason.
 Host SHOULD wait for a response before tearing down the resource (to prevent data loss).
+
+#### Notifications (View → Host)
 
 `ui/notifications/size-changed` - View's size changed
 
@@ -1213,6 +1440,22 @@ Host SHOULD wait for a response before tearing down the resource (to prevent dat
 ```
 
 The View SHOULD send this notification when rendered content body size changes (e.g. using ResizeObserver API to report up to date size).
+
+`ui/notifications/request-teardown` - View requests host to tear it down
+
+```typescript
+{
+  jsonrpc: "2.0",
+  method: "ui/notifications/request-teardown",
+  params: {}
+}
+```
+
+The View MAY send this notification to request that the host tear it down. This enables View-initiated teardown flows (e.g., user clicks a "Done" button in the View).
+
+**Host behavior:**
+- Host MAY defer or ignore the teardown request.
+- If the Host accepts the request, it MUST follow the graceful termination process by sending `ui/resource-teardown` to the View. The Host SHOULD wait for a response before tearing down the resource (to prevent data loss).
 
 `ui/notifications/host-context-changed` - Host context has changed
 
@@ -1366,19 +1609,24 @@ sequenceDiagram
   end
 ```
 
-#### 4. Cleanup
+#### 4. Teardown
+
+The Host can tear down Views. Views may request teardown by sending `ui/notifications/request-teardown` to the Host. In any case, the Host MUST send `ui/resource-teardown` to allow the View to terminate gracefully.
 
 ```mermaid
 sequenceDiagram
   participant H as Host
   participant UI as View (iframe)
+  opt View-initiated teardown
+    UI ->> H: ui/notifications/request-teardown
+  end
   H ->> UI: ui/resource-teardown
   UI --> UI: Graceful termination
   UI -->> H: ui/resource-teardown response
   H -x H: Tear down iframe and listeners
 ```
 
-Note: Cleanup may be triggered at any point in the lifecycle following View initialization.
+Note: Teardown may be triggered at any point in the lifecycle following View initialization.
 
 #### Key Differences from Pre-SEP MCP-UI:
 
@@ -1487,6 +1735,446 @@ This pattern enables interactive, self-updating views.
 
 Note: Tools with `visibility: ["app"]` are hidden from the agent but remain callable by apps via `tools/call`. This enables UI-only interactions (refresh buttons, form submissions) without exposing implementation details to the model. See the Visibility section under Resource Discovery for details.
 
+### App-Provided Tools
+
+Apps can register their own tools that hosts and agents can call, making apps **introspectable and accessible** to the model. This complements the existing capability where apps call server tools (via host proxy).
+
+#### Motivation: Semantic Introspection
+
+Without tool registration, apps are opaque to the model:
+- The host renders the app in a sandboxed iframe and has no guaranteed access to its internals — apps may embed further cross-origin iframes (via `frameDomains`), and even where same-origin, DOM access is not part of the host↔app contract
+- The model therefore cannot query app state or discover what operations the app supports
+
+With tool registration, apps expose a semantic interface:
+- The model discovers available operations via `tools/list`
+- The model queries app state via tools (e.g., `get_board_state`)
+- The model executes actions via tools (e.g., `make_move`)
+- Apps return structured data rather than relying on the host to interpret rendered output
+
+This is *pull*-based and complements the *push*-based [`ui/update-model-context`](#uiupdate-model-context) request already defined in this spec (and analogous mechanisms elsewhere, e.g. OAI Apps SDK's [`setWidgetState()`](https://developers.openai.com/apps-sdk/reference/sdk#setwidgetstate)). Push lets an app proactively keep the model's context current; pull lets the agent query and command the app on demand. Apps may use either or both.
+
+#### App Tool Registration
+
+Apps register tools using the SDK's `registerTool()` method:
+
+```typescript
+import { App } from '@modelcontextprotocol/ext-apps';
+import { z } from 'zod';
+
+const app = new App(
+  { name: "TicTacToe", version: "1.0.0" },
+  { tools: { listChanged: true } }  // Declare tool capability
+);
+
+// Register a tool with schema validation
+const moveTool = app.registerTool(
+  "tictactoe_move",
+  {
+    description: "Make a move in the tic-tac-toe game",
+    inputSchema: z.object({
+      position: z.number().int().min(0).max(8),
+      player: z.enum(['X', 'O'])
+    }),
+    outputSchema: z.object({
+      board: z.array(z.string()).length(9),
+      winner: z.enum(['X', 'O', 'draw', null]).nullable()
+    }),
+    annotations: {
+      readOnlyHint: false  // This tool has side effects
+    }
+  },
+  async (params) => {
+    // Validate and execute move
+    const newBoard = makeMove(params.position, params.player);
+    const winner = checkWinner(newBoard);
+
+    return {
+      content: [{
+        type: "text",
+        text: `Move made at position ${params.position}`
+      }],
+      structuredContent: {
+        board: newBoard,
+        winner
+      }
+    };
+  }
+);
+
+await app.connect(new PostMessageTransport(window.parent));
+```
+
+**Registration Options:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Unique tool identifier |
+| `description` | string | No | Human-readable description for agent |
+| `inputSchema` | [Standard Schema](https://standardschema.dev/) | No | Validates arguments; serialized to JSON Schema for `tools/list` |
+| `outputSchema` | [Standard Schema](https://standardschema.dev/) | No | Validates `structuredContent` |
+| `annotations` | ToolAnnotations | No | MCP tool hints (e.g., `readOnlyHint`) |
+| `_meta` | object | No | Custom metadata |
+
+Apps can also implement tool handling manually without the SDK:
+
+```javascript
+app.oncalltool = async (params, extra) => {
+  if (params.name === "tictactoe_move") {
+    // Manual validation
+    if (typeof params.arguments?.position !== 'number') {
+      throw new Error("Invalid position");
+    }
+
+    // Execute tool
+    const newBoard = makeMove(params.arguments.position, params.arguments.player);
+
+    return {
+      content: [{ type: "text", text: "Move made" }],
+      structuredContent: { board: newBoard }
+    };
+  }
+
+  throw new Error(`Unknown tool: ${params.name}`);
+};
+
+app.onlisttools = async () => {
+  return {
+    tools: [
+      {
+        name: "tictactoe_move",
+        description: "Make a move in the game",
+        inputSchema: {
+          type: "object",
+          properties: {
+            position: { type: "number", minimum: 0, maximum: 8 },
+            player: { type: "string", enum: ["X", "O"] }
+          },
+          required: ["position", "player"]
+        }
+      }
+    ]
+  };
+};
+```
+
+#### Tool Lifecycle
+
+Registered tools support dynamic lifecycle management:
+
+**Enable/Disable:**
+
+```typescript
+const tool = app.registerTool("my_tool", config, callback);
+
+// Disable tool (hide from tools/list)
+tool.disable();
+
+// Re-enable tool
+tool.enable();
+```
+
+When a tool is disabled/enabled, the app automatically sends `notifications/tools/list_changed` (if the app declared `listChanged: true` capability).
+
+**Update:**
+
+```typescript
+// Update tool description or schema
+tool.update({
+  description: "New description",
+  inputSchema: newSchema
+});
+```
+
+Updates also trigger `notifications/tools/list_changed`.
+
+**Remove:**
+
+```typescript
+// Permanently remove tool
+tool.remove();
+```
+
+#### Long-Running App Tools
+
+App tools are bounded by the app's render lifecycle. For work that may outlive a single render, app `tools/call` MAY be task-augmented per [core MCP Tasks](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks); hosts proxy the `tasks/*` methods to the app exactly as they proxy `tools/call`. Because the iframe can be torn down at any time, apps SHOULD delegate long-lived work to the server (via `callServerTool()`) and return the server's task handle, so the host can continue polling the server after teardown.
+
+#### Schema Validation
+
+The SDK validates input and output against any [Standard Schema](https://standardschema.dev/)–compatible library (Zod, ArkType, Valibot, …). Examples below use Zod:
+
+**Input Validation:**
+
+```typescript
+app.registerTool(
+  "search",
+  {
+    inputSchema: z.object({
+      query: z.string().min(1).max(100),
+      limit: z.number().int().positive().default(10)
+    })
+  },
+  async (params) => {
+    // params.query is guaranteed to be a string (1-100 chars)
+    // params.limit is guaranteed to be a positive integer (default 10)
+    return performSearch(params.query, params.limit);
+  }
+);
+```
+
+If the host sends invalid arguments, the tool automatically returns an error before the callback is invoked.
+
+**Output Validation:**
+
+```typescript
+app.registerTool(
+  "get_status",
+  {
+    outputSchema: z.object({
+      status: z.enum(['ready', 'busy', 'error']),
+      timestamp: z.string().datetime()
+    })
+  },
+  async () => {
+    return {
+      content: [{ type: "text", text: "Status retrieved" }],
+      structuredContent: {
+        status: 'ready',
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+);
+```
+
+If the callback returns data that doesn't match `outputSchema`, the tool returns an error.
+
+#### Complete Example: Introspectable Tic-Tac-Toe
+
+This example demonstrates how apps expose semantic interfaces through tools:
+
+```typescript
+import { App } from '@modelcontextprotocol/ext-apps';
+import { z } from 'zod';
+
+// Game state
+let board: Array<'X' | 'O' | null> = Array(9).fill(null);
+let currentPlayer: 'X' | 'O' = 'X';
+let moveHistory: number[] = [];
+
+const app = new App(
+  { name: "TicTacToe", version: "1.0.0" },
+  { tools: { listChanged: true } }
+);
+
+// Agent can query semantic state directly
+app.registerTool(
+  "get_board_state",
+  {
+    description: "Get current game state including board, current player, and winner",
+    outputSchema: z.object({
+      board: z.array(z.enum(['X', 'O', null])).length(9),
+      currentPlayer: z.enum(['X', 'O']),
+      winner: z.enum(['X', 'O', 'draw', null]).nullable(),
+      moveHistory: z.array(z.number())
+    })
+  },
+  async () => {
+    return {
+      content: [{
+        type: "text",
+        text: `Board: ${board.map(c => c || '-').join('')}, Player: ${currentPlayer}`
+      }],
+      structuredContent: {
+        board,
+        currentPlayer,
+        winner: checkWinner(board),
+        moveHistory
+      }
+    };
+  }
+);
+
+// Agent can execute moves
+app.registerTool(
+  "make_move",
+  {
+    description: "Place a piece at the specified position",
+    inputSchema: z.object({
+      position: z.number().int().min(0).max(8)
+    }),
+    annotations: { readOnlyHint: false }
+  },
+  async ({ position }) => {
+    if (board[position] !== null) {
+      return {
+        content: [{ type: "text", text: "Position already taken" }],
+        isError: true
+      };
+    }
+
+    board[position] = currentPlayer;
+    moveHistory.push(position);
+    const winner = checkWinner(board);
+    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+
+    return {
+      content: [{
+        type: "text",
+        text: `Player ${board[position]} moved to position ${position}` +
+              (winner ? `. ${winner} wins!` : '')
+      }],
+      structuredContent: {
+        board,
+        currentPlayer,
+        winner,
+        moveHistory
+      }
+    };
+  }
+);
+
+// Agent can reset game
+app.registerTool(
+  "reset_game",
+  {
+    description: "Reset the game board to initial state",
+    annotations: { readOnlyHint: false }
+  },
+  async () => {
+    board = Array(9).fill(null);
+    currentPlayer = 'X';
+    moveHistory = [];
+
+    return {
+      content: [{ type: "text", text: "Game reset" }],
+      structuredContent: { board, currentPlayer, moveHistory }
+    };
+  }
+);
+
+await app.connect(new PostMessageTransport(window.parent));
+
+function checkWinner(board: Array<'X' | 'O' | null>): 'X' | 'O' | 'draw' | null {
+  const lines = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],  // rows
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],  // columns
+    [0, 4, 8], [2, 4, 6]              // diagonals
+  ];
+
+  for (const [a, b, c] of lines) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      return board[a];
+    }
+  }
+
+  return board.every(cell => cell !== null) ? 'draw' : null;
+}
+```
+
+**Agent Interaction:**
+
+```typescript
+// 1. Discover available operations
+const { tools } = await bridge.sendListTools({});
+// → ["get_board_state", "make_move", "reset_game"]
+
+// 2. Query semantic state (not visual/DOM)
+const state = await bridge.sendCallTool({
+  name: "get_board_state",
+  arguments: {}
+});
+// → { board: [null, null, null, ...], currentPlayer: 'X', winner: null }
+
+// 3. Execute actions based on semantic understanding
+if (state.structuredContent.board[4] === null) {
+  await bridge.sendCallTool({
+    name: "make_move",
+    arguments: { position: 4 }
+  });
+}
+
+// 4. Query updated state
+const newState = await bridge.sendCallTool({
+  name: "get_board_state",
+  arguments: {}
+});
+// → { board: [null, null, null, null, 'X', null, ...], currentPlayer: 'O', ... }
+```
+
+The agent interacts with the app through semantic operations rather than visual interpretation.
+
+#### Tool Flow Directions
+
+**Existing Flow (unchanged): App → Host → Server**
+
+Apps call server tools (proxied by host):
+
+```typescript
+// App calls server tool
+const result = await app.callServerTool("get_weather", { location: "NYC" });
+```
+
+Requires host `serverTools` capability.
+
+**New Flow: Host/Agent → App**
+
+Host/Agent calls app-registered tools:
+
+```typescript
+// Host calls app tool
+const result = await bridge.sendCallTool({
+  name: "tictactoe_move",
+  arguments: { position: 4 }
+});
+```
+
+Requires app `tools` capability.
+
+**Key Distinction:**
+
+| Aspect | Server Tools | App Tools |
+|--------|-------------|-----------|
+| **Lifetime** | Persistent (server process) | Ephemeral (while app loaded) |
+| **Source** | MCP Server | App JavaScript |
+| **Trust** | Trusted | Sandboxed (untrusted) |
+| **Discovery** | Server `tools/list` | App `tools/list` (when app declares capability) |
+| **When Available** | Always | Only while app is loaded |
+
+#### Use Cases
+
+**Introspection:** Agent queries app state semantically — the app's DOM is not exposed to the host or model
+
+**Voice mode:** Agent drives app interactions programmatically based on voice commands
+
+**Accessibility:** Structured state and operations more accessible than visual rendering
+
+**Complex workflows:** Agent discovers available operations and coordinates multi-step interactions
+
+**Stateful apps:** Apps expose operations (move, reset, query) rather than pushing state updates via messages
+
+#### Security Implications
+
+App tools run in **sandboxed iframes** (untrusted). See Security Implications section for detailed mitigations.
+
+Key considerations:
+- App tools could provide misleading descriptions
+- Tool namespacing needed to avoid conflicts with server tools
+- Resource limits (max tools, execution timeouts)
+- Audit trail for app tool invocations
+- User confirmation for tools with side effects
+
+#### Relation to WebMCP
+
+This feature is inspired by [WebMCP](https://github.com/webmachinelearning/webmcp) (W3C incubation), which proposes allowing web pages to register JavaScript functions as tools via `navigator.modelContext.registerTool()`.
+
+Key differences:
+- **WebMCP**: General web pages, browser API, manifest-based discovery
+- **This spec**: MCP Apps, standard MCP messages, capability-based negotiation
+
+Similar to WebMCP but without turning the App (embedded page) into an MCP server - apps register tools within the App/Host architecture.
+
+See [ext-apps#35](https://github.com/modelcontextprotocol/ext-apps/issues/35) for discussion.
+
 ### Client\<\>Server Capability Negotiation
 
 Clients and servers negotiate MCP Apps support through the standard MCP extensions capability mechanism (defined in SEP-1724).
@@ -1557,15 +2245,104 @@ if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
 - Tools MUST return meaningful content array even when UI is available
 - Servers MAY register different tool variants based on host capabilities
 
+#### App (Guest UI) Capabilities
+
+Apps advertise their capabilities in the `ui/initialize` request to the host. When an app supports tool registration, it includes the `tools` capability:
+
+```json
+{
+  "method": "ui/initialize",
+  "params": {
+    "appInfo": {
+      "name": "TicTacToe",
+      "version": "1.0.0"
+    },
+    "appCapabilities": {
+      "tools": {
+        "listChanged": true
+      }
+    }
+  }
+}
+```
+
+The host responds with its own capabilities, including support for proxying server tools:
+
+```json
+{
+  "result": {
+    "hostInfo": {
+      "name": "claude-desktop",
+      "version": "1.0.0"
+    },
+    "hostCapabilities": {
+      "serverTools": {
+        "listChanged": true
+      },
+      "openLinks": {},
+      "logging": {}
+    }
+  }
+}
+```
+
+**App Capability: `tools`**
+
+When present, the app can register tools that the host and agent can call.
+
+- `listChanged` (boolean, optional): If `true`, the app will send `notifications/tools/list_changed` when tools are added, removed, or modified
+
+**Host Capability: `serverTools`**
+
+When present, the host can proxy calls from the app to MCP server tools.
+
+- `listChanged` (boolean, optional): If `true`, the host will send `notifications/tools/list_changed` when server tools change
+
+These capabilities are independent - an app can have one, both, or neither.
+
+**TypeScript Types:**
+
+```typescript
+interface McpUiAppCapabilities {
+  tools?: {
+    listChanged?: boolean;
+  };
+}
+
+interface McpUiHostCapabilities {
+  serverTools?: {
+    listChanged?: boolean;
+  };
+  openLinks?: {};
+  logging?: {};
+}
+```
+
 ### Extensibility
 
-This specification defines the Minimum Viable Product (MVP) for MCP Apps. Future extensions may include:
+This specification defines the Minimum Viable Product (MVP) for MCP Apps.
+
+**Included in MVP:**
+
+- **App-Provided Tools:** Apps can register tools via `app.registerTool()` that agents can call
+  - Bidirectional tool flow (Apps consume server tools AND provide app tools)
+  - Full lifecycle management (enable/disable/update/remove)
+  - Schema validation via [Standard Schema](https://standardschema.dev/) (Zod, ArkType, Valibot, …)
+  - Tool list change notifications
 
 **Content Types (deferred from MVP):**
 
 - `externalUrl`: Embed external web applications (e.g., `text/uri-list`)
 
-**Advanced Features (see Future Considerations):**
+**Advanced Tool Features (future extensions):**
+
+- Tool namespacing standards and conventions
+- Standardized permission model specifications
+- Tool categories/tags for organization
+- Cross-app tool composition
+- Tool marketplace/discovery mechanisms
+
+**Other Advanced Features (see Future Considerations):**
 
 - Support multiple UI resources in a tool response
 - State persistence and restoration
@@ -1603,7 +2380,7 @@ This proposal synthesizes feedback from the UI CWG and MCP-UI community, host im
 
 - Reuses existing MCP infrastructure (type definitions, error handling, timeouts)
 - UI developers can use standard MCP SDK (`@modelcontextprotocol/sdk`) or alternatives
-- Automatic compatibility with future MCP features (long-running tools, sampling, etc.)
+- Automatic compatibility with core MCP features (Tasks for long-running calls, sampling, etc.)
 - Better auditability through structured JSON-RPC messages
 - Reduces maintenance burden (no parallel protocol to evolve)
 
@@ -1665,6 +2442,37 @@ This proposal synthesizes feedback from the UI CWG and MCP-UI community, host im
 - **Boolean `private` flag:** Simpler but less flexible; doesn't express model-only tools.
 - **Flat `ui/visibility` key:** Rejected in favor of nested structure for consistency with future `_meta.ui` fields.
 
+#### 6. App Tool Registration Support
+
+**Decision:** Enable Apps to register tools using standard MCP `tools/call` and `tools/list` messages, making tools flow bidirectionally between Apps and Hosts.
+
+**Rationale:**
+
+- **Semantic introspection:** Apps expose state and operations in a structured, machine-readable form. Hosts have no guaranteed DOM access into an app (which may itself nest cross-origin frames via `frameDomains`), so a tool surface is the only reliable introspection path
+- **Protocol reuse:** Reuses existing MCP tool infrastructure (`tools/call`, `tools/list`, `notifications/tools/list_changed`) instead of inventing new message types
+- **WebMCP alignment:** Brings WebMCP's vision of "JavaScript functions as tools" to MCP Apps while staying MCP-native
+- **Agent-driven interaction:** Agents can pull app state and issue commands on demand, complementing push-style [`ui/update-model-context`](#uiupdate-model-context)
+- **Bidirectional symmetry:** Apps act as both MCP clients (calling server tools) and MCP servers (providing app tools), creating clean architectural symmetry
+- **Use case coverage:** Enables interactive games, stateful forms, complex workflows, and reusable widgets
+
+**Alternatives considered:**
+
+- **Custom app-action API:** Rejected because it would duplicate MCP's existing tool infrastructure and create parallel protocol semantics. Using standard `tools/call` means automatic compatibility with future MCP features and better ecosystem integration.
+- **Server-side proxy tools:** Apps could expose operations by having the server register proxy tools that communicate back to the app. Rejected because it doesn't leverage the app's JavaScript execution environment, adds unnecessary round-trips, and couples app functionality to server implementation.
+- **Resources instead of tools:** Apps could expose state via `resources/read` rather than tools. Rejected because resources have wrong semantics (passive data retrieval vs. active operations), don't support parameters well, and don't convey operational intent.
+
+**Security implications:**
+
+Apps are forward-deployed emanations of server tools, running in the client context. Hosts should consider how to handle tool call approval:
+
+- Per-app-instance approval (confirm each time a specific app instance calls a tool)
+- Per-server approval (approve all apps from a trusted server)
+- Per-tool approval (approve based on tool semantics and annotations)
+- Clear attribution showing which app instance is calling a tool
+- Audit trails for app tool calls
+
+See [Security Implications: App-Provided Tools Security](#5-app-provided-tools-security) for detailed considerations.
+
 ### Backward Compatibility
 
 The proposal builds on the existing core protocol. There are no incompatibilities.
@@ -1725,8 +2533,10 @@ Hosts MUST enforce Content Security Policies based on resource metadata.
 **CSP Construction from Metadata:**
 
 ```typescript
-const csp = resource._meta?.ui?.csp; // `resource` is extracted from the `contents` of the `resources/read` result
-const permissions = resource._meta?.ui?.permissions;
+// Prefer content-level _meta.ui (resources/read), fall back to listing-level (resources/list)
+const uiMeta = resource._meta?.ui ?? listingResource._meta?.ui;
+const csp = uiMeta?.csp;
+const permissions = uiMeta?.permissions;
 
 const cspValue = `
   default-src 'none';
@@ -1754,6 +2564,83 @@ const allowAttribute = allowList.join(' ');
 - Host MUST block connections to undeclared domains
 - Host SHOULD warn users when UI requires external domain access
 - Host MAY implement global domain allowlists/blocklists
+
+#### 5. App-Provided Tools Security
+
+Apps can register their own tools that agents can call. Apps are forward-deployed emanations of server tools, running in the client context. Hosts need to decide how to handle approval for app tool calls.
+
+**Approval Considerations:**
+
+App-provided tools introduce additional approval considerations:
+
+- **Tool description accuracy:** Apps may describe tools in ways that don't fully capture side effects
+- **Namespace conflicts:** Apps could register tools with names conflicting with server tools
+- **Resource consumption:** Apps could register many tools or implement slow callbacks
+- **Data validation:** Tool results should match declared schemas
+- **Semantic clarity:** Tool operations should be clear from their descriptions
+
+**Approval Granularity:**
+
+Hosts have discretion in how they handle app tool call approval:
+
+1. **Per-app-instance approval:** Confirm each time a specific app instance's tool is called
+2. **Per-server approval:** Trust all apps from servers the user has approved
+3. **Per-tool approval:** Approve based on tool annotations (e.g., `readOnlyHint`)
+4. **Hybrid approaches:** Combine strategies (e.g., auto-approve read-only tools from trusted servers)
+
+**Host Protections:**
+
+Hosts SHOULD implement the following protections for app-provided tools:
+
+1. **Clear Attribution:**
+   - Display tool source in agent's tool list (e.g., "Tool from TicTacToe App")
+   - Visually distinguish app tools from server tools in UI
+   - Show app name and version in tool call confirmations
+
+2. **User Confirmation:**
+   - Require explicit user approval for tools with `readOnlyHint: false`
+   - Consider auto-approving tools with `readOnlyHint: true` after review
+   - Implement per-app permission settings (always allow, always deny, ask)
+
+3. **Namespace Management:**
+   - Recommend or enforce tool name prefixes (e.g., `app:move`, `tictactoe:move`)
+   - Prevent apps from registering tool names that conflict with server tools
+   - Document namespace conventions for app developers
+
+4. **Resource Limits:**
+   - Limit maximum number of tools per app (recommended: 50)
+   - Enforce execution timeouts for tool callbacks (recommended: 30 seconds)
+   - Limit tool result sizes (recommended: 10 MB)
+   - Throttle `tools/list_changed` notifications to prevent spam
+
+5. **Audit Trail:**
+   - Log all app tool registrations with timestamps
+   - Log all app tool calls with arguments and results
+   - Provide audit interface for users to review app tool activity
+
+6. **Result Validation:**
+   - Validate tool results match declared schemas
+   - Sanitize result content before displaying to user or agent
+   - Reject results that appear malicious (e.g., phishing content)
+
+**Permission Model:**
+
+Hosts MAY implement different permission levels based on tool annotations:
+
+| Annotation          | Recommended Permission | Example           |
+|---------------------|------------------------|-------------------|
+| `readOnlyHint: true`| Auto-approve (with caution) | `get_board_state()` |
+| `readOnlyHint: false` | User confirmation required | `make_move()` |
+| No annotation       | User confirmation required (safe default) | Any tool |
+
+**App Tool Lifecycle:**
+
+App tools MUST be tied to the app's lifecycle:
+
+- Tools become available once the app advertises the `tools` capability in `ui/initialize` and the host issues `tools/list`; subsequent changes are signaled via `notifications/tools/list_changed`
+- Tools automatically disappear when app iframe is torn down
+- Hosts MUST NOT persist app tool registrations across sessions
+- Calling a tool from a closed app MUST return an error
 
 ### Other risks
 

@@ -4,9 +4,9 @@ A demo MCP App that renders [ShaderToy](https://www.shadertoy.com/)-compatible G
 
 <table>
   <tr>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/shadertoy-server/01-gradient.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/shadertoy-server/01-gradient.png" alt="Gradient" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/shadertoy-server/02-kaleidoscope.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/shadertoy-server/02-kaleidoscope.png" alt="Kaleidoscope" width="100%"></a></td>
-    <td><a href="https://modelcontextprotocol.github.io/ext-apps/screenshots/shadertoy-server/03-fractal.png"><img src="https://modelcontextprotocol.github.io/ext-apps/screenshots/shadertoy-server/03-fractal.png" alt="Kaleidoscope" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/shadertoy-server/01-gradient.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/shadertoy-server/01-gradient.png" alt="Gradient" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/shadertoy-server/02-kaleidoscope.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/shadertoy-server/02-kaleidoscope.png" alt="Kaleidoscope" width="100%"></a></td>
+    <td><a href="https://apps.extensions.modelcontextprotocol.io/screenshots/shadertoy-server/03-fractal.png"><img src="https://apps.extensions.modelcontextprotocol.io/screenshots/shadertoy-server/03-fractal.png" alt="Kaleidoscope" width="100%"></a></td>
   </tr>
 </table>
 

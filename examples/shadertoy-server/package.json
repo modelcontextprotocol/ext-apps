@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-shadertoy",
-  "version": "1.0.1",
+  "version": "1.7.4",
   "type": "module",
   "description": "MCP App Server example for rendering ShaderToy-compatible GLSL shaders",
   "repository": {
@@ -19,13 +19,13 @@
     "serve": "bun --watch main.ts",
     "serve:stdio": "bun main.ts --stdio",
     "start": "cross-env NODE_ENV=development npm run build && npm run serve",
-    "start:stdio": "cross-env NODE_ENV=development npm run build && npm run serve:stdio",
-    "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve'",
+    "start:stdio": "cross-env NODE_ENV=development npm run build 1>&2 && npm run serve:stdio",
+    "dev": "cross-env NODE_ENV=development concurrently \"npm run watch\" \"npm run serve\"",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.0.0",
-    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "zod": "^4.1.13"

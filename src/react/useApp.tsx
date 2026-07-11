@@ -1,20 +1,28 @@
 import { useEffect, useState } from "react";
 import { Implementation } from "@modelcontextprotocol/sdk/types.js";
 import { Client } from "@modelcontextprotocol/sdk/client";
-import { App, McpUiAppCapabilities, PostMessageTransport } from "../app";
+import {
+  App,
+  AppOptions,
+  McpUiAppCapabilities,
+  PostMessageTransport,
+} from "../app";
 export * from "../app";
 
 /**
  * Options for configuring the {@link useApp `useApp`} hook.
  *
- * Note: This interface does NOT expose {@link App `App`} options like `autoResize`.
- * The hook creates the `App` with default options (`autoResize: true`). If you
- * need custom `App` options, create the `App` manually instead of using this hook.
+ * The `autoResize` and `strict` options are forwarded to the underlying
+ * {@link App `App`} instance. For other {@link AppOptions `AppOptions`},
+ * create the `App` manually instead of using this hook.
  *
  * @see {@link useApp `useApp`} for the hook that uses these options
  * @see {@link useAutoResize `useAutoResize`} for manual auto-resize control with custom `App` options
  */
-export interface UseAppOptions {
+export interface UseAppOptions extends Pick<
+  AppOptions,
+  "autoResize" | "strict"
+> {
   /** App identification (name and version) */
   appInfo: Implementation;
   /**
@@ -121,6 +129,8 @@ export function useApp({
   appInfo,
   capabilities,
   onAppCreated,
+  autoResize = true,
+  strict,
 }: UseAppOptions): AppState {
   const [app, setApp] = useState<App | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -128,6 +138,7 @@ export function useApp({
 
   useEffect(() => {
     let mounted = true;
+    let appInstance: App | undefined;
 
     async function connect() {
       try {
@@ -135,18 +146,24 @@ export function useApp({
           window.parent,
           window.parent,
         );
-        const app = new App(appInfo, capabilities);
+        appInstance = new App(appInfo, capabilities, { autoResize, strict });
 
         // Register handlers BEFORE connecting
-        onAppCreated?.(app);
+        onAppCreated?.(appInstance);
 
-        await app.connect(transport);
+        await appInstance.connect(transport);
 
-        if (mounted) {
-          setApp(app);
-          setIsConnected(true);
-          setError(null);
+        if (!mounted) {
+          // Unmounted during the handshake (e.g. React StrictMode dev
+          // double-invoke). Close so the abandoned transport's window
+          // `message` listener doesn't keep receiving host postMessages
+          // alongside the second mount's instance.
+          void appInstance.close();
+          return;
         }
+        setApp(appInstance);
+        setIsConnected(true);
+        setError(null);
       } catch (error) {
         if (mounted) {
           setApp(null);
@@ -162,6 +179,7 @@ export function useApp({
 
     return () => {
       mounted = false;
+      void appInstance?.close();
     };
   }, []); // Intentionally not including options to avoid reconnection
 

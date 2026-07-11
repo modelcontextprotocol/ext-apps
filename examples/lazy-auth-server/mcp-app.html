@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Lazy Auth Demo</title>
+  </head>
+  <body>
+    <main class="main">
+      <h3>Public App</h3>
+      <p>
+        No auth was needed to render this view. Click below to invoke the
+        protected
+        <code>get_secret</code> tool — the host will run the OAuth flow on 401
+        and retry.
+      </p>
+      <div class="actions">
+        <button id="auth-btn">Auth me</button>
+        <button id="revoke-btn">Revoke token</button>
+        <button id="fullscreen-btn" title="Toggle fullscreen">⤢</button>
+      </div>
+      <div id="output"></div>
+    </main>
+    <script type="module" src="/src/mcp-app.ts"></script>
+  </body>
+</html>

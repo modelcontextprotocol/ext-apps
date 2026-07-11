@@ -12,6 +12,8 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   CallToolResult,
   CallToolResultSchema,
+  CreateMessageRequest,
+  CreateMessageResult,
   ListResourcesResultSchema,
   ReadResourceResultSchema,
   ListPromptsResultSchema,
@@ -226,6 +228,26 @@ function AppBridge_oncalltool_forwardToServer(
     );
   };
   //#endregion AppBridge_oncalltool_forwardToServer
+}
+
+/**
+ * Example: Forward sampling requests to your LLM provider.
+ */
+function AppBridge_oncreatesamplingmessage_forwardToLlm(
+  bridge: AppBridge,
+  myLlmProvider: {
+    complete: (
+      params: CreateMessageRequest["params"],
+      opts: { signal: AbortSignal },
+    ) => Promise<CreateMessageResult>;
+  },
+) {
+  //#region AppBridge_oncreatesamplingmessage_forwardToLlm
+  bridge.oncreatesamplingmessage = async (params, extra) => {
+    // Apply rate limiting, user approval, cost controls here
+    return await myLlmProvider.complete(params, { signal: extra.signal });
+  };
+  //#endregion AppBridge_oncreatesamplingmessage_forwardToLlm
 }
 
 /**

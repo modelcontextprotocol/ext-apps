@@ -13,6 +13,7 @@
 export {
   LATEST_PROTOCOL_VERSION,
   OPEN_LINK_METHOD,
+  DOWNLOAD_FILE_METHOD,
   MESSAGE_METHOD,
   SANDBOX_PROXY_READY_METHOD,
   SANDBOX_RESOURCE_READY_METHOD,
@@ -22,6 +23,7 @@ export {
   TOOL_RESULT_METHOD,
   TOOL_CANCELLED_METHOD,
   HOST_CONTEXT_CHANGED_METHOD,
+  REQUEST_TEARDOWN_METHOD,
   RESOURCE_TEARDOWN_METHOD,
   INITIALIZE_METHOD,
   INITIALIZED_METHOD,
@@ -34,6 +36,8 @@ export {
   type McpUiHostStyles,
   type McpUiOpenLinkRequest,
   type McpUiOpenLinkResult,
+  type McpUiDownloadFileRequest,
+  type McpUiDownloadFileResult,
   type McpUiMessageRequest,
   type McpUiMessageResult,
   type McpUiUpdateModelContextRequest,
@@ -49,6 +53,7 @@ export {
   type McpUiHostContextChangedNotification,
   type McpUiResourceTeardownRequest,
   type McpUiResourceTeardownResult,
+  type McpUiRequestTeardownNotification,
   type McpUiHostCapabilities,
   type McpUiAppCapabilities,
   type McpUiInitializeRequest,
@@ -68,6 +73,7 @@ export {
 import type {
   McpUiInitializeRequest,
   McpUiOpenLinkRequest,
+  McpUiDownloadFileRequest,
   McpUiMessageRequest,
   McpUiUpdateModelContextRequest,
   McpUiResourceTeardownRequest,
@@ -81,8 +87,10 @@ import type {
   McpUiInitializedNotification,
   McpUiSizeChangedNotification,
   McpUiSandboxProxyReadyNotification,
+  McpUiRequestTeardownNotification,
   McpUiInitializeResult,
   McpUiOpenLinkResult,
+  McpUiDownloadFileResult,
   McpUiMessageResult,
   McpUiResourceTeardownResult,
   McpUiRequestDisplayModeResult,
@@ -96,6 +104,8 @@ export {
   McpUiHostStylesSchema,
   McpUiOpenLinkRequestSchema,
   McpUiOpenLinkResultSchema,
+  McpUiDownloadFileRequestSchema,
+  McpUiDownloadFileResultSchema,
   McpUiMessageRequestSchema,
   McpUiMessageResultSchema,
   McpUiUpdateModelContextRequestSchema,
@@ -111,6 +121,7 @@ export {
   McpUiHostContextChangedNotificationSchema,
   McpUiResourceTeardownRequestSchema,
   McpUiResourceTeardownResultSchema,
+  McpUiRequestTeardownNotificationSchema,
   McpUiHostCapabilitiesSchema,
   McpUiAppCapabilitiesSchema,
   McpUiInitializeRequestSchema,
@@ -129,6 +140,9 @@ export {
 import {
   CallToolRequest,
   CallToolResult,
+  CreateMessageRequest,
+  CreateMessageResult,
+  CreateMessageResultWithTools,
   EmptyResult,
   ListPromptsRequest,
   ListPromptsResult,
@@ -154,11 +168,13 @@ import {
  * - MCP UI requests (initialize, open-link, message, resource-teardown, request-display-mode)
  * - MCP server requests forwarded from the app (tools/call, tools/list, resources/list,
  *   resources/templates/list, resources/read, prompts/list)
+ * - MCP client requests forwarded to the host (sampling/createMessage)
  * - Protocol requests (ping)
  */
 export type AppRequest =
   | McpUiInitializeRequest
   | McpUiOpenLinkRequest
+  | McpUiDownloadFileRequest
   | McpUiMessageRequest
   | McpUiUpdateModelContextRequest
   | McpUiResourceTeardownRequest
@@ -169,6 +185,7 @@ export type AppRequest =
   | ListResourceTemplatesRequest
   | ReadResourceRequest
   | ListPromptsRequest
+  | CreateMessageRequest
   | PingRequest;
 
 /**
@@ -181,7 +198,7 @@ export type AppRequest =
  * - Sandbox resource ready
  *
  * App to host:
- * - Initialized, size-changed, sandbox-proxy-ready
+ * - Initialized, size-changed, sandbox-proxy-ready, request-teardown
  * - Logging messages
  */
 export type AppNotification =
@@ -199,6 +216,7 @@ export type AppNotification =
   | McpUiInitializedNotification
   | McpUiSizeChangedNotification
   | McpUiSandboxProxyReadyNotification
+  | McpUiRequestTeardownNotification
   | LoggingMessageNotification;
 
 /**
@@ -207,6 +225,7 @@ export type AppNotification =
 export type AppResult =
   | McpUiInitializeResult
   | McpUiOpenLinkResult
+  | McpUiDownloadFileResult
   | McpUiMessageResult
   | McpUiResourceTeardownResult
   | McpUiRequestDisplayModeResult
@@ -216,4 +235,6 @@ export type AppResult =
   | ListResourceTemplatesResult
   | ReadResourceResult
   | ListPromptsResult
+  | CreateMessageResult
+  | CreateMessageResultWithTools
   | EmptyResult;
