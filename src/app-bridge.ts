@@ -1,6 +1,8 @@
-import { type Client } from "@modelcontextprotocol/client";
 import {
-  Server,
+  Protocol,
+  type BaseContext,
+  type Client,
+  type ProtocolOptions,
   type CallToolRequest,
   type CallToolResult,
   type CreateMessageRequest,
@@ -24,13 +26,10 @@ import {
   type RequestOptions,
   type ResourceListChangedNotification,
   type Result,
-  type ServerCapabilities,
-  type ServerContext,
-  type ServerOptions,
   type Tool,
   type ToolListChangedNotification,
   type Transport,
-} from "@modelcontextprotocol/server";
+} from "@modelcontextprotocol/client";
 import {
   EmptyResultSchema,
   LoggingMessageNotificationSchema,
@@ -42,8 +41,6 @@ type MethodSchema = ZodObject<{
   method: ZodLiteral<string>;
   params: ZodType;
 }>;
-
-const INNER_MCP_PROTOCOL_VERSION = "2025-11-25";
 
 import {
   type McpUiSandboxResourceReadyNotification,
@@ -95,20 +92,6 @@ export * from "./types";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
 import { RESOURCE_URI_META_KEY } from "./app";
 export { PostMessageTransport } from "./message-transport";
-
-function proxiedInnerCapabilities(
-  capabilities: ServerCapabilities,
-): ServerCapabilities {
-  return {
-    ...(capabilities.tools && { tools: capabilities.tools }),
-    ...(capabilities.resources && {
-      resources: {
-        listChanged: capabilities.resources.listChanged,
-      },
-    }),
-    ...(capabilities.prompts && { prompts: capabilities.prompts }),
-  };
-}
 
 /**
  * Extract UI resource URI from tool metadata.
@@ -215,13 +198,10 @@ export function buildAllowAttribute(
  *
  * @property hostContext - Optional initial host context to provide to the view
  *
- * @see `ServerOptions` from @modelcontextprotocol/server for available options
+ * @see `ProtocolOptions` from @modelcontextprotocol/client for available options
  * @see {@link McpUiHostContext `McpUiHostContext`} for the hostContext structure
  */
-export type HostOptions = Omit<
-  ServerOptions,
-  "capabilities" | "supportedProtocolVersions"
-> & {
+export type HostOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
   hostContext?: McpUiHostContext;
 };
 
@@ -241,7 +221,7 @@ export const SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION];
  *
  * @internal
  */
-type RequestHandlerExtra = ServerContext;
+type RequestHandlerExtra = BaseContext;
 
 /**
  * Maps DOM-style event names to their notification `params` types.
@@ -315,7 +295,7 @@ export type AppBridgeEventMap = {
  * await bridge.connect(transport);
  * ```
  */
-export class AppBridge extends Server {
+export class AppBridge extends Protocol<BaseContext> {
   private _appCapabilities?: McpUiAppCapabilities;
   private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
@@ -328,26 +308,17 @@ export class AppBridge extends Server {
    * handler registration. AppBridge uses it to preserve the existing warning
    * when a View calls host methods before `ui/notifications/initialized`,
    * without adding overload-forwarding adapters around `setRequestHandler`.
-   * Chaining through `super._wrapHandler()` retains the base `Server`'s own
-   * role-specific behavior, including tool-result validation. The two
-   * initialization methods and `ping` are exempt because they are valid before
-   * the Apps-ready gate. This wraps registered callbacks, not JSON-RPC dispatch.
+   * `ui/initialize` and `ping` are exempt because they are valid before the
+   * Apps-ready gate. This wraps registered callbacks, not JSON-RPC dispatch.
    *
    * @see {@link https://github.com/anthropics/claude-ai-mcp/issues/149 claude-ai-mcp#149}
    */
   protected override _wrapHandler(
     method: string,
-    handler: (
-      request: JSONRPCRequest,
-      context: ServerContext,
-    ) => Promise<Result>,
-  ): (request: JSONRPCRequest, context: ServerContext) => Promise<Result> {
+    handler: (request: JSONRPCRequest, context: BaseContext) => Promise<Result>,
+  ): (request: JSONRPCRequest, context: BaseContext) => Promise<Result> {
     const wrapped = super._wrapHandler(method, handler);
-    if (
-      method === "initialize" ||
-      method === "ui/initialize" ||
-      method === "ping"
-    ) {
+    if (method === "ui/initialize" || method === "ping") {
       return wrapped;
     }
     return async (request, context) => {
@@ -439,14 +410,6 @@ export class AppBridge extends Server {
     }
   }
 
-  private ensureInnerCapabilities(capabilities: ServerCapabilities): void {
-    const current = super.getCapabilities();
-    const missing = Object.keys(capabilities).some(
-      (key) => current[key as keyof ServerCapabilities] === undefined,
-    );
-    if (missing) this.registerCapabilities(capabilities);
-  }
-
   /**
    * Create a new AppBridge instance.
    *
@@ -486,30 +449,7 @@ export class AppBridge extends Server {
     private _hostCapabilities: McpUiHostCapabilities,
     options?: HostOptions,
   ) {
-    // TEMPORARY INNER-CHANNEL NEGOTIATION:
-    // App and AppBridge use the public v2 Client/Server roles, so the iframe
-    // channel first completes the SDK's standard legacy MCP initialization.
-    // ui/initialize remains authoritative for Apps capabilities, identity, and
-    // host context, and ui/notifications/initialized remains the View-ready gate.
-    // Keep the inner MCP era pinned to 2025-11-25. Revisit this sequence only
-    // after the MCP Apps negotiation specification is resolved:
-    // https://github.com/modelcontextprotocol/ext-apps/issues/708
-    super(_hostInfo, {
-      ...options,
-      capabilities: {},
-      supportedProtocolVersions: [INNER_MCP_PROTOCOL_VERSION],
-    });
-
-    // The base Server's standard initialized callback is MCP-ready state. The
-    // public AppBridge callback remains exclusively the Apps View-ready gate.
-    super.setNotificationHandler("notifications/initialized", () => {});
-    Object.defineProperty(this, "oninitialized", {
-      configurable: true,
-      enumerable: true,
-      get: () => this.getEventHandler("initialized"),
-      set: (callback: AppBridge["oninitialized"]) =>
-        this.setEventHandler("initialized", callback),
-    });
+    super(options);
 
     this._ensureEventSlot("initialized");
 
@@ -542,6 +482,35 @@ export class AppBridge extends Server {
         return { mode: currentMode };
       },
     );
+  }
+
+  /** @internal */
+  protected buildContext(ctx: BaseContext): BaseContext {
+    return ctx;
+  }
+
+  /**
+   * Verify that the view supports the capability required for the given request method.
+   * @internal
+   */
+  protected assertCapabilityForMethod(_method: string): void {
+    // Host-to-view requests are not capability-gated.
+  }
+
+  /**
+   * Verify that a request handler is registered and supported for the given method.
+   * @internal
+   */
+  protected assertRequestHandlerCapability(_method: string): void {
+    // Host handler registration is not capability-gated.
+  }
+
+  /**
+   * Verify that the host supports the capability required for the given notification method.
+   * @internal
+   */
+  protected assertNotificationCapability(_method: string): void {
+    // Host notifications are not capability-gated.
   }
 
   /**
@@ -713,9 +682,18 @@ export class AppBridge extends Server {
    * @see {@link sendToolInput `sendToolInput`} for sending tool arguments to the View
    * @deprecated Use {@link addEventListener `addEventListener("initialized", handler)`} instead — it composes with other listeners and supports cleanup via {@link removeEventListener `removeEventListener`}.
    */
-  override oninitialized?: (
-    params?: McpUiInitializedNotification["params"],
-  ) => void;
+  get oninitialized():
+    | ((params?: McpUiInitializedNotification["params"]) => void)
+    | undefined {
+    return this.getEventHandler("initialized");
+  }
+  set oninitialized(
+    callback:
+      | ((params?: McpUiInitializedNotification["params"]) => void)
+      | undefined,
+  ) {
+    this.setEventHandler("initialized", callback);
+  }
 
   /**
    * Register a handler for message requests from the view.
@@ -1178,7 +1156,6 @@ export class AppBridge extends Server {
   ) {
     this.warnIfRequestHandlerReplaced("oncalltool", this._oncalltool, callback);
     this._oncalltool = callback;
-    this.ensureInnerCapabilities({ tools: {} });
     this.setRequestHandler("tools/call", async (request, extra) => {
       if (!this._oncalltool) throw new Error("No oncalltool handler set");
       return this._oncalltool(request.params, extra);
@@ -1299,7 +1276,6 @@ export class AppBridge extends Server {
       callback,
     );
     this._onlistresources = callback;
-    this.ensureInnerCapabilities({ resources: {} });
     this.setRequestHandler("resources/list", async (request, extra) => {
       if (!this._onlistresources)
         throw new Error("No onlistresources handler set");
@@ -1353,7 +1329,6 @@ export class AppBridge extends Server {
       callback,
     );
     this._onlistresourcetemplates = callback;
-    this.ensureInnerCapabilities({ resources: {} });
     this.setRequestHandler(
       "resources/templates/list",
       async (request, extra) => {
@@ -1410,7 +1385,6 @@ export class AppBridge extends Server {
       callback,
     );
     this._onreadresource = callback;
-    this.ensureInnerCapabilities({ resources: {} });
     this.setRequestHandler("resources/read", async (request, extra) => {
       if (!this._onreadresource)
         throw new Error("No onreadresource handler set");
@@ -1492,7 +1466,6 @@ export class AppBridge extends Server {
       callback,
     );
     this._onlistprompts = callback;
-    this.ensureInnerCapabilities({ prompts: {} });
     this.setRequestHandler("prompts/list", async (request, extra) => {
       if (!this._onlistprompts) throw new Error("No onlistprompts handler set");
       return this._onlistprompts(request.params, extra);
@@ -1532,7 +1505,7 @@ export class AppBridge extends Server {
    *
    * @see {@link McpUiHostCapabilities `McpUiHostCapabilities`} for the capabilities structure
    */
-  getHostCapabilities(): McpUiHostCapabilities {
+  getCapabilities(): McpUiHostCapabilities {
     return this._hostCapabilities;
   }
 
@@ -1565,7 +1538,7 @@ export class AppBridge extends Server {
 
     return {
       protocolVersion,
-      hostCapabilities: this.getHostCapabilities(),
+      hostCapabilities: this.getCapabilities(),
       hostInfo: this._hostInfo,
       hostContext: this._hostContext,
     };
@@ -1931,7 +1904,6 @@ export class AppBridge extends Server {
       if (!serverCapabilities) {
         throw new Error("Client server capabilities not available");
       }
-      this.registerCapabilities(proxiedInnerCapabilities(serverCapabilities));
 
       if (serverCapabilities.tools) {
         this.oncalltool = async (params, extra) => {
@@ -1989,9 +1961,9 @@ export class AppBridge extends Server {
       }
     }
 
-    // The standard MCP handshake only establishes the temporary inner Server
-    // role. ui/notifications/initialized remains the public View-ready signal.
-
+    // Protocol.connect only wires the transport — no MCP handshake happens on
+    // the iframe channel. The View drives ui/initialize;
+    // ui/notifications/initialized remains the public View-ready signal.
     return super.connect(transport);
   }
 }

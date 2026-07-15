@@ -60,8 +60,8 @@ rm -fR  package-lock.json node_modules && \
 
 ### Key Source Files
 
-- `src/app.ts` - `App` subclasses the base MCP SDK `Client`, handles View initialization, tool calls, and messaging
-- `src/app-bridge.ts` - `AppBridge` subclasses the base MCP SDK `Server` for the inner iframe channel and proxies through a separate outer `Client`
+- `src/app.ts` - `App` subclasses the base MCP SDK `Protocol`, handles View initialization, tool calls, and messaging
+- `src/app-bridge.ts` - `AppBridge` subclasses the base MCP SDK `Protocol` for the iframe channel and proxies through a separate outer `Client`
 - `src/server/index.ts` - Helpers for MCP servers to register tools/resources with UI metadata
 - `src/types.ts` - Protocol types re-exported from `spec.types.ts` and Zod schemas from `generated/schema.ts` (auto-generated during build)
 - `src/message-transport.ts` - `PostMessageTransport` for iframe communication
@@ -70,12 +70,12 @@ rm -fR  package-lock.json node_modules && \
 ### Protocol Flow
 
 ```
-View (App/Client) <--PostMessageTransport--> Host (AppBridge/Server) <--separate MCP Client--> MCP Server
+View (App/Protocol) <--PostMessageTransport--> Host (AppBridge/Protocol) <--separate MCP Client--> MCP Server
 ```
 
 1. Host creates iframe with view HTML
 2. View creates `App` instance and calls `connect()` with `PostMessageTransport`
-3. View and Host complete the temporary inner base MCP handshake, then the View sends `ui/initialize` and receives authoritative Apps capabilities and context
+3. View sends `ui/initialize` (the only handshake on the iframe channel) and receives authoritative Apps capabilities and context
 4. Host sends `sendToolInput()` with tool arguments after initialization
 5. View can call server tools via `app.callServerTool()` or send messages via `app.sendMessage()`
 6. Host sends `sendToolResult()` when tool execution completes

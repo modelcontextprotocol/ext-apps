@@ -97,7 +97,7 @@ sequenceDiagram
 ```
 
 1. **Discovery** — The Host learns about tools and their UI resources when connecting to the server.
-2. **Initialization** — When a UI tool is called, the Host renders the iframe. The SDK first completes its temporary inner base MCP handshake, then the View sends `ui/initialize` and receives host context (theme, capabilities, container dimensions). `ui/initialize` remains authoritative for Apps capabilities and identity, and `ui/notifications/initialized` remains the public View-ready signal.
+2. **Initialization** — When a UI tool is called, the Host renders the iframe. The View sends `ui/initialize` (the only handshake on the iframe channel) and receives host context (theme, capabilities, container dimensions). `ui/initialize` is authoritative for Apps capabilities and identity, and `ui/notifications/initialized` is the public View-ready signal.
 3. **Data delivery** — The Host sends tool arguments and, once available, tool results to the View. Results include both `content` (text for the model's context) and optionally `structuredContent` (data optimized for UI rendering). This separation lets servers provide rich data to the UI without bloating the model's context.
 4. **Interactive phase** — The user interacts with the View. The View can call tools, send messages, or update context.
 5. **Teardown** — Before unmounting, the Host notifies the View so it can save state or release resources.

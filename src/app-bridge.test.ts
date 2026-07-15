@@ -82,7 +82,7 @@ describe("App <-> AppBridge integration", () => {
       expect(initializedFired).toBe(true);
     });
 
-    it("keeps standard initialization separate from the Apps-ready gate", async () => {
+    it("sends only the Apps handshake on the wire and gates the Apps-ready callback", async () => {
       const methods: string[] = [];
       let releaseAppsInitialized!: () => void;
       let reachedAppsInitialized!: () => void;
@@ -115,14 +115,9 @@ describe("App <-> AppBridge integration", () => {
       await reachedGate;
 
       expect(methods).toEqual([
-        "initialize",
-        "notifications/initialized",
         "ui/initialize",
         "ui/notifications/initialized",
       ]);
-      expect(app.getNegotiatedProtocolVersion()).toBe("2025-11-25");
-      expect(bridge.getNegotiatedProtocolVersion()).toBe("2025-11-25");
-      expect(bridge.getClientVersion()).toEqual(testAppInfo);
       expect(bridge.getAppVersion()).toEqual(testAppInfo);
       expect(singularCalls).toBe(0);
       expect(listenerCalls).toBe(0);
@@ -143,8 +138,7 @@ describe("App <-> AppBridge integration", () => {
 
       const hostCaps = app.getHostCapabilities();
       expect(hostCaps).toEqual(testHostCapabilities);
-      expect(bridge.getHostCapabilities()).toEqual(testHostCapabilities);
-      expect(bridge.getCapabilities()).toEqual({});
+      expect(bridge.getCapabilities()).toEqual(testHostCapabilities);
     });
 
     it("Bridge receives app info and capabilities after initialization", async () => {

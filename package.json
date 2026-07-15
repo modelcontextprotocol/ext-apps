@@ -77,9 +77,9 @@
   "author": "Olivier Chafik",
   "devDependencies": {
     "@boneskull/typedoc-plugin-mermaid": "^0.2.0",
-    "@modelcontextprotocol/client": "2.0.0-beta.4",
-    "@modelcontextprotocol/core": "2.0.0-beta.4",
-    "@modelcontextprotocol/server": "2.0.0-beta.4",
+    "@modelcontextprotocol/client": "file:/root/src/mcp/projects/v2-2026-ext-apps/tarballs/mcp-client.tgz",
+    "@modelcontextprotocol/core": "file:/root/src/mcp/projects/v2-2026-ext-apps/tarballs/mcp-core.tgz",
+    "@modelcontextprotocol/server": "file:/root/src/mcp/projects/v2-2026-ext-apps/tarballs/mcp-server.tgz",
     "@playwright/test": "1.57.0",
     "@types/bun": "^1.3.2",
     "@types/node": "20.19.27",
@@ -129,7 +129,10 @@
     "seroval": "1.4.1",
     "seroval-plugins": "1.4.2",
     "solid-js": "1.9.10",
-    "@types/node": "20.19.27"
+    "@types/node": "20.19.27",
+    "@modelcontextprotocol/core": "file:/root/src/mcp/projects/v2-2026-ext-apps/tarballs/mcp-core.tgz",
+    "@modelcontextprotocol/client": "file:/root/src/mcp/projects/v2-2026-ext-apps/tarballs/mcp-client.tgz",
+    "@modelcontextprotocol/server": "file:/root/src/mcp/projects/v2-2026-ext-apps/tarballs/mcp-server.tgz"
   },
   "dependencies": {
     "@standard-schema/spec": "^1.1.0"

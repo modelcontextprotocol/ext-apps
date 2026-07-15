@@ -14,8 +14,6 @@ import {
   McpUiInitializedNotificationSchema,
 } from "./types";
 
-const INNER_MCP_PROTOCOL_VERSION = "2025-11-25";
-
 type ConnectedPair = {
   app: App;
   server: Server;
@@ -34,7 +32,6 @@ async function connectPair(
     { name: "inner-mcp-server", version: "0.0.0" },
     {
       capabilities: { resources: {}, tools: {} },
-      supportedProtocolVersions: [INNER_MCP_PROTOCOL_VERSION],
     },
   );
   const [appTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -103,8 +100,8 @@ afterEach(async () => {
   );
 });
 
-describe("App base MCP SDK v2 Client migration", () => {
-  it("completes the legacy MCP handshake before the authoritative Apps handshake", async () => {
+describe("App base MCP SDK v2 Protocol migration", () => {
+  it("performs only the Apps handshake — no MCP initialize on the wire", async () => {
     const pair = await connectPair();
     connected.push(pair);
 
@@ -123,25 +120,19 @@ describe("App base MCP SDK v2 Client migration", () => {
         ].includes(method),
       );
 
+    // The filter above includes the core MCP lifecycle methods, so this
+    // equality also proves no `initialize`/`notifications/initialized` was sent
+    // — the wire contract deployed v1 hosts depend on.
     expect(lifecycleMethods).toEqual([
-      "initialize",
-      "notifications/initialized",
       "ui/initialize",
       "ui/notifications/initialized",
     ]);
-    expect(pair.app.getNegotiatedProtocolVersion()).toBe(
-      INNER_MCP_PROTOCOL_VERSION,
-    );
   });
 
   it("uses ui/initialize as the authority for Apps host state", async () => {
     const pair = await connectPair();
     connected.push(pair);
 
-    expect(pair.app.getServerVersion()).toEqual({
-      name: "inner-mcp-server",
-      version: "0.0.0",
-    });
     expect(pair.app.getHostVersion()).toEqual({
       name: "apps-host",
       version: "2.0.0",
@@ -219,9 +210,6 @@ describe("App base MCP SDK v2 Client migration", () => {
     const second = await connectPair(first.app);
     connected.push(second);
 
-    expect(second.app.getNegotiatedProtocolVersion()).toBe(
-      INNER_MCP_PROTOCOL_VERSION,
-    );
     expect(second.app.getHostVersion()).toEqual({
       name: "apps-host",
       version: "2.0.0",
