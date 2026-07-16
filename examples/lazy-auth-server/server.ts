@@ -414,20 +414,36 @@ async function handleAuthorize(req: Request, res: Response) {
     if (state) denyUrl.searchParams.set("state", state);
     res.type("text/html").send(/*html*/ `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Authorize</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>body{font-family:system-ui,sans-serif;max-width:420px;margin:40px auto;padding:0 16px;color-scheme:light dark}
-.box{border:1px solid #ccc;border-radius:8px;padding:20px}dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;margin:16px 0}
+.box{border:1px solid #ccc;border-radius:8px;padding:20px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;margin:16px 0}
 dt{color:#888}dd{margin:0;word-break:break-all}
-button{padding:10px 20px;margin:4px;font-size:15px;font-weight:bold;border:none;border-radius:6px;cursor:pointer}
-.approve{background:#1a7a3e;color:#fff}.deny{background:#b91c1c;color:#fff}</style></head>
+.actions{display:flex;flex-wrap:wrap;gap:12px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.btn{box-sizing:border-box;flex:1;min-height:56px;min-width:56px;display:flex;align-items:center;justify-content:center;
+padding:12px 20px;font-size:16px;font-weight:bold;border:none;border-radius:8px;cursor:pointer;
+text-decoration:none;color:#fff;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.btn:active{filter:brightness(0.8)}
+.approve{background:#1a7a3e}.deny{background:#b91c1c}</style></head>
 <body><div class="box">
 <h2>🔑 Mock Authorization</h2>
 <p>An application is requesting access:</p>
 <dl><dt>Client</dt><dd>${escapeHtml(client_id ?? "(none)")}</dd>
 <dt>Scope</dt><dd>${escapeHtml(scope ?? "(default)")}</dd>
 <dt>Redirect</dt><dd>${escapeHtml(redirect_uri)}</dd></dl>
-<a href="${escapeHtml(approveUrl.href)}"><button class="approve">Approve</button></a>
-<a href="${escapeHtml(denyUrl.href)}"><button class="deny">Deny</button></a>
-</div></body></html>`);
+<div class="actions">
+<a class="btn approve" role="button" href="${escapeHtml(approveUrl.href)}">Approve</a>
+<a class="btn deny" role="button" href="${escapeHtml(denyUrl.href)}">Deny</a>
+</div>
+</div>
+<script>
+// Anchors only activate on Enter; role="button" promises Space too.
+for (const a of document.querySelectorAll(".btn"))
+  a.addEventListener("keydown", (e) => {
+    if (e.key === " ") { e.preventDefault(); a.click(); }
+  });
+</script>
+</body></html>`);
     return;
   }
 
