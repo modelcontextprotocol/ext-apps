@@ -7,7 +7,7 @@ import { getTheme, onThemeChange } from "./theme";
 import { HOST_STYLE_VARIABLES } from "./host-styles";
 
 
-const SANDBOX_PROXY_BASE_URL = "http://localhost:8081/sandbox.html";
+const SANDBOX_PROXY_BASE_URL = `http://localhost:${import.meta.env.VITE_SANDBOX_PORT ?? "8081"}/sandbox.html`;
 const IMPLEMENTATION = { name: "MCP Apps Host", version: "1.0.0" };
 
 

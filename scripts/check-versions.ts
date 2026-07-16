@@ -23,7 +23,7 @@ const [major, minor] = rootVersion.split(".").map(Number);
  * - "^X.Y.Z" where X.Y matches root major.minor (e.g., ^1.0.0 is compatible with 1.0.1)
  * - Exact match like "1.0.1"
  */
-function isCompatible(dep) {
+function isCompatible(dep: string) {
   if (dep === "../..") return true;
 
   // Handle caret ranges like ^1.0.0

@@ -1,6 +1,5 @@
-import { OptionDefaults } from "typedoc";
+import { OptionDefaults, type TypeDocOptions } from "typedoc";
 
-/** @type {Partial<import('typedoc').TypeDocOptions>} */
 const config = {
   name: "MCP Apps",
   readme: "README.md",
@@ -49,9 +48,9 @@ const config = {
   out: "docs/api",
   plugin: [
     "typedoc-github-theme",
-    "./scripts/typedoc-plugin-fix-mermaid-entities.mjs",
-    "./scripts/typedoc-plugin-seo.mjs",
-    "./scripts/typedoc-plugin-mcpstyle.mjs",
+    "./scripts/typedoc-plugin-fix-mermaid-entities.ts",
+    "./scripts/typedoc-plugin-seo.ts",
+    "./scripts/typedoc-plugin-mcpstyle.ts",
     "@boneskull/typedoc-plugin-mermaid",
   ],
   ignoredHighlightLanguages: ["mermaid"],
@@ -61,6 +60,6 @@ const config = {
       kind_plural_module: "API Documentation",
     },
   },
-};
+} satisfies Partial<TypeDocOptions>;
 
 export default config;

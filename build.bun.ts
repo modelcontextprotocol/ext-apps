@@ -2,8 +2,9 @@
 import { $ } from "bun";
 import { cpSync, mkdirSync } from "node:fs";
 
-// Run TypeScript compiler for type declarations
-await $`tsc`;
+// TypeDoc and declaration emit still require TypeScript's JavaScript compiler API.
+// Keep this compatibility lane explicit while native TypeScript 7 checks source.
+await $`node node_modules/typescript/bin/tsc`;
 
 // Copy schema.json (tsc is emitDeclarationOnly, Bun.build doesn't emit JSON assets).
 // Needed for the "./schema.json" package export.

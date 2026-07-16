@@ -1,5 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const hostPort = process.env.E2E_HOST_PORT ?? "8080";
+const sandboxPort = process.env.E2E_SANDBOX_PORT ?? "8081";
+const baseURL = `http://localhost:${hostPort}`;
+const webServerTimeout = Number(process.env.E2E_WEB_SERVER_TIMEOUT ?? "180000");
+
 export default defineConfig({
   testDir: "./tests/e2e",
   // Exclude the screenshot generation spec from default runs.
@@ -19,7 +24,7 @@ export default defineConfig({
   snapshotPathTemplate:
     "{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}{ext}",
   use: {
-    baseURL: "http://localhost:8080",
+    baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -37,16 +42,20 @@ export default defineConfig({
   // Run examples server before tests
   // Supports EXAMPLE=<folder> env var to run a single example (e.g., EXAMPLE=say-server npm run test:e2e)
   webServer: {
-    command: "npm run examples:start",
-    url: "http://localhost:8080",
+    command: "npm run examples:start:e2e",
+    url: baseURL,
     // Always start fresh servers to avoid stale state issues
     reuseExistingServer: false,
     // 3 minutes to allow uv to download Python dependencies on first run
-    timeout: 180000,
+    timeout: webServerTimeout,
     // Pass through EXAMPLE env var to filter to a single server
     env: {
       ...process.env,
       EXAMPLE: process.env.EXAMPLE ?? "",
+      EXCLUDE_EXAMPLES: process.env.E2E_EXCLUDE_EXAMPLES ?? "",
+      HOST_PORT: hostPort,
+      SANDBOX_PORT: sandboxPort,
+      VITE_SANDBOX_PORT: sandboxPort,
       // Let pdf-server fetch from the http://127.0.0.1 range-counting fixture
       // (validateUrl rejects loopback HTTP unless this is set). Scoped to this
       // server's check only — does not touch Node's TLS verification.

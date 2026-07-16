@@ -9,13 +9,13 @@
  *   OS prefers-color-scheme media query
  */
 
-import { Renderer } from "typedoc";
+import { Renderer, type Application } from "typedoc";
 
 /**
  * TypeDoc plugin entry point.
  * @param {import('typedoc').Application} app
  */
-export function load(app) {
+export function load(app: Application) {
   app.renderer.on(Renderer.EVENT_END_PAGE, (page) => {
     if (!page.contents) return;
 
@@ -33,8 +33,12 @@ export function load(app) {
 
     // For document pages, replace the breadcrumb with the group name
     // (e.g. "Security", "Getting Started"). The page title is in the H1.
-    if (page.model?.isDocument?.() && page.model.frontmatter?.group) {
-      const group = String(page.model.frontmatter.group);
+    const documentModel = page.model as {
+      isDocument?: () => boolean;
+      frontmatter?: Record<string, unknown>;
+    };
+    if (documentModel?.isDocument?.() && documentModel.frontmatter?.group) {
+      const group = String(documentModel.frontmatter.group);
       page.contents = page.contents.replace(
         /<ul class="tsd-breadcrumb"[^>]*>.*?<\/ul>/,
         `<ul class="tsd-breadcrumb" aria-label="Breadcrumb"><li><span>${group}</span></li></ul>`,

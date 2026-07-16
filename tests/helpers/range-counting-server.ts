@@ -194,12 +194,16 @@ export async function startRangeServer(): Promise<RangeServer> {
       }
     }
 
-    // Stall once N bytes have already been served — lets pdfjs read the
+    // Stall at an exact aggregate byte budget — lets pdfjs read the
     // header/trailer/xref (scattered across the file) before blocking the
-    // bulk content streams.
+    // bulk content streams. Truncate the response that reaches the budget so
+    // one large range cannot overshoot it before the next request stalls.
     if (stallAfterBytes !== null) {
-      if (totalBytesServed >= parseInt(stallAfterBytes, 10)) {
+      const budget = parseInt(stallAfterBytes, 10);
+      if (totalBytesServed >= budget) {
         await releasePromise;
+      } else {
+        end = Math.min(end, begin + budget - totalBytesServed);
       }
     }
 

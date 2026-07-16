@@ -12,14 +12,14 @@
  *    CSS filters handle dark mode styling.
  */
 
-import { Renderer } from "typedoc";
+import { Renderer, type Application } from "typedoc";
 
 /**
  * Decode HTML entities back to raw characters.
  * @param {string} html - HTML-encoded string
  * @returns {string} Decoded string
  */
-function decodeHtmlEntities(html) {
+function decodeHtmlEntities(html: string) {
   return html
     .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num, 10)))
     .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
@@ -48,7 +48,7 @@ const darkModeStyles = `
  * TypeDoc plugin entry point.
  * @param {import('typedoc').Application} app
  */
-export function load(app) {
+export function load(app: Application) {
   // Use high priority (200) to run before the mermaid plugin (default is 0)
   app.renderer.on(
     Renderer.EVENT_END_PAGE,

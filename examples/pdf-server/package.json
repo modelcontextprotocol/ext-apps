@@ -22,7 +22,7 @@
     "start:stdio": "cross-env NODE_ENV=development npm run build 1>&2 && npm run serve:stdio",
     "dev": "cross-env NODE_ENV=development concurrently \"npm run watch\" \"npm run serve\"",
     "prepublishOnly": "npm run build",
-    "build:mcpb": "npm run build && node build-mcpb.mjs"
+    "build:mcpb": "npm run build && node --import tsx build-mcpb.ts"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "^2.6.5",
@@ -39,7 +39,7 @@
     "@types/node": "22.10.0",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vite": "^6.0.0",
     "vite-plugin-singlefile": "^2.3.0"
   },

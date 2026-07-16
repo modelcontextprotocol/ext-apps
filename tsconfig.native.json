@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "types": ["node", "bun"],
+    "lib": ["ES2021", "DOM"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "docs/**/*.ts",
+    "docs/**/*.tsx",
+    "scripts/**/*.ts",
+    "build.bun.ts",
+    "typedoc.config.ts",
+    "examples/run-all.ts",
+    "examples/pdf-server/build-mcpb.ts",
+    "examples/basic-server-svelte/svelte.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
+}

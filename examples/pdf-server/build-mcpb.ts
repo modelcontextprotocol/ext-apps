@@ -45,7 +45,7 @@ writeFileSync(
 );
 writeFileSync(path.join(stage, "package.json"), JSON.stringify(pkg, null, 2));
 
-const run = (cmd) => execSync(cmd, { cwd: stage, stdio: "inherit" });
+const run = (cmd: string) => execSync(cmd, { cwd: stage, stdio: "inherit" });
 run(
   "npm install --omit=dev --omit=optional --no-audit --no-fund --no-package-lock " +
     "--registry=https://registry.npmjs.org/",

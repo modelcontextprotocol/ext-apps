@@ -40,7 +40,7 @@
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "force-graph": "^1.49.0",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vite": "^6.0.0",
     "vite-plugin-singlefile": "^2.3.0"
   },

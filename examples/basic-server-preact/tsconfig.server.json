@@ -4,6 +4,7 @@
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "types": ["node"],
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",

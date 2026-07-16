@@ -4,11 +4,11 @@
  * to the same version.
  *
  * Usage:
- *   node scripts/bump-version.mjs patch
- *   node scripts/bump-version.mjs minor
- *   node scripts/bump-version.mjs major
- *   node scripts/bump-version.mjs 1.4.0
- *   node scripts/bump-version.mjs prerelease --preid=beta
+ *   node scripts/bump-version.ts patch
+ *   node scripts/bump-version.ts minor
+ *   node scripts/bump-version.ts major
+ *   node scripts/bump-version.ts 1.4.0
+ *   node scripts/bump-version.ts prerelease --preid=beta
  *
  * Writes the new version to stdout (logs go to stderr).
  */
@@ -19,12 +19,12 @@ import { readFileSync } from "node:fs";
 const args = process.argv.slice(2);
 if (!args[0]) {
   console.error(
-    "Usage: node scripts/bump-version.mjs <patch|minor|major|prerelease|X.Y.Z> [--preid=<id>]",
+    "Usage: node scripts/bump-version.ts <patch|minor|major|prerelease|X.Y.Z> [--preid=<id>]",
   );
   process.exit(1);
 }
 
-const exec = (cmd) =>
+const exec = (cmd: string) =>
   execSync(cmd, { stdio: ["inherit", "pipe", "inherit"] })
     .toString()
     .trim();

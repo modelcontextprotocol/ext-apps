@@ -7,13 +7,20 @@
  * - Copies favicons to the output directory
  */
 
-import { Renderer } from "typedoc";
+import { Renderer, type Application } from "typedoc";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import * as htmlparser2 from "htmlparser2";
 
 const SITE_NAME = "MCP Apps";
+type Replacement = { old: string; new: string };
+type JsonLdOptions = {
+  title: string;
+  description: string;
+  url: string;
+  isDocument: boolean;
+};
 
 /**
  * Convert a TypeDoc-generated document filename to a lowercase hyphenated slug.
@@ -22,7 +29,7 @@ const SITE_NAME = "MCP Apps";
  * @param {string} filename
  * @returns {string}
  */
-function toSlug(filename) {
+function toSlug(filename: string) {
   return filename
     .replace(/\.html$/, "")
     .replace(/_/g, "-")
@@ -36,7 +43,7 @@ function toSlug(filename) {
  * @param {string} html
  * @returns {string}
  */
-function extractDescription(html) {
+function extractDescription(html: string) {
   // Find the main content area
   const contentMatch = html.match(
     /<div class="tsd-panel tsd-typography">([\s\S]*?)<\/div>\s*<\/div>/,
@@ -71,7 +78,7 @@ function extractDescription(html) {
  * @param {string} html
  * @returns {string}
  */
-function extractTitle(html) {
+function extractTitle(html: string) {
   const match = html.match(/<title>([^<]+)<\/title>/);
   return match ? match[1] : SITE_NAME;
 }
@@ -81,7 +88,7 @@ function extractTitle(html) {
  * @param {string} url
  * @returns {boolean}
  */
-function isDocumentPage(url) {
+function isDocumentPage(url: string) {
   return url.includes("documents/");
 }
 
@@ -94,7 +101,7 @@ function isDocumentPage(url) {
  * @param {boolean} options.isDocument
  * @returns {object}
  */
-function buildJsonLd({ title, description, url, isDocument }) {
+function buildJsonLd({ title, description, url, isDocument }: JsonLdOptions) {
   return {
     "@context": "https://schema.org",
     "@type": isDocument ? "TechArticle" : "WebPage",
@@ -114,7 +121,7 @@ function buildJsonLd({ title, description, url, isDocument }) {
  * TypeDoc plugin entry point.
  * @param {import('typedoc').Application} app
  */
-export function load(app) {
+export function load(app: Application) {
   const hostedBaseUrl = app.options.getValue("hostedBaseUrl") || "";
 
   // --- Per-page: inject JSON-LD, meta descriptions, and favicons ---
@@ -124,9 +131,13 @@ export function load(app) {
     const title = extractTitle(page.contents);
 
     // Prefer frontmatter description, fall back to auto-extraction
+    const documentModel = page.model as {
+      isDocument?: () => boolean;
+      frontmatter?: Record<string, unknown>;
+    };
     const frontmatterDesc =
-      page.model?.isDocument?.() && page.model.frontmatter?.description
-        ? String(page.model.frontmatter.description)
+      documentModel?.isDocument?.() && documentModel.frontmatter?.description
+        ? String(documentModel.frontmatter.description)
         : "";
     const description = frontmatterDesc || extractDescription(page.contents);
     const fullUrl = hostedBaseUrl
@@ -202,7 +213,7 @@ export function load(app) {
     if (!fs.existsSync(docsDir)) return;
 
     // Build rename map: old filename → new slug
-    const renameMap = new Map();
+    const renameMap = new Map<string, string>();
     for (const file of fs.readdirSync(docsDir)) {
       if (!file.endsWith(".html")) continue;
       const slug = toSlug(file);
@@ -258,7 +269,11 @@ export function load(app) {
  * @param {string} varName - JS variable name (e.g. "navigationData", "searchData")
  * @param {Array<{old: string, new: string}>} replacements
  */
-function updateCompressedJsData(filePath, varName, replacements) {
+function updateCompressedJsData(
+  filePath: string,
+  varName: string,
+  replacements: Replacement[],
+) {
   if (!fs.existsSync(filePath)) return;
 
   let content = fs.readFileSync(filePath, "utf8");
@@ -293,7 +308,7 @@ function updateCompressedJsData(filePath, varName, replacements) {
  * @param {string} dir
  * @param {Array<{old: string, new: string}>} replacements
  */
-function updateLinksRecursive(dir, replacements) {
+function updateLinksRecursive(dir: string, replacements: Replacement[]) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
