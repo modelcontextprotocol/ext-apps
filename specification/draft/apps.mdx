@@ -406,12 +406,9 @@ Example (app-only tool, hidden from model):
 - If `ui.resourceUri` is present and host supports MCP Apps, host renders tool results using the specified UI resource
 - If host does not support MCP Apps, tool behaves as standard tool (text-only fallback)
 - Resource MUST exist on the server
-- Host SHOULD use `resources/read` to fetch the referenced resource URI at some point, but MAY ingest the resource out-of-band and store it on their own servers
+- Host MUST use `resources/read` to fetch the referenced resource URI
 - Host MAY prefetch and cache UI resource content for performance optimization
 - Since UI resources are primarily discovered through tool metadata, Servers MAY omit UI-only resources from `resources/list` and `notifications/resources/list_changed`
-
-> [!NOTE]
-> Hosts might want to pre-review and store the contents of MCP App resources to perform ahead-of-time checks on their contents; the above requirements allow hosts to ingest such resources through any mechanism, such as a registration pipeline of sorts, as opposed eagerly fetching it via `resources/read` from a third-party MCP server in each session.
 
 #### Visibility:
 
