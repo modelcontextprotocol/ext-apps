@@ -492,8 +492,8 @@ export interface McpUiRequestTeardownNotification {
  * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
 export interface McpUiHostCapabilities {
-  /** @description Experimental features (structure TBD). */
-  experimental?: {};
+  /** @description Experimental features keyed by identifier. */
+  experimental?: Record<string, object>;
   /** @description Host supports opening external URLs. */
   openLinks?: {};
   /** @description Host supports file downloads via ui/download-file. */
@@ -536,8 +536,8 @@ export interface McpUiHostCapabilities {
  * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`} for the initialization request that includes these capabilities
  */
 export interface McpUiAppCapabilities {
-  /** @description Experimental features (structure TBD). */
-  experimental?: {};
+  /** @description Experimental features keyed by identifier. */
+  experimental?: Record<string, object>;
   /** @description App exposes MCP-style tools that the host can call. */
   tools?: {
     /** @description App supports tools/list_changed notifications. */

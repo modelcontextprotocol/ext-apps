@@ -45,6 +45,9 @@ function createMockClient(
 const testHostInfo = { name: "TestHost", version: "1.0.0" };
 const testAppInfo = { name: "TestApp", version: "1.0.0" };
 const testHostCapabilities: McpUiHostCapabilities = {
+  experimental: {
+    "com.example/host-extension": { version: 1 },
+  },
   openLinks: {},
   serverTools: {},
   logging: {},
@@ -97,7 +100,12 @@ describe("App <-> AppBridge integration", () => {
     });
 
     it("Bridge receives app info and capabilities after initialization", async () => {
-      const appCapabilities = { tools: { listChanged: true } };
+      const appCapabilities = {
+        experimental: {
+          "com.example/app-extension": { version: 1 },
+        },
+        tools: { listChanged: true },
+      };
       app = new App(testAppInfo, appCapabilities, { autoResize: false });
 
       await bridge.connect(bridgeTransport);

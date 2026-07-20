@@ -9,10 +9,19 @@
       "type": "object",
       "properties": {
         "experimental": {
-          "description": "Experimental features (structure TBD).",
+          "description": "Experimental features keyed by identifier.",
           "type": "object",
-          "properties": {},
-          "additionalProperties": false
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Experimental features keyed by identifier."
+          }
         },
         "tools": {
           "description": "App exposes MCP-style tools that the host can call.",
@@ -298,10 +307,19 @@
       "type": "object",
       "properties": {
         "experimental": {
-          "description": "Experimental features (structure TBD).",
+          "description": "Experimental features keyed by identifier.",
           "type": "object",
-          "properties": {},
-          "additionalProperties": false
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Experimental features keyed by identifier."
+          }
         },
         "openLinks": {
           "description": "Host supports opening external URLs.",
@@ -2537,10 +2555,19 @@
               "type": "object",
               "properties": {
                 "experimental": {
-                  "description": "Experimental features (structure TBD).",
+                  "description": "Experimental features keyed by identifier.",
                   "type": "object",
-                  "properties": {},
-                  "additionalProperties": false
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {},
+                    "description": "Experimental features keyed by identifier."
+                  }
                 },
                 "tools": {
                   "description": "App exposes MCP-style tools that the host can call.",
@@ -2651,10 +2678,19 @@
           "type": "object",
           "properties": {
             "experimental": {
-              "description": "Experimental features (structure TBD).",
+              "description": "Experimental features keyed by identifier.",
               "type": "object",
-              "properties": {},
-              "additionalProperties": false
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Experimental features keyed by identifier."
+              }
             },
             "openLinks": {
               "description": "Host supports opening external URLs.",

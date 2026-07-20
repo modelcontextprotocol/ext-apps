@@ -496,11 +496,16 @@ export const McpUiRequestTeardownNotificationSchema = z.object({
  * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
 export const McpUiHostCapabilitiesSchema = z.object({
-  /** @description Experimental features (structure TBD). */
+  /** @description Experimental features keyed by identifier. */
   experimental: z
-    .object({})
+    .record(
+      z.string(),
+      z
+        .record(z.string(), z.any())
+        .describe("Experimental features keyed by identifier."),
+    )
     .optional()
-    .describe("Experimental features (structure TBD)."),
+    .describe("Experimental features keyed by identifier."),
   /** @description Host supports opening external URLs. */
   openLinks: z
     .object({})
@@ -583,11 +588,16 @@ export const McpUiHostCapabilitiesSchema = z.object({
  * @see {@link McpUiInitializeRequest `McpUiInitializeRequest`} for the initialization request that includes these capabilities
  */
 export const McpUiAppCapabilitiesSchema = z.object({
-  /** @description Experimental features (structure TBD). */
+  /** @description Experimental features keyed by identifier. */
   experimental: z
-    .object({})
+    .record(
+      z.string(),
+      z
+        .record(z.string(), z.any())
+        .describe("Experimental features keyed by identifier."),
+    )
     .optional()
-    .describe("Experimental features (structure TBD)."),
+    .describe("Experimental features keyed by identifier."),
   /** @description App exposes MCP-style tools that the host can call. */
   tools: z
     .object({

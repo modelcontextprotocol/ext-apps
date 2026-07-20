@@ -548,8 +548,8 @@ When the View sends an `ui/initialize` request to the Host, it MUST include its 
 
 ```typescript
 interface McpUiAppCapabilities {
-  /** Experimental features (structure TBD). */
-  experimental?: {};
+  /** Experimental features keyed by identifier. */
+  experimental?: Record<string, object>;
   /** App exposes MCP-style tools that the host can call. */
   tools?: {
     /** App supports tools/list_changed notifications. */
@@ -677,8 +677,8 @@ interface SupportedContentBlockModalities {
 }
 
 interface HostCapabilities {
-  /** Experimental features (structure TBD). */
-  experimental?: {};
+  /** Experimental features keyed by identifier. */
+  experimental?: Record<string, object>;
   /** Host supports opening external URLs. */
   openLinks?: {};
   /** Host supports file downloads via ui/download-file. */
