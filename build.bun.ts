@@ -61,4 +61,16 @@ await Promise.all([
     outdir: "dist/src/server",
     external: PEER_EXTERNALS,
   }),
+  // The validator runs in Node (CLI + library), not the browser; playwright
+  // stays external because it is an optional requirement for behavioral checks.
+  buildJs("src/validator/index.ts", {
+    outdir: "dist/src/validator",
+    target: "node",
+    external: [...PEER_EXTERNALS, "playwright"],
+  }),
+  buildJs("src/validator/cli.ts", {
+    outdir: "dist/src/validator",
+    target: "node",
+    external: [...PEER_EXTERNALS, "playwright"],
+  }),
 ]);
