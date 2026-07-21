@@ -25,6 +25,7 @@ const config = {
     "src/app-bridge.ts",
     "src/message-transport.ts",
     "src/types.ts",
+    "src/validator/index.ts",
   ],
   excludePrivate: true,
   excludeInternal: false,

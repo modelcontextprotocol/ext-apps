@@ -43,6 +43,8 @@ export {
   validateServerStatically,
   validateAppBehavior,
 };
+export type { BehavioralOptions } from "./harness.js";
+export type { FetchedUiResource, StaticValidationResult } from "./static.js";
 
 /** What to validate. Exactly one of the members must be provided. */
 export type ValidationTarget =
