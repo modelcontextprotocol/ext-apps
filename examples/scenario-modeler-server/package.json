@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-scenario-modeler",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "type": "module",
   "description": "Financial scenario modeling MCP App Server",
   "repository": {
