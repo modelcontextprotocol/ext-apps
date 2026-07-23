@@ -61,4 +61,15 @@ await Promise.all([
     outdir: "dist/src/server",
     external: PEER_EXTERNALS,
   }),
+  // Conformance: an isomorphic protocol (browser-safe, imported by the app View)
+  // and the Node runner (Playwright kept external — an optional peer dep).
+  buildJs("src/conformance/protocol.ts", {
+    outdir: "dist/src/conformance",
+    external: PEER_EXTERNALS,
+  }),
+  buildJs("src/conformance/index.ts", {
+    outdir: "dist/src/conformance",
+    target: "node",
+    external: ["playwright", ...PEER_EXTERNALS],
+  }),
 ]);
