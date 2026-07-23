@@ -2,682 +2,682 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/index.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/hierarchy.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/documents/overview.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/documents/quickstart.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/documents/agent-skills.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/documents/testing-mcp-apps.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/documents/patterns.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/documents/authorization.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/documents/csp-and-cors.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/documents/migrate-openai-app.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules/_modelcontextprotocol_ext-apps_react.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/_modelcontextprotocol_ext-apps_react.AppState.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/_modelcontextprotocol_ext-apps_react.UseAppOptions.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/_modelcontextprotocol_ext-apps_react.useApp.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/_modelcontextprotocol_ext-apps_react.useAutoResize.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/_modelcontextprotocol_ext-apps_react.useDocumentTheme.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/_modelcontextprotocol_ext-apps_react.useHostFonts.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/_modelcontextprotocol_ext-apps_react.useHostStyles.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/_modelcontextprotocol_ext-apps_react.useHostStyleVariables.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules/app.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules/app.StandardSchemaV1.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaV1.FailureResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaV1.Issue.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaV1.Options.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaV1.PathSegment.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaV1.Props.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaV1.SuccessResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaV1.Types.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.StandardSchemaV1.InferInput.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.StandardSchemaV1.InferOutput.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.StandardSchemaV1.Result.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules/app.StandardSchemaWithJSON.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.StandardSchemaWithJSON.InferInput.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.StandardSchemaWithJSON.InferOutput.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/classes/app.App.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/classes/app.ProtocolWithEvents.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiAppCapabilities.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiClientCapabilities.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiDownloadFileRequest.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiDownloadFileResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiHostCapabilities.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiHostContext.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiHostContextChangedNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiHostCss.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiHostStyles.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiInitializedNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiInitializeRequest.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiInitializeResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiMessageRequest.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiMessageResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiOpenLinkRequest.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiOpenLinkResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiRequestDisplayModeRequest.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiRequestDisplayModeResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiRequestTeardownNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiResourceCsp.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiResourceMeta.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiResourcePermissions.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiResourceTeardownRequest.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiResourceTeardownResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiSandboxProxyReadyNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiSandboxResourceReadyNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiSizeChangedNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiSupportedContentBlockModalities.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiToolCancelledNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiToolInputNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiToolInputPartialNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiToolMeta.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiToolResultNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiUpdateModelContextRequest.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaV1.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.StandardSchemaWithJSON.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.AppEventMap.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.AppOptions.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.AppToolCallback.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.AppToolResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.McpUiDisplayMode.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.McpUiStyles.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.McpUiStyleVariableKey.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.McpUiTheme.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.McpUiToolVisibility.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app.RegisteredAppTool.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.DOWNLOAD_FILE_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.HOST_CONTEXT_CHANGED_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.INITIALIZE_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.INITIALIZED_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.LATEST_PROTOCOL_VERSION.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiAppCapabilitiesSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiDisplayModeSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiDownloadFileRequestSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiDownloadFileResultSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiHostCapabilitiesSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiHostContextChangedNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiHostContextSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiHostCssSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiHostStylesSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiInitializedNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiInitializeRequestSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiInitializeResultSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiMessageRequestSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiMessageResultSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiOpenLinkRequestSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiOpenLinkResultSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiRequestDisplayModeRequestSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiRequestDisplayModeResultSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiRequestTeardownNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiResourceCspSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiResourceMetaSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiResourcePermissionsSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiResourceTeardownRequestSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiResourceTeardownResultSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiSandboxProxyReadyNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiSandboxResourceReadyNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiSizeChangedNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiSupportedContentBlockModalitiesSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiThemeSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiToolCancelledNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiToolInputNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiToolInputPartialNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiToolMetaSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiToolResultNotificationSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiToolVisibilitySchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.McpUiUpdateModelContextRequestSchema.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.MESSAGE_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.OPEN_LINK_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.REQUEST_DISPLAY_MODE_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.REQUEST_TEARDOWN_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.RESOURCE_MIME_TYPE.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.RESOURCE_TEARDOWN_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.RESOURCE_URI_META_KEY.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.SANDBOX_PROXY_READY_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.SANDBOX_RESOURCE_READY_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.SIZE_CHANGED_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.TOOL_CANCELLED_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.TOOL_INPUT_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.TOOL_INPUT_PARTIAL_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app.TOOL_RESULT_METHOD.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/app.applyDocumentTheme.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/app.applyHostFonts.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/app.applyHostStyleVariables.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/app.getDocumentTheme.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules/app-bridge.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/classes/app-bridge.AppBridge.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app-bridge.AppBridgeEventMap.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/app-bridge.HostOptions.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/app-bridge.SUPPORTED_PROTOCOL_VERSIONS.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/app-bridge.buildAllowAttribute.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/app-bridge.getToolUiResourceUri.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/app-bridge.isToolVisibilityAppOnly.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/app-bridge.isToolVisibilityModelOnly.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules/message-transport.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/classes/message-transport.PostMessageTransport.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules/server-helpers.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/server-helpers.McpUiAppResourceConfig.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/server-helpers.McpUiAppToolConfig.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/interfaces/server-helpers.ToolConfig.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/server-helpers.McpUiReadResourceCallback.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/server-helpers.McpUiReadResourceResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/server-helpers.ReadResourceCallback.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/server-helpers.ResourceMetadata.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/server-helpers.ToolCallback.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/variables/server-helpers.EXTENSION_ID.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/server-helpers.getUiCapability.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/server-helpers.registerAppResource.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/functions/server-helpers.registerAppTool.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/modules/types.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/types.AppNotification.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/types.AppRequest.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 	<url>
 		<loc>https://apps.extensions.modelcontextprotocol.io/api/types/types.AppResult.html</loc>
-		<lastmod>2026-06-05T12:08:21.170Z</lastmod>
+		<lastmod>2026-07-23T11:26:48.550Z</lastmod>
 	</url>
 </urlset>
