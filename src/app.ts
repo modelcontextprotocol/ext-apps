@@ -1828,10 +1828,11 @@ export class App extends ProtocolWithEvents<
   }
 
   /**
-   * Set up automatic size change notifications using ResizeObserver.
+   * Set up automatic size change notifications using ResizeObserver and MutationObserver.
    *
-   * Observes both `document.documentElement` and `document.body` for size changes
-   * and automatically sends `ui/notifications/size-changed` notifications to the host.
+   * Observes both `document.documentElement` and `document.body` for size changes,
+   * and the document for mutations that can affect out-of-flow content such as portals.
+   * Automatically sends `ui/notifications/size-changed` notifications to the host.
    * The notifications are debounced using requestAnimationFrame to avoid duplicates.
    *
    * Note: This method is automatically called by `connect()` if the `autoResize`
@@ -1858,6 +1859,7 @@ export class App extends ProtocolWithEvents<
    */
   setupSizeChangedNotifications() {
     let scheduled = false;
+    let animationFrameId: number | undefined;
     let lastWidth = 0;
     let lastHeight = 0;
 
@@ -1866,7 +1868,7 @@ export class App extends ProtocolWithEvents<
         return;
       }
       scheduled = true;
-      requestAnimationFrame(() => {
+      animationFrameId = requestAnimationFrame(() => {
         scheduled = false;
         const html = document.documentElement;
 
@@ -1882,8 +1884,36 @@ export class App extends ProtocolWithEvents<
         // destroying their scroll positions.
         const originalHeight = html.style.height;
         html.style.height = "max-content";
-        const height = Math.ceil(html.getBoundingClientRect().height);
+        const htmlRect = html.getBoundingClientRect();
+        let height = htmlRect.height;
+
+        // Out-of-flow descendants (for example, menus rendered in a portal)
+        // do not contribute to the html element's intrinsic height.
+        const clippingBottoms = new WeakMap<Element, number>();
+        document.body.querySelectorAll("*").forEach((element) => {
+          const rect = element.getBoundingClientRect();
+          const parentElement = element.parentElement;
+          const inheritedClippingBottom =
+            (parentElement && clippingBottoms.get(parentElement)) ?? Infinity;
+          height = Math.max(
+            height,
+            Math.min(rect.bottom, inheritedClippingBottom) - htmlRect.top,
+          );
+
+          if (element.childElementCount > 0) {
+            const overflowY = getComputedStyle(element).overflowY;
+            clippingBottoms.set(
+              element,
+              overflowY === "visible"
+                ? inheritedClippingBottom
+                : Math.min(rect.bottom, inheritedClippingBottom),
+            );
+          }
+        });
+
+        height = Math.ceil(height);
         html.style.height = originalHeight;
+        mutationObserver.takeRecords();
 
         const width = Math.ceil(window.innerWidth);
 
@@ -1903,7 +1933,21 @@ export class App extends ProtocolWithEvents<
     resizeObserver.observe(document.documentElement);
     resizeObserver.observe(document.body);
 
-    return () => resizeObserver.disconnect();
+    const mutationObserver = new MutationObserver(sendBodySizeChanged);
+    mutationObserver.observe(document.documentElement, {
+      attributes: true,
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      if (animationFrameId !== undefined) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
   }
 
   /**
