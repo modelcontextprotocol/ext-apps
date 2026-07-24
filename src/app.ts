@@ -1890,7 +1890,7 @@ export class App extends ProtocolWithEvents<
         // Out-of-flow descendants (for example, menus rendered in a portal)
         // do not contribute to the html element's intrinsic height.
         const clippingBottoms = new WeakMap<Element, number>();
-        document.body.querySelectorAll("*").forEach((element) => {
+        const measureElement = (element: Element) => {
           const rect = element.getBoundingClientRect();
           const parentElement = element.parentElement;
           const inheritedClippingBottom =
@@ -1909,7 +1909,9 @@ export class App extends ProtocolWithEvents<
                 : Math.min(rect.bottom, inheritedClippingBottom),
             );
           }
-        });
+        };
+        measureElement(document.body);
+        document.body.querySelectorAll("*").forEach(measureElement);
 
         height = Math.ceil(height);
         html.style.height = originalHeight;

@@ -57,6 +57,10 @@ test("auto-resize tracks out-of-flow portal content", async ({ page }) => {
       '<div class="scroll"><div class="scroll-content"></div></div>';
     await waitForMeasurement();
 
+    document.body.style.cssText = "height: 120px; overflow: auto";
+    document.body.innerHTML = '<div class="scroll-content"></div>';
+    await waitForMeasurement();
+
     cleanup();
     document.body.append(portal);
     await waitForMeasurement();
@@ -64,5 +68,5 @@ test("auto-resize tracks out-of-flow portal content", async ({ page }) => {
     return reportedSizes;
   });
 
-  expect(sizes.map(({ height }) => height)).toEqual([100, 400, 600, 100]);
+  expect(sizes.map(({ height }) => height)).toEqual([100, 400, 600, 100, 120]);
 });
