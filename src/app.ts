@@ -1911,7 +1911,15 @@ export class App extends ProtocolWithEvents<
           }
         };
         measureElement(document.body);
-        document.body.querySelectorAll("*").forEach(measureElement);
+        const treeWalker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_ELEMENT,
+        );
+        let element = treeWalker.nextNode() as Element | null;
+        while (element) {
+          measureElement(element);
+          element = treeWalker.nextNode() as Element | null;
+        }
 
         height = Math.ceil(height);
         html.style.height = originalHeight;
