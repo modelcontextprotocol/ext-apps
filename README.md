@@ -90,6 +90,7 @@ it will guide you through the rest.
   <a href="https://learning.postman.com/docs/postman-ai/mcp-requests/interact"><img src="https://img.shields.io/badge/Postman-docs-FF6C37?logo=postman&logoColor=white" alt="Postman"></a>
   <a href="https://www.mcpjam.com/blog/mcp-apps-example"><img src="https://img.shields.io/badge/MCPJam-docs-8B5CF6" alt="MCPJam"></a>
   <a href="https://manufact.com/inspector"><img src="https://img.shields.io/badge/mcp--use-inspector-E5F3FD" alt="mcp-use"></a>
+  <a href="https://docs.alpic.ai/distribution/playground"><img src="https://img.shields.io/badge/Alpic-playground-E90060?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAMAAABHPGVmAAAAKlBMVEUKDhz%2F%2F%2F%2BjpaogJDFBRE%2Fw8PHHyMvh4eNmaHF1d4CUlpuFho2ztLhWWWP5YkbJAAAACXBIWXMAAAsTAAALEwEAmpwYAAAB1klEQVR42u2Y0ZKDIAxFBQQF8f9%2FdyW7dhAu7U7Iy87mzvShGfXU3CTGLotKpVKpVCqV6h%2FI2VuxfF3tUwcdVEccA2LNS%2BWCq2mUykG%2BCtg5iNmv76mllOApCPHrFQgNxJf8HHIQs10XdFtDKcEKPQ0x4brg6htKWGr0PIR8jq0tj4oQgJiIzD8rtATErMAWMj%2FxIYcBPjuPgoENcW3Jks%2BdLeXS32jLmise%2BZxQ8GRD%2BkkCbSlByi0Pgm3p0P6nJ1meXJ%2F8K1tKo7qUOFM4wdxEMMS4iSp9sqFJQrZ4hOZBTEa5gbaQ%2BTwI%2FcCu8TOq482xIWZkSx8MfAi0xcOEJTZkULKohXjm29epGU2SIGK%2BfT9J%2Bjre%2BRBYsiUYBSHkaEI2B0EInRx%2BkbApiB89EaMgBNdx7u5vDoJH79ne3yQElqxvEzYLKY%2Bl81PCZiFUsvlDwqYhw80uSkJg4z8Ttsss3OltwgQgMGGPlpSAwITVM0wCgius6iARCGzJcn%2BHJCSMXraCIATPsPW2SggCh364a1sIgveUew%2BTgtBGsuE9zDspyLBZ3M5aVCOCUDFlqXUbrm8j7%2FnvJ2B9G3kf%2BZBlt0iu%2Fr%2BNxHqRU6lUKpVKpVL9UX0BOrAPfcbTY8UAAAAASUVORK5CYII%3D" alt="Alpic Playground"></a>
 </p>
 
 > [!NOTE]
