@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/github.com%2Fmodelcontextprotocol%2Fext-apps.svg)](https://mcptoplist.com/server/github.com%2Fmodelcontextprotocol%2Fext-apps)
+
 <!-- LOGO -->
 <div align="center">
   <picture>
