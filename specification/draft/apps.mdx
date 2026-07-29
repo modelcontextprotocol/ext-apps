@@ -2184,31 +2184,43 @@ extension. They do not introduce additional extension identifiers.
 
 #### Client (Host) Capabilities
 
-Clients advertise MCP Apps support in the initialize request using the extension identifier `io.modelcontextprotocol/ui`:
+In MCP protocol revision `2026-07-28`, clients advertise MCP Apps support in
+the request-scoped capabilities carried in
+`_meta["io.modelcontextprotocol/clientCapabilities"]`. The extension identifier
+is `io.modelcontextprotocol/ui`:
 
 ```json
 {
-  "method": "initialize",
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
   "params": {
-    "protocolVersion": "2025-11-25",
-    "capabilities": {
-      "elicitation": {
-        "form": {}
+    "name": "schedule_delivery",
+    "arguments": {},
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientInfo": {
+        "name": "example-client",
+        "version": "1.0.0"
       },
-      "extensions": {
-        "io.modelcontextprotocol/ui": {
-          "mimeTypes": ["text/html;profile=mcp-app"],
-          "elicitation": {}
+      "io.modelcontextprotocol/clientCapabilities": {
+        "elicitation": {
+          "form": {}
+        },
+        "extensions": {
+          "io.modelcontextprotocol/ui": {
+            "mimeTypes": ["text/html;profile=mcp-app"],
+            "elicitation": {}
+          }
         }
       }
-    },
-    "clientInfo": {
-      "name": "claude-desktop",
-      "version": "1.0.0"
     }
   }
 }
 ```
+
+For protocol revisions that use the `initialize` handshake, clients place the
+same capability object in `InitializeRequest.params.capabilities`.
 
 **Extension Settings:**
 
@@ -2224,26 +2236,28 @@ Future versions may add additional settings:
 #### Server Capabilities
 
 A server that may attach an MCP App to a form-mode elicitation advertises the
-same setting in its initialize result:
+same setting in its `server/discover` result:
 
 ```json
 {
+  "jsonrpc": "2.0",
+  "id": "discover-1",
   "result": {
-    "protocolVersion": "2025-11-25",
+    "resultType": "complete",
+    "supportedVersions": ["2026-07-28"],
     "capabilities": {
       "extensions": {
         "io.modelcontextprotocol/ui": {
           "elicitation": {}
         }
       }
-    },
-    "serverInfo": {
-      "name": "example-server",
-      "version": "1.0.0"
     }
   }
 }
 ```
+
+For protocol revisions that use the `initialize` handshake, servers place the
+same setting in `InitializeResult.capabilities`.
 
 App-rendered elicitation is negotiated only when all of the following are
 true:
@@ -2260,75 +2274,86 @@ in to app-rendered elicitation.
 
 #### Server Behavior
 
-Servers SHOULD check client capabilities before registering UI-enabled tools. The SDK provides the `getUiCapability` helper for this:
+Servers SHOULD check the effective client capabilities before attaching MCP
+Apps metadata. In `2026-07-28`, those capabilities are request-scoped:
 
 ```typescript
 import { getUiCapability, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 
-const uiCap = getUiCapability(clientCapabilities);
-if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
-  // Register tools with UI templates
-  server.registerTool("get_weather", {
-    description: "Get weather with interactive dashboard",
-    inputSchema: { /* ... */ },
-    _meta: {
-      ui: { resourceUri: "ui://weather-server/dashboard" }
-    }
-  });
-} else {
-  // Register text-only version
-  server.registerTool("get_weather", {
-    description: "Get weather as text",
-    inputSchema: { /* ... */ }
-    // No UI metadata
-  });
+const uiCap = getUiCapability(requestContext.clientCapabilities);
+const useApp =
+  requestContext.clientCapabilities.elicitation?.form !== undefined &&
+  uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) &&
+  uiCap?.elicitation !== undefined;
+
+if (useApp) {
+  elicitation._meta = {
+    ...elicitation._meta,
+    ui: { resourceUri: "ui://delivery/choose-window.html" },
+  };
 }
 ```
+
+For protocol revisions that use an `initialize` handshake,
+`requestContext.clientCapabilities` is the initialized session capability
+object.
 
 **Graceful Degradation:**
 
 - Servers SHOULD provide text-only fallback behavior for all UI-enabled tools
 - Tools MUST return meaningful content array even when UI is available
-- Servers MAY register different tool variants based on host capabilities
+- Servers MAY select different result metadata based on effective host
+  capabilities
 
 ### App-Rendered Elicitation
 
 When app-rendered elicitation is negotiated, a server can associate an MCP App
-resource with a standard form-mode `elicitation/create` request. This feature
-uses the existing MCP Apps extension, the standard MCP elicitation request and
-result, and the existing View↔Host JSON-RPC channel. It defines no new method,
-result, or extension identifier.
+resource with a standard form-mode `elicitation/create` input request. In
+protocol revision `2026-07-28`, that input request is carried by the core
+multi-round-trip request (MRTR) flow. This feature uses the existing MCP Apps
+extension, the standard MCP elicitation request and result, and the existing
+View↔Host JSON-RPC channel. It defines no new method, result, or extension
+identifier.
 
 #### Associating an App with an Elicitation
 
-The server attaches the app resource URI at `_meta.ui.resourceUri`:
+The server attaches the app resource URI at `_meta.ui.resourceUri` on the
+embedded elicitation request:
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": 12,
-  "method": "elicitation/create",
-  "params": {
-    "mode": "form",
-    "message": "Choose a delivery window",
-    "requestedSchema": {
-      "type": "object",
-      "properties": {
-        "window": {
-          "type": "string",
-          "oneOf": [
-            { "const": "morning", "title": "Morning" },
-            { "const": "afternoon", "title": "Afternoon" }
-          ]
+  "result": {
+    "resultType": "input_required",
+    "inputRequests": {
+      "delivery-window": {
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "message": "Choose a delivery window",
+          "requestedSchema": {
+            "type": "object",
+            "properties": {
+              "window": {
+                "type": "string",
+                "oneOf": [
+                  { "const": "morning", "title": "Morning" },
+                  { "const": "afternoon", "title": "Afternoon" }
+                ]
+              }
+            },
+            "required": ["window"]
+          },
+          "_meta": {
+            "ui": {
+              "resourceUri": "ui://delivery/choose-window.html"
+            }
+          }
         }
-      },
-      "required": ["window"]
-    },
-    "_meta": {
-      "ui": {
-        "resourceUri": "ui://delivery/choose-window.html"
       }
-    }
+    },
+    "requestState": "schedule-delivery:v1"
   }
 }
 ```
@@ -2349,7 +2374,7 @@ channel supports elicitation:
 {
   "method": "ui/initialize",
   "params": {
-    "protocolVersion": "2025-11-25",
+    "protocolVersion": "2026-01-26",
     "appInfo": {
       "name": "delivery-window",
       "version": "1.0.0"
@@ -2364,7 +2389,7 @@ channel supports elicitation:
 ```json
 {
   "result": {
-    "protocolVersion": "2025-11-25",
+    "protocolVersion": "2026-01-26",
     "hostInfo": {
       "name": "example-host",
       "version": "1.0.0"
@@ -2384,9 +2409,12 @@ form-elicitation UI instead.
 
 #### Resolution Flow
 
-For each app-rendered elicitation, the client:
+For each app-rendered elicitation in protocol revision `2026-07-28`, the
+client:
 
-1. Receives the standard form-mode `elicitation/create` request.
+1. Receives an `InputRequiredResult` while processing an originating client
+   request and selects the standard form-mode `elicitation/create` entry from
+   `inputRequests`.
 2. Confirms that app-rendered elicitation was negotiated and validates
    `_meta.ui.resourceUri`.
 3. Reads and validates the MCP App resource using the same server connection.
@@ -2394,10 +2422,12 @@ For each app-rendered elicitation, the client:
    resource URI, then completes the `ui/initialize` handshake.
 5. If the app and host advertised their View↔Host `elicitation` settings,
    forwards the unchanged `elicitation/create` request to that app instance.
-6. Validates the app's response as a standard MCP `ElicitResult` and returns it
-   unchanged to the server.
+6. Validates the app's response as a standard MCP `ElicitResult`.
+7. Places the result under the same key in `inputResponses` and retries the
+   originating request with the server-provided `requestState`, if any.
 
-For example, an app resolves the request by returning the standard result:
+For example, an app resolves the View↔Host request by returning the standard
+result:
 
 ```json
 {
@@ -2407,6 +2437,43 @@ For example, an app resolves the request by returning the standard result:
     "action": "accept",
     "content": {
       "window": "morning"
+    }
+  }
+}
+```
+
+The host then resumes the originating MCP operation using the core MRTR shape:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "method": "tools/call",
+  "params": {
+    "name": "schedule_delivery",
+    "arguments": {},
+    "inputResponses": {
+      "delivery-window": {
+        "action": "accept",
+        "content": {
+          "window": "morning"
+        }
+      }
+    },
+    "requestState": "schedule-delivery:v1",
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {
+        "elicitation": {
+          "form": {}
+        },
+        "extensions": {
+          "io.modelcontextprotocol/ui": {
+            "mimeTypes": ["text/html;profile=mcp-app"],
+            "elicitation": {}
+          }
+        }
+      }
     }
   }
 }
@@ -2425,8 +2492,8 @@ View↔Host request.
 #### Validation, Fallback, and Retry
 
 The host MUST validate an accepted app result against the standard
-`ElicitResult` shape and the request's `requestedSchema` before returning it to
-the server.
+`ElicitResult` shape and the request's `requestedSchema` before adding it to
+`inputResponses`.
 
 If the app resource is missing or invalid, cannot be loaded, fails to
 initialize, does not advertise `elicitation`, cannot complete the bridge
@@ -2438,10 +2505,15 @@ An app result with `action: "decline"` or `action: "cancel"` is a successful
 resolution and MUST be returned to the server. It MUST NOT trigger native
 fallback.
 
-Subsequent validation and retry use the core MCP elicitation flow. MCP Apps add
-no retry method. When the core protocol associates a retry with the same
-request, the host SHOULD preserve the app instance and its local state when
-policy and lifecycle permit.
+Subsequent validation and retry use the core MCP MRTR flow. MCP Apps add no
+retry method. When the core protocol associates a retry with the same request,
+the host SHOULD preserve the app instance and its local state when policy and
+lifecycle permit.
+
+On protocol revisions that use direct server-to-client requests, the same
+semantic `elicitation/create` request can be delivered directly and its
+`ElicitResult` can be returned as the JSON-RPC response. Implementations MUST
+NOT assume that connection-bound state survives between MRTR rounds.
 
 #### App (Guest UI) Capabilities
 
