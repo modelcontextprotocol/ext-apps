@@ -38,6 +38,8 @@ import {
   McpUiResourceMeta,
   McpUiToolMeta,
   McpUiClientCapabilities,
+  McpUiServerCapabilities,
+  McpUiElicitationMeta,
 } from "../app.js";
 import type {
   BaseToolCallback,
@@ -55,7 +57,10 @@ import type {
 import type { StandardSchemaWithJSON } from "../standard-schema";
 import type {
   ClientCapabilities,
+  ElicitRequest,
+  ElicitRequestFormParams,
   ReadResourceResult,
+  ServerCapabilities,
   ToolAnnotations,
 } from "@modelcontextprotocol/sdk/types.js";
 
@@ -468,4 +473,119 @@ export function getUiCapability(
   return clientCapabilities.extensions?.[EXTENSION_ID] as
     | McpUiClientCapabilities
     | undefined;
+}
+
+/**
+ * Get the MCP Apps extension settings advertised by a server.
+ */
+export function getUiServerCapability(
+  serverCapabilities:
+    | (ServerCapabilities & { extensions?: Record<string, unknown> })
+    | null
+    | undefined,
+): McpUiServerCapabilities | undefined {
+  if (!serverCapabilities) {
+    return undefined;
+  }
+
+  return serverCapabilities.extensions?.[EXTENSION_ID] as
+    | McpUiServerCapabilities
+    | undefined;
+}
+
+/**
+ * Determine whether the client and server negotiated app-rendered form
+ * elicitations.
+ *
+ * This deliberately requires the core form-elicitation capability and the
+ * nested `elicitation` setting on both sides of the existing MCP Apps
+ * extension. A MIME type match alone is not sufficient.
+ */
+export function supportsAppElicitation(
+  clientCapabilities:
+    | (ClientCapabilities & { extensions?: Record<string, unknown> })
+    | null
+    | undefined,
+  serverCapabilities:
+    | (ServerCapabilities & { extensions?: Record<string, unknown> })
+    | null
+    | undefined,
+): boolean {
+  const clientUi = getUiCapability(clientCapabilities);
+  const serverUi = getUiServerCapability(serverCapabilities);
+
+  return Boolean(
+    clientCapabilities?.elicitation?.form &&
+    clientUi?.mimeTypes?.includes(RESOURCE_MIME_TYPE) &&
+    clientUi.elicitation &&
+    serverUi?.elicitation,
+  );
+}
+
+/**
+ * Attach an MCP App resource to a standard form-mode elicitation request.
+ */
+export function withElicitationUi(
+  params: ElicitRequestFormParams,
+  resourceUri: string,
+): ElicitRequestFormParams & {
+  _meta: { ui: McpUiElicitationMeta; [key: string]: unknown };
+} {
+  if ((params as ElicitRequest["params"]).mode === "url") {
+    throw new Error("MCP Apps only support form-mode elicitations");
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(resourceUri);
+  } catch {
+    throw new Error("Elicitation UI resourceUri must be an absolute ui:// URI");
+  }
+  if (parsed.protocol !== "ui:") {
+    throw new Error("Elicitation UI resourceUri must be an absolute ui:// URI");
+  }
+
+  const meta = params._meta ?? {};
+  const ui =
+    typeof meta.ui === "object" && meta.ui !== null
+      ? (meta.ui as Record<string, unknown>)
+      : {};
+
+  return {
+    ...params,
+    _meta: {
+      ...meta,
+      ui: { ...ui, resourceUri },
+    },
+  };
+}
+
+/**
+ * Read and validate the MCP App resource URI from elicitation metadata.
+ */
+export function getElicitationUiResourceUri(
+  params: ElicitRequest["params"],
+): string | undefined {
+  const ui = params._meta?.ui;
+  if (typeof ui !== "object" || ui === null) {
+    return undefined;
+  }
+  const resourceUri = (ui as Record<string, unknown>).resourceUri;
+  if (resourceUri === undefined) {
+    return undefined;
+  }
+  if (typeof resourceUri !== "string") {
+    throw new Error("Elicitation UI resourceUri must be a string");
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(resourceUri);
+  } catch {
+    throw new Error("Elicitation UI resourceUri must be an absolute ui:// URI");
+  }
+  if (parsed.protocol !== "ui:") {
+    throw new Error("Elicitation UI resourceUri must be an absolute ui:// URI");
+  }
+  return resourceUri;
 }

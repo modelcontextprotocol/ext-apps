@@ -106,51 +106,51 @@ interface UIResource {
    */
   _meta?: {
     ui?: UIResourceMeta;
-  }
+  };
 }
 
 interface McpUiResourceCsp {
-    /**
-     * Origins for network requests (fetch/XHR/WebSocket)
-     *
-     * - Empty or omitted = no external connections (secure default)
-     * - Maps to CSP `connect-src` directive
-     *
-     * @example
-     * ["https://api.weather.com", "wss://realtime.service.com"]
-     */
-    connectDomains?: string[],
-    /**
-     * Origins for static resources (images, scripts, stylesheets, fonts, media)
-     *
-     * - Empty or omitted = no external resources (secure default)
-     * - Wildcard subdomains supported: `https://*.example.com`
-     * - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives
-     *
-     * @example
-     * ["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]
-     */
-    resourceDomains?: string[],
-    /**
-     * Origins for nested iframes
-     *
-     * - Empty or omitted = no nested iframes allowed (`frame-src 'none'`)
-     * - Maps to CSP `frame-src` directive
-     *
-     * @example
-     * ["https://www.youtube.com", "https://player.vimeo.com"]
-     */
-    frameDomains?: string[],
-    /**
-     * Allowed base URIs for the document
-     *
-     * - Empty or omitted = only same origin allowed (`base-uri 'self'`)
-     * - Maps to CSP `base-uri` directive
-     *
-     * @example
-     * ["https://cdn.example.com"]
-     */
-    baseUriDomains?: string[],
+  /**
+   * Origins for network requests (fetch/XHR/WebSocket)
+   *
+   * - Empty or omitted = no external connections (secure default)
+   * - Maps to CSP `connect-src` directive
+   *
+   * @example
+   * ["https://api.weather.com", "wss://realtime.service.com"]
+   */
+  connectDomains?: string[];
+  /**
+   * Origins for static resources (images, scripts, stylesheets, fonts, media)
+   *
+   * - Empty or omitted = no external resources (secure default)
+   * - Wildcard subdomains supported: `https://*.example.com`
+   * - Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives
+   *
+   * @example
+   * ["https://cdn.jsdelivr.net", "https://*.cloudflare.com"]
+   */
+  resourceDomains?: string[];
+  /**
+   * Origins for nested iframes
+   *
+   * - Empty or omitted = no nested iframes allowed (`frame-src 'none'`)
+   * - Maps to CSP `frame-src` directive
+   *
+   * @example
+   * ["https://www.youtube.com", "https://player.vimeo.com"]
+   */
+  frameDomains?: string[];
+  /**
+   * Allowed base URIs for the document
+   *
+   * - Empty or omitted = only same origin allowed (`base-uri 'self'`)
+   * - Maps to CSP `base-uri` directive
+   *
+   * @example
+   * ["https://cdn.example.com"]
+   */
+  baseUriDomains?: string[];
 }
 
 interface UIResourceMeta {
@@ -160,7 +160,7 @@ interface UIResourceMeta {
    * Servers declare which external origins their UI needs to access.
    * Hosts use this to enforce appropriate CSP headers.
    */
-  csp?: McpUiResourceCsp,
+  csp?: McpUiResourceCsp;
   /**
    * Sandbox permissions requested by the UI
    *
@@ -174,26 +174,26 @@ interface UIResourceMeta {
      *
      * Maps to Permission Policy `camera` feature
      */
-    camera?: {},
+    camera?: {};
     /**
      * Request microphone access
      *
      * Maps to Permission Policy `microphone` feature
      */
-    microphone?: {},
+    microphone?: {};
     /**
      * Request geolocation access
      *
      * Maps to Permission Policy `geolocation` feature
      */
-    geolocation?: {},
+    geolocation?: {};
     /**
      * Request clipboard write access
      *
      * Maps to Permission Policy `clipboard-write` feature
      */
-    clipboardWrite?: {},
-  },
+    clipboardWrite?: {};
+  };
   /**
    * Dedicated origin for view
    *
@@ -213,7 +213,7 @@ interface UIResourceMeta {
    * @example
    * "www-example-com.oaiusercontent.com"
    */
-  domain?: string,
+  domain?: string;
   /**
    * Visual boundary preference
    *
@@ -224,7 +224,7 @@ interface UIResourceMeta {
    * - `false`: Request no visible border + background
    * - omitted: host decides border
    */
-  prefersBorder?: boolean,
+  prefersBorder?: boolean;
 }
 ```
 
@@ -448,12 +448,12 @@ Note that you don’t need an SDK to “talk MCP” with the host:
 let nextId = 1;
 function sendRequest(method: string, params: any) {
   const id = nextId++;
-  window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
+  window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
   return new Promise((resolve, reject) => {
-    window.addEventListener('message', function listener(event) {
+    window.addEventListener("message", function listener(event) {
       const data: JSONRPCMessage = event.data;
       if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
+        window.removeEventListener("message", listener);
         if (event.data?.result) {
           resolve(event.data?.result);
         } else if (event.data?.error) {
@@ -466,20 +466,19 @@ function sendRequest(method: string, params: any) {
   });
 }
 function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
+  window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
 }
 function onNotification(method: string, handler: (params: any) => void) {
-  window.addEventListener('message', function listener(event) {
+  window.addEventListener("message", function listener(event) {
     if (event.data?.method === method) {
       handler(event.data.params);
     }
   });
 }
 
-
 const initializeResult = await sendRequest("initialize", {
   capabilities: {},
-  clientInfo: {name: "My UI", version: "1.0.0"},
+  clientInfo: { name: "My UI", version: "1.0.0" },
   protocolVersion: "2025-06-18",
 });
 ```
@@ -510,6 +509,7 @@ If the Host is a web page, it MUST wrap the View and communicate with it through
 UI iframes can use the following subset of standard MCP protocol messages.
 
 Note that `tools/call` and `tools/list` flow **bidirectionally**:
+
 - **App → Host → Server**: Apps call server tools (requires host `serverTools` capability)
 - **Host → App**: Host calls app-registered tools (requires app `tools` capability)
 
@@ -572,9 +572,9 @@ interface HostContext {
   /** Metadata of the tool call that instantiated the View */
   toolInfo?: {
     /** JSON-RPC id of the tools/call request */
-    id?: RequestId,
+    id?: RequestId;
     /** Contains name, inputSchema, etc… */
-    tool: Tool,
+    tool: Tool;
   };
   /** Current color theme preference */
   theme?: "light" | "dark";
@@ -594,12 +594,13 @@ interface HostContext {
   availableDisplayModes?: string[];
   /** Container dimensions for the iframe. Specify either width or maxWidth, and either height or maxHeight. */
   containerDimensions?: (
-    | { height: number }      // If specified, container is fixed at this height
-    | { maxHeight?: number }  // Otherwise, container height is determined by the View's height, up to this maximum height (if defined)
-  ) & (
-    | { width: number }       // If specified, container is fixed at this width
-    | { maxWidth?: number }   // Otherwise, container width is determined by the View's width, up to this maximum width (if defined)
-  );
+    | { height: number } // If specified, container is fixed at this height
+    | { maxHeight?: number } // Otherwise, container height is determined by the View's height, up to this maximum height (if defined)
+  ) &
+    (
+      | { width: number } // If specified, container is fixed at this width
+      | { maxWidth?: number } // Otherwise, container width is determined by the View's width, up to this maximum width (if defined)
+    );
   /** User's language/region preference (BCP 47, e.g., "en-US") */
   locale?: string;
   /** User's timezone (IANA, e.g., "America/New_York") */
@@ -612,7 +613,7 @@ interface HostContext {
   deviceCapabilities?: {
     touch?: boolean;
     hover?: boolean;
-  }
+  };
   /** Safe area boundaries in pixels */
   safeAreaInsets?: {
     top: number;
@@ -742,11 +743,11 @@ The `HostContext` provides sizing information via `containerDimensions`:
 
 #### Dimension Modes
 
-| Mode | Dimensions Field | Meaning |
-|------|-----------------|---------|
-| Fixed | `height` or `width` | Host controls the size. View should fill the available space. |
-| Flexible | `maxHeight` or `maxWidth` | View controls the size, up to the specified maximum. |
-| Unbounded | Field omitted | View controls the size with no limit. |
+| Mode      | Dimensions Field          | Meaning                                                       |
+| --------- | ------------------------- | ------------------------------------------------------------- |
+| Fixed     | `height` or `width`       | Host controls the size. View should fill the available space. |
+| Flexible  | `maxHeight` or `maxWidth` | View controls the size, up to the specified maximum.          |
+| Unbounded | Field omitted             | View controls the size with no limit.                         |
 
 These modes can be combined independently. For example, a host might specify a fixed width but flexible height, allowing the View to grow vertically based on content.
 
@@ -763,7 +764,10 @@ if (containerDimensions) {
   if ("height" in containerDimensions) {
     // Fixed height: fill the container
     document.documentElement.style.height = "100vh";
-  } else if ("maxHeight" in containerDimensions && containerDimensions.maxHeight) {
+  } else if (
+    "maxHeight" in containerDimensions &&
+    containerDimensions.maxHeight
+  ) {
     // Flexible with max: let content determine size, up to max
     document.documentElement.style.maxHeight = `${containerDimensions.maxHeight}px`;
   }
@@ -773,7 +777,10 @@ if (containerDimensions) {
   if ("width" in containerDimensions) {
     // Fixed width: fill the container
     document.documentElement.style.width = "100vw";
-  } else if ("maxWidth" in containerDimensions && containerDimensions.maxWidth) {
+  } else if (
+    "maxWidth" in containerDimensions &&
+    containerDimensions.maxWidth
+  ) {
     // Flexible with max: let content determine size, up to max
     document.documentElement.style.maxWidth = `${containerDimensions.maxWidth}px`;
   }
@@ -846,11 +853,13 @@ Hosts notify views of display mode changes via `ui/notifications/host-context-ch
 #### Requirements
 
 **View behavior:**
+
 - View MUST declare all display modes it supports in `appCapabilities.availableDisplayModes` during initialization.
 - View MUST check if the requested mode is in `availableDisplayModes` from host context before requesting a mode change.
 - View MUST handle the response mode differing from the requested mode.
 
 **Host behavior:**
+
 - Host MUST NOT switch the View to a display mode that does not appear in its `appCapabilities.availableDisplayModes`, if set.
 - Host MUST return the resulting mode (whether updated or not) in the response to `ui/request-display-mode`.
 - If the requested mode is not available, Host SHOULD return the current display mode in the response.
@@ -965,6 +974,7 @@ type McpUiStyleVariableKey =
 #### View Behavior
 
 - Views should set default fallback values for the set of these variables that they use, to account for hosts who don't pass some or all style variables. This ensures graceful degradation when hosts omit `styles` or specific variables:
+
 ```
 :root {
   --color-text-primary: light-dark(#171717, #000000);
@@ -972,8 +982,9 @@ type McpUiStyleVariableKey =
   ...
 }
 ```
+
 - Views can use the `applyHostStyleVariables` utility (or `useHostStyleVariables` if they prefer a React hook) to easily populate the host-provided CSS variables into their style sheet
-- Views can use the `applyDocumentTheme` utility (or `useDocumentTheme` if they prefer a React hook) to easily respond to Host Context `theme` changes in a way that is compatible with the host's light/dark color variables 
+- Views can use the `applyDocumentTheme` utility (or `useDocumentTheme` if they prefer a React hook) to easily respond to Host Context `theme` changes in a way that is compatible with the host's light/dark color variables
 
 Example usage of standardized CSS variables:
 
@@ -1125,10 +1136,11 @@ MCP Apps run in sandboxed iframes where direct file downloads are blocked (`allo
 The `contents` array uses standard MCP resource types (`EmbeddedResource` and `ResourceLink`), avoiding custom content formats. For `EmbeddedResource`, content is inline via `text` (UTF-8) or `blob` (base64). For `ResourceLink`, the host can retrieve the content directly from the URI.
 
 Host behavior:
-* Host SHOULD show a confirmation dialog before initiating the download.
-* For `EmbeddedResource`, host SHOULD derive the filename from the last segment of `resource.uri`.
-* Host MAY reject the download based on security policy, file size limits, or user preferences.
-* Host SHOULD sanitize filenames to prevent path traversal.
+
+- Host SHOULD show a confirmation dialog before initiating the download.
+- For `EmbeddedResource`, host SHOULD derive the filename from the last segment of `resource.uri`.
+- Host MAY reject the download based on security policy, file size limits, or user preferences.
+- Host SHOULD sanitize filenames to prevent path traversal.
 
 `ui/message` - Send message content to the host's chat interface
 
@@ -1164,9 +1176,11 @@ Host behavior:
   }
 }
 ```
+
 Host behavior:
-* Host SHOULD add the message to the conversation context, preserving the specified role.
-* Host MAY request user consent.
+
+- Host SHOULD add the message to the conversation context, preserving the specified role.
+- Host MAY request user consent.
 
 `ui/request-display-mode` - Request host to change display mode
 
@@ -1229,6 +1243,7 @@ The View MAY send this request to update the Host's model context. This context 
 This event serves a different use case from `notifications/message` (logging) and `ui/message` (which also trigger follow-ups).
 
 Host behavior:
+
 - SHOULD provide the context to the model in future turns
 - MAY overwrite the previous model context with the new update
 - MAY defer sending the context to the model until the next user message (including `ui/message`)
@@ -1278,6 +1293,7 @@ When Apps declare the `tools` capability, the Host can send standard MCP tool re
 ```
 
 **App Behavior:**
+
 - Apps MUST implement `oncalltool` handler if they declare `tools` capability
 - Apps SHOULD validate tool names and arguments
 - Apps MAY use `app.registerTool()` SDK helper for automatic validation
@@ -1308,19 +1324,21 @@ When Apps declare the `tools` capability, the Host can send standard MCP tool re
 ```
 
 **Tool Structure** (identical to [core MCP `Tool`](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool)):
+
 ```typescript
 interface Tool {
-  name: string;                    // Unique tool identifier
-  title?: string;                  // Display name
-  description?: string;            // Human-readable description
-  inputSchema: object;             // JSON Schema for arguments
-  outputSchema?: object;           // JSON Schema for structuredContent
-  annotations?: ToolAnnotations;   // MCP tool annotations (e.g., readOnlyHint)
+  name: string; // Unique tool identifier
+  title?: string; // Display name
+  description?: string; // Human-readable description
+  inputSchema: object; // JSON Schema for arguments
+  outputSchema?: object; // JSON Schema for structuredContent
+  annotations?: ToolAnnotations; // MCP tool annotations (e.g., readOnlyHint)
   _meta?: object;
 }
 ```
 
 **App Behavior:**
+
 - Apps MUST implement `onlisttools` handler if they declare `tools` capability
 - Apps SHOULD return complete tool metadata including schemas
 - Apps MAY filter tools based on context or permissions
@@ -1455,6 +1473,7 @@ The View SHOULD send this notification when rendered content body size changes (
 The View MAY send this notification to request that the host tear it down. This enables View-initiated teardown flows (e.g., user clicks a "Done" button in the View).
 
 **Host behavior:**
+
 - Host MAY defer or ignore the teardown request.
 - If the Host accepts the request, it MUST follow the graceful termination process by sending `ui/resource-teardown` to the View. The Host SHOULD wait for a response before tearing down the resource (to prevent data loss).
 
@@ -1743,28 +1762,30 @@ Apps can register their own tools that hosts and agents can call, making apps **
 #### Motivation: Semantic Introspection
 
 Without tool registration, apps are opaque to the model:
+
 - The host renders the app in a sandboxed iframe and has no guaranteed access to its internals — apps may embed further cross-origin iframes (via `frameDomains`), and even where same-origin, DOM access is not part of the host↔app contract
 - The model therefore cannot query app state or discover what operations the app supports
 
 With tool registration, apps expose a semantic interface:
+
 - The model discovers available operations via `tools/list`
 - The model queries app state via tools (e.g., `get_board_state`)
 - The model executes actions via tools (e.g., `make_move`)
 - Apps return structured data rather than relying on the host to interpret rendered output
 
-This is *pull*-based and complements the *push*-based [`ui/update-model-context`](#uiupdate-model-context) request already defined in this spec (and analogous mechanisms elsewhere, e.g. OAI Apps SDK's [`setWidgetState()`](https://developers.openai.com/apps-sdk/reference/sdk#setwidgetstate)). Push lets an app proactively keep the model's context current; pull lets the agent query and command the app on demand. Apps may use either or both.
+This is _pull_-based and complements the _push_-based [`ui/update-model-context`](#uiupdate-model-context) request already defined in this spec (and analogous mechanisms elsewhere, e.g. OAI Apps SDK's [`setWidgetState()`](https://developers.openai.com/apps-sdk/reference/sdk#setwidgetstate)). Push lets an app proactively keep the model's context current; pull lets the agent query and command the app on demand. Apps may use either or both.
 
 #### App Tool Registration
 
 Apps register tools using the SDK's `registerTool()` method:
 
 ```typescript
-import { App } from '@modelcontextprotocol/ext-apps';
-import { z } from 'zod';
+import { App } from "@modelcontextprotocol/ext-apps";
+import { z } from "zod";
 
 const app = new App(
   { name: "TicTacToe", version: "1.0.0" },
-  { tools: { listChanged: true } }  // Declare tool capability
+  { tools: { listChanged: true } }, // Declare tool capability
 );
 
 // Register a tool with schema validation
@@ -1774,15 +1795,15 @@ const moveTool = app.registerTool(
     description: "Make a move in the tic-tac-toe game",
     inputSchema: z.object({
       position: z.number().int().min(0).max(8),
-      player: z.enum(['X', 'O'])
+      player: z.enum(["X", "O"]),
     }),
     outputSchema: z.object({
       board: z.array(z.string()).length(9),
-      winner: z.enum(['X', 'O', 'draw', null]).nullable()
+      winner: z.enum(["X", "O", "draw", null]).nullable(),
     }),
     annotations: {
-      readOnlyHint: false  // This tool has side effects
-    }
+      readOnlyHint: false, // This tool has side effects
+    },
   },
   async (params) => {
     // Validate and execute move
@@ -1790,16 +1811,18 @@ const moveTool = app.registerTool(
     const winner = checkWinner(newBoard);
 
     return {
-      content: [{
-        type: "text",
-        text: `Move made at position ${params.position}`
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Move made at position ${params.position}`,
+        },
+      ],
       structuredContent: {
         board: newBoard,
-        winner
-      }
+        winner,
+      },
     };
-  }
+  },
 );
 
 await app.connect(new PostMessageTransport(window.parent));
@@ -1807,14 +1830,14 @@ await app.connect(new PostMessageTransport(window.parent));
 
 **Registration Options:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Unique tool identifier |
-| `description` | string | No | Human-readable description for agent |
-| `inputSchema` | [Standard Schema](https://standardschema.dev/) | No | Validates arguments; serialized to JSON Schema for `tools/list` |
-| `outputSchema` | [Standard Schema](https://standardschema.dev/) | No | Validates `structuredContent` |
-| `annotations` | ToolAnnotations | No | MCP tool hints (e.g., `readOnlyHint`) |
-| `_meta` | object | No | Custom metadata |
+| Field          | Type                                           | Required | Description                                                     |
+| -------------- | ---------------------------------------------- | -------- | --------------------------------------------------------------- |
+| `name`         | string                                         | Yes      | Unique tool identifier                                          |
+| `description`  | string                                         | No       | Human-readable description for agent                            |
+| `inputSchema`  | [Standard Schema](https://standardschema.dev/) | No       | Validates arguments; serialized to JSON Schema for `tools/list` |
+| `outputSchema` | [Standard Schema](https://standardschema.dev/) | No       | Validates `structuredContent`                                   |
+| `annotations`  | ToolAnnotations                                | No       | MCP tool hints (e.g., `readOnlyHint`)                           |
+| `_meta`        | object                                         | No       | Custom metadata                                                 |
 
 Apps can also implement tool handling manually without the SDK:
 
@@ -1822,16 +1845,19 @@ Apps can also implement tool handling manually without the SDK:
 app.oncalltool = async (params, extra) => {
   if (params.name === "tictactoe_move") {
     // Manual validation
-    if (typeof params.arguments?.position !== 'number') {
+    if (typeof params.arguments?.position !== "number") {
       throw new Error("Invalid position");
     }
 
     // Execute tool
-    const newBoard = makeMove(params.arguments.position, params.arguments.player);
+    const newBoard = makeMove(
+      params.arguments.position,
+      params.arguments.player,
+    );
 
     return {
       content: [{ type: "text", text: "Move made" }],
-      structuredContent: { board: newBoard }
+      structuredContent: { board: newBoard },
     };
   }
 
@@ -1848,12 +1874,12 @@ app.onlisttools = async () => {
           type: "object",
           properties: {
             position: { type: "number", minimum: 0, maximum: 8 },
-            player: { type: "string", enum: ["X", "O"] }
+            player: { type: "string", enum: ["X", "O"] },
           },
-          required: ["position", "player"]
-        }
-      }
-    ]
+          required: ["position", "player"],
+        },
+      },
+    ],
   };
 };
 ```
@@ -1882,7 +1908,7 @@ When a tool is disabled/enabled, the app automatically sends `notifications/tool
 // Update tool description or schema
 tool.update({
   description: "New description",
-  inputSchema: newSchema
+  inputSchema: newSchema,
 });
 ```
 
@@ -1911,14 +1937,14 @@ app.registerTool(
   {
     inputSchema: z.object({
       query: z.string().min(1).max(100),
-      limit: z.number().int().positive().default(10)
-    })
+      limit: z.number().int().positive().default(10),
+    }),
   },
   async (params) => {
     // params.query is guaranteed to be a string (1-100 chars)
     // params.limit is guaranteed to be a positive integer (default 10)
     return performSearch(params.query, params.limit);
-  }
+  },
 );
 ```
 
@@ -1931,19 +1957,19 @@ app.registerTool(
   "get_status",
   {
     outputSchema: z.object({
-      status: z.enum(['ready', 'busy', 'error']),
-      timestamp: z.string().datetime()
-    })
+      status: z.enum(["ready", "busy", "error"]),
+      timestamp: z.string().datetime(),
+    }),
   },
   async () => {
     return {
       content: [{ type: "text", text: "Status retrieved" }],
       structuredContent: {
-        status: 'ready',
-        timestamp: new Date().toISOString()
-      }
+        status: "ready",
+        timestamp: new Date().toISOString(),
+      },
     };
-  }
+  },
 );
 ```
 
@@ -1954,45 +1980,48 @@ If the callback returns data that doesn't match `outputSchema`, the tool returns
 This example demonstrates how apps expose semantic interfaces through tools:
 
 ```typescript
-import { App } from '@modelcontextprotocol/ext-apps';
-import { z } from 'zod';
+import { App } from "@modelcontextprotocol/ext-apps";
+import { z } from "zod";
 
 // Game state
-let board: Array<'X' | 'O' | null> = Array(9).fill(null);
-let currentPlayer: 'X' | 'O' = 'X';
+let board: Array<"X" | "O" | null> = Array(9).fill(null);
+let currentPlayer: "X" | "O" = "X";
 let moveHistory: number[] = [];
 
 const app = new App(
   { name: "TicTacToe", version: "1.0.0" },
-  { tools: { listChanged: true } }
+  { tools: { listChanged: true } },
 );
 
 // Agent can query semantic state directly
 app.registerTool(
   "get_board_state",
   {
-    description: "Get current game state including board, current player, and winner",
+    description:
+      "Get current game state including board, current player, and winner",
     outputSchema: z.object({
-      board: z.array(z.enum(['X', 'O', null])).length(9),
-      currentPlayer: z.enum(['X', 'O']),
-      winner: z.enum(['X', 'O', 'draw', null]).nullable(),
-      moveHistory: z.array(z.number())
-    })
+      board: z.array(z.enum(["X", "O", null])).length(9),
+      currentPlayer: z.enum(["X", "O"]),
+      winner: z.enum(["X", "O", "draw", null]).nullable(),
+      moveHistory: z.array(z.number()),
+    }),
   },
   async () => {
     return {
-      content: [{
-        type: "text",
-        text: `Board: ${board.map(c => c || '-').join('')}, Player: ${currentPlayer}`
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Board: ${board.map((c) => c || "-").join("")}, Player: ${currentPlayer}`,
+        },
+      ],
       structuredContent: {
         board,
         currentPlayer,
         winner: checkWinner(board),
-        moveHistory
-      }
+        moveHistory,
+      },
     };
-  }
+  },
 );
 
 // Agent can execute moves
@@ -2001,37 +2030,40 @@ app.registerTool(
   {
     description: "Place a piece at the specified position",
     inputSchema: z.object({
-      position: z.number().int().min(0).max(8)
+      position: z.number().int().min(0).max(8),
     }),
-    annotations: { readOnlyHint: false }
+    annotations: { readOnlyHint: false },
   },
   async ({ position }) => {
     if (board[position] !== null) {
       return {
         content: [{ type: "text", text: "Position already taken" }],
-        isError: true
+        isError: true,
       };
     }
 
     board[position] = currentPlayer;
     moveHistory.push(position);
     const winner = checkWinner(board);
-    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+    currentPlayer = currentPlayer === "X" ? "O" : "X";
 
     return {
-      content: [{
-        type: "text",
-        text: `Player ${board[position]} moved to position ${position}` +
-              (winner ? `. ${winner} wins!` : '')
-      }],
+      content: [
+        {
+          type: "text",
+          text:
+            `Player ${board[position]} moved to position ${position}` +
+            (winner ? `. ${winner} wins!` : ""),
+        },
+      ],
       structuredContent: {
         board,
         currentPlayer,
         winner,
-        moveHistory
-      }
+        moveHistory,
+      },
     };
-  }
+  },
 );
 
 // Agent can reset game
@@ -2039,27 +2071,34 @@ app.registerTool(
   "reset_game",
   {
     description: "Reset the game board to initial state",
-    annotations: { readOnlyHint: false }
+    annotations: { readOnlyHint: false },
   },
   async () => {
     board = Array(9).fill(null);
-    currentPlayer = 'X';
+    currentPlayer = "X";
     moveHistory = [];
 
     return {
       content: [{ type: "text", text: "Game reset" }],
-      structuredContent: { board, currentPlayer, moveHistory }
+      structuredContent: { board, currentPlayer, moveHistory },
     };
-  }
+  },
 );
 
 await app.connect(new PostMessageTransport(window.parent));
 
-function checkWinner(board: Array<'X' | 'O' | null>): 'X' | 'O' | 'draw' | null {
+function checkWinner(
+  board: Array<"X" | "O" | null>,
+): "X" | "O" | "draw" | null {
   const lines = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8],  // rows
-    [0, 3, 6], [1, 4, 7], [2, 5, 8],  // columns
-    [0, 4, 8], [2, 4, 6]              // diagonals
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8], // rows
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8], // columns
+    [0, 4, 8],
+    [2, 4, 6], // diagonals
   ];
 
   for (const [a, b, c] of lines) {
@@ -2068,7 +2107,7 @@ function checkWinner(board: Array<'X' | 'O' | null>): 'X' | 'O' | 'draw' | null 
     }
   }
 
-  return board.every(cell => cell !== null) ? 'draw' : null;
+  return board.every((cell) => cell !== null) ? "draw" : null;
 }
 ```
 
@@ -2082,7 +2121,7 @@ const { tools } = await bridge.sendListTools({});
 // 2. Query semantic state (not visual/DOM)
 const state = await bridge.sendCallTool({
   name: "get_board_state",
-  arguments: {}
+  arguments: {},
 });
 // → { board: [null, null, null, ...], currentPlayer: 'X', winner: null }
 
@@ -2090,14 +2129,14 @@ const state = await bridge.sendCallTool({
 if (state.structuredContent.board[4] === null) {
   await bridge.sendCallTool({
     name: "make_move",
-    arguments: { position: 4 }
+    arguments: { position: 4 },
   });
 }
 
 // 4. Query updated state
 const newState = await bridge.sendCallTool({
   name: "get_board_state",
-  arguments: {}
+  arguments: {},
 });
 // → { board: [null, null, null, null, 'X', null, ...], currentPlayer: 'O', ... }
 ```
@@ -2125,7 +2164,7 @@ Host/Agent calls app-registered tools:
 // Host calls app tool
 const result = await bridge.sendCallTool({
   name: "tictactoe_move",
-  arguments: { position: 4 }
+  arguments: { position: 4 },
 });
 ```
 
@@ -2133,13 +2172,13 @@ Requires app `tools` capability.
 
 **Key Distinction:**
 
-| Aspect | Server Tools | App Tools |
-|--------|-------------|-----------|
-| **Lifetime** | Persistent (server process) | Ephemeral (while app loaded) |
-| **Source** | MCP Server | App JavaScript |
-| **Trust** | Trusted | Sandboxed (untrusted) |
-| **Discovery** | Server `tools/list` | App `tools/list` (when app declares capability) |
-| **When Available** | Always | Only while app is loaded |
+| Aspect             | Server Tools                | App Tools                                       |
+| ------------------ | --------------------------- | ----------------------------------------------- |
+| **Lifetime**       | Persistent (server process) | Ephemeral (while app loaded)                    |
+| **Source**         | MCP Server                  | App JavaScript                                  |
+| **Trust**          | Trusted                     | Sandboxed (untrusted)                           |
+| **Discovery**      | Server `tools/list`         | App `tools/list` (when app declares capability) |
+| **When Available** | Always                      | Only while app is loaded                        |
 
 #### Use Cases
 
@@ -2158,6 +2197,7 @@ Requires app `tools` capability.
 App tools run in **sandboxed iframes** (untrusted). See Security Implications section for detailed mitigations.
 
 Key considerations:
+
 - App tools could provide misleading descriptions
 - Tool namespacing needed to avoid conflicts with server tools
 - Resource limits (max tools, execution timeouts)
@@ -2169,6 +2209,7 @@ Key considerations:
 This feature is inspired by [WebMCP](https://github.com/webmachinelearning/webmcp) (W3C incubation), which proposes allowing web pages to register JavaScript functions as tools via `navigator.modelContext.registerTool()`.
 
 Key differences:
+
 - **WebMCP**: General web pages, browser API, manifest-based discovery
 - **This spec**: MCP Apps, standard MCP messages, capability-based negotiation
 
@@ -2178,7 +2219,10 @@ See [ext-apps#35](https://github.com/modelcontextprotocol/ext-apps/issues/35) fo
 
 ### Client\<\>Server Capability Negotiation
 
-Clients and servers negotiate MCP Apps support through the standard MCP extensions capability mechanism (defined in SEP-1724).
+Clients and servers negotiate MCP Apps support through the standard MCP
+extensions capability mechanism (defined in SEP-1724). Features of MCP Apps
+are settings of the existing `io.modelcontextprotocol/ui` extension. They do
+not introduce additional extension identifiers.
 
 #### Client (Host) Capabilities
 
@@ -2188,11 +2232,15 @@ Clients advertise MCP Apps support in the initialize request using the extension
 {
   "method": "initialize",
   "params": {
-    "protocolVersion": "2024-11-05",
+    "protocolVersion": "2025-11-25",
     "capabilities": {
+      "elicitation": {
+        "form": {}
+      },
       "extensions": {
         "io.modelcontextprotocol/ui": {
-          "mimeTypes": ["text/html;profile=mcp-app"]
+          "mimeTypes": ["text/html;profile=mcp-app"],
+          "elicitation": {}
         }
       }
     },
@@ -2206,35 +2254,82 @@ Clients advertise MCP Apps support in the initialize request using the extension
 
 **Extension Settings:**
 
-- `mimeTypes`: Array of supported content types (REQUIRED, e.g., `["text/html;profile=mcp-app"]`)
+- `mimeTypes`: Array of supported content types (REQUIRED, e.g.,
+  `["text/html;profile=mcp-app"]`)
+- `elicitation`: Client can use an MCP App to render and resolve form-mode
+  `elicitation/create` requests that identify a UI resource
 
 Future versions may add additional settings:
 
 - `features`: Specific feature support (e.g., `["streaming", "persistence"]`)
 - `sandboxPolicies`: Supported sandbox attribute configurations
 
+#### Server Capabilities
+
+A server that may attach an MCP App to a form-mode elicitation advertises the
+same setting in its initialize result:
+
+```json
+{
+  "result": {
+    "protocolVersion": "2025-11-25",
+    "capabilities": {
+      "extensions": {
+        "io.modelcontextprotocol/ui": {
+          "elicitation": {}
+        }
+      }
+    },
+    "serverInfo": {
+      "name": "example-server",
+      "version": "1.0.0"
+    }
+  }
+}
+```
+
+App-rendered elicitation is negotiated only when all of the following are
+true:
+
+1. The client advertises the core `elicitation.form` capability.
+2. The client advertises `text/html;profile=mcp-app` in
+   `io.modelcontextprotocol/ui.mimeTypes`.
+3. The client advertises `io.modelcontextprotocol/ui.elicitation`.
+4. The server advertises `io.modelcontextprotocol/ui.elicitation`.
+
+A MIME type match alone does not negotiate app-rendered elicitation. This
+explicit two-sided setting lets either peer use MCP Apps without also opting
+in to app-rendered elicitation.
+
 #### Server Behavior
 
 Servers SHOULD check client capabilities before registering UI-enabled tools. The SDK provides the `getUiCapability` helper for this:
 
 ```typescript
-import { getUiCapability, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
+import {
+  getUiCapability,
+  RESOURCE_MIME_TYPE,
+} from "@modelcontextprotocol/ext-apps/server";
 
 const uiCap = getUiCapability(clientCapabilities);
 if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
   // Register tools with UI templates
   server.registerTool("get_weather", {
     description: "Get weather with interactive dashboard",
-    inputSchema: { /* ... */ },
+    inputSchema: {
+      /* ... */
+    },
     _meta: {
-      ui: { resourceUri: "ui://weather-server/dashboard" }
-    }
+      ui: { resourceUri: "ui://weather-server/dashboard" },
+    },
   });
 } else {
   // Register text-only version
   server.registerTool("get_weather", {
     description: "Get weather as text",
-    inputSchema: { /* ... */ }
+    inputSchema: {
+      /* ... */
+    },
     // No UI metadata
   });
 }
@@ -2246,7 +2341,159 @@ if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
 - Tools MUST return meaningful content array even when UI is available
 - Servers MAY register different tool variants based on host capabilities
 
-#### App (Guest UI) Capabilities
+### App-Rendered Elicitation
+
+When app-rendered elicitation is negotiated, a server can associate an MCP App
+resource with a standard form-mode `elicitation/create` request. This feature
+uses the existing MCP Apps extension, the standard MCP elicitation request and
+result, and the existing View↔Host JSON-RPC channel. It defines no new method,
+result, or extension identifier.
+
+#### Associating an App with an Elicitation
+
+The server attaches the app resource URI at `_meta.ui.resourceUri`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "method": "elicitation/create",
+  "params": {
+    "mode": "form",
+    "message": "Choose a delivery window",
+    "requestedSchema": {
+      "type": "object",
+      "properties": {
+        "window": {
+          "type": "string",
+          "oneOf": [
+            { "const": "morning", "title": "Morning" },
+            { "const": "afternoon", "title": "Afternoon" }
+          ]
+        }
+      },
+      "required": ["window"]
+    },
+    "_meta": {
+      "ui": {
+        "resourceUri": "ui://delivery/choose-window.html"
+      }
+    }
+  }
+}
+```
+
+`resourceUri` MUST be an absolute `ui://` URI. It is resolved against the same
+MCP server connection that sent the elicitation. A server MUST NOT attach this
+metadata unless app-rendered elicitation was negotiated.
+
+App rendering is defined only for form mode. A client MUST NOT route URL-mode
+elicitations to an MCP App under this setting.
+
+#### Host↔App Capability Negotiation
+
+The host and the selected app independently confirm that their View↔Host
+channel supports elicitation:
+
+```json
+{
+  "method": "ui/initialize",
+  "params": {
+    "protocolVersion": "2025-11-25",
+    "appInfo": {
+      "name": "delivery-window",
+      "version": "1.0.0"
+    },
+    "appCapabilities": {
+      "elicitation": {}
+    }
+  }
+}
+```
+
+```json
+{
+  "result": {
+    "protocolVersion": "2025-11-25",
+    "hostInfo": {
+      "name": "example-host",
+      "version": "1.0.0"
+    },
+    "hostCapabilities": {
+      "elicitation": {}
+    },
+    "hostContext": {}
+  }
+}
+```
+
+An app MUST advertise `appCapabilities.elicitation` before it receives an
+elicitation. A host MUST advertise `hostCapabilities.elicitation` before it
+forwards one. If either setting is absent, the host MUST use its native
+form-elicitation UI instead.
+
+#### Resolution Flow
+
+For each app-rendered elicitation, the client:
+
+1. Receives the standard form-mode `elicitation/create` request.
+2. Confirms that app-rendered elicitation was negotiated and validates
+   `_meta.ui.resourceUri`.
+3. Reads and validates the MCP App resource using the same server connection.
+4. Creates or selects an app instance that is bound to this exact request and
+   resource URI, then completes the `ui/initialize` handshake.
+5. If the app and host advertised their View↔Host `elicitation` settings,
+   forwards the unchanged `elicitation/create` request to that app instance.
+6. Validates the app's response as a standard MCP `ElicitResult` and returns it
+   unchanged to the server.
+
+For example, an app resolves the request by returning the standard result:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "result": {
+    "action": "accept",
+    "content": {
+      "window": "morning"
+    }
+  }
+}
+```
+
+The host remains the MCP client and policy enforcement point. The app does not
+connect to the server directly and does not introduce an app-specific result
+or callback method.
+
+The host MUST bind forwarding to the originating request, resource URI, and app
+instance. It MUST NOT forward to a global or "currently active" app bridge.
+This requirement also applies when multiple elicitations are in flight.
+Cancellation and timeout signals SHOULD be propagated across the bound
+View↔Host request.
+
+#### Validation, Fallback, and Retry
+
+The host MUST validate an accepted app result against the standard
+`ElicitResult` shape and the request's `requestedSchema` before returning it to
+the server.
+
+If the app resource is missing or invalid, cannot be loaded, fails to
+initialize, does not advertise `elicitation`, cannot complete the bridge
+request, or returns an invalid result, the host SHOULD fall back to its native
+form-elicitation UI. The original message and requested schema MUST be
+preserved.
+
+An app result with `action: "decline"` or `action: "cancel"` is a successful
+resolution and MUST be returned to the server. It MUST NOT trigger native
+fallback.
+
+Subsequent validation and retry use the core MCP elicitation flow. MCP Apps add
+no retry method. When the core protocol associates a retry with the same
+request, the host SHOULD preserve the app instance and its local state when
+policy and lifecycle permit.
+
+### App (Guest UI) Capability Negotiation
 
 Apps advertise their capabilities in the `ui/initialize` request to the host. When an app supports tool registration, it includes the `tools` capability:
 
@@ -2541,23 +2788,23 @@ const permissions = uiMeta?.permissions;
 
 const cspValue = `
   default-src 'none';
-  script-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
-  style-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
-  connect-src 'self' ${csp?.connectDomains?.join(' ') || ''};
-  img-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};
-  font-src 'self' ${csp?.resourceDomains?.join(' ') || ''};
-  media-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};
-  frame-src ${csp?.frameDomains?.join(' ') || "'none'"};
+  script-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(" ") || ""};
+  style-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(" ") || ""};
+  connect-src 'self' ${csp?.connectDomains?.join(" ") || ""};
+  img-src 'self' data: ${csp?.resourceDomains?.join(" ") || ""};
+  font-src 'self' ${csp?.resourceDomains?.join(" ") || ""};
+  media-src 'self' data: ${csp?.resourceDomains?.join(" ") || ""};
+  frame-src ${csp?.frameDomains?.join(" ") || "'none'"};
   object-src 'none';
-  base-uri ${csp?.baseUriDomains?.join(' ') || "'self'"};
+  base-uri ${csp?.baseUriDomains?.join(" ") || "'self'"};
 `;
 
 // Permission Policy for iframe allow attribute
 const allowList: string[] = [];
-if (permissions?.camera) allowList.push('camera');
-if (permissions?.microphone) allowList.push('microphone');
-if (permissions?.geolocation) allowList.push('geolocation');
-const allowAttribute = allowList.join(' ');
+if (permissions?.camera) allowList.push("camera");
+if (permissions?.microphone) allowList.push("microphone");
+if (permissions?.geolocation) allowList.push("geolocation");
+const allowAttribute = allowList.join(" ");
 ```
 
 **Security Requirements:**
@@ -2628,11 +2875,11 @@ Hosts SHOULD implement the following protections for app-provided tools:
 
 Hosts MAY implement different permission levels based on tool annotations:
 
-| Annotation          | Recommended Permission | Example           |
-|---------------------|------------------------|-------------------|
-| `readOnlyHint: true`| Auto-approve (with caution) | `get_board_state()` |
-| `readOnlyHint: false` | User confirmation required | `make_move()` |
-| No annotation       | User confirmation required (safe default) | Any tool |
+| Annotation            | Recommended Permission                    | Example             |
+| --------------------- | ----------------------------------------- | ------------------- |
+| `readOnlyHint: true`  | Auto-approve (with caution)               | `get_board_state()` |
+| `readOnlyHint: false` | User confirmation required                | `make_move()`       |
+| No annotation         | User confirmation required (safe default) | Any tool            |
 
 **App Tool Lifecycle:**
 

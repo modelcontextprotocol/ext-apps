@@ -67,6 +67,8 @@ export {
   type McpUiToolVisibility,
   type McpUiToolMeta,
   type McpUiClientCapabilities,
+  type McpUiServerCapabilities,
+  type McpUiElicitationMeta,
 } from "./spec.types.js";
 
 // Import types needed for protocol type unions (not re-exported, just used internally)
@@ -134,6 +136,9 @@ export {
   McpUiRequestDisplayModeResultSchema,
   McpUiToolVisibilitySchema,
   McpUiToolMetaSchema,
+  McpUiClientCapabilitiesSchema,
+  McpUiServerCapabilitiesSchema,
+  McpUiElicitationMetaSchema,
 } from "./generated/schema.js";
 
 // Re-export SDK types used in protocol type unions
@@ -144,6 +149,8 @@ import {
   CreateMessageResult,
   CreateMessageResultWithTools,
   EmptyResult,
+  ElicitRequest,
+  ElicitResult,
   ListPromptsRequest,
   ListPromptsResult,
   ListResourcesRequest,
@@ -186,6 +193,7 @@ export type AppRequest =
   | ReadResourceRequest
   | ListPromptsRequest
   | CreateMessageRequest
+  | ElicitRequest
   | PingRequest;
 
 /**
@@ -237,4 +245,5 @@ export type AppResult =
   | ListPromptsResult
   | CreateMessageResult
   | CreateMessageResultWithTools
+  | ElicitResult
   | EmptyResult;

@@ -54,6 +54,12 @@
             ],
             "description": "Display mode for UI presentation."
           }
+        },
+        "elicitation": {
+          "description": "App can render and resolve form-mode `elicitation/create`\nrequests using the standard MCP request and result shapes.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -68,6 +74,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "elicitation": {
+          "description": "Client can use an MCP App to render form-mode elicitations\nwhen a request identifies a UI resource.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -302,6 +314,18 @@
       },
       "additionalProperties": {}
     },
+    "McpUiElicitationMeta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "resourceUri": {
+          "type": "string",
+          "description": "Absolute `ui://` URI of the MCP App resource that can render\nand resolve this elicitation."
+        }
+      },
+      "required": ["resourceUri"],
+      "additionalProperties": false
+    },
     "McpUiHostCapabilities": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -531,6 +555,12 @@
               "additionalProperties": false
             }
           },
+          "additionalProperties": false
+        },
+        "elicitation": {
+          "description": "Host can forward form-mode `elicitation/create` requests to\nthis app and return its standard MCP `ElicitResult` to the server.",
+          "type": "object",
+          "properties": {},
           "additionalProperties": false
         }
       },
@@ -2600,6 +2630,12 @@
                     ],
                     "description": "Display mode for UI presentation."
                   }
+                },
+                "elicitation": {
+                  "description": "App can render and resolve form-mode `elicitation/create`\nrequests using the standard MCP request and result shapes.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false,
@@ -2902,6 +2938,12 @@
                   "additionalProperties": false
                 }
               },
+              "additionalProperties": false
+            },
+            "elicitation": {
+              "description": "Host can forward form-mode `elicitation/create` requests to\nthis app and return its standard MCP `ElicitResult` to the server.",
+              "type": "object",
+              "properties": {},
               "additionalProperties": false
             }
           },
@@ -4439,6 +4481,19 @@
         }
       },
       "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiServerCapabilities": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "elicitation": {
+          "description": "Server may attach an MCP App resource to form-mode\n`elicitation/create` requests.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     },
     "McpUiSizeChangedNotification": {
