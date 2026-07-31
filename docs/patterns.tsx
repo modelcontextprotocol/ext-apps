@@ -360,6 +360,61 @@ function hostContextReact() {
 }
 
 /**
+ * Example: Passing contextual launch data (server-side)
+ */
+function contextualLaunchServer(server: McpServer) {
+  //#region contextualLaunchServer
+  registerAppTool(
+    server,
+    "open-discussion",
+    {
+      title: "Open protocol discussion",
+      description: "Open a protocol discussion in an interactive view",
+      inputSchema: {
+        discussionNumber: z.number().int().positive(),
+        view: z.enum(["summary", "debate", "migration-feedback"]),
+        contextHandle: z.string().optional(),
+      },
+      _meta: {
+        ui: { resourceUri: "ui://protocol/discussion.html" },
+      },
+    },
+    async ({ discussionNumber, view, contextHandle }) => ({
+      content: [
+        { type: "text", text: `Opened discussion #${discussionNumber}` },
+      ],
+      structuredContent: { discussionNumber, view, contextHandle },
+    }),
+  );
+  //#endregion contextualLaunchServer
+}
+
+/**
+ * Example: Passing contextual launch data (client-side)
+ */
+function contextualLaunchClient(
+  app: App,
+  renderDiscussion: (input: {
+    discussionNumber: number;
+    view: "summary" | "debate" | "migration-feedback";
+    contextHandle?: string;
+  }) => void,
+) {
+  //#region contextualLaunchClient
+  interface DiscussionLaunchInput {
+    discussionNumber: number;
+    view: "summary" | "debate" | "migration-feedback";
+    contextHandle?: string;
+  }
+
+  app.ontoolinput = ({ arguments: input }) => {
+    const launch = input as unknown as DiscussionLaunchInput;
+    renderDiscussion(launch);
+  };
+  //#endregion contextualLaunchClient
+}
+
+/**
  * Example: Persisting view state (server-side)
  */
 function persistViewStateServer(url: string, title: string, pageCount: number) {
@@ -464,6 +519,8 @@ void binaryBlobResourceServer;
 void binaryBlobResourceClient;
 void hostContextVanillaJs;
 void hostContextReact;
+void contextualLaunchServer;
+void contextualLaunchClient;
 void persistViewStateServer;
 void persistViewState;
 void visibilityBasedPause;

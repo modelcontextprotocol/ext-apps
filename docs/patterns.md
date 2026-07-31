@@ -503,6 +503,74 @@ await app.sendMessage({
 > [!NOTE]
 > For a full example that implements this pattern, see: [`examples/transcript-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/transcript-server).
 
+## Passing contextual launch data
+
+Use tool arguments for app-specific launch data, such as the item to open, the
+initial view, or an opaque handle for server-side state. The Host delivers the
+arguments to the View in `ui/notifications/tool-input`, so the same App can
+render different entry points without a separate launch protocol.
+
+**Server-side**: Define the launch data in the tool's input schema. Prefer
+bounded values and opaque handles over embedding sensitive state.
+
+<!-- prettier-ignore -->
+```tsx source="./patterns.tsx#contextualLaunchServer"
+registerAppTool(
+  server,
+  "open-discussion",
+  {
+    title: "Open protocol discussion",
+    description: "Open a protocol discussion in an interactive view",
+    inputSchema: {
+      discussionNumber: z.number().int().positive(),
+      view: z.enum(["summary", "debate", "migration-feedback"]),
+      contextHandle: z.string().optional(),
+    },
+    _meta: {
+      ui: { resourceUri: "ui://protocol/discussion.html" },
+    },
+  },
+  async ({ discussionNumber, view, contextHandle }) => ({
+    content: [
+      { type: "text", text: `Opened discussion #${discussionNumber}` },
+    ],
+    structuredContent: { discussionNumber, view, contextHandle },
+  }),
+);
+```
+
+**Client-side**: Handle the complete tool input and render the requested entry
+point. Register the handler before connecting so the View does not miss the
+notification.
+
+<!-- prettier-ignore -->
+```ts source="./patterns.tsx#contextualLaunchClient"
+interface DiscussionLaunchInput {
+  discussionNumber: number;
+  view: "summary" | "debate" | "migration-feedback";
+  contextHandle?: string;
+}
+
+app.ontoolinput = ({ arguments: input }) => {
+  const launch = input as unknown as DiscussionLaunchInput;
+  renderDiscussion(launch);
+};
+```
+
+Tool arguments are application input, not proof of user identity or trusted
+launch provenance. Treat them as untrusted even when a Host or model supplied
+them. Use the MCP authorization flow for user identity, and resolve sensitive
+or durable state server-side from a short-lived, audience-bound opaque handle.
+Do not place credentials, raw conversation content, or personal data in launch
+arguments.
+
+If multiple tools point to the same UI resource, a Host can identify the
+invoking tool through `hostContext.toolInfo`. This field is currently optional,
+so an App that requires deterministic routing should also include an explicit
+discriminator such as `view` in its tool input. See
+[issue #492](https://github.com/modelcontextprotocol/ext-apps/issues/492) for
+the discussion about making invoking-tool information consistently available.
+
 ## Persisting view state
 
 For recoverable view state (e.g., current page in a PDF viewer, camera position in a map), use [`localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) with a stable identifier provided by the server.
