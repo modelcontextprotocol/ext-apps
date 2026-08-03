@@ -414,14 +414,11 @@ describe("elicitation UI metadata", () => {
     },
   };
 
-  it("attaches and reads an absolute ui:// resource URI", () => {
-    const enhanced = withElicitationUi(
-      params,
-      "ui://example/choose-option.html",
-    );
+  it("attaches and reads an absolute hierarchical ui:// resource URI", () => {
+    const enhanced = withElicitationUi(params, "ui://weather/view.html");
     expect(enhanced.requestedSchema).toEqual(params.requestedSchema);
     expect(getElicitationUiResourceUri(enhanced)).toBe(
-      "ui://example/choose-option.html",
+      "ui://weather/view.html",
     );
   });
 
@@ -440,5 +437,30 @@ describe("elicitation UI metadata", () => {
     expect(() => withElicitationUi(params, "https://example.com")).toThrow(
       "absolute ui://",
     );
+  });
+
+  it.each([
+    "ui:example/view.html",
+    "ui:///view.html",
+    "ui://",
+    "ui://[invalid",
+  ])("rejects invalid resource URI in the setter: %s", (resourceUri) => {
+    expect(() => withElicitationUi(params, resourceUri)).toThrow(
+      "absolute ui://",
+    );
+  });
+
+  it.each([
+    "ui:example/view.html",
+    "ui:///view.html",
+    "ui://",
+    "ui://[invalid",
+  ])("rejects invalid resource URI in the getter: %s", (resourceUri) => {
+    expect(() =>
+      getElicitationUiResourceUri({
+        ...params,
+        _meta: { ui: { resourceUri } },
+      }),
+    ).toThrow("absolute ui://");
   });
 });

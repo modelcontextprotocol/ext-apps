@@ -522,6 +522,26 @@ export function supportsAppElicitation(
   );
 }
 
+const ELICITATION_UI_URI_ERROR =
+  "Elicitation UI resourceUri must be an absolute ui:// URI";
+
+function validateElicitationUiResourceUri(resourceUri: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(resourceUri);
+  } catch {
+    throw new Error(ELICITATION_UI_URI_ERROR);
+  }
+
+  if (
+    parsed.protocol !== "ui:" ||
+    !/^ui:\/\//i.test(resourceUri) ||
+    parsed.host.length === 0
+  ) {
+    throw new Error(ELICITATION_UI_URI_ERROR);
+  }
+}
+
 /**
  * Attach an MCP App resource to a standard form-mode elicitation request.
  */
@@ -535,15 +555,7 @@ export function withElicitationUi(
     throw new Error("MCP Apps only support form-mode elicitations");
   }
 
-  let parsed: URL;
-  try {
-    parsed = new URL(resourceUri);
-  } catch {
-    throw new Error("Elicitation UI resourceUri must be an absolute ui:// URI");
-  }
-  if (parsed.protocol !== "ui:") {
-    throw new Error("Elicitation UI resourceUri must be an absolute ui:// URI");
-  }
+  validateElicitationUiResourceUri(resourceUri);
 
   const meta = params._meta ?? {};
   const ui =
@@ -578,14 +590,6 @@ export function getElicitationUiResourceUri(
     throw new Error("Elicitation UI resourceUri must be a string");
   }
 
-  let parsed: URL;
-  try {
-    parsed = new URL(resourceUri);
-  } catch {
-    throw new Error("Elicitation UI resourceUri must be an absolute ui:// URI");
-  }
-  if (parsed.protocol !== "ui:") {
-    throw new Error("Elicitation UI resourceUri must be an absolute ui:// URI");
-  }
+  validateElicitationUiResourceUri(resourceUri);
   return resourceUri;
 }
