@@ -559,7 +559,7 @@ interface McpUiAppCapabilities {
    * Display modes the app supports. See Display Modes section for details.
    * @example ["inline", "fullscreen"]
    */
-  availableDisplayModes?: Array<"inline" | "fullscreen" | "pip">;
+  availableDisplayModes?: Array<"inline" | "fullscreen" | "pip" | "split">;
 }
 ```
 
@@ -589,7 +589,7 @@ interface HostContext {
     };
   };
   /** How the View is currently displayed */
-  displayMode?: "inline" | "fullscreen" | "pip";
+  displayMode?: "inline" | "fullscreen" | "pip" | "split";
   /** Display modes the host supports */
   availableDisplayModes?: string[];
   /** Container dimensions for the iframe. Specify either width or maxWidth, and either height or maxHeight. */
@@ -805,12 +805,21 @@ Views using the SDK automatically send size-changed notifications via ResizeObse
 Views can be displayed in different modes depending on the host's capabilities and the view's declared support.
 
 ```typescript
-type McpUiDisplayMode = "inline" | "fullscreen" | "pip";
+type McpUiDisplayMode = "inline" | "fullscreen" | "pip" | "split";
 ```
 
 - **inline**: Default mode, embedded within the host's content flow
 - **fullscreen**: View takes over the full screen/window
 - **pip**: Picture-in-picture, floating overlay
+- **split**: View is displayed in a persistent, non-overlapping region while the host's primary conversational interface remains visible and interactive
+
+#### Split Mode
+
+In `split` mode, the View occupies a dedicated region of the host UI (e.g., a side panel) that does not overlap the host's primary conversational interface. Both remain visible and interactive at the same time, allowing users to keep referencing the View as the conversation continues.
+
+- Host controls the orientation, placement, and dimensions of the split region, how (and whether) it can be resized, and how many split Views it permits at once.
+- Entering or leaving `split` mode SHOULD NOT inherently recreate the current View: it is a presentation change of the already-rendered View, and its state SHOULD be preserved across the transition.
+- This mode does not define reusing Views across separate tool calls; each tool call still renders a new View instance.
 
 #### Declaring Support
 
@@ -1177,7 +1186,7 @@ Host behavior:
   id: 3,
   method: "ui/request-display-mode",
   params: {
-    mode: "inline" | "fullscreen" | "pip"  // Requested display mode
+    mode: "inline" | "fullscreen" | "pip" | "split"  // Requested display mode
   }
 }
 
@@ -1186,7 +1195,7 @@ Host behavior:
   jsonrpc: "2.0",
   id: 3,
   result: {
-    mode: "inline" | "fullscreen" | "pip"  // Actual display mode set
+    mode: "inline" | "fullscreen" | "pip" | "split"  // Actual display mode set
   }
 }
 ```

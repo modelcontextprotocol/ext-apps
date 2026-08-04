@@ -36,7 +36,7 @@ export type McpUiTheme = "light" | "dark";
 /**
  * @description Display mode for UI presentation.
  */
-export type McpUiDisplayMode = "inline" | "fullscreen" | "pip";
+export type McpUiDisplayMode = "inline" | "fullscreen" | "pip" | "split";
 
 /**
  * @description CSS variable keys available to MCP apps for theming.

@@ -3,7 +3,11 @@
  *
  * This app exercises every capability, callback, and result format combination.
  */
-import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import {
+  App,
+  type McpUiDisplayMode,
+  type McpUiHostContext,
+} from "@modelcontextprotocol/ext-apps";
 import "./global.css";
 import "./mcp-app.css";
 
@@ -99,6 +103,7 @@ const updateContextImageBtn = document.getElementById(
 const displayInlineBtn = document.getElementById("display-inline-btn")!;
 const displayFullscreenBtn = document.getElementById("display-fullscreen-btn")!;
 const displayPipBtn = document.getElementById("display-pip-btn")!;
+const displaySplitBtn = document.getElementById("display-split-btn")!;
 
 const linkUrlEl = document.getElementById("link-url") as HTMLInputElement;
 const openLinkBtn = document.getElementById("open-link-btn")!;
@@ -347,7 +352,10 @@ function handleHostContextChanged(ctx: McpUiHostContext): void {
 
 const app = new App(
   { name: "Debug App", version: "1.0.0" },
-  { tools: { listChanged: true } }, // Declare tools capability for oncalltool/onlisttools
+  {
+    tools: { listChanged: true }, // Declare tools capability for oncalltool/onlisttools
+    availableDisplayModes: ["inline", "fullscreen", "pip", "split"],
+  },
   { autoResize: false }, // We'll manage auto-resize ourselves for toggle demo
 );
 
@@ -513,9 +521,7 @@ updateContextImageBtn.addEventListener("click", async () => {
 // Display Mode Actions
 // ============================================================================
 
-async function requestDisplayMode(
-  mode: "inline" | "fullscreen" | "pip",
-): Promise<void> {
+async function requestDisplayMode(mode: McpUiDisplayMode): Promise<void> {
   try {
     const result = await app.requestDisplayMode({ mode });
     logEvent("display-mode-result", { mode, result });
@@ -529,6 +535,7 @@ displayFullscreenBtn.addEventListener("click", () =>
   requestDisplayMode("fullscreen"),
 );
 displayPipBtn.addEventListener("click", () => requestDisplayMode("pip"));
+displaySplitBtn.addEventListener("click", () => requestDisplayMode("split"));
 
 // ============================================================================
 // Link Action

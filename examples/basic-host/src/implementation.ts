@@ -1,4 +1,4 @@
-import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiDisplayMode, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -262,15 +262,19 @@ function hookInitializedCallback(appBridge: AppBridge): Promise<void> {
 export type ModelContext = McpUiUpdateModelContextRequest["params"];
 export type AppMessage = McpUiMessageRequest["params"];
 
+/** Display modes this host supports and advertises to apps. */
+const HOST_AVAILABLE_DISPLAY_MODES = ["inline", "fullscreen", "split"] as const satisfies readonly McpUiDisplayMode[];
+export type HostDisplayMode = (typeof HOST_AVAILABLE_DISPLAY_MODES)[number];
+
 export interface AppBridgeCallbacks {
   onContextUpdate?: (context: ModelContext | null) => void;
   onMessage?: (message: AppMessage) => void;
-  onDisplayModeChange?: (mode: "inline" | "fullscreen") => void;
+  onDisplayModeChange?: (mode: HostDisplayMode) => void;
 }
 
 export interface AppBridgeOptions {
   containerDimensions?: { maxHeight?: number; width?: number } | { height: number; width?: number };
-  displayMode?: "inline" | "fullscreen";
+  displayMode?: HostDisplayMode;
 }
 
 export function newAppBridge(
@@ -296,7 +300,7 @@ export function newAppBridge(
       },
       containerDimensions: options?.containerDimensions ?? { maxHeight: 6000 },
       displayMode: options?.displayMode ?? "inline",
-      availableDisplayModes: ["inline", "fullscreen"],
+      availableDisplayModes: [...HOST_AVAILABLE_DISPLAY_MODES],
     },
   });
 
@@ -395,7 +399,7 @@ export function newAppBridge(
   // Handle display mode change requests from the app
   appBridge.onrequestdisplaymode = async (params) => {
     log.info("Display mode request from MCP App:", params);
-    const newMode = params.mode === "fullscreen" ? "fullscreen" : "inline";
+    const newMode = HOST_AVAILABLE_DISPLAY_MODES.find((m) => m === params.mode) ?? "inline";
     // Update host context and notify the app
     appBridge.sendHostContextChange({
       displayMode: newMode,
