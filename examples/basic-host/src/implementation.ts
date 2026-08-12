@@ -88,11 +88,21 @@ export function hasAppHtml(toolCallInfo: ToolCallInfo): toolCallInfo is Required
 }
 
 
-export function callTool(
+/**
+ * Resolves URI template parameters like {param} with values from structuredContent
+ */
+function resolveUriParameters(uriTemplate: string, structuredContent: Record<string, unknown>): string {
+  return uriTemplate.replace(/\{(\w+)\}/g, (match, paramName) => {
+    const value = structuredContent[paramName];
+    return value !== undefined ? String(value) : match;
+  });
+}
+
+export async function callTool(
   serverInfo: ServerInfo,
   name: string,
   input: Record<string, unknown>,
-): ToolCallInfo {
+): Promise<ToolCallInfo> {
   log.info("Calling tool", name, "with input", input);
   const resultPromise = serverInfo.client.callTool({ name, arguments: input }) as Promise<CallToolResult>;
 
@@ -102,10 +112,17 @@ export function callTool(
   }
 
   const toolCallInfo: ToolCallInfo = { serverInfo, tool, input, resultPromise };
+  let result = await resultPromise;
 
   const uiResourceUri = getToolUiResourceUri(tool);
   if (uiResourceUri) {
-    toolCallInfo.appResourcePromise = getUiResource(serverInfo, uiResourceUri);
+    // Replace URL parameters with values from structuredContent
+    let resolvedUri = uiResourceUri;
+    if (result.structuredContent && typeof result.structuredContent === 'object') {
+      resolvedUri = resolveUriParameters(uiResourceUri, result.structuredContent);
+      log.info(`Resolved URI: ${uiResourceUri} -> ${resolvedUri}`);
+    }
+    toolCallInfo.appResourcePromise = getUiResource(serverInfo, resolvedUri);
   }
 
   return toolCallInfo;
