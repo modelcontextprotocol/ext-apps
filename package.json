@@ -38,6 +38,14 @@
       "types": "./dist/src/server/index.d.ts",
       "default": "./dist/src/server/index.js"
     },
+    "./conformance": {
+      "types": "./dist/src/conformance/index.d.ts",
+      "default": "./dist/src/conformance/index.js"
+    },
+    "./conformance/protocol": {
+      "types": "./dist/src/conformance/protocol.d.ts",
+      "default": "./dist/src/conformance/protocol.js"
+    },
     "./schema.json": "./dist/src/generated/schema.json"
   },
   "files": [
@@ -109,11 +117,15 @@
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "playwright": "^1.49.0",
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
     "react-dom": "^17.0.0 || ^18.0.0 || ^19.0.0",
     "zod": "^3.25.0 || ^4.0.0"
   },
   "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    },
     "react": {
       "optional": true
     },

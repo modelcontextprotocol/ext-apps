@@ -1,0 +1,76 @@
+[
+  {
+    "id": "lifecycle/tool-input",
+    "clause": "MUST",
+    "vantage": "in-view",
+    "spec": "2026-01-26",
+    "line": 1106,
+    "implemented": true,
+    "bucket": "automatic"
+  },
+  {
+    "id": "security/csp-no-loosening",
+    "clause": "MUST NOT",
+    "vantage": "in-view",
+    "spec": "2026-01-26",
+    "line": 286,
+    "implemented": true,
+    "bucket": "automatic"
+  },
+  {
+    "id": "security/sandbox-proxy-required",
+    "clause": "MUST",
+    "vantage": "in-view",
+    "spec": "2026-01-26",
+    "line": 472,
+    "implemented": true,
+    "bucket": "automatic"
+  },
+  {
+    "id": "security/iframe-sandboxed",
+    "clause": "MUST",
+    "vantage": "host",
+    "spec": "2026-01-26",
+    "line": 1698,
+    "implemented": true,
+    "bucket": "operator-verify"
+  },
+  {
+    "id": "visibility/app-tool-hidden",
+    "clause": "MUST NOT",
+    "vantage": "host",
+    "spec": "2026-01-26",
+    "line": 400,
+    "implemented": true,
+    "bucket": "operator-verify",
+    "askAgent": true
+  },
+  {
+    "id": "messages/add-to-conversation",
+    "clause": "SHOULD",
+    "vantage": "host",
+    "spec": "2026-01-26",
+    "line": 1033,
+    "implemented": true,
+    "bucket": "operator-verify"
+  },
+  {
+    "id": "links/open-external",
+    "clause": "SHOULD",
+    "vantage": "host",
+    "spec": "2026-01-26",
+    "line": 996,
+    "implemented": true,
+    "bucket": "operator-verify"
+  },
+  {
+    "id": "model-context/provide-future-turns",
+    "clause": "SHOULD",
+    "vantage": "host",
+    "spec": "2026-01-26",
+    "line": 1097,
+    "implemented": true,
+    "bucket": "operator-verify",
+    "askAgent": true
+  }
+]
