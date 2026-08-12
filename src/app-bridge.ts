@@ -91,6 +91,7 @@ import {
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResult,
   McpUiResourcePermissions,
+  McpUiResourceSandbox,
   McpUiToolMeta,
 } from "./types";
 export * from "./types";
@@ -196,6 +197,53 @@ export function buildAllowAttribute(
   if (permissions.clipboardWrite) allowList.push("clipboard-write");
 
   return allowList.join("; ");
+}
+
+/**
+ * Mapping of McpUiResourceSandbox keys to sandbox attribute values.
+ * @internal
+ */
+const SANDBOX_FLAG_MAP: Record<keyof McpUiResourceSandbox, string> = {
+  forms: "allow-forms",
+  popups: "allow-popups",
+  modals: "allow-modals",
+  downloads: "allow-downloads",
+};
+
+/**
+ * Baseline sandbox flags always included - required for SDK operation.
+ * @internal
+ */
+const BASELINE_SANDBOX = "allow-scripts allow-same-origin";
+
+/**
+ * Build iframe `sandbox` attribute string from sandbox configuration.
+ *
+ * Maps McpUiResourceSandbox to sandbox attribute format, always including
+ * baseline flags (allow-scripts allow-same-origin).
+ *
+ * @param sandbox - Sandbox flags requested by the UI resource
+ * @returns Space-separated sandbox flags including baseline
+ *
+ * @example
+ * ```typescript
+ * const sandbox = buildSandboxAttribute({ forms: {}, popups: {} });
+ * // Returns: "allow-scripts allow-same-origin allow-forms allow-popups"
+ * iframe.setAttribute("sandbox", sandbox);
+ * ```
+ */
+export function buildSandboxAttribute(
+  sandbox: McpUiResourceSandbox | undefined,
+): string {
+  if (!sandbox) return BASELINE_SANDBOX;
+
+  const additional = Object.entries(sandbox)
+    .filter(([_, v]) => v !== undefined)
+    .map(([k]) => SANDBOX_FLAG_MAP[k as keyof McpUiResourceSandbox])
+    .filter(Boolean);
+
+  if (additional.length === 0) return BASELINE_SANDBOX;
+  return [BASELINE_SANDBOX, ...additional].join(" ");
 }
 
 /**

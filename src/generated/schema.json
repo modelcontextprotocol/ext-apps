@@ -430,6 +430,37 @@
                 }
               },
               "additionalProperties": false
+            },
+            "flags": {
+              "description": "Sandbox flags granted by the host (forms, popups, modals, downloads).",
+              "type": "object",
+              "properties": {
+                "forms": {
+                  "description": "Allow form submission (sandbox `allow-forms` flag).",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "popups": {
+                  "description": "Allow window.open popups (sandbox `allow-popups` flag).",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "modals": {
+                  "description": "Allow alert/confirm/prompt/print dialogs (sandbox `allow-modals` flag).",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "downloads": {
+                  "description": "Allow file downloads (sandbox `allow-downloads` flag).",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2801,6 +2832,37 @@
                     }
                   },
                   "additionalProperties": false
+                },
+                "flags": {
+                  "description": "Sandbox flags granted by the host (forms, popups, modals, downloads).",
+                  "type": "object",
+                  "properties": {
+                    "forms": {
+                      "description": "Allow form submission (sandbox `allow-forms` flag).",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "popups": {
+                      "description": "Allow window.open popups (sandbox `allow-popups` flag).",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "modals": {
+                      "description": "Allow alert/confirm/prompt/print dialogs (sandbox `allow-modals` flag).",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "downloads": {
+                      "description": "Allow file downloads (sandbox `allow-downloads` flag).",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false
@@ -4264,6 +4326,37 @@
           },
           "additionalProperties": false
         },
+        "sandbox": {
+          "description": "Sandbox flags requested by the UI.",
+          "type": "object",
+          "properties": {
+            "forms": {
+              "description": "Allow form submission (sandbox `allow-forms` flag).",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "popups": {
+              "description": "Allow window.open popups (sandbox `allow-popups` flag).",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "modals": {
+              "description": "Allow alert/confirm/prompt/print dialogs (sandbox `allow-modals` flag).",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "downloads": {
+              "description": "Allow file downloads (sandbox `allow-downloads` flag).",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "domain": {
           "description": "Dedicated origin for view sandbox.\n\nUseful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.\n\n**Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:\n- Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)\n- URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)\n\nIf omitted, host uses default sandbox origin (typically per-conversation).",
           "type": "string"
@@ -4299,6 +4392,37 @@
         },
         "clipboardWrite": {
           "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "McpUiResourceSandbox": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "forms": {
+          "description": "Allow form submission (sandbox `allow-forms` flag).",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "popups": {
+          "description": "Allow window.open popups (sandbox `allow-popups` flag).",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "modals": {
+          "description": "Allow alert/confirm/prompt/print dialogs (sandbox `allow-modals` flag).",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "downloads": {
+          "description": "Allow file downloads (sandbox `allow-downloads` flag).",
           "type": "object",
           "properties": {},
           "additionalProperties": false
@@ -4364,8 +4488,42 @@
               "description": "HTML content to load into the inner iframe."
             },
             "sandbox": {
-              "description": "Optional override for the inner iframe's sandbox attribute.",
-              "type": "string"
+              "description": "Sandbox configuration: structured flags object or raw attribute string override.",
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "forms": {
+                      "description": "Allow form submission (sandbox `allow-forms` flag).",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "popups": {
+                      "description": "Allow window.open popups (sandbox `allow-popups` flag).",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "modals": {
+                      "description": "Allow alert/confirm/prompt/print dialogs (sandbox `allow-modals` flag).",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "downloads": {
+                      "description": "Allow file downloads (sandbox `allow-downloads` flag).",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "string"
+                }
+              ]
             },
             "csp": {
               "description": "CSP configuration from resource metadata.",

@@ -203,6 +203,37 @@ export const McpUiSandboxProxyReadyNotificationSchema = z.object({
 });
 
 /**
+ * @description Sandbox flags requested by the UI resource.
+ * These control iframe sandbox attribute beyond the baseline (scripts, same-origin).
+ * Hosts MAY honor these by adding flags to the iframe sandbox attribute.
+ * Apps SHOULD NOT assume flags are granted; use feature detection as fallback.
+ */
+export const McpUiResourceSandboxSchema = z.object({
+  /** @description Allow form submission (sandbox `allow-forms` flag). */
+  forms: z
+    .object({})
+    .optional()
+    .describe("Allow form submission (sandbox `allow-forms` flag)."),
+  /** @description Allow window.open popups (sandbox `allow-popups` flag). */
+  popups: z
+    .object({})
+    .optional()
+    .describe("Allow window.open popups (sandbox `allow-popups` flag)."),
+  /** @description Allow alert/confirm/prompt/print dialogs (sandbox `allow-modals` flag). */
+  modals: z
+    .object({})
+    .optional()
+    .describe(
+      "Allow alert/confirm/prompt/print dialogs (sandbox `allow-modals` flag).",
+    ),
+  /** @description Allow file downloads (sandbox `allow-downloads` flag). */
+  downloads: z
+    .object({})
+    .optional()
+    .describe("Allow file downloads (sandbox `allow-downloads` flag)."),
+});
+
+/**
  * @description Content Security Policy configuration for UI resources.
  *
  * Servers declare which origins their UI requires. Hosts use this to enforce appropriate CSP headers.
@@ -551,6 +582,10 @@ export const McpUiHostCapabilitiesSchema = z.object({
       csp: McpUiResourceCspSchema.optional().describe(
         "CSP domains approved by the host.",
       ),
+      /** @description Sandbox flags granted by the host (forms, popups, modals, downloads). */
+      flags: McpUiResourceSandboxSchema.optional().describe(
+        "Sandbox flags granted by the host (forms, popups, modals, downloads).",
+      ),
     })
     .optional()
     .describe("Sandbox configuration applied by the host."),
@@ -636,6 +671,10 @@ export const McpUiResourceMetaSchema = z.object({
   /** @description Sandbox permissions requested by the UI resource. */
   permissions: McpUiResourcePermissionsSchema.optional().describe(
     "Sandbox permissions requested by the UI resource.",
+  ),
+  /** @description Sandbox flags requested by the UI. */
+  sandbox: McpUiResourceSandboxSchema.optional().describe(
+    "Sandbox flags requested by the UI.",
   ),
   /**
    * @description Dedicated origin for view sandbox.
@@ -822,11 +861,13 @@ export const McpUiSandboxResourceReadyNotificationSchema = z.object({
   params: z.object({
     /** @description HTML content to load into the inner iframe. */
     html: z.string().describe("HTML content to load into the inner iframe."),
-    /** @description Optional override for the inner iframe's sandbox attribute. */
+    /** @description Sandbox configuration: structured flags object or raw attribute string override. */
     sandbox: z
-      .string()
+      .union([McpUiResourceSandboxSchema, z.string()])
       .optional()
-      .describe("Optional override for the inner iframe's sandbox attribute."),
+      .describe(
+        "Sandbox configuration: structured flags object or raw attribute string override.",
+      ),
     /** @description CSP configuration from resource metadata. */
     csp: McpUiResourceCspSchema.optional().describe(
       "CSP configuration from resource metadata.",

@@ -20,6 +20,7 @@ import {
   AppBridge,
   buildAllowAttribute,
   getToolUiResourceUri,
+  buildSandboxAttribute,
   isToolVisibilityModelOnly,
   isToolVisibilityAppOnly,
   type McpUiHostCapabilities,
@@ -2466,6 +2467,92 @@ describe("getToolUiResourceUri", () => {
       expect(() => getToolUiResourceUri(tool)).toThrow(
         "Invalid UI resource URI",
       );
+    });
+  });
+});
+
+describe("buildSandboxAttribute", () => {
+  const BASELINE = "allow-scripts allow-same-origin";
+
+  describe("baseline handling", () => {
+    it("returns baseline for undefined", () => {
+      expect(buildSandboxAttribute(undefined)).toBe(BASELINE);
+    });
+
+    it("returns baseline for empty object", () => {
+      expect(buildSandboxAttribute({})).toBe(BASELINE);
+    });
+  });
+
+  describe("single flags", () => {
+    it("adds forms flag", () => {
+      expect(buildSandboxAttribute({ forms: {} })).toBe(
+        `${BASELINE} allow-forms`,
+      );
+    });
+
+    it("adds popups flag", () => {
+      expect(buildSandboxAttribute({ popups: {} })).toBe(
+        `${BASELINE} allow-popups`,
+      );
+    });
+
+    it("adds modals flag", () => {
+      expect(buildSandboxAttribute({ modals: {} })).toBe(
+        `${BASELINE} allow-modals`,
+      );
+    });
+
+    it("adds downloads flag", () => {
+      expect(buildSandboxAttribute({ downloads: {} })).toBe(
+        `${BASELINE} allow-downloads`,
+      );
+    });
+  });
+
+  describe("multiple flags", () => {
+    it("adds multiple flags", () => {
+      const result = buildSandboxAttribute({
+        forms: {},
+        popups: {},
+        modals: {},
+        downloads: {},
+      });
+      expect(result).toContain("allow-forms");
+      expect(result).toContain("allow-popups");
+      expect(result).toContain("allow-modals");
+      expect(result).toContain("allow-downloads");
+      expect(result.startsWith(BASELINE)).toBe(true);
+    });
+
+    it("adds forms and popups", () => {
+      const result = buildSandboxAttribute({ forms: {}, popups: {} });
+      expect(result).toContain("allow-forms");
+      expect(result).toContain("allow-popups");
+      expect(result).not.toContain("allow-modals");
+      expect(result).not.toContain("allow-downloads");
+    });
+  });
+
+  describe("undefined values in object", () => {
+    it("ignores undefined values", () => {
+      const result = buildSandboxAttribute({
+        forms: {},
+        popups: undefined,
+        modals: undefined,
+        downloads: undefined,
+      });
+      expect(result).toBe(`${BASELINE} allow-forms`);
+    });
+
+    it("returns baseline when all values are undefined", () => {
+      const result = buildSandboxAttribute({
+        forms: undefined,
+        popups: undefined,
+        modals: undefined,
+        downloads: undefined,
+      });
+      expect(result).toBe(BASELINE);
     });
   });
 });

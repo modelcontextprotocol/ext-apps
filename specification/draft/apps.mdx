@@ -195,6 +195,40 @@ interface UIResourceMeta {
     clipboardWrite?: {},
   },
   /**
+   * Sandbox flags requested by the UI
+   *
+   * Servers declare which sandbox capabilities their UI needs beyond baseline (allow-scripts, allow-same-origin).
+   * Hosts MAY honor these by adding flags to the iframe sandbox attribute.
+   * Apps SHOULD NOT assume flags are granted; use feature detection as fallback.
+   *
+   */
+  sandbox?: {
+    /**
+     * Allow form submission
+     *
+     * Maps to sandbox `allow-forms` flag
+     */
+    forms?: {},
+    /**
+     * Allow window.open popups
+     *
+     * Maps to sandbox `allow-popups` flag
+     */
+    popups?: {},
+    /**
+     * Allow alert/confirm/prompt/print dialogs
+     *
+     * Maps to sandbox `allow-modals` flag
+     */
+    modals?: {},
+    /**
+     * Allow file downloads
+     *
+     * Maps to sandbox `allow-downloads` flag
+     */
+    downloads?: {},
+  },
+  /**
    * Dedicated origin for view
    *
    * Optional domain for the view's sandbox origin. Useful when views need
@@ -501,6 +535,7 @@ If the Host is a web page, it MUST wrap the View and communicate with it through
    - Block dangerous features (`object-src 'none'`)
    - Apply restrictive defaults if no CSP metadata is provided
    - If `permissions` is declared, the Sandbox MAY set the inner iframe's `allow` attribute accordingly
+   - If `sandbox` is declared (as object or string), the Sandbox MAY set the inner iframe's `sandbox` attribute accordingly (baseline: `allow-scripts allow-same-origin`)
 6. The Sandbox MUST forward messages sent by the Host to the View, and vice versa, for any method that doesn't start with `ui/notifications/sandbox-`. This includes lifecycle messages, e.g., `ui/initialize` request & `ui/notifications/initialized` notification both sent by the View. The Host MUST NOT send any request or notification to the View before it receives an `initialized` notification.
 7. The Sandbox SHOULD NOT create/send any requests to the Host or to the View (this would require synthesizing new request ids).
 8. The Host MAY forward any message from the View (coming via the Sandbox) to the MCP Apps server, for any method that doesn't start with `ui/`. While the Host SHOULD ensure the View's MCP connection is spec-compliant, it MAY decide to block some messages or subject them to further user approval.
@@ -714,6 +749,13 @@ interface HostCapabilities {
       frameDomains?: string[];
       /** Approved base URIs for the document (base-uri directive). */
       baseUriDomains?: string[];
+    };
+    /** Sandbox flags granted by the host. */
+    flags?: {
+      forms?: {};
+      popups?: {};
+      modals?: {};
+      downloads?: {};
     };
   };
   /**
@@ -1504,7 +1546,13 @@ These messages are reserved for web-based hosts that implement the recommended d
       microphone?: {},
       geolocation?: {},
       clipboardWrite?: {},
-    }
+    },
+    sandbox?: {          // Sandbox flags from resource metadata (or raw string override)
+      forms?: {},        // Allow form submission (allow-forms)
+      popups?: {},       // Allow window.open popups (allow-popups)
+      modals?: {},       // Allow alert/confirm/prompt/print (allow-modals)
+      downloads?: {},    // Allow file downloads (allow-downloads)
+    } | string           // Raw sandbox attribute override
   }
 }
 ```

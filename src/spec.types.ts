@@ -249,8 +249,8 @@ export interface McpUiSandboxResourceReadyNotification {
   params: {
     /** @description HTML content to load into the inner iframe. */
     html: string;
-    /** @description Optional override for the inner iframe's sandbox attribute. */
-    sandbox?: string;
+    /** @description Sandbox configuration: structured flags object or raw attribute string override. */
+    sandbox?: McpUiResourceSandbox | string;
     /** @description CSP configuration from resource metadata. */
     csp?: McpUiResourceCsp;
     /** @description Sandbox permissions from resource metadata. */
@@ -516,6 +516,8 @@ export interface McpUiHostCapabilities {
     permissions?: McpUiResourcePermissions;
     /** @description CSP domains approved by the host. */
     csp?: McpUiResourceCsp;
+    /** @description Sandbox flags granted by the host (forms, popups, modals, downloads). */
+    flags?: McpUiResourceSandbox;
   };
   /** @description Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns. */
   updateModelContext?: McpUiSupportedContentBlockModalities;
@@ -655,6 +657,23 @@ export interface McpUiResourceCsp {
 }
 
 /**
+ * @description Sandbox flags requested by the UI resource.
+ * These control iframe sandbox attribute beyond the baseline (scripts, same-origin).
+ * Hosts MAY honor these by adding flags to the iframe sandbox attribute.
+ * Apps SHOULD NOT assume flags are granted; use feature detection as fallback.
+ */
+export interface McpUiResourceSandbox {
+  /** @description Allow form submission (sandbox `allow-forms` flag). */
+  forms?: {};
+  /** @description Allow window.open popups (sandbox `allow-popups` flag). */
+  popups?: {};
+  /** @description Allow alert/confirm/prompt/print dialogs (sandbox `allow-modals` flag). */
+  modals?: {};
+  /** @description Allow file downloads (sandbox `allow-downloads` flag). */
+  downloads?: {};
+}
+
+/**
  * @description Sandbox permissions requested by the UI resource.
  *
  * Servers declare which browser capabilities their UI needs.
@@ -696,6 +715,8 @@ export interface McpUiResourceMeta {
   csp?: McpUiResourceCsp;
   /** @description Sandbox permissions requested by the UI resource. */
   permissions?: McpUiResourcePermissions;
+  /** @description Sandbox flags requested by the UI. */
+  sandbox?: McpUiResourceSandbox;
   /**
    * @description Dedicated origin for view sandbox.
    *

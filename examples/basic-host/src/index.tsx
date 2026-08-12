@@ -432,10 +432,10 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
   useEffect(() => {
     const iframe = iframeRef.current!;
 
-    // First get CSP and permissions from resource, then load sandbox
+    // First get CSP, permissions, and sandbox from resource, then load sandbox
     // CSP is set via HTTP headers (tamper-proof), permissions via iframe allow attribute
-    toolCallInfo.appResourcePromise.then(({ csp, permissions }) => {
-      loadSandboxProxy(iframe, csp, permissions).then((firstTime) => {
+    toolCallInfo.appResourcePromise.then(({ csp, permissions, sandbox }) => {
+      loadSandboxProxy(iframe, csp, permissions, sandbox).then((firstTime) => {
         // The `firstTime` check guards against React Strict Mode's double
         // invocation (mount → unmount → remount simulation in development).
         // Outside of Strict Mode, this `useEffect` runs only once per

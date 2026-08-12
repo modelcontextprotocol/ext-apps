@@ -47,6 +47,10 @@ export type McpUiSandboxProxyReadyNotificationSchemaInferredType = z.infer<
   typeof generated.McpUiSandboxProxyReadyNotificationSchema
 >;
 
+export type McpUiResourceSandboxSchemaInferredType = z.infer<
+  typeof generated.McpUiResourceSandboxSchema
+>;
+
 export type McpUiResourceCspSchemaInferredType = z.infer<
   typeof generated.McpUiResourceCspSchema
 >;
@@ -204,6 +208,12 @@ expectType<spec.McpUiSandboxProxyReadyNotification>(
 );
 expectType<McpUiSandboxProxyReadyNotificationSchemaInferredType>(
   {} as spec.McpUiSandboxProxyReadyNotification,
+);
+expectType<spec.McpUiResourceSandbox>(
+  {} as McpUiResourceSandboxSchemaInferredType,
+);
+expectType<McpUiResourceSandboxSchemaInferredType>(
+  {} as spec.McpUiResourceSandbox,
 );
 expectType<spec.McpUiResourceCsp>({} as McpUiResourceCspSchemaInferredType);
 expectType<McpUiResourceCspSchemaInferredType>({} as spec.McpUiResourceCsp);

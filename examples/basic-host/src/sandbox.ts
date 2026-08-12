@@ -1,5 +1,5 @@
 import type { McpUiSandboxProxyReadyNotification, McpUiSandboxResourceReadyNotification } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { buildAllowAttribute } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { buildAllowAttribute, buildSandboxAttribute } from "@modelcontextprotocol/ext-apps/app-bridge";
 
 const ALLOWED_REFERRER_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/;
 
@@ -41,12 +41,15 @@ try {
 // iframe on a separate origin. It creates an inner iframe for untrusted HTML
 // content. Per the specification, the Host and the Sandbox MUST have different
 // origins.
-const inner = document.createElement("iframe");
-inner.style = "width:100%; height:100%; border:none;";
-inner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
-// Note: allow attribute is set later when receiving sandbox-resource-ready notification
-// based on the permissions requested by the app
-document.body.appendChild(inner);
+//
+// The inner iframe is created lazily when the `sandbox-resource-ready`
+// notification arrives (not at file top) so that its `sandbox` attribute is set
+// to the negotiated value *before* the element is inserted into the DOM.
+// Per the HTML spec, mutating the `sandbox` attribute on an already-attached
+// iframe only takes effect after a navigation; `document.write()` is NOT a
+// navigation, so setting the attribute after attachment would leave the old
+// (or default) flags in effect.
+let inner: HTMLIFrameElement | null = null;
 
 const RESOURCE_READY_NOTIFICATION: McpUiSandboxResourceReadyNotification["method"] =
   "ui/notifications/sandbox-resource-ready";
@@ -85,15 +88,27 @@ window.addEventListener("message", async (event) => {
 
     if (event.data && event.data.method === RESOURCE_READY_NOTIFICATION) {
       const { html, sandbox, permissions } = event.data.params;
-      if (typeof sandbox === "string") {
-        inner.setAttribute("sandbox", sandbox);
-      }
+      // sandbox can be a string (raw override) or object (structured flags)
+      const sandboxAttr = typeof sandbox === "string"
+        ? sandbox
+        : buildSandboxAttribute(sandbox);
+      console.log("[Sandbox] Setting sandbox attribute:", sandboxAttr);
+
+      // Create the inner iframe with the final sandbox attribute before
+      // inserting into the DOM, so negotiated flags are enforced immediately.
+      inner = document.createElement("iframe");
+      inner.style.cssText = "width:100%; height:100%; border:none;";
+      inner.setAttribute("sandbox", sandboxAttr);
+
       // Set Permission Policy allow attribute if permissions are requested
       const allowAttribute = buildAllowAttribute(permissions);
       if (allowAttribute) {
         console.log("[Sandbox] Setting allow attribute:", allowAttribute);
         inner.setAttribute("allow", allowAttribute);
       }
+
+      document.body.appendChild(inner);
+
       if (typeof html === "string") {
         // Use document.write instead of srcdoc (which the CesiumJS Map won't work with)
         const doc = inner.contentDocument || inner.contentWindow?.document;
@@ -112,7 +127,7 @@ window.addEventListener("message", async (event) => {
         inner.contentWindow.postMessage(event.data, "*");
       }
     }
-  } else if (event.source === inner.contentWindow) {
+  } else if (inner && event.source === inner.contentWindow) {
     if (event.origin !== OWN_ORIGIN) {
       console.error(
         "[Sandbox] Rejecting message from inner iframe with unexpected origin:",
