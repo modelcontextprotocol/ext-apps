@@ -2,7 +2,7 @@ import { getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage, type HostDisplayMode } from "./implementation";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
 import styles from "./index.module.css";
 
@@ -417,6 +417,34 @@ function CollapsiblePanel({ icon, label, content, badge, defaultExpanded = false
 }
 
 
+// Keep the split region within sensible bounds: wide enough to be useful,
+// narrow enough that the conversation column stays usable.
+function setSplitViewWidth(clientX: number) {
+  const width = Math.min(
+    Math.max(window.innerWidth - clientX, 280),
+    Math.max(window.innerWidth - 320, 280),
+  );
+  document.documentElement.style.setProperty("--split-view-width", `${width}px`);
+}
+
+function SplitResizeHandle() {
+  return (
+    <div
+      className={styles.splitResizeHandle}
+      title="Drag to resize"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          setSplitViewWidth(e.clientX);
+        }
+      }}
+    />
+  );
+}
+
 interface AppIFramePanelProps {
   toolCallInfo: Required<ToolCallInfo>;
   isDestroying?: boolean;
@@ -427,7 +455,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
   const appBridgeRef = useRef<ReturnType<typeof newAppBridge> | null>(null);
   const [modelContext, setModelContext] = useState<ModelContext | null>(null);
   const [messages, setMessages] = useState<AppMessage[]>([]);
-  const [displayMode, setDisplayMode] = useState<"inline" | "fullscreen">("inline");
+  const [displayMode, setDisplayMode] = useState<HostDisplayMode>("inline");
 
   useEffect(() => {
     const iframe = iframeRef.current!;
@@ -510,12 +538,16 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
   };
   const messagesText = messages.map(formatMessage).join("\n\n");
 
-  const panelClassName = displayMode === "fullscreen"
-    ? `${styles.appIframePanel} ${styles.fullscreen}`
-    : styles.appIframePanel;
+  // Presentation only: the iframe node stays mounted across mode changes,
+  // so View state survives inline <-> split transitions.
+  const panelClassName =
+    displayMode === "inline"
+      ? styles.appIframePanel
+      : `${styles.appIframePanel} ${styles[displayMode]}`;
 
   return (
-    <div className={panelClassName}>
+    <div className={panelClassName} data-display-mode={displayMode}>
+      {displayMode === "split" && <SplitResizeHandle />}
       <iframe ref={iframeRef} />
       {messages.length > 0 && (
         <CollapsiblePanel

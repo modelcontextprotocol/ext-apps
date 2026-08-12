@@ -23,7 +23,12 @@ export const McpUiThemeSchema = z
  * @description Display mode for UI presentation.
  */
 export const McpUiDisplayModeSchema = z
-  .union([z.literal("inline"), z.literal("fullscreen"), z.literal("pip")])
+  .union([
+    z.literal("inline"),
+    z.literal("fullscreen"),
+    z.literal("pip"),
+    z.literal("split"),
+  ])
   .describe("Display mode for UI presentation.");
 
 /**

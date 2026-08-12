@@ -38,3 +38,9 @@ html, body {
 code {
   font-size: 1em;
 }
+
+/* While a View is in split display mode, reserve the right-hand region for it
+   so the conversation column and the split View never overlap. */
+body:has([data-display-mode="split"]) {
+  margin-right: var(--split-view-width, 40vw);
+}

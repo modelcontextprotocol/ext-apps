@@ -624,6 +624,77 @@ describe("App <-> AppBridge integration", () => {
     });
   });
 
+  describe("display mode negotiation", () => {
+    it("split crosses the handshake and round-trips through requestDisplayMode", async () => {
+      const [newAppTransport, newBridgeTransport] =
+        InMemoryTransport.createLinkedPair();
+      const splitApp = new App(
+        testAppInfo,
+        { availableDisplayModes: ["inline", "split"] },
+        { autoResize: false },
+      );
+      const splitBridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+        {
+          hostContext: {
+            availableDisplayModes: ["inline", "fullscreen", "split"],
+          },
+        },
+      );
+      splitBridge.onrequestdisplaymode = async ({ mode }) => ({ mode });
+
+      await splitBridge.connect(newBridgeTransport);
+      await splitApp.connect(newAppTransport);
+
+      expect(splitBridge.getAppCapabilities()?.availableDisplayModes).toEqual([
+        "inline",
+        "split",
+      ]);
+      expect(splitApp.getHostContext()?.availableDisplayModes).toEqual([
+        "inline",
+        "fullscreen",
+        "split",
+      ]);
+
+      const result = await splitApp.requestDisplayMode({ mode: "split" });
+      expect(result.mode).toBe("split");
+
+      await newAppTransport.close();
+      await newBridgeTransport.close();
+    });
+
+    it("default handler returns the current mode from host context", async () => {
+      const [newAppTransport, newBridgeTransport] =
+        InMemoryTransport.createLinkedPair();
+      const bridgeWithContext = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+        { hostContext: { displayMode: "fullscreen" } },
+      );
+
+      await bridgeWithContext.connect(newBridgeTransport);
+      await app.connect(newAppTransport);
+      const result = await app.requestDisplayMode({ mode: "split" });
+
+      expect(result.mode).toBe("fullscreen");
+
+      await newAppTransport.close();
+      await newBridgeTransport.close();
+    });
+
+    it("default handler falls back to inline when host context has no display mode", async () => {
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      const result = await app.requestDisplayMode({ mode: "split" });
+
+      expect(result.mode).toBe("inline");
+    });
+  });
+
   describe("deprecated method aliases", () => {
     beforeEach(async () => {
       await bridge.connect(bridgeTransport);

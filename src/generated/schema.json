@@ -50,6 +50,10 @@
               {
                 "type": "string",
                 "const": "pip"
+              },
+              {
+                "type": "string",
+                "const": "split"
               }
             ],
             "description": "Display mode for UI presentation."
@@ -86,6 +90,10 @@
         {
           "type": "string",
           "const": "pip"
+        },
+        {
+          "type": "string",
+          "const": "split"
         }
       ],
       "description": "Display mode for UI presentation."
@@ -1141,6 +1149,10 @@
                 {
                   "type": "string",
                   "const": "pip"
+                },
+                {
+                  "type": "string",
+                  "const": "split"
                 }
               ]
             },
@@ -1160,6 +1172,10 @@
                   {
                     "type": "string",
                     "const": "pip"
+                  },
+                  {
+                    "type": "string",
+                    "const": "split"
                   }
                 ],
                 "description": "Display mode for UI presentation."
@@ -1904,6 +1920,10 @@
             {
               "type": "string",
               "const": "pip"
+            },
+            {
+              "type": "string",
+              "const": "split"
             }
           ]
         },
@@ -1923,6 +1943,10 @@
               {
                 "type": "string",
                 "const": "pip"
+              },
+              {
+                "type": "string",
+                "const": "split"
               }
             ],
             "description": "Display mode for UI presentation."
@@ -2596,6 +2620,10 @@
                       {
                         "type": "string",
                         "const": "pip"
+                      },
+                      {
+                        "type": "string",
+                        "const": "split"
                       }
                     ],
                     "description": "Display mode for UI presentation."
@@ -3505,6 +3533,10 @@
                 {
                   "type": "string",
                   "const": "pip"
+                },
+                {
+                  "type": "string",
+                  "const": "split"
                 }
               ]
             },
@@ -3524,6 +3556,10 @@
                   {
                     "type": "string",
                     "const": "pip"
+                  },
+                  {
+                    "type": "string",
+                    "const": "split"
                   }
                 ],
                 "description": "Display mode for UI presentation."
@@ -4105,6 +4141,10 @@
                 {
                   "type": "string",
                   "const": "pip"
+                },
+                {
+                  "type": "string",
+                  "const": "split"
                 }
               ],
               "description": "The display mode being requested."
@@ -4134,6 +4174,10 @@
             {
               "type": "string",
               "const": "pip"
+            },
+            {
+              "type": "string",
+              "const": "split"
             }
           ],
           "description": "The display mode that was actually set. May differ from requested if not supported."
