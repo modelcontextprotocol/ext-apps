@@ -13,6 +13,7 @@ playwright-report/
 test-results/
 __pycache__/
 *.pyc
+/examples/dicom-viewer-mcp-app/dicom
 
 # MCPB bundles (built artifacts)
 *.mcpb
