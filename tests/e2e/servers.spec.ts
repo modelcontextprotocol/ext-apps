@@ -8,6 +8,7 @@ import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 // Note: map-server uses SLOW_SERVERS timeout instead of masking to wait for tiles
 const DYNAMIC_MASKS: Record<string, string[]> = {
   integration: ['[class*="serverTime"]'], // Server time display [CSS module]
+  "basic-angular": [".server-time"], // Server time display (component-scoped)
   "basic-preact": ['[class*="serverTime"]'], // Server time display [CSS module]
   "basic-react": ['[class*="serverTime"]'], // Server time display [CSS module]
   "basic-solid": ['[class*="serverTime"]'], // Server time display [CSS module]
@@ -45,6 +46,7 @@ const HOST_MASKS: Record<string, string[]> = {
   // Servers with dynamic timestamps in Tool Result (get-time response)
   // Mask entire collapsible panels to avoid font rendering differences
   integration: ['[class*="collapsiblePanel"]'],
+  "basic-angular": ['[class*="collapsiblePanel"]'],
   "basic-preact": ['[class*="collapsiblePanel"]'],
   "basic-react": ['[class*="collapsiblePanel"]'],
   "basic-solid": ['[class*="collapsiblePanel"]'],
@@ -70,6 +72,11 @@ const ALL_SERVERS = [
     key: "integration",
     name: "Integration Test Server",
     dir: "integration-server",
+  },
+  {
+    key: "basic-angular",
+    name: "Basic MCP App Server (Angular)",
+    dir: "basic-server-angular",
   },
   {
     key: "basic-preact",

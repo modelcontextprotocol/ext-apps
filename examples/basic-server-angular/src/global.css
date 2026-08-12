@@ -1,0 +1,92 @@
+:root {
+  color-scheme: light dark;
+
+  /*
+   * Fallbacks for host style variables used by this app.
+   * The host may provide these (and many more) via the host context.
+   */
+  --color-text-primary: light-dark(#1f2937, #f3f4f6);
+  --color-text-inverse: light-dark(#f3f4f6, #1f2937);
+  --color-text-info: light-dark(#1d4ed8, #60a5fa);
+  --color-background-primary: light-dark(#ffffff, #1a1a1a);
+  --color-background-inverse: light-dark(#1a1a1a, #ffffff);
+  --color-background-info: light-dark(#eff6ff, #1e3a5f);
+  --color-ring-primary: light-dark(#3b82f6, #60a5fa);
+  --border-radius-md: 6px;
+  --border-width-regular: 1px;
+  --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --font-weight-normal: 400;
+  --font-weight-bold: 700;
+  --font-text-md-size: 1rem;
+  --font-text-md-line-height: 1.5;
+  --font-heading-3xl-size: 2.25rem;
+  --font-heading-3xl-line-height: 1.1;
+  --font-heading-2xl-size: 1.875rem;
+  --font-heading-2xl-line-height: 1.2;
+  --font-heading-xl-size: 1.5rem;
+  --font-heading-xl-line-height: 1.25;
+  --font-heading-lg-size: 1.25rem;
+  --font-heading-lg-line-height: 1.3;
+  --font-heading-md-size: 1rem;
+  --font-heading-md-line-height: 1.4;
+  --font-heading-sm-size: 0.875rem;
+  --font-heading-sm-line-height: 1.4;
+
+  /* Spacing derived from host typography */
+  --spacing-unit: var(--font-text-md-size);
+  --spacing-xs: calc(var(--spacing-unit) * 0.25);
+  --spacing-sm: calc(var(--spacing-unit) * 0.5);
+  --spacing-md: var(--spacing-unit);
+  --spacing-lg: calc(var(--spacing-unit) * 1.5);
+
+  /* App accent color (customize for your brand) */
+  --color-accent: #2563eb;
+  --color-text-on-accent: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  font-family: var(--font-sans);
+  font-size: var(--font-text-md-size);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--font-text-md-line-height);
+  color: var(--color-text-primary);
+}
+
+h1 {
+  font-size: var(--font-heading-3xl-size);
+  line-height: var(--font-heading-3xl-line-height);
+}
+h2 {
+  font-size: var(--font-heading-2xl-size);
+  line-height: var(--font-heading-2xl-line-height);
+}
+h3 {
+  font-size: var(--font-heading-xl-size);
+  line-height: var(--font-heading-xl-line-height);
+}
+h4 {
+  font-size: var(--font-heading-lg-size);
+  line-height: var(--font-heading-lg-line-height);
+}
+h5 {
+  font-size: var(--font-heading-md-size);
+  line-height: var(--font-heading-md-line-height);
+}
+h6 {
+  font-size: var(--font-heading-sm-size);
+  line-height: var(--font-heading-sm-line-height);
+}
+
+code, pre, kbd {
+  font-family: var(--font-mono);
+  font-size: 1em;
+}
+
+b, strong {
+  font-weight: var(--font-weight-bold);
+}
