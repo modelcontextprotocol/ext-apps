@@ -626,5 +626,113 @@ app.ontoolinput = (params) => {
 > [!IMPORTANT]
 > Partial arguments are "healed" JSON — the host closes unclosed brackets/braces to produce valid JSON. This means objects may be incomplete (e.g., the last item in an array may be truncated). Don't rely on partial data for critical operations; use it only for preview UI.
 
+_See [`examples/threejs-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/threejs-server) for a full implementation of this pattern._
+
+## Using UI Data in Tool Call Responses
+
+Sometimes an MCP server needs user interaction to form its tool response. Since MCP Apps can be displayed before the tool call completes, you can use a combination of model-visible and app-only tools to collect user input and incorporate it into the final response.
+
+The pattern works as follows:
+
+1. Register a model-visible tool (e.g., `pick_color`) that displays a UI and waits for user input
+2. Register an [app-only tool](#tools-that-are-private-to-apps) (e.g., `user_picked_color`) that the UI calls when the user completes their selection
+3. The UI receives tool arguments via `ontoolinput`, then calls the app-only tool when the user finishes
+4. The model-visible tool's handler resolves only after the app-only tool is called
+
+**Server-side**: Register both tools — one that waits for user input, and one that the UI calls to submit the result:
+
+<!-- prettier-ignore -->
+```ts source="./patterns.tsx#uiDataToolResponseServer"
+// Map of pending color picks waiting for user input
+const pendingColorPicks = new Map<
+  string,
+  { resolve: (color: string) => void }
+>();
+
+// 1. Model-visible tool that displays the color picker UI
+registerAppTool(
+  server,
+  "pick_color",
+  {
+    title: "Pick Color",
+    description: "Let the user pick a color",
+    inputSchema: {
+      requestId: z.string().describe("Unique ID for this request"),
+      defaultColor: z.string().optional().describe("Initial color value"),
+    },
+    _meta: { ui: { resourceUri: "ui://colors/picker.html" } },
+  },
+  async ({ requestId, defaultColor }) => {
+    // Wait for the user to pick a color via the UI
+    const pickedColor = await new Promise<string>((resolve) => {
+      pendingColorPicks.set(requestId, { resolve });
+    });
+
+    return {
+      content: [{ type: "text", text: `User selected: ${pickedColor}` }],
+      structuredContent: { color: pickedColor },
+    };
+  },
+);
+
+// 2. App-only tool that the UI calls when user finishes picking
+registerAppTool(
+  server,
+  "user_picked_color",
+  {
+    title: "User Picked Color",
+    description: "Called by the UI when user selects a color",
+    inputSchema: {
+      requestId: z.string().describe("Request ID from pick_color"),
+      color: z.string().describe("The color the user picked"),
+    },
+    // Hidden from model - only callable by the App
+    _meta: { ui: { visibility: ["app"] } },
+  },
+  async ({ requestId, color }) => {
+    const pending = pendingColorPicks.get(requestId);
+    if (pending) {
+      pending.resolve(color);
+      pendingColorPicks.delete(requestId);
+      return { content: [{ type: "text", text: "Color submitted" }] };
+    }
+    return {
+      isError: true,
+      content: [{ type: "text", text: "No pending request found" }],
+    };
+  },
+);
+```
+
 > [!NOTE]
-> For full examples that implement this pattern, see: [`examples/shadertoy-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/shadertoy-server) and [`examples/threejs-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/threejs-server).
+> Because it may take users a while to interact the UI, servers should consider using [tasks](https://modelcontextprotocol.io/specification/draft/basic/utilities/tasks) for reliability and network fault-tolerance.
+
+**Client-side**: The UI receives the request ID, displays the picker, and calls the app-only tool when the user makes a selection:
+
+<!-- prettier-ignore -->
+```ts source="./patterns.tsx#uiDataToolResponseClient"
+let requestId: string | undefined;
+
+// Receive the request ID from the tool input
+app.ontoolinput = (params) => {
+  requestId = params.arguments?.requestId as string;
+  const defaultColor = (params.arguments?.defaultColor as string) ?? "#000000";
+  initializeColorPicker(defaultColor);
+};
+
+// When user picks a color, call the app-only tool to complete the request
+async function onColorSelected(color: string) {
+  if (!requestId) return;
+
+  await app.callServerTool({
+    name: "user_picked_color",
+    arguments: { requestId, color },
+  });
+}
+
+// Example: Wire up a color input
+const colorInput = document.querySelector<HTMLInputElement>("#color-picker");
+colorInput?.addEventListener("change", () => {
+  onColorSelected(colorInput.value);
+});
+```
