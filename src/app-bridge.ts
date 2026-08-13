@@ -194,6 +194,7 @@ export function buildAllowAttribute(
   if (permissions.microphone) allowList.push("microphone");
   if (permissions.geolocation) allowList.push("geolocation");
   if (permissions.clipboardWrite) allowList.push("clipboard-write");
+  if (permissions.tools) allowList.push("tools");
 
   return allowList.join("; ");
 }

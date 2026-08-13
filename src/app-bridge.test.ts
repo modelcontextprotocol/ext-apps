@@ -2825,6 +2825,10 @@ describe("buildAllowAttribute", () => {
         "clipboard-write",
       );
     });
+
+    it("when only tools is set", () => {
+      expect(buildAllowAttribute({ tools: {} })).toBe("tools");
+    });
   });
 
   describe("returns multiple directives joined with '; '", () => {
@@ -2841,8 +2845,9 @@ describe("buildAllowAttribute", () => {
           microphone: {},
           geolocation: {},
           clipboardWrite: {},
+          tools: {},
         }),
-      ).toBe("camera; microphone; geolocation; clipboard-write");
+      ).toBe("camera; microphone; geolocation; clipboard-write; tools");
     });
   });
 });
