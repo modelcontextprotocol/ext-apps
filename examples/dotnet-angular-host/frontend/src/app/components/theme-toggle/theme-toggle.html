@@ -1,0 +1,7 @@
+<button
+  class="theme-toggle"
+  (click)="toggle()"
+  [title]="'Switch to ' + (theme() === 'dark' ? 'light' : 'dark') + ' mode'"
+>
+  {{ theme() === 'dark' ? '☀️' : '🌙' }}
+</button>
