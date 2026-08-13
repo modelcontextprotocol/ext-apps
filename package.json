@@ -44,7 +44,8 @@
     "dist"
   ],
   "workspaces": [
-    "examples/*"
+    "examples/*",
+    "packages/*"
   ],
   "scripts": {
     "start": "npm run examples:dev",

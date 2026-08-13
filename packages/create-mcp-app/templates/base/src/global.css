@@ -1,0 +1,45 @@
+:root {
+  color-scheme: light dark;
+
+  /*
+   * Fallbacks for host style variables.
+   * The host may override these (and many more) via the host context.
+   */
+  --color-text-primary: light-dark(#1f2937, #f3f4f6);
+  --color-background-primary: light-dark(#ffffff, #1a1a1a);
+  --color-ring-primary: light-dark(#3b82f6, #60a5fa);
+  --border-radius-md: 6px;
+  --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+  --font-weight-normal: 400;
+  --font-weight-bold: 700;
+  --font-text-md-size: 1rem;
+  --font-text-md-line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  font-family: var(--font-sans);
+  font-size: var(--font-text-md-size);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--font-text-md-line-height);
+  color: var(--color-text-primary);
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 1em;
+}
+
+b,
+strong {
+  font-weight: var(--font-weight-bold);
+}

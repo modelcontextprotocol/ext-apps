@@ -1,0 +1,37 @@
+{
+  "name": "{{name}}",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json && node scripts/bundle-server.mjs",
+    "watch": "cross-env INPUT=mcp-app.html vite build --watch",
+    "serve": "tsx --watch main.ts",
+    "start": "cross-env NODE_ENV=development npm run build && npm run serve",
+    "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^{{sdkVersion}}",
+    "@modelcontextprotocol/sdk": "^{{mcpSdkVersion}}",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}

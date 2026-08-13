@@ -154,6 +154,42 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
 
+  publish-packages:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    environment: Release
+    needs: [publish]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - create-mcp-app
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+      - run: npm ci
+
+      - name: Build package
+        run: npm run build --workspace packages/${{ matrix.package }}
+
+      - name: Publish package
+        run: npm publish --workspace packages/${{ matrix.package }} --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
+
   publish-mcpb:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'

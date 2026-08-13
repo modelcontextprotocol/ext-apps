@@ -1,0 +1,33 @@
+{
+  "name": "@modelcontextprotocol/create-mcp-app",
+  "version": "0.4.1",
+  "description": "Create MCP App projects with one command",
+  "type": "module",
+  "bin": {
+    "create-mcp-app": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "test": "npm run build && node test/scaffold-build.test.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "directory": "packages/create-mcp-app"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "@modelcontextprotocol/sdk": "^1.24.0",
+    "picocolors": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
+  }
+}
