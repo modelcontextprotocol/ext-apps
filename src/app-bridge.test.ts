@@ -151,6 +151,61 @@ describe("App <-> AppBridge integration", () => {
     });
   });
 
+  describe("app-rendered elicitation", () => {
+    it("forwards the standard request to the bound app and returns its standard result", async () => {
+      const elicitationHostCapabilities: McpUiHostCapabilities = {
+        ...testHostCapabilities,
+        elicitation: {},
+      };
+      bridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        elicitationHostCapabilities,
+      );
+      app.onelicitation = async (params) => ({
+        action: "accept",
+        content: { choice: params.message },
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      expect(bridge.getAppCapabilities()?.elicitation).toEqual({});
+      await expect(
+        bridge.requestElicitation({
+          message: "Choose an option",
+          requestedSchema: {
+            type: "object",
+            properties: {
+              choice: { type: "string" },
+            },
+            required: ["choice"],
+          },
+        }),
+      ).resolves.toEqual({
+        action: "accept",
+        content: { choice: "Choose an option" },
+      });
+    });
+
+    it("fails closed when the app did not advertise elicitation", async () => {
+      bridge = new AppBridge(createMockClient() as Client, testHostInfo, {
+        ...testHostCapabilities,
+        elicitation: {},
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      expect(() =>
+        bridge.requestElicitation({
+          message: "Choose an option",
+          requestedSchema: { type: "object", properties: {} },
+        }),
+      ).toThrow("App does not support elicitation");
+    });
+  });
+
   describe("Host -> App notifications", () => {
     beforeEach(async () => {
       await bridge.connect(bridgeTransport);

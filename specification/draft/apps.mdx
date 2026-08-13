@@ -2179,72 +2179,341 @@ See [ext-apps#35](https://github.com/modelcontextprotocol/ext-apps/issues/35) fo
 ### Client\<\>Server Capability Negotiation
 
 Clients and servers negotiate MCP Apps support through the standard MCP extensions capability mechanism (defined in SEP-1724).
+Features of MCP Apps are settings of the existing `io.modelcontextprotocol/ui`
+extension. They do not introduce additional extension identifiers.
 
 #### Client (Host) Capabilities
 
-Clients advertise MCP Apps support in the initialize request using the extension identifier `io.modelcontextprotocol/ui`:
+In MCP protocol revision `2026-07-28`, clients advertise MCP Apps support in
+the request-scoped capabilities carried in
+`_meta["io.modelcontextprotocol/clientCapabilities"]`. The extension identifier
+is `io.modelcontextprotocol/ui`:
 
 ```json
 {
-  "method": "initialize",
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
   "params": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {
-      "extensions": {
-        "io.modelcontextprotocol/ui": {
-          "mimeTypes": ["text/html;profile=mcp-app"]
+    "name": "schedule_delivery",
+    "arguments": {},
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientInfo": {
+        "name": "example-client",
+        "version": "1.0.0"
+      },
+      "io.modelcontextprotocol/clientCapabilities": {
+        "elicitation": {
+          "form": {}
+        },
+        "extensions": {
+          "io.modelcontextprotocol/ui": {
+            "mimeTypes": ["text/html;profile=mcp-app"],
+            "elicitation": {}
+          }
         }
       }
-    },
-    "clientInfo": {
-      "name": "claude-desktop",
-      "version": "1.0.0"
     }
   }
 }
 ```
 
+For protocol revisions that use the `initialize` handshake, clients place the
+same capability object in `InitializeRequest.params.capabilities`.
+
 **Extension Settings:**
 
 - `mimeTypes`: Array of supported content types (REQUIRED, e.g., `["text/html;profile=mcp-app"]`)
+- `elicitation`: Client can use an MCP App to render and resolve form-mode
+  `elicitation/create` requests that identify a UI resource
 
 Future versions may add additional settings:
 
 - `features`: Specific feature support (e.g., `["streaming", "persistence"]`)
 - `sandboxPolicies`: Supported sandbox attribute configurations
 
+#### Server Capabilities
+
+A server that may attach an MCP App to a form-mode elicitation advertises the
+same setting in its `server/discover` result:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "discover-1",
+  "result": {
+    "resultType": "complete",
+    "supportedVersions": ["2026-07-28"],
+    "capabilities": {
+      "extensions": {
+        "io.modelcontextprotocol/ui": {
+          "elicitation": {}
+        }
+      }
+    }
+  }
+}
+```
+
+For protocol revisions that use the `initialize` handshake, servers place the
+same setting in `InitializeResult.capabilities`.
+
+App-rendered elicitation is negotiated only when all of the following are
+true:
+
+1. The client advertises the core `elicitation.form` capability.
+2. The client advertises `text/html;profile=mcp-app` in
+   `io.modelcontextprotocol/ui.mimeTypes`.
+3. The client advertises `io.modelcontextprotocol/ui.elicitation`.
+4. The server advertises `io.modelcontextprotocol/ui.elicitation`.
+
+A MIME type match alone does not negotiate app-rendered elicitation. This
+explicit two-sided setting lets either peer use MCP Apps without also opting
+in to app-rendered elicitation.
+
 #### Server Behavior
 
-Servers SHOULD check client capabilities before registering UI-enabled tools. The SDK provides the `getUiCapability` helper for this:
+Servers SHOULD check the effective client capabilities before attaching MCP
+Apps metadata. In `2026-07-28`, those capabilities are request-scoped:
 
 ```typescript
 import { getUiCapability, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 
-const uiCap = getUiCapability(clientCapabilities);
-if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
-  // Register tools with UI templates
-  server.registerTool("get_weather", {
-    description: "Get weather with interactive dashboard",
-    inputSchema: { /* ... */ },
-    _meta: {
-      ui: { resourceUri: "ui://weather-server/dashboard" }
-    }
-  });
-} else {
-  // Register text-only version
-  server.registerTool("get_weather", {
-    description: "Get weather as text",
-    inputSchema: { /* ... */ }
-    // No UI metadata
-  });
+const uiCap = getUiCapability(requestContext.clientCapabilities);
+const useApp =
+  requestContext.clientCapabilities.elicitation?.form !== undefined &&
+  uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) &&
+  uiCap?.elicitation !== undefined;
+
+if (useApp) {
+  elicitation._meta = {
+    ...elicitation._meta,
+    ui: { resourceUri: "ui://delivery/choose-window.html" },
+  };
 }
 ```
+
+For protocol revisions that use an `initialize` handshake,
+`requestContext.clientCapabilities` is the initialized session capability
+object.
 
 **Graceful Degradation:**
 
 - Servers SHOULD provide text-only fallback behavior for all UI-enabled tools
 - Tools MUST return meaningful content array even when UI is available
-- Servers MAY register different tool variants based on host capabilities
+- Servers MAY select different result metadata based on effective host
+  capabilities
+
+### App-Rendered Elicitation
+
+When app-rendered elicitation is negotiated, a server can associate an MCP App
+resource with a standard form-mode `elicitation/create` input request. In
+protocol revision `2026-07-28`, that input request is carried by the core
+multi-round-trip request (MRTR) flow. This feature uses the existing MCP Apps
+extension, the standard MCP elicitation request and result, and the existing
+View↔Host JSON-RPC channel. It defines no new method, result, or extension
+identifier.
+
+#### Associating an App with an Elicitation
+
+The server attaches the app resource URI at `_meta.ui.resourceUri` on the
+embedded elicitation request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "result": {
+    "resultType": "input_required",
+    "inputRequests": {
+      "delivery-window": {
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "message": "Choose a delivery window",
+          "requestedSchema": {
+            "type": "object",
+            "properties": {
+              "window": {
+                "type": "string",
+                "oneOf": [
+                  { "const": "morning", "title": "Morning" },
+                  { "const": "afternoon", "title": "Afternoon" }
+                ]
+              }
+            },
+            "required": ["window"]
+          },
+          "_meta": {
+            "ui": {
+              "resourceUri": "ui://delivery/choose-window.html"
+            }
+          }
+        }
+      }
+    },
+    "requestState": "schedule-delivery:v1"
+  }
+}
+```
+
+`resourceUri` MUST be an absolute `ui://` URI. It is resolved against the same
+MCP server connection that sent the elicitation. A server MUST NOT attach this
+metadata unless app-rendered elicitation was negotiated.
+
+App rendering is defined only for form mode. A client MUST NOT route URL-mode
+elicitations to an MCP App under this setting.
+
+#### Host↔App Capability Negotiation
+
+The host and the selected app independently confirm that their View↔Host
+channel supports elicitation:
+
+```json
+{
+  "method": "ui/initialize",
+  "params": {
+    "protocolVersion": "2026-01-26",
+    "appInfo": {
+      "name": "delivery-window",
+      "version": "1.0.0"
+    },
+    "appCapabilities": {
+      "elicitation": {}
+    }
+  }
+}
+```
+
+```json
+{
+  "result": {
+    "protocolVersion": "2026-01-26",
+    "hostInfo": {
+      "name": "example-host",
+      "version": "1.0.0"
+    },
+    "hostCapabilities": {
+      "elicitation": {}
+    },
+    "hostContext": {}
+  }
+}
+```
+
+An app MUST advertise `appCapabilities.elicitation` before it receives an
+elicitation. A host MUST advertise `hostCapabilities.elicitation` before it
+forwards one. If either setting is absent, the host MUST use its native
+form-elicitation UI instead.
+
+#### Resolution Flow
+
+For each app-rendered elicitation in protocol revision `2026-07-28`, the
+client:
+
+1. Receives an `InputRequiredResult` while processing an originating client
+   request and selects the standard form-mode `elicitation/create` entry from
+   `inputRequests`.
+2. Confirms that app-rendered elicitation was negotiated and validates
+   `_meta.ui.resourceUri`.
+3. Reads and validates the MCP App resource using the same server connection.
+4. Creates or selects an app instance that is bound to this exact request and
+   resource URI, then completes the `ui/initialize` handshake.
+5. If the app and host advertised their View↔Host `elicitation` settings,
+   forwards the unchanged `elicitation/create` request to that app instance.
+6. Validates the app's response as a standard MCP `ElicitResult`.
+7. Places the result under the same key in `inputResponses` and retries the
+   originating request with the server-provided `requestState`, if any.
+
+For example, an app resolves the View↔Host request by returning the standard
+result:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "result": {
+    "action": "accept",
+    "content": {
+      "window": "morning"
+    }
+  }
+}
+```
+
+The host then resumes the originating MCP operation using the core MRTR shape:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "method": "tools/call",
+  "params": {
+    "name": "schedule_delivery",
+    "arguments": {},
+    "inputResponses": {
+      "delivery-window": {
+        "action": "accept",
+        "content": {
+          "window": "morning"
+        }
+      }
+    },
+    "requestState": "schedule-delivery:v1",
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {
+        "elicitation": {
+          "form": {}
+        },
+        "extensions": {
+          "io.modelcontextprotocol/ui": {
+            "mimeTypes": ["text/html;profile=mcp-app"],
+            "elicitation": {}
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+The host remains the MCP client and policy enforcement point. The app does not
+connect to the server directly and does not introduce an app-specific result
+or callback method.
+
+The host MUST bind forwarding to the originating request, resource URI, and app
+instance. It MUST NOT forward to a global or "currently active" app bridge.
+This requirement also applies when multiple elicitations are in flight.
+Cancellation and timeout signals SHOULD be propagated across the bound
+View↔Host request.
+
+#### Validation, Fallback, and Retry
+
+The host MUST validate an accepted app result against the standard
+`ElicitResult` shape and the request's `requestedSchema` before adding it to
+`inputResponses`.
+
+If the app resource is missing or invalid, cannot be loaded, fails to
+initialize, does not advertise `elicitation`, cannot complete the bridge
+request, or returns an invalid result, the host SHOULD fall back to its native
+form-elicitation UI. The original message and requested schema MUST be
+preserved.
+
+An app result with `action: "decline"` or `action: "cancel"` is a successful
+resolution and MUST be returned to the server. It MUST NOT trigger native
+fallback.
+
+Subsequent validation and retry use the core MCP MRTR flow. MCP Apps add no
+retry method. When the core protocol associates a retry with the same request,
+the host SHOULD preserve the app instance and its local state when policy and
+lifecycle permit.
+
+On protocol revisions that use direct server-to-client requests, the same
+semantic `elicitation/create` request can be delivered directly and its
+`ElicitResult` can be returned as the JSON-RPC response. Implementations MUST
+NOT assume that connection-bound state survives between MRTR rounds.
 
 #### App (Guest UI) Capabilities
 

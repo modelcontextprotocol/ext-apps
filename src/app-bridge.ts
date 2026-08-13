@@ -10,6 +10,9 @@ import {
   CreateMessageResult,
   CreateMessageResultWithTools,
   EmptyResult,
+  ElicitRequest,
+  ElicitResult,
+  ElicitResultSchema,
   Implementation,
   ListPromptsRequest,
   ListPromptsRequestSchema,
@@ -441,6 +444,36 @@ export class AppBridge extends ProtocolWithEvents<
    */
   getAppCapabilities(): McpUiAppCapabilities | undefined {
     return this._appCapabilities;
+  }
+
+  /**
+   * Forward a form-mode MCP elicitation to this exact app instance.
+   *
+   * Hosts should call this only from the core MCP client's handler for the
+   * originating `elicitation/create` request. The returned value is the
+   * standard MCP `ElicitResult` and can be returned directly to the server.
+   */
+  requestElicitation(
+    params: ElicitRequest["params"],
+    options?: RequestOptions,
+  ): Promise<ElicitResult> {
+    if (!this._initializedReceived) {
+      throw new Error("App has not completed ui/initialize");
+    }
+    if (!this._capabilities.elicitation) {
+      throw new Error("Host does not support app-rendered elicitation");
+    }
+    if (!this._appCapabilities?.elicitation) {
+      throw new Error("App does not support elicitation");
+    }
+    if (params.mode !== undefined && params.mode !== "form") {
+      throw new Error("MCP Apps only support form-mode elicitations");
+    }
+    return this.request(
+      { method: "elicitation/create", params },
+      ElicitResultSchema,
+      options,
+    );
   }
 
   /**
@@ -1408,7 +1441,14 @@ export class AppBridge extends ProtocolWithEvents<
    * @internal
    */
   assertCapabilityForMethod(method: AppRequest["method"]): void {
-    // TODO
+    if (
+      method === "elicitation/create" &&
+      !this._appCapabilities?.elicitation
+    ) {
+      throw new Error(
+        `App does not support elicitation capability (required for ${method})`,
+      );
+    }
   }
 
   /**

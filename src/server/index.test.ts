@@ -5,6 +5,10 @@ import {
   RESOURCE_URI_META_KEY,
   RESOURCE_MIME_TYPE,
   getUiCapability,
+  getUiServerCapability,
+  supportsAppElicitation,
+  withElicitationUi,
+  getElicitationUiResourceUri,
   EXTENSION_ID,
 } from "./index";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -354,5 +358,109 @@ describe("getUiCapability", () => {
       },
     };
     expect(getUiCapability(caps)).toBeUndefined();
+  });
+});
+
+describe("app-rendered elicitation negotiation", () => {
+  const clientCapabilities = {
+    elicitation: { form: {} },
+    extensions: {
+      [EXTENSION_ID]: {
+        mimeTypes: [RESOURCE_MIME_TYPE],
+        elicitation: {},
+      },
+    },
+  };
+  const serverCapabilities = {
+    extensions: {
+      [EXTENSION_ID]: {
+        elicitation: {},
+      },
+    },
+  };
+
+  it("requires matching client, server, core form, MIME, and UI settings", () => {
+    expect(supportsAppElicitation(clientCapabilities, serverCapabilities)).toBe(
+      true,
+    );
+    expect(supportsAppElicitation({}, serverCapabilities)).toBe(false);
+    expect(supportsAppElicitation(clientCapabilities, {})).toBe(false);
+    expect(
+      supportsAppElicitation(
+        {
+          ...clientCapabilities,
+          elicitation: {},
+        },
+        serverCapabilities,
+      ),
+    ).toBe(false);
+  });
+
+  it("reads the server setting from the existing MCP Apps extension", () => {
+    expect(getUiServerCapability(serverCapabilities)).toEqual({
+      elicitation: {},
+    });
+  });
+});
+
+describe("elicitation UI metadata", () => {
+  const params = {
+    message: "Choose an option",
+    requestedSchema: {
+      type: "object" as const,
+      properties: {
+        choice: { type: "string" as const },
+      },
+    },
+  };
+
+  it("attaches and reads an absolute hierarchical ui:// resource URI", () => {
+    const enhanced = withElicitationUi(params, "ui://weather/view.html");
+    expect(enhanced.requestedSchema).toEqual(params.requestedSchema);
+    expect(getElicitationUiResourceUri(enhanced)).toBe(
+      "ui://weather/view.html",
+    );
+  });
+
+  it("rejects URL-mode elicitation and non-ui resource URIs", () => {
+    expect(() =>
+      withElicitationUi(
+        {
+          mode: "url",
+          message: "Continue",
+          elicitationId: "123",
+          url: "https://example.com",
+        } as any,
+        "ui://example/view.html",
+      ),
+    ).toThrow("form-mode");
+    expect(() => withElicitationUi(params, "https://example.com")).toThrow(
+      "absolute ui://",
+    );
+  });
+
+  it.each([
+    "ui:example/view.html",
+    "ui:///view.html",
+    "ui://",
+    "ui://[invalid",
+  ])("rejects invalid resource URI in the setter: %s", (resourceUri) => {
+    expect(() => withElicitationUi(params, resourceUri)).toThrow(
+      "absolute ui://",
+    );
+  });
+
+  it.each([
+    "ui:example/view.html",
+    "ui:///view.html",
+    "ui://",
+    "ui://[invalid",
+  ])("rejects invalid resource URI in the getter: %s", (resourceUri) => {
+    expect(() =>
+      getElicitationUiResourceUri({
+        ...params,
+        _meta: { ui: { resourceUri } },
+      }),
+    ).toThrow("absolute ui://");
   });
 });

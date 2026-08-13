@@ -15,6 +15,9 @@ import {
   CreateMessageResultWithTools,
   CreateMessageResultWithToolsSchema,
   EmptyResultSchema,
+  ElicitRequest,
+  ElicitRequestSchema,
+  ElicitResult,
   Implementation,
   ListResourcesRequest,
   ListResourcesResult,
@@ -1014,6 +1017,49 @@ export class App extends ProtocolWithEvents<
   }
 
   /**
+   * Handle a form-mode elicitation that the host has bound to this app.
+   *
+   * The callback receives the unchanged standard MCP `elicitation/create`
+   * parameters and returns the unchanged standard MCP `ElicitResult`.
+   * Register this handler before {@link connect `connect`}; doing so advertises
+   * the app's `elicitation` capability during `ui/initialize`.
+   */
+  private _onelicitation?: (
+    params: ElicitRequest["params"],
+    extra: RequestHandlerExtra,
+  ) => ElicitResult | Promise<ElicitResult>;
+  get onelicitation() {
+    return this._onelicitation;
+  }
+  set onelicitation(
+    callback:
+      | ((
+          params: ElicitRequest["params"],
+          extra: RequestHandlerExtra,
+        ) => ElicitResult | Promise<ElicitResult>)
+      | undefined,
+  ) {
+    this.warnIfRequestHandlerReplaced(
+      "onelicitation",
+      this._onelicitation,
+      callback,
+    );
+    this._onelicitation = callback;
+    if (callback && !this._capabilities.elicitation && !this.transport) {
+      this.registerCapabilities({ elicitation: {} });
+    }
+    this.replaceRequestHandler(ElicitRequestSchema, (request, extra) => {
+      if (!this._onelicitation) {
+        throw new Error("No onelicitation handler set");
+      }
+      if (request.params.mode !== undefined && request.params.mode !== "form") {
+        throw new Error("MCP Apps only support form-mode elicitations");
+      }
+      return this._onelicitation(request.params, extra);
+    });
+  }
+
+  /**
    * Convenience handler for tool call requests from the host.
    *
    * Set this property to register a handler that will be called when the host
@@ -1162,6 +1208,13 @@ export class App extends ProtocolWithEvents<
         if (!this._capabilities.tools) {
           throw new Error(
             `Client does not support tool capability (required for ${method})`,
+          );
+        }
+        return;
+      case "elicitation/create":
+        if (!this._capabilities.elicitation) {
+          throw new Error(
+            `App does not support elicitation capability (required for ${method})`,
           );
         }
         return;
