@@ -37,6 +37,35 @@ registerAppTool(
 > [!NOTE]
 > For full examples that implement this pattern, see: [`examples/system-monitor-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/system-monitor-server) and [`examples/pdf-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/pdf-server).
 
+## Tool result data visibility
+
+A tool result has three fields for data, each with different visibility:
+
+| Field               | Seen by model                | Seen by App | Use for                                                       |
+| ------------------- | ---------------------------- | ----------- | ------------------------------------------------------------- |
+| `content`           | Yes                          | Yes         | Short text summary for the model and for text-only hosts      |
+| `structuredContent` | Only when `content` is empty | Yes         | Structured data the App renders (tables, charts, lists)       |
+| `_meta`             | No                           | Yes         | Opaque metadata such as IDs, timestamps, and view identifiers |
+
+Per the core MCP guideline, hosts fall back to passing `structuredContent` to the model only when `content` is empty, so populating `content` is the way to keep large render payloads out of the model's context. The App receives all three fields regardless. Keep `content` brief: the model uses it to decide what to say next, so a one-line summary is preferable to raw data.
+
+> [!WARNING]
+> Do not return large payloads in tool results. Serve base64-encoded audio, images, or file contents via MCP resources (see [Serving binary blobs via resources](#serving-binary-blobs-via-resources)) or have the App fetch them over the network. Even when `structuredContent` is kept out of the model's context, large tool results still slow down transport, inflate conversation storage, and some host implementations include more of the result than the specification requires.
+
+Write `content` for the model, not the user. The user sees your App, not the `content` text. State explicitly that a view was displayed and what it contains so the model does not re-describe what is already on screen:
+
+```ts
+return {
+  content: [
+    {
+      type: "text",
+      text: "Rendered an interactive chart of Q3 revenue by region. The user can see and interact with it; do not describe the chart contents in your response.",
+    },
+  ],
+  structuredContent: { regions, revenue, quarter: "Q3" },
+};
+```
+
 ## Polling for live data
 
 For real-time dashboards or monitoring views, use an app-only tool (with `visibility: ["app"]`) that the App polls at regular intervals.
@@ -402,6 +431,31 @@ function MyApp() {
 > [!NOTE]
 > For full examples that implement this pattern, see: [`examples/basic-server-vanillajs/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) and [`examples/basic-server-react/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react).
 
+> [!TIP]
+> Avoid setting the `color-scheme` CSS property on your root element. If the App declares `color-scheme: light dark` and the host document does not, the browser inserts an opaque backdrop behind the iframe to prevent cross-scheme bleed-through, which breaks transparent backgrounds. Use the `[data-theme]` attribute approach shown above and let the host control scheme negotiation.
+
+## Supporting touch devices
+
+In inline mode, the App scrolls with the surrounding conversation. Do not capture vertical pan gestures or add nested scroll containers to inline layouts; let touch-drag pass through so the user can scroll the chat past your App.
+
+For interactive surfaces that handle horizontal drag or pinch (sliders, canvases, maps), set [`touch-action`](https://developer.mozilla.org/en-US/docs/Web/CSS/touch-action) so the browser delivers `pointermove` events to the App while still allowing vertical scroll to reach the page:
+
+```css
+/* Horizontal slider: consume horizontal drag, leave vertical to the chat */
+.slider-track {
+  touch-action: pan-y;
+}
+
+/* Fullscreen canvas that handles its own pan and pinch */
+.fullscreen .chart-surface {
+  touch-action: none;
+}
+```
+
+Reserve `touch-action: none` for fullscreen mode, where the App owns the viewport and there is no outer scroll to conflict with.
+
+Prevent horizontal overflow by setting `overflow-x: hidden` on the root container if the layout contains any fixed-width elements. Horizontal overflow on mobile causes the entire App to shift when the page is scrolled.
+
 ## Entering / exiting fullscreen
 
 Toggle fullscreen mode by calling {@link app!App.requestDisplayMode `requestDisplayMode`}:
@@ -452,6 +506,61 @@ In fullscreen mode, remove the container's border radius so content extends to t
 
 > [!NOTE]
 > For full examples that implement this pattern, see: [`examples/shadertoy-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/shadertoy-server), [`examples/pdf-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/pdf-server), and [`examples/map-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/map-server).
+
+## Controlling App height
+
+By default, the SDK observes the document's content height and reports it to the host so the iframe grows to fit (`autoResize: true`). This is appropriate for content-driven UI such as cards, tables, and forms. It is the wrong choice for viewport-filling UI such as canvases, maps, and editors.
+
+| UI type                               | Strategy    | `autoResize` | Root CSS height            |
+| ------------------------------------- | ----------- | ------------ | -------------------------- |
+| Cards, tables, forms (natural height) | Auto-resize | `true`       | unset                      |
+| Fixed-size widgets                    | Fixed       | `false`      | explicit `px`              |
+| Canvases, maps, editors (fill space)  | Host-driven | `false`      | from `containerDimensions` |
+
+**Auto-resize (default).** For content with a natural height. The iframe grows to fit.
+
+**Fixed height.** For UI that should remain the same size when inline. Disable auto-resize, set an explicit height, and report it to the host with {@link app!App.sendSizeChanged `sendSizeChanged`} so the iframe is allocated the correct size:
+
+```ts
+const app = new App(
+  { name: "my-app", version: "0.1.0" },
+  {},
+  { autoResize: false },
+);
+await app.connect();
+app.sendSizeChanged({ width: document.body.clientWidth, height: 500 });
+```
+
+```css
+html,
+body {
+  height: 500px;
+  margin: 0;
+}
+```
+
+**Host-driven height.** For UI that should fill the space the host provides (common for fullscreen-capable Apps). Disable auto-resize and size the root element from {@link types!McpUiHostContext `hostContext.containerDimensions`}, which may report fixed `width`/`height` or `maxWidth`/`maxHeight` bounds:
+
+```ts
+const app = new App(
+  { name: "my-app", version: "0.1.0" },
+  {},
+  { autoResize: false },
+);
+const root = document.getElementById("root")!;
+
+app.addEventListener("hostcontextchanged", (ctx) => {
+  const dims = ctx.containerDimensions;
+  if (dims && "height" in dims) root.style.height = `${dims.height}px`;
+  if (dims && "width" in dims) root.style.width = `${dims.width}px`;
+});
+await app.connect();
+```
+
+> [!WARNING]
+> Do not combine `autoResize: true` with `height: 100vh` or `100%` on the root element. The SDK reports the document height, the host grows the iframe to match, the document sees a taller viewport and grows again. This loops until the host's maximum height cap.
+
+The React `useApp` hook always creates the App with `autoResize: true` and does not currently expose an option to disable it. For fixed or host-driven height, construct the `App` manually with `{ autoResize: false }` instead of using `useApp`.
 
 ## Passing contextual information from the App to the model
 
@@ -569,6 +678,11 @@ app.ontoolresult = (result) => {
 
 For state that represents user effort (e.g., saved bookmarks, annotations, custom configurations), consider persisting it server-side using [app-only tools](#tools-that-are-private-to-apps) instead. Pass the `viewUUID` to the app-only tool to scope the saved data to that view instance.
 
+> [!WARNING]
+> Namespace all `localStorage` keys. Hosts typically serve every MCP App from the same sandbox origin, so all Apps share a single `localStorage`. Generic keys such as `"state"` or `"settings"` will collide with other Apps. The server-generated `viewUUID` pattern above avoids this; any additional keys should be prefixed with a string unique to your App.
+>
+> `localStorage` availability is host-dependent and may be disabled in some sandbox configurations. Wrap access in `try`/`catch` and degrade gracefully.
+
 > [!NOTE]
 > For full examples using `localStorage`, see: [`examples/pdf-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/pdf-server) (persists current page) and [`examples/map-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/map-server) (persists camera position).
 
@@ -600,6 +714,118 @@ app.onteardown = async () => {
 
 > [!NOTE]
 > For full examples that implement this pattern, see: [`examples/shadertoy-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/shadertoy-server) and [`examples/threejs-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/threejs-server).
+
+## Sharing one UI resource across multiple tools
+
+Several tools can reference the same `ui://` resource. For example, a single document viewer App might render results from `open-document`, `search-documents`, and `recent-documents`.
+
+The App needs to know which tool produced its data in order to parse the payload correctly. The host may provide this via `hostContext.toolInfo`, but the field is optional and not available on every host. The reliable approach is to include a discriminator in the tool result:
+
+```ts
+// In each tool handler, tag the result with its origin
+return {
+  content: [{ type: "text", text: "Opened annual-report.pdf" }],
+  structuredContent: {
+    kind: "open-document", // discriminator
+    document: { id, title, pageCount },
+  },
+};
+```
+
+```ts
+// In the App, branch on the discriminator
+app.addEventListener("toolresult", (result) => {
+  if (result.isError || !result.structuredContent) {
+    return renderError(result);
+  }
+  const data = result.structuredContent as { kind: string };
+  switch (data.kind) {
+    case "open-document":
+      renderViewer(data);
+      break;
+    case "search-documents":
+      renderSearchResults(data);
+      break;
+  }
+});
+```
+
+## Conditionally showing UI
+
+The tool-to-resource binding is declared at registration time. A tool either has a `_meta.ui.resourceUri` or it does not; the server cannot decide per-call whether to render UI.
+
+A stateful server can decide at connection time. During `initialize`, the client declares whether it supports the Apps extension; use {@link server-helpers!getUiCapability `getUiCapability`} to read that declaration and register UI-backed tools only for clients that can render them:
+
+<!-- prettier-ignore -->
+```ts source="../src/server/index.examples.ts#getUiCapability_checkSupport"
+server.server.oninitialized = () => {
+  const clientCapabilities = server.server.getClientCapabilities();
+  const uiCap = getUiCapability(clientCapabilities);
+
+  if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
+    // App-enhanced tool
+    registerAppTool(
+      server,
+      "weather",
+      {
+        description: "Get weather information with interactive dashboard",
+        _meta: { ui: { resourceUri: "ui://weather/dashboard" } },
+      },
+      weatherHandler,
+    );
+  } else {
+    // Text-only fallback
+    server.registerTool(
+      "weather",
+      {
+        description: "Get weather information",
+      },
+      textWeatherHandler,
+    );
+  }
+};
+```
+
+If both behaviors are needed for a single UI-capable client, register two tools:
+
+- `query-data` with no `_meta.ui`, returning text and structured data for the model to reason about
+- `visualize-data` with `_meta.ui`, returning the same data rendered as an interactive App
+
+Write distinct descriptions so the model selects the correct tool based on user intent ("show me" maps to visualize, "tell me" maps to query).
+
+If the decision must be made server-side (for example, showing UI only when the result set exceeds a threshold), the workaround is to always attach the UI resource and have the App render a minimal collapsed placeholder when there is nothing to show. Keep the placeholder small to avoid adding visual noise to the conversation.
+
+## Opening external links and downloading files
+
+Use {@link app!App.openLink `app.openLink()`} instead of `window.open()` or `<a target="_blank">`, and {@link app!App.downloadFile `app.downloadFile()`} instead of synthesizing `<a download>` clicks. The sandbox blocks direct navigation and downloads; these methods ask the host to perform the action on the App's behalf.
+
+Both are optional host capabilities. Check {@link app!App.getHostCapabilities `getHostCapabilities`} before rendering the corresponding controls so the App degrades gracefully on hosts that do not implement them:
+
+```ts
+const caps = app.getHostCapabilities();
+
+// Hide controls the host cannot honor
+docsLink.hidden = !caps?.openLinks;
+downloadButton.hidden = !caps?.downloadFile;
+
+docsLink.onclick = () => app.openLink({ url: "https://example.com/docs" });
+
+downloadButton.onclick = () =>
+  app.downloadFile({
+    contents: [
+      {
+        type: "resource",
+        resource: {
+          uri: "file:///report.csv",
+          mimeType: "text/csv",
+          text: csv,
+        },
+      },
+    ],
+  });
+```
+
+Hosts typically show an interstitial confirmation for `openLink` so users can review the destination before navigating. Do not assume navigation is instant, and do not chain multiple `openLink` calls.
 
 ## Lowering perceived latency
 

@@ -94,7 +94,7 @@ sequenceDiagram
 
 1. **Discovery** — The Host learns about tools and their UI resources when connecting to the server.
 2. **Initialization** — When a UI tool is called, the Host renders the iframe. The View sends `ui/initialize` and receives host context (theme, capabilities, container dimensions). This handshake ensures the View is ready before receiving data.
-3. **Data delivery** — The Host sends tool arguments and, once available, tool results to the View. Results include both `content` (text for the model's context) and optionally `structuredContent` (data optimized for UI rendering). This separation lets servers provide rich data to the UI without bloating the model's context.
+3. **Data delivery** — The Host sends tool arguments and, once available, tool results to the View. Results include both `content` (text for the model's context) and optionally `structuredContent` (data optimized for UI rendering, passed to the model only when `content` is empty). This separation lets servers provide rich data to the UI without bloating the model's context.
 4. **Interactive phase** — The user interacts with the View. The View can call tools, send messages, or update context.
 5. **Teardown** — Before unmounting, the Host notifies the View so it can save state or release resources.
 
@@ -109,6 +109,8 @@ Resources are declared upfront, during tool registration. This design enables:
 - **Prefetching** — Hosts can cache templates before tool execution
 - **Separation of concerns** — Templates (presentation) are separate from tool results (data)
 - **Review** — Hosts can inspect UI templates during connection setup
+
+**Versioning and caching.** Resource caching behavior is host-defined. A host may re-fetch the `ui://` resource on each render, cache it for the session, or persist it alongside the conversation. When a user revisits an old conversation, the host may run the current template code against the original tool result, or it may replay a snapshot of both from the time of the original tool call. Design the App to tolerate older `structuredContent` shapes: handle unknown fields gracefully and do not assume the template and the data were produced by the same code version.
 
 See the [UI Resource Format](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#ui-resource-format) section of the specification for the full schema.
 

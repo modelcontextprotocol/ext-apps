@@ -14,6 +14,8 @@ const config = {
     "docs/agent-skills.md",
     "docs/testing-mcp-apps.md",
     "docs/patterns.md",
+    "docs/design-guidelines.md",
+    "docs/troubleshooting.md",
     "docs/authorization.md",
     "docs/csp-cors.md",
     "docs/migrate_from_openai_apps.md",
