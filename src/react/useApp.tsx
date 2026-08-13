@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Implementation } from "@modelcontextprotocol/sdk/types.js";
-import { Client } from "@modelcontextprotocol/sdk/client";
+import type { Implementation } from "@modelcontextprotocol/client";
 import {
   App,
   AppOptions,

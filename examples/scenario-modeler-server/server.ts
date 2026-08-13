@@ -3,11 +3,11 @@ import {
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -305,8 +305,8 @@ export function createServer(): McpServer {
         title: "Get Scenario Data",
         description:
           "Returns SaaS scenario templates and optionally computes custom projections for given inputs",
-        inputSchema: GetScenarioDataInputSchema.shape,
-        outputSchema: GetScenarioDataOutputSchema.shape,
+        inputSchema: GetScenarioDataInputSchema,
+        outputSchema: GetScenarioDataOutputSchema,
         _meta: { ui: { resourceUri } },
       },
       async (args: {

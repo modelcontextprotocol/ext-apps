@@ -7,7 +7,7 @@ import {
   applyHostStyleVariables,
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/client";
 
 function extractTime(result: CallToolResult): string {
   const { text } = result.content?.find((c) => c.type === "text")!;

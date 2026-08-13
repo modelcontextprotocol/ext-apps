@@ -5,7 +5,7 @@
  * The video is served as a base64 blob and converted to a data URI for playback.
  */
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/client";
 import "./global.css";
 import "./mcp-app.css";
 

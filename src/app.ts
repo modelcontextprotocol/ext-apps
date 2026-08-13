@@ -1,39 +1,30 @@
 import {
+  Protocol,
+  type BaseContext,
+  type ProtocolOptions,
   type RequestOptions,
-  mergeCapabilities,
-  ProtocolOptions,
-} from "@modelcontextprotocol/sdk/shared/protocol.js";
-
-import {
-  CallToolRequest,
-  CallToolRequestSchema,
-  CallToolResult,
-  CallToolResultSchema,
-  CreateMessageRequest,
-  CreateMessageResult,
-  CreateMessageResultSchema,
-  CreateMessageResultWithTools,
-  CreateMessageResultWithToolsSchema,
-  EmptyResultSchema,
-  Implementation,
-  ListResourcesRequest,
-  ListResourcesResult,
-  ListResourcesResultSchema,
-  ListToolsRequest,
-  ListToolsRequestSchema,
-  ListToolsResult,
-  LoggingMessageNotification,
-  PingRequestSchema,
-  ReadResourceRequest,
-  ReadResourceResult,
-  ReadResourceResultSchema,
-  Tool,
-  ToolAnnotations,
-  ToolListChangedNotification,
-} from "@modelcontextprotocol/sdk/types.js";
-import { AppNotification, AppRequest, AppResult } from "./types";
-import { ProtocolWithEvents } from "./events";
-export { ProtocolWithEvents };
+  type CallToolRequest,
+  type CallToolResult,
+  type CreateMessageRequest,
+  type CreateMessageResult,
+  type CreateMessageResultWithTools,
+  type Implementation,
+  type ListResourcesRequest,
+  type ListResourcesResult,
+  type ListToolsRequest,
+  type ListToolsResult,
+  type LoggingMessageNotification,
+  type ReadResourceRequest,
+  type ReadResourceResult,
+  type Tool,
+  type ToolAnnotations,
+  type ToolListChangedNotification,
+  type Transport,
+} from "@modelcontextprotocol/client";
+import { EmptyResultSchema } from "@modelcontextprotocol/core";
+export { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY } from "./constants";
+import { EventDispatcher } from "./events";
+export { EventDispatcher } from "./events";
 import { PostMessageTransport } from "./message-transport";
 import {
   LATEST_PROTOCOL_VERSION,
@@ -55,6 +46,7 @@ import {
   McpUiResourceTeardownRequest,
   McpUiResourceTeardownRequestSchema,
   McpUiResourceTeardownResult,
+  McpUiResourceTeardownResultSchema,
   McpUiRequestTeardownNotification,
   McpUiSizeChangedNotification,
   McpUiToolCancelledNotification,
@@ -68,13 +60,34 @@ import {
   McpUiRequestDisplayModeRequest,
   McpUiRequestDisplayModeResultSchema,
 } from "./types";
-import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   StandardSchemaV1,
   standardSchemaToJsonSchema,
   validateStandardSchema,
 } from "./standard-schema";
-import { z } from "zod/v4";
+import { z, type ZodLiteral, type ZodObject, type ZodType } from "zod/v4";
+
+type MethodSchema = ZodObject<{
+  method: ZodLiteral<string>;
+  params: ZodType;
+}>;
+
+function mergeAppCapabilities(
+  base: McpUiAppCapabilities,
+  additional: McpUiAppCapabilities,
+): McpUiAppCapabilities {
+  const result = { ...base, ...additional };
+  if (additional.experimental !== undefined) {
+    result.experimental = {
+      ...base.experimental,
+      ...additional.experimental,
+    };
+  }
+  if (additional.tools !== undefined) {
+    result.tools = { ...base.tools, ...additional.tools };
+  }
+  return result;
+}
 
 export type {
   StandardSchemaV1,
@@ -146,7 +159,6 @@ export {
  * }
  * ```
  */
-export const RESOURCE_URI_META_KEY = "ui/resourceUri";
 
 /**
  * MIME type for MCP UI resources.
@@ -155,16 +167,15 @@ export const RESOURCE_URI_META_KEY = "ui/resourceUri";
  *
  * Used by {@link server-helpers!registerAppResource `registerAppResource`} as the default MIME type for app resources.
  */
-export const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 
 /**
  * Options for configuring {@link App `App`} behavior.
  *
- * Extends `ProtocolOptions` from the MCP SDK with `App`-specific configuration.
+ * Extends `ProtocolOptions` from the base MCP SDK with `App`-specific configuration.
  *
- * @see `ProtocolOptions` from @modelcontextprotocol/sdk for inherited options
+ * @see `ProtocolOptions` from @modelcontextprotocol/client for inherited options
  */
-export type AppOptions = ProtocolOptions & {
+export type AppOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
   /**
    * Automatically report size changes to the host using `ResizeObserver`.
    *
@@ -204,9 +215,7 @@ export type AppOptions = ProtocolOptions & {
   allowUnsafeEval?: boolean;
 };
 
-type RequestHandlerExtra = Parameters<
-  Parameters<App["setRequestHandler"]>[1]
->[1];
+type RequestHandlerExtra = BaseContext;
 
 /**
  * Result of an app-registered tool callback. When `Out` is provided,
@@ -228,7 +237,7 @@ export type AppToolResult<
  * validated/parsed input; when `In` is `undefined`, the callback receives only
  * `extra`. When `Out` is provided, the return's `structuredContent` is typed.
  *
- * Mirrors `ToolCallback` from `@modelcontextprotocol/sdk/server/mcp.js` but is
+ * Mirrors `ToolCallback` from `@modelcontextprotocol/server` but is
  * parameterized over {@link StandardSchemaV1} instead of zod, so any
  * Standard-Schema-compatible library (Zod, ArkType, Valibot, …) can be used.
  */
@@ -246,7 +255,7 @@ export type AppToolCallback<
 
 /**
  * Handle returned by {@link App.registerTool}. Mirrors `RegisteredTool` from
- * `@modelcontextprotocol/sdk/server/mcp.js` but stores
+ * `@modelcontextprotocol/server` but stores
  * {@link StandardSchemaV1} schemas.
  */
 export type RegisteredAppTool = {
@@ -271,9 +280,9 @@ export type RegisteredAppTool = {
 /**
  * Maps DOM-style event names to their notification `params` types.
  *
- * Used by {@link App `App`} (which extends {@link ProtocolWithEvents `ProtocolWithEvents`})
- * to provide type-safe `addEventListener` / `removeEventListener` and
- * singular `on*` handler support.
+ * Used by {@link App `App`} and its composed {@link EventDispatcher} to
+ * provide type-safe `addEventListener` / `removeEventListener` and singular
+ * `on*` handler support.
  */
 export type AppEventMap = {
   toolinput: McpUiToolInputNotification["params"];
@@ -287,9 +296,9 @@ export type AppEventMap = {
  * Main class for MCP Apps to communicate with their host.
  *
  * The `App` class provides a framework-agnostic way to build interactive MCP Apps
- * that run inside host applications. It extends the MCP SDK's `Protocol` class and
- * handles the connection lifecycle, initialization handshake, and bidirectional
- * communication with the host.
+ * that run inside host applications. It extends the base MCP SDK's public
+ * `Protocol` class, composes an {@link EventDispatcher}, and adds the Apps
+ * handshake, lifecycle, and high-level APIs.
  *
  * ## Architecture
  *
@@ -304,15 +313,15 @@ export type AppEventMap = {
  * 3. **Interactive**: Send requests, receive notifications, call tools
  * 4. **Teardown**: Host sends teardown request before unmounting
  *
- * ## Inherited Methods
+ * ## Protocol and event methods
  *
- * As a subclass of {@link ProtocolWithEvents `ProtocolWithEvents`}, `App` inherits:
+ * From the base MCP SDK's `Protocol`, `App` provides:
  * - `setRequestHandler()` - Register handlers for requests from host
  * - `setNotificationHandler()` - Register handlers for notifications from host
+ *
+ * From its composed {@link EventDispatcher}, `App` also provides:
  * - `addEventListener()` - Append a listener for a notification event (multi-listener)
  * - `removeEventListener()` - Remove a previously added listener
- *
- * @see {@link ProtocolWithEvents `ProtocolWithEvents`} for the DOM-model event system
  *
  * ## Notification Setters (DOM-model `on*` handlers)
  *
@@ -342,17 +351,14 @@ export type AppEventMap = {
  * await app.connect();
  * ```
  */
-export class App extends ProtocolWithEvents<
-  AppRequest,
-  AppNotification,
-  AppResult,
-  AppEventMap
-> {
+export class App extends Protocol<BaseContext> {
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
   private _registeredTools: { [name: string]: RegisteredAppTool } = {};
   private _initializedSent = false;
+  private readonly _registeredEvents = new Set<keyof AppEventMap>();
+  private readonly _events = new EventDispatcher<AppEventMap>();
 
   /**
    * Warn if a host-bound method is called before {@link connect `connect`} has
@@ -378,7 +384,9 @@ export class App extends ProtocolWithEvents<
     console.warn(`${msg}. This will throw in a future release.`);
   }
 
-  protected readonly eventSchemas = {
+  private readonly eventSchemas: {
+    [K in keyof AppEventMap]: MethodSchema;
+  } = {
     toolinput: McpUiToolInputNotificationSchema,
     toolinputpartial: McpUiToolInputPartialNotificationSchema,
     toolresult: McpUiToolResultNotificationSchema,
@@ -427,28 +435,65 @@ export class App extends ProtocolWithEvents<
     console.warn(msg);
   }
 
-  protected override setEventHandler<K extends keyof AppEventMap>(
+  protected setEventHandler<K extends keyof AppEventMap>(
     event: K,
     handler: ((params: AppEventMap[K]) => void) | undefined,
   ): void {
     if (handler) this._assertHandlerTiming(event);
-    super.setEventHandler(event, handler);
+    this._ensureEventSlot(event);
+    this._events.setHandler(event, handler);
   }
 
-  override addEventListener<K extends keyof AppEventMap>(
+  addEventListener<K extends keyof AppEventMap>(
     event: K,
     handler: (params: AppEventMap[K]) => void,
   ): void {
     this._assertHandlerTiming(event);
-    super.addEventListener(event, handler);
+    this._ensureEventSlot(event);
+    this._events.addEventListener(event, handler);
   }
 
-  protected override onEventDispatch<K extends keyof AppEventMap>(
+  removeEventListener<K extends keyof AppEventMap>(
     event: K,
-    params: AppEventMap[K],
+    handler: (params: AppEventMap[K]) => void,
   ): void {
-    if (event === "hostcontextchanged") {
-      this._hostContext = { ...this._hostContext, ...params };
+    this._events.removeEventListener(event, handler);
+  }
+
+  private _ensureEventSlot<K extends keyof AppEventMap>(event: K): void {
+    if (this._registeredEvents.has(event)) return;
+    const schema = this.eventSchemas[event];
+    if (!schema) throw new Error(`Unknown event: ${String(event)}`);
+    this.setNotificationHandler(
+      schema.shape.method.value,
+      { params: schema.shape.params },
+      (params) => {
+        const eventParams = params as AppEventMap[K];
+        if (event === "hostcontextchanged") {
+          this._hostContext = { ...this._hostContext, ...eventParams };
+        }
+        this._events.dispatch(event, eventParams);
+      },
+    );
+    this._registeredEvents.add(event);
+  }
+
+  protected getEventHandler<K extends keyof AppEventMap>(
+    event: K,
+  ): ((params: AppEventMap[K]) => void) | undefined {
+    return this._events.getHandler(event);
+  }
+
+  protected warnIfRequestHandlerReplaced(
+    name: string,
+    previous: unknown,
+    next: unknown,
+  ): void {
+    if (previous && next) {
+      console.warn(
+        `[MCP Apps] ${name} handler replaced. ` +
+          `Previous handler will no longer be called.`,
+      );
     }
   }
 
@@ -456,7 +501,7 @@ export class App extends ProtocolWithEvents<
    * Create a new MCP App instance.
    *
    * @param _appInfo - App identification (name and version)
-   * @param _capabilities - Features and capabilities this app provides
+   * @param _appCapabilities - Features and capabilities this app provides
    * @param options - Configuration options including `autoResize` behavior
    *
    * @example
@@ -470,7 +515,7 @@ export class App extends ProtocolWithEvents<
    */
   constructor(
     private _appInfo: Implementation,
-    private _capabilities: McpUiAppCapabilities = {},
+    private _appCapabilities: McpUiAppCapabilities = {},
     private options: AppOptions = { autoResize: true },
   ) {
     super(options);
@@ -479,24 +524,31 @@ export class App extends ProtocolWithEvents<
       z.config({ jitless: true });
     }
 
-    this.setRequestHandler(PingRequestSchema, (request) => {
+    this.setRequestHandler("ping", (request) => {
       console.log("Received ping:", request.params);
       return {};
     });
 
-    // Eagerly register the hostcontextchanged event slot so that
-    // onEventDispatch (which merges into _hostContext) fires even if the
-    // user never assigns onhostcontextchanged or calls addEventListener.
+    // Eagerly register hostcontextchanged so the owner-side context merge runs
+    // even if the user never assigns a handler or adds a listener.
     this.setEventHandler("hostcontextchanged", undefined);
   }
 
-  private registerCapabilities(capabilities: McpUiAppCapabilities): void {
+  /** @internal */
+  protected buildContext(ctx: BaseContext): BaseContext {
+    return ctx;
+  }
+
+  private registerAppCapabilities(capabilities: McpUiAppCapabilities): void {
     if (this.transport) {
       throw new Error(
         "Cannot register capabilities after transport is established",
       );
     }
-    this._capabilities = mergeCapabilities(this._capabilities, capabilities);
+    this._appCapabilities = mergeAppCapabilities(
+      this._appCapabilities,
+      capabilities,
+    );
   }
 
   registerTool<
@@ -519,7 +571,7 @@ export class App extends ProtocolWithEvents<
     }
     const app = this;
     const notify = () => {
-      if (app._initializedSent && app._capabilities.tools?.listChanged) {
+      if (app._initializedSent && app._appCapabilities.tools?.listChanged) {
         void app.sendToolListChanged();
       }
     };
@@ -591,8 +643,8 @@ export class App extends ProtocolWithEvents<
     // to declare { tools: {} } in the constructor just to use registerTool.
     // Only do this pre-connect; post-connect the capability was already
     // advertised (or wasn't) and can't change.
-    if (!this._capabilities.tools && !this.transport) {
-      this.registerCapabilities({ tools: { listChanged: true } });
+    if (!this._appCapabilities.tools && !this.transport) {
+      this.registerAppCapabilities({ tools: { listChanged: true } });
     }
 
     this.ensureToolHandlersInitialized();
@@ -924,9 +976,9 @@ export class App extends ProtocolWithEvents<
    * without replacing.
    *
    * Notification params are automatically merged into the internal host context
-   * via {@link onEventDispatch `onEventDispatch`} before any handler or listener
-   * fires. This means {@link getHostContext `getHostContext`} will return the
-   * updated values even before your callback runs.
+   * before any handler or listener fires. This means
+   * {@link getHostContext `getHostContext`} will return the updated values even
+   * before your callback runs.
    *
    * Register handlers before calling {@link connect `connect`} to avoid missing notifications.
    *
@@ -1004,11 +1056,15 @@ export class App extends ProtocolWithEvents<
   ) {
     this.warnIfRequestHandlerReplaced("onteardown", this._onteardown, callback);
     this._onteardown = callback;
-    this.replaceRequestHandler(
-      McpUiResourceTeardownRequestSchema,
-      (request, extra) => {
+    this.setRequestHandler(
+      "ui/resource-teardown",
+      {
+        params: McpUiResourceTeardownRequestSchema.shape.params,
+        result: McpUiResourceTeardownResultSchema,
+      },
+      (params, extra) => {
         if (!this._onteardown) throw new Error("No onteardown handler set");
-        return this._onteardown(request.params, extra);
+        return this._onteardown(params, extra);
       },
     );
   }
@@ -1058,7 +1114,7 @@ export class App extends ProtocolWithEvents<
   ) {
     this.warnIfRequestHandlerReplaced("oncalltool", this._oncalltool, callback);
     this._oncalltool = callback;
-    this.replaceRequestHandler(CallToolRequestSchema, (request, extra) => {
+    this.setRequestHandler("tools/call", (request, extra) => {
       if (!this._oncalltool) throw new Error("No oncalltool handler set");
       return this._oncalltool(request.params, extra);
     });
@@ -1129,7 +1185,7 @@ export class App extends ProtocolWithEvents<
       callback,
     );
     this._onlisttools = callback;
-    this.replaceRequestHandler(ListToolsRequestSchema, (request, extra) => {
+    this.setRequestHandler("tools/list", (request, extra) => {
       if (!this._onlisttools) throw new Error("No onlisttools handler set");
       return this._onlisttools(request.params, extra);
     });
@@ -1139,7 +1195,7 @@ export class App extends ProtocolWithEvents<
    * Verify that the host supports the capability required for the given request method.
    * @internal
    */
-  assertCapabilityForMethod(method: AppRequest["method"]): void {
+  protected override assertCapabilityForMethod(method: string): void {
     switch (method) {
       case "sampling/createMessage":
         if (!this._hostCapabilities?.sampling) {
@@ -1155,11 +1211,11 @@ export class App extends ProtocolWithEvents<
    * Verify that the app declared the capability required for the given request method.
    * @internal
    */
-  assertRequestHandlerCapability(method: AppRequest["method"]): void {
+  protected override assertRequestHandlerCapability(method: string): void {
     switch (method) {
       case "tools/call":
       case "tools/list":
-        if (!this._capabilities.tools) {
+        if (!this._appCapabilities.tools) {
           throw new Error(
             `Client does not support tool capability (required for ${method})`,
           );
@@ -1177,24 +1233,8 @@ export class App extends ProtocolWithEvents<
    * Verify that the app supports the capability required for the given notification method.
    * @internal
    */
-  assertNotificationCapability(_method: AppNotification["method"]): void {
+  protected override assertNotificationCapability(_method: string): void {
     // TODO
-  }
-
-  /**
-   * Verify that task creation is supported for the given request method.
-   * @internal
-   */
-  protected assertTaskCapability(_method: string): void {
-    throw new Error("Tasks are not supported in MCP Apps");
-  }
-
-  /**
-   * Verify that task handler is supported for the given method.
-   * @internal
-   */
-  protected assertTaskHandlerCapability(_method: string): void {
-    throw new Error("Task handlers are not supported in MCP Apps");
   }
 
   /**
@@ -1245,7 +1285,6 @@ export class App extends ProtocolWithEvents<
     }
     return await this.request(
       { method: "tools/call", params },
-      CallToolResultSchema,
       {
         // Hosts may interpose long-running or user-interactive steps before the
         // tool result arrives. Opting in here lets a host heartbeat keep the
@@ -1302,11 +1341,7 @@ export class App extends ProtocolWithEvents<
     options?: RequestOptions,
   ): Promise<ReadResourceResult> {
     this._assertInitialized("readServerResource");
-    return await this.request(
-      { method: "resources/read", params },
-      ReadResourceResultSchema,
-      options,
-    );
+    return await this.request({ method: "resources/read", params }, options);
   }
 
   /**
@@ -1350,11 +1385,7 @@ export class App extends ProtocolWithEvents<
     options?: RequestOptions,
   ): Promise<ListResourcesResult> {
     this._assertInitialized("listServerResources");
-    return await this.request(
-      { method: "resources/list", params },
-      ListResourcesResultSchema,
-      options,
-    );
+    return await this.request({ method: "resources/list", params }, options);
   }
 
   /**
@@ -1415,8 +1446,8 @@ export class App extends ProtocolWithEvents<
    * }
    * ```
    *
-   * @see `CreateMessageRequest` from @modelcontextprotocol/sdk for the request type
-   * @see `CreateMessageResult` / `CreateMessageResultWithTools` from @modelcontextprotocol/sdk for result types
+   * @see `CreateMessageRequest` from @modelcontextprotocol/client for the request type
+   * @see `CreateMessageResult` / `CreateMessageResultWithTools` from @modelcontextprotocol/client for result types
    */
   async createSamplingMessage(
     params: CreateMessageRequest["params"] & { tools?: undefined },
@@ -1431,12 +1462,8 @@ export class App extends ProtocolWithEvents<
     options?: RequestOptions,
   ): Promise<CreateMessageResult | CreateMessageResultWithTools> {
     this._assertInitialized("createSamplingMessage");
-    const resultSchema = params.tools
-      ? CreateMessageResultWithToolsSchema
-      : CreateMessageResultSchema;
     return await this.request(
       { method: "sampling/createMessage", params },
-      resultSchema,
       options,
     );
   }
@@ -1953,14 +1980,18 @@ export class App extends ProtocolWithEvents<
       );
     }
     this._initializedSent = false;
-    await super.connect(transport);
 
     try {
+      // Protocol.connect only wires the transport — no MCP handshake. The
+      // ui/initialize request below is the sole negotiation on this channel,
+      // matching the v1 wire behavior deployed hosts expect.
+      await super.connect(transport);
+
       const result = await this.request(
         <McpUiInitializeRequest>{
           method: "ui/initialize",
           params: {
-            appCapabilities: this._capabilities,
+            appCapabilities: this._appCapabilities,
             appInfo: this._appInfo,
             protocolVersion: LATEST_PROTOCOL_VERSION,
           },

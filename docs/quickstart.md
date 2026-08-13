@@ -21,7 +21,7 @@ This tutorial assumes you've built an MCP server before and are comfortable with
 
 We'll use the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) to build the server.
 
-You'll also need Node.js 18+.
+You'll also need Node.js 20+.
 
 ## 1. Set up the project
 
@@ -37,7 +37,7 @@ Install the dependencies you'll need:
 
 ```bash
 npm init -y
-npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/sdk express cors
+npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/client@2.0.0-beta.5 @modelcontextprotocol/core@2.0.0-beta.5 @modelcontextprotocol/server@2.0.0-beta.5 @modelcontextprotocol/node@2.0.0-beta.5 @modelcontextprotocol/express@2.0.0-beta.5 zod@^4.2.0 express cors
 npm install -D typescript vite vite-plugin-singlefile @types/express @types/cors @types/node tsx concurrently cross-env
 ```
 
@@ -178,9 +178,10 @@ import {
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { z } from "zod";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 
@@ -205,7 +206,7 @@ export function createServer(): McpServer {
     {
       title: "Get Time",
       description: "Returns the current server time.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       _meta: { ui: { resourceUri } }, // Links this tool to its UI resource
     },
     async () => {
@@ -240,10 +241,10 @@ export function createServer(): McpServer {
 
 <!-- prettier-ignore -->
 ```ts source="../examples/quickstart/main.ts"
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMcpExpressApp } from "@modelcontextprotocol/express";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import type { McpServer } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import cors from "cors";
 import type { Request, Response } from "express";
 import { createServer } from "./server.js";
@@ -263,7 +264,7 @@ export async function startStreamableHTTPServer(
 
   app.all("/mcp", async (req: Request, res: Response) => {
     const server = createServer();
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });
 

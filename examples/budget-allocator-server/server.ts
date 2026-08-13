@@ -4,11 +4,11 @@
  * Provides budget configuration, 24 months of historical allocation data,
  * and industry benchmarks by company stage.
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -270,7 +270,7 @@ export function createServer(): McpServer {
       title: "Get Budget Data",
       description:
         "Returns budget configuration with 24 months of historical allocations and industry benchmarks by company stage. The widget is interactive and exposes tools for reading/modifying allocations, adjusting budgets, and comparing against industry benchmarks.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       outputSchema: BudgetDataResponseSchema,
       _meta: { ui: { resourceUri } },
     },

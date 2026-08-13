@@ -1,17 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
-import {
-  EmptyResultSchema,
-  ListPromptsResultSchema,
-  ListResourcesResultSchema,
-  ListResourceTemplatesResultSchema,
-  PromptListChangedNotificationSchema,
-  ReadResourceResultSchema,
-  ResourceListChangedNotificationSchema,
-  ToolListChangedNotificationSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
+import { Server, type ServerCapabilities } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
 import { App } from "./app";
@@ -22,6 +11,7 @@ import {
   getToolUiResourceUri,
   isToolVisibilityModelOnly,
   isToolVisibilityAppOnly,
+  McpUiOpenLinkResultSchema,
   type McpUiHostCapabilities,
 } from "./app-bridge";
 
@@ -34,11 +24,18 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
  */
 function createMockClient(
   serverCapabilities: ServerCapabilities = {},
-): Pick<Client, "getServerCapabilities" | "request" | "notification"> {
+): Pick<
+  Client,
+  | "getServerCapabilities"
+  | "request"
+  | "notification"
+  | "setNotificationHandler"
+> {
   return {
     getServerCapabilities: () => serverCapabilities,
     request: async () => ({}) as never,
     notification: async () => {},
+    setNotificationHandler: () => {},
   };
 }
 
@@ -88,6 +85,53 @@ describe("App <-> AppBridge integration", () => {
       expect(initializedFired).toBe(true);
     });
 
+    it("sends only the Apps handshake on the wire and gates the Apps-ready callback", async () => {
+      const methods: string[] = [];
+      let releaseAppsInitialized!: () => void;
+      let reachedAppsInitialized!: () => void;
+      const appsInitializedGate = new Promise<void>((resolve) => {
+        releaseAppsInitialized = resolve;
+      });
+      const reachedGate = new Promise<void>((resolve) => {
+        reachedAppsInitialized = resolve;
+      });
+      const originalSend = appTransport.send.bind(appTransport);
+      appTransport.send = async (message, options) => {
+        if ("method" in message) methods.push(message.method);
+        if (
+          "method" in message &&
+          message.method === "ui/notifications/initialized"
+        ) {
+          reachedAppsInitialized();
+          await appsInitializedGate;
+        }
+        return originalSend(message, options);
+      };
+
+      let singularCalls = 0;
+      let listenerCalls = 0;
+      bridge.oninitialized = () => singularCalls++;
+      bridge.addEventListener("initialized", () => listenerCalls++);
+
+      await bridge.connect(bridgeTransport);
+      const connecting = app.connect(appTransport);
+      await reachedGate;
+
+      expect(methods).toEqual([
+        "ui/initialize",
+        "ui/notifications/initialized",
+      ]);
+      expect(bridge.getAppVersion()).toEqual(testAppInfo);
+      expect(singularCalls).toBe(0);
+      expect(listenerCalls).toBe(0);
+
+      releaseAppsInitialized();
+      await connecting;
+
+      expect(singularCalls).toBe(1);
+      expect(listenerCalls).toBe(1);
+    });
+
     it("App receives host info and capabilities after connect", async () => {
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
@@ -97,6 +141,7 @@ describe("App <-> AppBridge integration", () => {
 
       const hostCaps = app.getHostCapabilities();
       expect(hostCaps).toEqual(testHostCapabilities);
+      expect(bridge.getCapabilities()).toEqual(testHostCapabilities);
     });
 
     it("Bridge receives app info and capabilities after initialization", async () => {
@@ -622,6 +667,30 @@ describe("App <-> AppBridge integration", () => {
 
       expect(result.isError).toBe(true);
     });
+
+    it("rejects invalid params for a custom ui request", async () => {
+      bridge.onopenlink = async () => ({});
+      await app.connect(appTransport);
+
+      await expect(
+        app.request(
+          {
+            method: "ui/open-link",
+            params: { url: 42 },
+          },
+          McpUiOpenLinkResultSchema,
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("rejects invalid results from a custom ui handler", async () => {
+      bridge.onopenlink = async () => ({ isError: "yes" }) as never;
+      await app.connect(appTransport);
+
+      await expect(
+        app.openLink({ url: "https://example.com" }),
+      ).rejects.toThrow();
+    });
   });
 
   describe("deprecated method aliases", () => {
@@ -691,10 +760,7 @@ describe("App <-> AppBridge integration", () => {
       await app.connect(appTransport);
 
       // Bridge can send ping via the protocol's request method
-      const result = await bridge.request(
-        { method: "ping", params: {} },
-        EmptyResultSchema,
-      );
+      const result = await bridge.request({ method: "ping", params: {} });
 
       expect(result).toEqual({});
     });
@@ -809,7 +875,7 @@ describe("App <-> AppBridge integration", () => {
       });
       await bridge.callTool({ name: "noargs", arguments: {} });
       expect(receivedExtra).toBeDefined();
-      expect(receivedExtra.signal).toBeInstanceOf(AbortSignal);
+      expect(receivedExtra.mcpReq.signal).toBeInstanceOf(AbortSignal);
     });
 
     it("isError result skips output schema validation", async () => {
@@ -2191,10 +2257,10 @@ describe("App <-> AppBridge integration", () => {
       await app.connect(appTransport);
 
       // App sends resources/list request via the protocol's request method
-      const result = await app.request(
-        { method: "resources/list", params: requestParams },
-        ListResourcesResultSchema,
-      );
+      const result = await app.request({
+        method: "resources/list",
+        params: requestParams,
+      });
 
       expect(receivedRequests).toHaveLength(1);
       expect(receivedRequests[0]).toMatchObject(requestParams);
@@ -2235,10 +2301,10 @@ describe("App <-> AppBridge integration", () => {
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
 
-      const result = await app.request(
-        { method: "resources/read", params: requestParams },
-        ReadResourceResultSchema,
-      );
+      const result = await app.request({
+        method: "resources/read",
+        params: requestParams,
+      });
 
       expect(receivedRequests).toHaveLength(1);
       expect(receivedRequests[0]).toMatchObject(requestParams);
@@ -2286,10 +2352,10 @@ describe("App <-> AppBridge integration", () => {
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
 
-      const result = await app.request(
-        { method: "resources/templates/list", params: requestParams },
-        ListResourceTemplatesResultSchema,
-      );
+      const result = await app.request({
+        method: "resources/templates/list",
+        params: requestParams,
+      });
 
       expect(receivedRequests).toHaveLength(1);
       expect(receivedRequests[0]).toMatchObject(requestParams);
@@ -2309,10 +2375,10 @@ describe("App <-> AppBridge integration", () => {
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
 
-      const result = await app.request(
-        { method: "prompts/list", params: requestParams },
-        ListPromptsResultSchema,
-      );
+      const result = await app.request({
+        method: "prompts/list",
+        params: requestParams,
+      });
 
       expect(receivedRequests).toHaveLength(1);
       expect(receivedRequests[0]).toMatchObject(requestParams);
@@ -2321,9 +2387,13 @@ describe("App <-> AppBridge integration", () => {
 
     it("sendToolListChanged sends notification to app", async () => {
       const receivedNotifications: unknown[] = [];
-      app.setNotificationHandler(ToolListChangedNotificationSchema, (n) => {
-        receivedNotifications.push(n.params);
-      });
+      bridge.oncalltool = async () => ({ content: [] });
+      app.setNotificationHandler(
+        "notifications/tools/list_changed",
+        (notification) => {
+          receivedNotifications.push(notification.params);
+        },
+      );
 
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
@@ -2336,9 +2406,13 @@ describe("App <-> AppBridge integration", () => {
 
     it("sendResourceListChanged sends notification to app", async () => {
       const receivedNotifications: unknown[] = [];
-      app.setNotificationHandler(ResourceListChangedNotificationSchema, (n) => {
-        receivedNotifications.push(n.params);
-      });
+      bridge.onlistresources = async () => ({ resources: [] });
+      app.setNotificationHandler(
+        "notifications/resources/list_changed",
+        (notification) => {
+          receivedNotifications.push(notification.params);
+        },
+      );
 
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
@@ -2351,9 +2425,13 @@ describe("App <-> AppBridge integration", () => {
 
     it("sendPromptListChanged sends notification to app", async () => {
       const receivedNotifications: unknown[] = [];
-      app.setNotificationHandler(PromptListChangedNotificationSchema, (n) => {
-        receivedNotifications.push(n.params);
-      });
+      bridge.onlistprompts = async () => ({ prompts: [] });
+      app.setNotificationHandler(
+        "notifications/prompts/list_changed",
+        (notification) => {
+          receivedNotifications.push(notification.params);
+        },
+      );
 
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
@@ -2363,6 +2441,184 @@ describe("App <-> AppBridge integration", () => {
 
       expect(receivedNotifications).toHaveLength(1);
     });
+  });
+});
+
+describe("AppBridge outer v2 Client proxy", () => {
+  let outerClient: Client;
+  let outerServer: Server;
+  let outerClientTransport: InMemoryTransport;
+  let outerServerTransport: InMemoryTransport;
+  let outerInitializeCount: number;
+
+  beforeEach(async () => {
+    [outerClientTransport, outerServerTransport] =
+      InMemoryTransport.createLinkedPair();
+    outerInitializeCount = 0;
+    const originalSend = outerClientTransport.send.bind(outerClientTransport);
+    outerClientTransport.send = async (message, options) => {
+      if ("method" in message && message.method === "initialize") {
+        outerInitializeCount++;
+      }
+      return originalSend(message, options);
+    };
+
+    outerServer = new Server(
+      { name: "ActualServer", version: "1.0.0" },
+      {
+        capabilities: {
+          tools: { listChanged: true },
+          resources: { listChanged: true },
+          prompts: { listChanged: true },
+        },
+        supportedProtocolVersions: ["2025-11-25"],
+      },
+    );
+    outerServer.setRequestHandler("tools/call", async (request) => ({
+      content: [
+        {
+          type: "text",
+          text: `outer:${request.params.name}`,
+        },
+      ],
+    }));
+
+    outerClient = new Client(
+      { name: "HostOuterClient", version: "1.0.0" },
+      {
+        capabilities: {},
+        versionNegotiation: { mode: "legacy" },
+        supportedProtocolVersions: ["2025-11-25"],
+      },
+    );
+    await outerServer.connect(outerServerTransport);
+    await outerClient.connect(outerClientTransport);
+  });
+
+  afterEach(async () => {
+    await outerClient.close().catch(() => {});
+    await outerServer.close().catch(() => {});
+  });
+
+  it("proxies through the outer Client without reconnecting it", async () => {
+    const bridge = new AppBridge(
+      outerClient,
+      testHostInfo,
+      testHostCapabilities,
+    );
+    const app = new App(testAppInfo, {}, { autoResize: false });
+    let [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+
+    await bridge.connect(bridgeTransport);
+    await app.connect(appTransport);
+    expect(
+      await app.callServerTool({ name: "first", arguments: {} }),
+    ).toMatchObject({
+      content: [{ type: "text", text: "outer:first" }],
+    });
+    expect(outerInitializeCount).toBe(1);
+
+    await app.close();
+    await bridge.close();
+    [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+    await bridge.connect(bridgeTransport);
+    await app.connect(appTransport);
+
+    expect(
+      await app.callServerTool({ name: "second", arguments: {} }),
+    ).toMatchObject({
+      content: [{ type: "text", text: "outer:second" }],
+    });
+    expect(outerInitializeCount).toBe(1);
+    expect(outerClient.getServerVersion()).toMatchObject({
+      name: "ActualServer",
+      version: "1.0.0",
+    });
+
+    await app.close();
+    await bridge.close();
+  });
+
+  it("propagates View cancellation to the actual outer Server", async () => {
+    let started!: () => void;
+    let aborted!: () => void;
+    const startedPromise = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const abortedPromise = new Promise<void>((resolve) => {
+      aborted = resolve;
+    });
+    outerServer.setRequestHandler("tools/call", async (_request, context) => {
+      started();
+      await new Promise<void>((resolve) => {
+        context.mcpReq.signal.addEventListener(
+          "abort",
+          () => {
+            aborted();
+            resolve();
+          },
+          { once: true },
+        );
+      });
+      return { content: [] };
+    });
+
+    const bridge = new AppBridge(
+      outerClient,
+      testHostInfo,
+      testHostCapabilities,
+    );
+    const app = new App(testAppInfo, {}, { autoResize: false });
+    const [appTransport, bridgeTransport] =
+      InMemoryTransport.createLinkedPair();
+    await bridge.connect(bridgeTransport);
+    await app.connect(appTransport);
+
+    const controller = new AbortController();
+    const result = app.callServerTool(
+      { name: "cancel-me", arguments: {} },
+      { signal: controller.signal },
+    );
+    await startedPromise;
+    controller.abort("test cancellation");
+    await abortedPromise;
+    await expect(result).rejects.toThrow();
+
+    await app.close();
+    await bridge.close();
+  });
+
+  it("forwards outer list-changed notifications to the App", async () => {
+    const bridge = new AppBridge(
+      outerClient,
+      testHostInfo,
+      testHostCapabilities,
+    );
+    const app = new App(testAppInfo, {}, { autoResize: false });
+    const [appTransport, bridgeTransport] =
+      InMemoryTransport.createLinkedPair();
+    const received: string[] = [];
+    app.setNotificationHandler("notifications/tools/list_changed", () => {
+      received.push("tools");
+    });
+    app.setNotificationHandler("notifications/resources/list_changed", () => {
+      received.push("resources");
+    });
+    app.setNotificationHandler("notifications/prompts/list_changed", () => {
+      received.push("prompts");
+    });
+
+    await bridge.connect(bridgeTransport);
+    await app.connect(appTransport);
+    await outerServer.sendToolListChanged();
+    await outerServer.sendResourceListChanged();
+    await outerServer.sendPromptListChanged();
+    await flush();
+
+    expect(received).toEqual(["tools", "resources", "prompts"]);
+
+    await app.close();
+    await bridge.close();
   });
 });
 
@@ -2721,7 +2977,7 @@ describe("isToolVisibilityAppOnly", () => {
       expect(a).toEqual([]);
     });
 
-    it("App.onEventDispatch merges hostcontext before listeners fire", async () => {
+    it("App merges hostcontext before listeners fire", async () => {
       let seen: unknown;
       app.addEventListener("hostcontextchanged", () => {
         seen = app.getHostContext();
@@ -2760,38 +3016,16 @@ describe("isToolVisibilityAppOnly", () => {
       expect(app.onteardown).toBe(handler);
     });
 
-    it("direct setRequestHandler throws when called twice", () => {
+    it("direct setRequestHandler uses base SDK replacement semantics", () => {
       const bridge2 = new AppBridge(
         createMockClient() as Client,
         testHostInfo,
         testHostCapabilities,
       );
-      bridge2.setRequestHandler(
-        // @ts-expect-error — exercising throw path with raw schema
-        { shape: { method: { value: "test/method" } } },
-        () => ({}),
-      );
+      bridge2.setRequestHandler("ping", () => ({}));
       expect(() => {
-        bridge2.setRequestHandler(
-          // @ts-expect-error — exercising throw path with raw schema
-          { shape: { method: { value: "test/method" } } },
-          () => ({}),
-        );
-      }).toThrow(/already registered/);
-    });
-
-    it("direct setNotificationHandler throws for event-mapped methods", () => {
-      const app2 = new App(testAppInfo, {}, { autoResize: false });
-      app2.addEventListener("toolinput", () => {});
-      expect(() => {
-        app2.setNotificationHandler(
-          // @ts-expect-error — exercising throw path with raw schema
-          {
-            shape: { method: { value: "ui/notifications/tool-input" } },
-          },
-          () => {},
-        );
-      }).toThrow(/already registered/);
+        bridge2.setRequestHandler("ping", () => ({}));
+      }).not.toThrow();
     });
   });
 });

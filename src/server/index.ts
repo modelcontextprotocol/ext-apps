@@ -32,32 +32,24 @@
  */
 
 import {
-  RESOURCE_URI_META_KEY,
-  RESOURCE_MIME_TYPE,
   McpUiResourceCsp,
   McpUiResourceMeta,
   McpUiToolMeta,
   McpUiClientCapabilities,
-} from "../app.js";
+} from "../spec.types.js";
+import { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "../constants.js";
 import type {
-  BaseToolCallback,
+  ClientCapabilities,
   McpServer,
+  ReadResourceResult,
   RegisteredTool,
   ResourceMetadata,
+  StandardSchemaWithJSON,
+  ToolAnnotations,
   ToolCallback,
   ReadResourceCallback as _ReadResourceCallback,
   RegisteredResource,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  AnySchema,
-  ZodRawShapeCompat,
-} from "@modelcontextprotocol/sdk/server/zod-compat.js";
-import type { StandardSchemaWithJSON } from "../standard-schema";
-import type {
-  ClientCapabilities,
-  ReadResourceResult,
-  ToolAnnotations,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 
 // Re-exports for convenience
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
@@ -70,8 +62,8 @@ export type { ResourceMetadata, ToolCallback };
 export interface ToolConfig {
   title?: string;
   description?: string;
-  inputSchema?: ZodRawShapeCompat | StandardSchemaWithJSON;
-  outputSchema?: ZodRawShapeCompat | StandardSchemaWithJSON;
+  inputSchema?: StandardSchemaWithJSON;
+  outputSchema?: StandardSchemaWithJSON;
   annotations?: ToolAnnotations;
   _meta?: Record<string, unknown>;
 }
@@ -157,7 +149,7 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  *   {
  *     title: "Get Weather",
  *     description: "Get current weather for a location",
- *     inputSchema: { location: z.string() },
+ *     inputSchema: z.object({ location: z.string() }),
  *     _meta: {
  *       ui: { resourceUri: "ui://weather/view.html" },
  *     },
@@ -197,7 +189,7 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  *   "update-quantity",
  *   {
  *     description: "Update item quantity in cart",
- *     inputSchema: { itemId: z.string(), quantity: z.number() },
+ *     inputSchema: z.object({ itemId: z.string(), quantity: z.number() }),
  *     _meta: {
  *       ui: {
  *         resourceUri: "ui://shop/cart.html",
@@ -215,9 +207,8 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  * @see {@link registerAppResource `registerAppResource`} to register the HTML resource referenced by the tool
  */
 export function registerAppTool<
-  OutputArgs extends ZodRawShapeCompat | StandardSchemaWithJSON,
-  InputArgs extends undefined | ZodRawShapeCompat | StandardSchemaWithJSON =
-    undefined,
+  OutputArgs extends StandardSchemaWithJSON,
+  InputArgs extends StandardSchemaWithJSON | undefined = undefined,
 >(
   server: Pick<McpServer, "registerTool">,
   name: string,
@@ -225,15 +216,7 @@ export function registerAppTool<
     inputSchema?: InputArgs;
     outputSchema?: OutputArgs;
   },
-  // The widened constraint signals the v2 API shape, but NOTE: McpServer in
-  // sdk@1.x still calls zod internals at runtime, so non-zod schemas will fail
-  // here until we depend on sdk v2. Zod (which all current callers use) is
-  // unaffected. The cast below bridges the 1.x type signature.
-  cb: ToolCallback<
-    InputArgs extends undefined | ZodRawShapeCompat | AnySchema
-      ? InputArgs
-      : AnySchema
-  >,
+  cb: ToolCallback<InputArgs>,
 ): RegisteredTool {
   // Normalize metadata for backward compatibility:
   // - If _meta.ui.resourceUri is set, also set the legacy flat key
@@ -251,14 +234,7 @@ export function registerAppTool<
     normalizedMeta = { ...meta, ui: { ...uiMeta, resourceUri: legacyUri } };
   }
 
-  // Cast bridges the widened StandardSchemaWithJSON constraint to the
-  // sdk@1.x zod-typed signature. Drops once we depend on sdk v2.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return server.registerTool(
-    name,
-    { ...config, _meta: normalizedMeta } as any,
-    cb as any,
-  );
+  return server.registerTool(name, { ...config, _meta: normalizedMeta }, cb);
 }
 
 export type McpUiReadResourceResult = ReadResourceResult & {
@@ -418,10 +394,6 @@ export const EXTENSION_ID = "io.modelcontextprotocol/ui";
  * This helper retrieves the capability object from the `extensions` field
  * where MCP Apps advertises its support.
  *
- * Note: The `clientCapabilities` parameter extends the SDK's `ClientCapabilities`
- * type with an `extensions` field (pending SEP-1724). Once `extensions` is added
- * to the SDK, this can use `ClientCapabilities` directly.
- *
  * @param clientCapabilities - The client capabilities from the initialize response
  * @returns The MCP Apps capability settings, or `undefined` if not supported
  *
@@ -456,10 +428,7 @@ export const EXTENSION_ID = "io.modelcontextprotocol/ui";
  * ```
  */
 export function getUiCapability(
-  clientCapabilities:
-    | (ClientCapabilities & { extensions?: Record<string, unknown> })
-    | null
-    | undefined,
+  clientCapabilities: ClientCapabilities | null | undefined,
 ): McpUiClientCapabilities | undefined {
   if (!clientCapabilities) {
     return undefined;

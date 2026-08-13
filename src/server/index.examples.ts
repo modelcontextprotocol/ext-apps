@@ -9,17 +9,14 @@
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
-import type {
-  McpServer,
-  ToolCallback,
-  ReadResourceCallback,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, ToolCallback } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import {
   registerAppTool,
   registerAppResource,
   getUiCapability,
   RESOURCE_MIME_TYPE,
+  type ReadResourceCallback,
 } from "./index.js";
 
 // Stubs for external functions used in examples
@@ -74,7 +71,7 @@ function registerAppTool_basicUsage(server: McpServer) {
     {
       title: "Get Weather",
       description: "Get current weather for a location",
-      inputSchema: { location: z.string() },
+      inputSchema: z.object({ location: z.string() }),
       _meta: {
         ui: { resourceUri: "ui://weather/view.html" },
       },
@@ -122,7 +119,7 @@ function registerAppTool_appOnlyVisibility(server: McpServer) {
     "update-quantity",
     {
       description: "Update item quantity in cart",
-      inputSchema: { itemId: z.string(), quantity: z.number() },
+      inputSchema: z.object({ itemId: z.string(), quantity: z.number() }),
       _meta: {
         ui: {
           resourceUri: "ui://shop/cart.html",

@@ -1,6 +1,9 @@
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -29,7 +32,7 @@ export function createServer(): McpServer {
     {
       title: "Get Time",
       description: "Returns the current server time as an ISO 8601 string.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       outputSchema: z.object({
         time: z.string(),
       }),

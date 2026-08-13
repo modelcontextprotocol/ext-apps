@@ -77,13 +77,15 @@ Before writing any code, analyze the server's existing tools and determine which
 ## Step 2: Add Dependencies
 
 ```bash
-npm install @modelcontextprotocol/ext-apps
+npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/client@2.0.0-beta.5 @modelcontextprotocol/core@2.0.0-beta.5 @modelcontextprotocol/server@2.0.0-beta.5 zod@^4.2.0
 npm install -D vite vite-plugin-singlefile
 ```
 
 Plus framework-specific dependencies if needed (e.g., `react`, `react-dom`, `@vitejs/plugin-react` for React).
 
-Use `npm install` to add dependencies rather than manually writing version numbers. This lets npm resolve the latest compatible versions. Never specify version numbers from memory.
+Use the exact base MCP SDK prerelease required by ext-apps. Existing servers
+that still import `@modelcontextprotocol/sdk` v1 must migrate those imports and
+handler schemas before adding the App integration.
 
 ## Step 3: Set Up the Build Pipeline
 
@@ -146,10 +148,14 @@ Transform plain MCP tools into App tools with UI.
 
 **Before** (plain MCP tool):
 ```typescript
-server.tool("my-tool", { param: z.string() }, async (args) => {
-  const data = await fetchData(args.param);
-  return { content: [{ type: "text", text: JSON.stringify(data) }] };
-});
+server.registerTool(
+  "my-tool",
+  { inputSchema: z.object({ param: z.string() }) },
+  async ({ param }) => {
+    const data = await fetchData(param);
+    return { content: [{ type: "text", text: JSON.stringify(data) }] };
+  },
+);
 ```
 
 **After** (App tool with UI):
@@ -158,17 +164,22 @@ import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@model
 
 const resourceUri = "ui://my-tool/mcp-app.html";
 
-registerAppTool(server, "my-tool", {
-  description: "Shows data with an interactive UI",
-  inputSchema: { param: z.string() },
-  _meta: { ui: { resourceUri } },
-}, async (args) => {
-  const data = await fetchData(args.param);
-  return {
-    content: [{ type: "text", text: JSON.stringify(data) }],   // text fallback for non-UI hosts
-    structuredContent: { data },                                 // structured data for the UI
-  };
-});
+registerAppTool(
+  server,
+  "my-tool",
+  {
+    description: "Shows data with an interactive UI",
+    inputSchema: z.object({ param: z.string() }),
+    _meta: { ui: { resourceUri } },
+  },
+  async ({ param }) => {
+    const data = await fetchData(param);
+    return {
+      content: [{ type: "text", text: JSON.stringify(data) }], // text fallback for non-UI hosts
+      structuredContent: { data }, // structured data for the UI
+    };
+  },
+);
 ```
 
 Key guidance:
@@ -187,17 +198,21 @@ import path from "node:path";
 
 const resourceUri = "ui://my-tool/mcp-app.html";
 
-registerAppResource(server, {
-  uri: resourceUri,
-  name: "My Tool UI",
-  mimeType: RESOURCE_MIME_TYPE,
-}, async () => {
-  const html = await fs.readFile(
-    path.resolve(import.meta.dirname, "dist", "mcp-app.html"),
-    "utf-8",
-  );
-  return { contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: html }] };
-});
+registerAppResource(
+  server,
+  "My Tool UI",
+  resourceUri,
+  {},
+  async () => {
+    const html = await fs.readFile(
+      path.resolve(import.meta.dirname, "dist", "mcp-app.html"),
+      "utf-8",
+    );
+    return {
+      contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: html }],
+    };
+  },
+);
 ```
 
 If multiple tools share the same UI, they can reference the same `resourceUri` and the same resource registration.
@@ -271,25 +286,32 @@ registerAppTool(server, "poll-data", {
 });
 ```
 
-The UI calls these via `app.callServerTool("poll-data", {})`.
+The UI calls these via
+`app.callServerTool({ name: "poll-data", arguments: {} })`.
 
 ### CSP Configuration
 
 If the UI needs to load external resources (fonts, APIs, CDNs), declare the domains:
 
 ```typescript
-registerAppResource(server, {
-  uri: resourceUri,
-  name: "My Tool UI",
-  mimeType: RESOURCE_MIME_TYPE,
-  _meta: {
-    ui: {
-      connectDomains: ["api.example.com"],      // fetch/XHR targets
-      resourceDomains: ["cdn.example.com"],      // scripts, styles, images
-      frameDomains: ["embed.example.com"],        // nested iframes
+registerAppResource(server, "My Tool UI", resourceUri, {}, async () => ({
+  contents: [
+    {
+      uri: resourceUri,
+      mimeType: RESOURCE_MIME_TYPE,
+      text: html,
+      _meta: {
+        ui: {
+          csp: {
+            connectDomains: ["https://api.example.com"], // fetch/XHR targets
+            resourceDomains: ["https://cdn.example.com"], // scripts, styles, images
+            frameDomains: ["https://embed.example.com"], // nested iframes
+          },
+        },
+      },
     },
-  },
-}, async () => { /* ... */ });
+  ],
+}));
 ```
 
 ### Streaming Partial Input
@@ -326,7 +348,14 @@ server.server.oninitialized = () => {
     }, appToolHandler);
   } else {
     // Text-only client — register plain tool
-    server.tool("my-tool", "Shows data", { param: z.string() }, plainToolHandler);
+    server.registerTool(
+      "my-tool",
+      {
+        description: "Shows data",
+        inputSchema: z.object({ param: z.string() }),
+      },
+      plainToolHandler,
+    );
   }
 };
 ```

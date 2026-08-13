@@ -1,8 +1,12 @@
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { z } from "zod";
 
 // Works both from source (server.ts) and compiled (dist/server.js)
 const DIST_DIR = import.meta.filename.endsWith(".ts")
@@ -29,7 +33,7 @@ export function createServer(): McpServer {
     {
       title: "Get Time",
       description: "Returns the current server time as an ISO 8601 string.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       _meta: { ui: { resourceUri } }, // Links this tool to its UI resource
     },
     async (): Promise<CallToolResult> => {

@@ -8,8 +8,10 @@ import {
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -161,7 +163,7 @@ export function createServer(): McpServer {
       title: "Show Three.js Scene",
       description:
         "Render an interactive 3D scene with custom Three.js code. Supports transparent backgrounds (alpha: true) for seamless host UI integration. Available globals: THREE, OrbitControls, EffectComposer, RenderPass, UnrealBloomPass, canvas, width, height.",
-      inputSchema: {
+      inputSchema: z.object({
         code: z
           .string()
           .default(DEFAULT_THREEJS_CODE)
@@ -172,7 +174,7 @@ export function createServer(): McpServer {
           .positive()
           .default(400)
           .describe("Height in pixels"),
-      },
+      }),
       outputSchema: z.object({
         success: z.boolean(),
       }),
@@ -192,7 +194,7 @@ export function createServer(): McpServer {
     {
       title: "Learn Three.js",
       description: "Get documentation and examples for using the Three.js View",
-      inputSchema: {},
+      inputSchema: z.object({}),
     },
     async () => {
       return {

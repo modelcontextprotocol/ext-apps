@@ -110,11 +110,12 @@ See `/tmp/mcp-ext-apps/docs/patterns.md` for detailed recipes:
 **Always** use `npm install` to add dependencies rather than manually writing version numbers:
 
 ```bash
-npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/sdk zod express cors
+npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/client@2.0.0-beta.5 @modelcontextprotocol/core@2.0.0-beta.5 @modelcontextprotocol/server@2.0.0-beta.5 @modelcontextprotocol/node@2.0.0-beta.5 @modelcontextprotocol/express@2.0.0-beta.5 zod@^4.2.0 express cors
 npm install -D typescript vite vite-plugin-singlefile concurrently cross-env @types/node @types/express @types/cors
 ```
 
-This lets npm resolve the latest compatible versions. **Never** specify version numbers from memory.
+Use the exact base MCP SDK prerelease required by ext-apps. Do not substitute
+unpublished local packages or guess a different prerelease.
 
 ### TypeScript Server Execution
 

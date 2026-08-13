@@ -24,8 +24,11 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/ext-apps": "^1.7.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/express": "2.0.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "vue": "^3.5.0",

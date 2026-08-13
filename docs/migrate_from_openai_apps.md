@@ -66,7 +66,7 @@ The server-side changes involve updating metadata structure and using helper fun
 #### Before (OpenAI)
 
 ```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 function createServer() {
@@ -78,7 +78,7 @@ function createServer() {
     {
       title: "Shopping Cart",
       description: "Display the user's shopping cart",
-      inputSchema: { userId: z.string() },
+      inputSchema: z.object({ userId: z.string() }),
       annotations: { readOnlyHint: true },
       _meta: {
         "openai/outputTemplate": "ui://view/cart.html",
@@ -126,7 +126,7 @@ function createServer() {
 #### After (MCP Apps)
 
 ```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import {
   registerAppTool,
   registerAppResource,
@@ -144,7 +144,7 @@ function createServer() {
     {
       title: "Shopping Cart",
       description: "Display the user's shopping cart",
-      inputSchema: { userId: z.string() },
+      inputSchema: z.object({ userId: z.string() }),
       annotations: { readOnlyHint: true },
       _meta: { ui: { resourceUri: "ui://view/cart.html" } },
     },

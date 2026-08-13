@@ -150,7 +150,7 @@ registerAppTool(
   "get_account_balance",
   {
     description: "Get account balance",
-    inputSchema: { accountId: z.string() },
+    inputSchema: z.object({ accountId: z.string() }),
   },
   async ({ accountId }) => {
     if (!authInfo) {
