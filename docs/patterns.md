@@ -567,6 +567,29 @@ app.ontoolresult = (result) => {
 // e.g., saveState({ currentPage: 5 });
 ```
 
+**Alternative: using the tool call ID from host context**
+
+If you don't need a server-generated UUID, use {@link types!McpUiHostContext `hostContext.toolInfo.id`} — the JSON-RPC tool call ID — as the storage key directly. No server-side changes needed:
+
+<!-- prettier-ignore -->
+```ts source="./patterns.tsx#persistDataToolCallId"
+// Use the tool call ID as a stable localStorage key — no server-side UUID needed
+const toolCallId = String(app.getHostContext()?.toolInfo?.id ?? "default");
+
+function saveState<T>(state: T): void {
+  if (!toolCallId) return;
+  try { localStorage.setItem(toolCallId, JSON.stringify(state)); } catch {}
+}
+
+function loadState<T>(): T | null {
+  if (!toolCallId) return null;
+  try {
+    const s = localStorage.getItem(toolCallId);
+    return s ? (JSON.parse(s) as T) : null;
+  } catch { return null; }
+}
+```
+
 For state that represents user effort (e.g., saved bookmarks, annotations, custom configurations), consider persisting it server-side using [app-only tools](#tools-that-are-private-to-apps) instead. Pass the `viewUUID` to the app-only tool to scope the saved data to that view instance.
 
 > [!NOTE]

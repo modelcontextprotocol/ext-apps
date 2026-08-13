@@ -426,6 +426,29 @@ function persistViewState(app: App) {
 }
 
 /**
+ * Example: Persisting view state using tool call ID (no server-side UUID needed)
+ */
+function persistViewStateWithToolCallId(app: App) {
+  //#region persistDataToolCallId
+  // Use the tool call ID as a stable localStorage key — no server-side UUID needed
+  const toolCallId = String(app.getHostContext()?.toolInfo?.id ?? "default");
+
+  function saveState<T>(state: T): void {
+    if (!toolCallId) return;
+    try { localStorage.setItem(toolCallId, JSON.stringify(state)); } catch {}
+  }
+
+  function loadState<T>(): T | null {
+    if (!toolCallId) return null;
+    try {
+      const s = localStorage.getItem(toolCallId);
+      return s ? (JSON.parse(s) as T) : null;
+    } catch { return null; }
+  }
+  //#endregion persistDataToolCallId
+}
+
+/**
  * Example: Pausing computation-heavy views when out of view
  */
 function visibilityBasedPause(
