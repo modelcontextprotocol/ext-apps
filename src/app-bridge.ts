@@ -47,7 +47,7 @@ import {
   ProtocolOptions,
   RequestOptions,
 } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import { ProtocolWithEvents } from "./events";
+import { ProtocolWithEvents } from "./events.js";
 
 import {
   type AppNotification,
@@ -92,11 +92,11 @@ import {
   McpUiRequestDisplayModeResult,
   McpUiResourcePermissions,
   McpUiToolMeta,
-} from "./types";
-export * from "./types";
-export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
-import { RESOURCE_URI_META_KEY } from "./app";
-export { PostMessageTransport } from "./message-transport";
+} from "./types.js";
+export * from "./types.js";
+export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app.js";
+import { RESOURCE_URI_META_KEY } from "./app.js";
+export { PostMessageTransport } from "./message-transport.js";
 
 /**
  * Extract UI resource URI from tool metadata.

@@ -52,7 +52,7 @@ import type {
   AnySchema,
   ZodRawShapeCompat,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
-import type { StandardSchemaWithJSON } from "../standard-schema";
+import type { StandardSchemaWithJSON } from "../standard-schema.js";
 import type {
   ClientCapabilities,
   ReadResourceResult,
