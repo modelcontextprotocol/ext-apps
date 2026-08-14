@@ -225,6 +225,26 @@ interface UIResourceMeta {
    * - omitted: host decides border
    */
   prefersBorder?: boolean,
+  /**
+   * Origins the view is expecting to open via `ui/open-link`
+   *
+   * Servers declare external destinations the view legitimately links to (for
+   * example its own marketing site). Hosts MAY use this list to skip the link
+   * confirmation prompt for matching destinations.
+   *
+   * - Each entry is an origin (scheme + host[:port]); a leading `*.` is a
+   *   subdomain wildcard, matching the rules used for `csp` domain fields.
+   * - Empty or omitted = every `ui/open-link` is subject to the host's
+   *   default policy (typically a confirmation prompt).
+   *
+   * This is a UX hint, NOT an authorization mechanism. Hosts retain full
+   * authority, MUST still apply their own allowlist/blocklist, and SHOULD NOT
+   * treat a declared origin as proof that a destination is safe.
+   *
+   * @example
+   * ["https://example.com", "https://*.example.com"]
+   */
+  linkTrustedDomains?: string[],
 }
 ```
 
@@ -254,6 +274,7 @@ The resource content is returned via `resources/read`:
         };
         domain?: string;
         prefersBorder?: boolean;
+        linkTrustedDomains?: string[]; // Origins ui/open-link may skip confirmation for.
       };
     };
   }];
@@ -262,7 +283,7 @@ The resource content is returned via `resources/read`:
 
 #### Metadata Location
 
-`UIResourceMeta` (CSP, permissions, domain, prefersBorder) may be provided on either or both:
+`UIResourceMeta` (CSP, permissions, domain, prefersBorder, linkTrustedDomains) may be provided on either or both:
 
 - **`resources/list`:** On the resource entry's `_meta.ui` field. Useful as a static default that hosts can review at connection time.
 - **`resources/read`:** On each content item's `_meta.ui` field. Useful for per-response overrides or dynamic metadata that is only known at read time.
@@ -1062,6 +1083,23 @@ MCP Apps introduces additional JSON-RPC methods for UI-specific functionality:
 ```
 
 Host SHOULD open the URL in the user's default browser or a new tab.
+
+By default, hosts SHOULD guard `ui/open-link` against unexpected navigation —
+for example by showing a confirmation prompt — since the URL originates from
+sandboxed UI content.
+
+**Trusted destinations (`linkTrustedDomains`).** A server MAY declare origins it
+legitimately links to via the resource's `_meta.ui.linkTrustedDomains` (see
+[UI Resource Format](#ui-resource-format)). For a `ui/open-link` whose URL
+matches one of those origins, the host MAY **skip the confirmation prompt** and
+open the link directly.
+
+Matching uses the same origin rules as `csp` domain fields: an entry is an
+origin (scheme + host[:port]) and a leading `*.` is a subdomain wildcard.
+
+> **Security:** `linkTrustedDomains` is a UX hint, not an authorization
+> mechanism. Because the value comes from the (untrusted) server, hosts MUST
+> still enforce their own allowlist/blocklist and MAY confirm regardless.
 
 `ui/download-file` - Request host to download a file
 

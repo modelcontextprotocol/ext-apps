@@ -679,6 +679,35 @@ export const McpUiResourceMetaSchema = z.object({
     .describe(
       "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
     ),
+  /**
+   * @description Origins the view is expecting to open via `ui/open-link`.
+   *
+   * Servers declare external destinations the view legitimately links to (for
+   * example its own marketing site). Hosts MAY use this list to **skip the link
+   * confirmation prompt** for matching destinations, instead of confirming every
+   * `ui/open-link`.
+   *
+   * Matching follows the same origin rules as {@link McpUiResourceCsp} fields:
+   * an entry is an origin (scheme + host[:port]) and wildcard subdomains are
+   * supported (e.g. `https://*.example.com`).
+   *
+   * > [!IMPORTANT]
+   * > This is a **UX hint, not an authorization mechanism.** It only relaxes
+   * > confirmation for the declared origins; it does not grant the view any
+   * > capability. Hosts retain full authority and MUST still apply their own
+   * > global allowlist/blocklist and MAY confirm regardless. Because the value
+   * > comes from the server, hosts SHOULD NOT treat it as proof that a
+   * > destination is safe.
+   *
+   * - Empty or omitted → every `ui/open-link` is subject to the host's default
+   *   policy (typically a confirmation prompt).
+   *
+   * @example
+   * ```ts
+   * ["https://example.com", "https://*.example.com"]
+   * ```
+   */
+  linkTrustedDomains: z.array(z.string()).optional(),
 });
 
 /**

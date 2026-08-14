@@ -159,6 +159,12 @@ declare const chatManager: {
 // Stub for example code - represents a hypothetical URL validator
 declare function isAllowedDomain(url: string): boolean;
 
+// Stub for example code - represents the URL Pattern tester
+declare function matchesLinkTrustedDomains(
+  url: string,
+  linkTrustedDomains: string[] | undefined,
+): boolean;
+
 // Stub for example code - represents a hypothetical dialog API
 declare function showDialog(options: {
   message: string;
@@ -173,12 +179,23 @@ declare const modelContextManager: {
 /**
  * Example: Handle external link requests from the View.
  */
-function AppBridge_onopenlink_handleRequest(bridge: AppBridge) {
+function AppBridge_onopenlink_handleRequest(
+  bridge: AppBridge,
+  // Origins declared by the resource via `_meta.ui.linkTrustedDomains`.
+  linkTrustedDomains: string[] | undefined,
+) {
   //#region AppBridge_onopenlink_handleRequest
   bridge.onopenlink = async ({ url }, extra) => {
+    // The host's own policy always wins, regardless of server-declared trust.
     if (!isAllowedDomain(url)) {
       console.warn("Blocked external link:", url);
       return { isError: true };
+    }
+
+    // Destinations the server declared as trusted skip the confirmation prompt.
+    if (matchesLinkTrustedDomains(url, linkTrustedDomains)) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return {};
     }
 
     const confirmed = await showDialog({
