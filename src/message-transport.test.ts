@@ -387,4 +387,64 @@ describe("PostMessageTransport", () => {
       await transportB.close();
     });
   });
+
+  // ==========================================================================
+  // forHostIframe() — static factory for host-side transport
+  // ==========================================================================
+  describe("forHostIframe()", () => {
+    it("throws when iframe is not connected to the document", () => {
+      const iframe = {
+        isConnected: false,
+        contentWindow: {},
+      } as unknown as HTMLIFrameElement;
+
+      expect(() => PostMessageTransport.forHostIframe(iframe)).toThrow(
+        /iframe must be in the document/,
+      );
+      expect(() => PostMessageTransport.forHostIframe(iframe)).toThrow(
+        /appendChild/,
+      );
+    });
+
+    it("throws when contentWindow is null", () => {
+      const iframe = {
+        isConnected: true,
+        contentWindow: null,
+      } as unknown as HTMLIFrameElement;
+
+      expect(() => PostMessageTransport.forHostIframe(iframe)).toThrow(
+        /contentWindow is null/,
+      );
+    });
+
+    it("returns a transport when iframe is connected with contentWindow", () => {
+      const fakeContentWindow = { postMessage: mock(() => {}) };
+      const iframe = {
+        isConnected: true,
+        contentWindow: fakeContentWindow,
+      } as unknown as HTMLIFrameElement;
+
+      const transport = PostMessageTransport.forHostIframe(iframe);
+
+      expect(transport).toBeInstanceOf(PostMessageTransport);
+    });
+
+    it("returned transport uses contentWindow as event target", async () => {
+      const postMessageFn = mock(() => {});
+      const fakeContentWindow = { postMessage: postMessageFn };
+      const iframe = {
+        isConnected: true,
+        contentWindow: fakeContentWindow,
+      } as unknown as HTMLIFrameElement;
+
+      const transport = PostMessageTransport.forHostIframe(iframe);
+      await transport.send({ jsonrpc: "2.0", method: "test", id: 1 });
+
+      expect(postMessageFn).toHaveBeenCalledTimes(1);
+      expect(postMessageFn).toHaveBeenCalledWith(
+        { jsonrpc: "2.0", method: "test", id: 1 },
+        "*",
+      );
+    });
+  });
 });

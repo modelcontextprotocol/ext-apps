@@ -2,6 +2,7 @@ import {
   type RequestOptions,
   mergeCapabilities,
   ProtocolOptions,
+  DEFAULT_REQUEST_TIMEOUT_MSEC,
 } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 import {
@@ -1988,7 +1989,33 @@ export class App extends ProtocolWithEvents<
     } catch (error) {
       // Disconnect if initialization fails.
       void this.close();
+
+      if (App.isInitializationTimeoutError(error)) {
+        const timeoutMs = options?.timeout ?? DEFAULT_REQUEST_TIMEOUT_MSEC;
+        const timeoutSec = Math.round(timeoutMs / 1000);
+        throw new Error(
+          `ui/initialize: no response within ${timeoutSec}s — ` +
+            `host may have loaded the View before connecting its transport.`,
+          { cause: error },
+        );
+      }
+
       throw error;
     }
+  }
+
+  private static isInitializationTimeoutError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    const message = error.message.toLowerCase();
+    const name = error.name.toLowerCase();
+    return (
+      message.includes("timeout") ||
+      message.includes("timed out") ||
+      message.includes("requesttimeout") ||
+      name.includes("timeout") ||
+      name === "aborterror"
+    );
   }
 }

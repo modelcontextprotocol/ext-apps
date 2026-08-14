@@ -187,4 +187,40 @@ export class PostMessageTransport implements Transport {
    * @param version - The negotiated protocol version string
    */
   setProtocolVersion?: (version: string) => void;
+
+  /**
+   * Create a transport for a host embedding an MCP App in an iframe.
+   *
+   * This helper enforces the correct construction order: the iframe must be
+   * in the document before creating the transport. Call this **before** setting
+   * `srcdoc` or `src` on the iframe, then call `bridge.connect(transport)`, and
+   * only then load the View content.
+   *
+   * The `contentWindow` reference is available as soon as the iframe is in the
+   * DOM (it points to the initial `about:blank` document). You do **not** need
+   * to wait for `onload`.
+   *
+   * @param iframe - An HTMLIFrameElement that is already in the DOM
+   * @returns A PostMessageTransport configured for host→iframe communication
+   * @throws Error if the iframe is not connected to the document
+   * @throws Error if contentWindow is unavailable
+   */
+  static forHostIframe(iframe: HTMLIFrameElement): PostMessageTransport {
+    if (!iframe.isConnected) {
+      throw new Error(
+        "PostMessageTransport.forHostIframe: iframe must be in the document. " +
+          "Call document.body.appendChild(iframe) before creating the transport.",
+      );
+    }
+
+    const contentWindow = iframe.contentWindow;
+    if (!contentWindow) {
+      throw new Error(
+        "PostMessageTransport.forHostIframe: iframe.contentWindow is null. " +
+          "Ensure the iframe is attached to the DOM.",
+      );
+    }
+
+    return new PostMessageTransport(contentWindow, contentWindow);
+  }
 }

@@ -476,6 +476,33 @@ Open http://localhost:8080 in your browser:
 
 You've built your first MCP App!
 
+## Host Construction Order
+
+When building your own host (instead of using an existing MCP client), the order of operations matters. The host must start listening for messages **before** the View begins executing, otherwise the View's `ui/initialize` request will be lost.
+
+`iframe.contentWindow` is available as soon as the iframe is in the DOM (it points to the initial `about:blank` document) — you do not need to wait for `onload` to create the transport.
+
+```ts
+import {
+  AppBridge,
+  PostMessageTransport,
+} from "@modelcontextprotocol/ext-apps/app-bridge";
+
+const iframe = document.createElement("iframe");
+iframe.sandbox.add("allow-scripts");
+document.body.appendChild(iframe);
+
+const transport = PostMessageTransport.forHostIframe(iframe);
+const bridge = new AppBridge(mcpClient, hostInfo, hostCapabilities);
+await bridge.connect(transport);
+
+// Set content AFTER connecting — view's ui/initialize will be received
+iframe.srcdoc = htmlContent;
+```
+
+> [!CAUTION]
+> Setting `srcdoc` or `src` **before** connecting the transport will cause the View's `ui/initialize` to be lost. If you see a timeout like `"no response within 60s"`, this is the likely cause.
+
 ## Next Steps
 
 - **Continue learning**: The [`basic-server-vanillajs`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-vanillajs) example builds on this quickstart with host communication, theming, and lifecycle handlers
