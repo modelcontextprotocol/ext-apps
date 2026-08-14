@@ -15,8 +15,9 @@ We welcome contributions to the MCP Apps SDK! This document outlines the process
 1. Create a new branch for your changes
 2. Make your changes
 3. Run `npm run prettier` to ensure code style compliance
-4. Run `npm test` to verify all tests pass
-5. Submit a pull request
+4. If running prettier fails, run `npm run prettier:fix` to fix
+5. Run `npm test` to verify all tests pass
+6. Submit a pull request
 
 ## Pull Request Guidelines
 

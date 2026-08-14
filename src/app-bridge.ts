@@ -95,7 +95,6 @@ import {
 } from "./types";
 export * from "./types";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
-import { RESOURCE_URI_META_KEY } from "./app";
 export { PostMessageTransport } from "./message-transport";
 
 /**
@@ -115,27 +114,18 @@ export { PostMessageTransport } from "./message-transport";
  * const uri = getToolUiResourceUri({
  *   _meta: { ui: { resourceUri: "ui://server/app.html" } }
  * });
- *
- * // Deprecated flat format (still supported)
- * const uri = getToolUiResourceUri({
- *   _meta: { "ui/resourceUri": "ui://server/app.html" }
- * });
- * ```
  */
 export function getToolUiResourceUri(tool: Partial<Tool>): string | undefined {
   // Try new nested format first: _meta.ui.resourceUri
   const uiMeta = tool._meta?.ui as McpUiToolMeta | undefined;
   let uri: unknown = uiMeta?.resourceUri;
 
-  // Fall back to deprecated flat format: _meta["ui/resourceUri"]
-  if (uri === undefined) {
-    uri = tool._meta?.[RESOURCE_URI_META_KEY];
-  }
-
   if (typeof uri === "string" && uri.startsWith("ui://")) {
     return uri;
   } else if (uri !== undefined) {
-    throw new Error(`Invalid UI resource URI: ${JSON.stringify(uri)}`);
+    throw new Error(
+      `Invalid UI resource URI: ${JSON.stringify(uri)}. URI must be a string and start with "ui://"`,
+    );
   }
   return undefined;
 }

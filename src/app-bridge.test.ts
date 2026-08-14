@@ -2392,16 +2392,6 @@ describe("getToolUiResourceUri", () => {
     });
   });
 
-  describe("deprecated flat format (_meta['ui/resourceUri'])", () => {
-    it("extracts resourceUri from deprecated format", () => {
-      const tool = {
-        name: "test-tool",
-        _meta: { "ui/resourceUri": "ui://server/app.html" },
-      };
-      expect(getToolUiResourceUri(tool)).toBe("ui://server/app.html");
-    });
-  });
-
   describe("format precedence", () => {
     it("prefers new nested format over deprecated format", () => {
       const tool = {
