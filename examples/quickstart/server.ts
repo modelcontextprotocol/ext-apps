@@ -35,7 +35,14 @@ export function createServer(): McpServer {
     },
     async () => {
       const time = new Date().toISOString();
-      return { content: [{ type: "text", text: time }] };
+      return {
+        content: [{ type: "text", text: time }],
+        _meta: {
+          timestamp: time,
+          source: "quickstart-server",
+          debugToken: "quickstart-meta-debug",
+        },
+      };
     },
   );
 
