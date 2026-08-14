@@ -51,6 +51,8 @@ const HOST_MASKS: Record<string, string[]> = {
   "basic-svelte": ['[class*="collapsiblePanel"]'],
   "basic-vanillajs": ['[class*="collapsiblePanel"]'],
   "basic-vue": ['[class*="collapsiblePanel"]'],
+  // PDF server result includes a random viewUUID in the preview text
+  "pdf-server": ['[class*="collapsiblePanel"]'],
   // System monitor has dynamic system stats in result
   "system-monitor": ['[class*="collapsiblePanel"]'],
 };
