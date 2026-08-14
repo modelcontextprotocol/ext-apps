@@ -64,7 +64,7 @@ jobs:
 
       - name: Verify no private URLs in package-lock.json
         shell: bash
-        run: '! grep -E "\"resolved\": \"https?://" package-lock.json | grep -v registry.npmjs.org'
+        run: node scripts/check-lockfile-registry.mjs
 
       - name: Verify example dependency versions
         shell: bash
