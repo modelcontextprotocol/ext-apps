@@ -215,6 +215,19 @@ interface UIResourceMeta {
    */
   domain?: string,
   /**
+   * Public homepage URL for the app represented by this UI resource.
+   *
+   * This is distinct from `domain`, which configures the host-assigned sandbox
+   * origin. Hosts MAY expose this URL to help users learn more about or return
+   * to the app, but MUST treat it as an untrusted external link and apply their
+   * normal link validation, policy, and consent behavior. Its presence does not
+   * grant navigation permission or establish trust in the destination.
+   *
+   * @example
+   * "https://weather.example.com"
+   */
+  homepage?: string,
+  /**
    * Visual boundary preference
    *
    * Boolean controlling whether a visible border and background is provided by the host. Specifying an
@@ -253,6 +266,7 @@ The resource content is returned via `resources/read`:
           clipboardWrite?: {};   // Request clipboard write access
         };
         domain?: string;
+        homepage?: string;
         prefersBorder?: boolean;
       };
     };
@@ -262,7 +276,7 @@ The resource content is returned via `resources/read`:
 
 #### Metadata Location
 
-`UIResourceMeta` (CSP, permissions, domain, prefersBorder) may be provided on either or both:
+`UIResourceMeta` (CSP, permissions, domain, homepage, prefersBorder) may be provided on either or both:
 
 - **`resources/list`:** On the resource entry's `_meta.ui` field. Useful as a static default that hosts can review at connection time.
 - **`resources/read`:** On each content item's `_meta.ui` field. Useful for per-response overrides or dynamic metadata that is only known at read time.
@@ -311,6 +325,7 @@ Example:
         "connectDomains": ["https://api.openweathermap.org"],
         "resourceDomains": ["https://cdn.jsdelivr.net"]
       },
+      "homepage": "https://weather.example.com",
       "prefersBorder": true
     }
   }
@@ -328,6 +343,7 @@ Example:
           "connectDomains": ["https://api.openweathermap.org"],
           "resourceDomains": ["https://cdn.jsdelivr.net"]
         },
+        "homepage": "https://weather.example.com",
         "prefersBorder": true
       }
     }

@@ -230,7 +230,9 @@ describe("registerAppResource", () => {
       "ui://test/view.html",
       {
         description: "A test resource",
-        _meta: { ui: {} },
+        _meta: {
+          ui: { homepage: "https://example.com/apps/my-resource" },
+        },
       },
       callback,
     );
@@ -240,6 +242,9 @@ describe("registerAppResource", () => {
     expect(capturedUri).toBe("ui://test/view.html");
     expect(capturedConfig?.mimeType).toBe(RESOURCE_MIME_TYPE);
     expect(capturedConfig?.description).toBe("A test resource");
+    expect(capturedConfig?._meta).toEqual({
+      ui: { homepage: "https://example.com/apps/my-resource" },
+    });
   });
 
   it("should allow custom MIME type to override default", () => {

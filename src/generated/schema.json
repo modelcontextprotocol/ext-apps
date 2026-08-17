@@ -4268,6 +4268,10 @@
           "description": "Dedicated origin for view sandbox.\n\nUseful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.\n\n**Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:\n- Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)\n- URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)\n\nIf omitted, host uses default sandbox origin (typically per-conversation).",
           "type": "string"
         },
+        "homepage": {
+          "description": "Public homepage URL for the app represented by this UI resource.\n\nThis is distinct from `domain`, which configures the host-assigned sandbox\norigin. Hosts MAY expose this URL to\nhelp users learn more about or return to the app, but MUST treat it as an\nuntrusted external link and apply their normal link validation, policy,\nand consent behavior. Its presence does not grant navigation permission\nor establish trust in the destination.",
+          "type": "string"
+        },
         "prefersBorder": {
           "description": "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
           "type": "boolean"
