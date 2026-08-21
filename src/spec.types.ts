@@ -764,6 +764,11 @@ export interface McpUiRequestDisplayModeResult {
 export type McpUiToolVisibility = "model" | "app";
 
 /**
+ * @description Controls whether the host may preload a tool's UI resource.
+ */
+export type McpUiToolPreload = "optional" | "disabled";
+
+/**
  * @description UI-related metadata for tools.
  */
 export interface McpUiToolMeta {
@@ -776,6 +781,12 @@ export interface McpUiToolMeta {
    * ```
    */
   resourceUri?: string;
+  /**
+   * @description Whether the host may preload the UI resource. Default: "optional"
+   * - "optional": Host may preload or defer loading the UI resource
+   * - "disabled": Host waits for the tool result before loading the UI resource
+   */
+  preload?: McpUiToolPreload;
   /**
    * @description Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
@@ -793,6 +804,17 @@ export interface McpUiToolMeta {
    * not the tool. Hosts ignore it here.
    */
   permissions?: never;
+}
+
+/**
+ * @description MCP Apps metadata for a tool execution result.
+ */
+export interface McpUiToolResultMeta {
+  /**
+   * @description Whether the host should close or suppress the View associated
+   * with this tool invocation. Default: false
+   */
+  "ui/close"?: boolean;
 }
 
 /**

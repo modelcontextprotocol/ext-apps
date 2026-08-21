@@ -91,11 +91,17 @@ import {
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResult,
   McpUiResourcePermissions,
+  McpUiToolPreload,
   McpUiToolMeta,
+  McpUiToolResultMeta,
 } from "./types";
 export * from "./types";
-export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./app";
-import { RESOURCE_URI_META_KEY } from "./app";
+export {
+  RESOURCE_URI_META_KEY,
+  RESOURCE_MIME_TYPE,
+  UI_CLOSE_META_KEY,
+} from "./app";
+import { RESOURCE_URI_META_KEY, UI_CLOSE_META_KEY } from "./app";
 export { PostMessageTransport } from "./message-transport";
 
 /**
@@ -138,6 +144,33 @@ export function getToolUiResourceUri(tool: Partial<Tool>): string | undefined {
     throw new Error(`Invalid UI resource URI: ${JSON.stringify(uri)}`);
   }
   return undefined;
+}
+
+/**
+ * Get a tool's UI preload mode.
+ *
+ * @param tool - Tool object with optional UI metadata
+ * @returns The declared preload mode, or `"optional"` when omitted or unrecognized
+ */
+export function getToolUiPreload(tool: Partial<Tool>): McpUiToolPreload {
+  const uiMeta = tool._meta?.ui as McpUiToolMeta | undefined;
+  return uiMeta?.preload === "disabled" ? "disabled" : "optional";
+}
+
+/**
+ * Check whether a tool result requests closure of its associated View.
+ *
+ * The signal is scoped to the invocation that produced the result and is only
+ * active when `_meta["ui/close"]` is the literal boolean `true`.
+ *
+ * @param result - MCP tool execution result
+ * @returns True when the associated View should be suppressed or closed
+ */
+export function shouldCloseToolUi(
+  result: Pick<CallToolResult, "_meta">,
+): boolean {
+  const meta = result._meta as McpUiToolResultMeta | undefined;
+  return meta?.[UI_CLOSE_META_KEY] === true;
 }
 
 /**

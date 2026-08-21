@@ -34,6 +34,7 @@
 import {
   RESOURCE_URI_META_KEY,
   RESOURCE_MIME_TYPE,
+  UI_CLOSE_META_KEY,
   McpUiResourceCsp,
   McpUiResourceMeta,
   McpUiToolMeta,
@@ -60,7 +61,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Re-exports for convenience
-export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
+export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE, UI_CLOSE_META_KEY };
 export type { ResourceMetadata, ToolCallback };
 
 /**

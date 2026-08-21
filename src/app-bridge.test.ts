@@ -19,9 +19,12 @@ import { LATEST_PROTOCOL_VERSION } from "./types";
 import {
   AppBridge,
   buildAllowAttribute,
+  getToolUiPreload,
   getToolUiResourceUri,
   isToolVisibilityModelOnly,
   isToolVisibilityAppOnly,
+  shouldCloseToolUi,
+  UI_CLOSE_META_KEY,
   type McpUiHostCapabilities,
 } from "./app-bridge";
 
@@ -2467,6 +2470,49 @@ describe("getToolUiResourceUri", () => {
         "Invalid UI resource URI",
       );
     });
+  });
+});
+
+describe("getToolUiPreload", () => {
+  it("defaults to optional when preload is omitted", () => {
+    expect(getToolUiPreload({})).toBe("optional");
+    expect(getToolUiPreload({ _meta: { ui: {} } })).toBe("optional");
+  });
+
+  it("returns an explicitly declared mode", () => {
+    expect(getToolUiPreload({ _meta: { ui: { preload: "optional" } } })).toBe(
+      "optional",
+    );
+    expect(getToolUiPreload({ _meta: { ui: { preload: "disabled" } } })).toBe(
+      "disabled",
+    );
+  });
+
+  it("ignores an unrecognized mode for forward compatibility", () => {
+    expect(getToolUiPreload({ _meta: { ui: { preload: "required" } } })).toBe(
+      "optional",
+    );
+  });
+});
+
+describe("shouldCloseToolUi", () => {
+  it("returns true for the ui/close signal", () => {
+    expect(shouldCloseToolUi({ _meta: { [UI_CLOSE_META_KEY]: true } })).toBe(
+      true,
+    );
+  });
+
+  it("returns false when the signal is absent or false", () => {
+    expect(shouldCloseToolUi({})).toBe(false);
+    expect(shouldCloseToolUi({ _meta: { [UI_CLOSE_META_KEY]: false } })).toBe(
+      false,
+    );
+  });
+
+  it("ignores non-boolean truthy values", () => {
+    expect(shouldCloseToolUi({ _meta: { [UI_CLOSE_META_KEY]: "true" } })).toBe(
+      false,
+    );
   });
 });
 

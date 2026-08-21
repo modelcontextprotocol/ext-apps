@@ -716,6 +716,13 @@ export const McpUiToolVisibilitySchema = z
   .describe("Tool visibility scope - who can access the tool.");
 
 /**
+ * @description Controls whether the host may preload a tool's UI resource.
+ */
+export const McpUiToolPreloadSchema = z
+  .union([z.literal("optional"), z.literal("disabled")])
+  .describe("Controls whether the host may preload a tool's UI resource.");
+
+/**
  * @description UI-related metadata for tools.
  */
 export const McpUiToolMetaSchema = z.object({
@@ -728,6 +735,14 @@ export const McpUiToolMetaSchema = z.object({
    * ```
    */
   resourceUri: z.string().optional(),
+  /**
+   * @description Whether the host may preload the UI resource. Default: "optional"
+   * - "optional": Host may preload or defer loading the UI resource
+   * - "disabled": Host waits for the tool result before loading the UI resource
+   */
+  preload: McpUiToolPreloadSchema.optional().describe(
+    'Whether the host may preload the UI resource. Default: "optional"\n- "optional": Host may preload or defer loading the UI resource\n- "disabled": Host waits for the tool result before loading the UI resource',
+  ),
   /**
    * @description Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
@@ -750,6 +765,22 @@ export const McpUiToolMetaSchema = z.object({
    * not the tool. Hosts ignore it here.
    */
   permissions: z.never().optional(),
+});
+
+/**
+ * @description MCP Apps metadata for a tool execution result.
+ */
+export const McpUiToolResultMetaSchema = z.object({
+  /**
+   * @description Whether the host should close or suppress the View associated
+   * with this tool invocation. Default: false
+   */
+  "ui/close": z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the host should close or suppress the View associated\nwith this tool invocation. Default: false",
+    ),
 });
 
 /**
