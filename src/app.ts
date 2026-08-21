@@ -149,6 +149,17 @@ export {
 export const RESOURCE_URI_META_KEY = "ui/resourceUri";
 
 /**
+ * Metadata key for suppressing or closing the View associated with a tool
+ * invocation.
+ *
+ * A server sets this key to `true` in `CallToolResult._meta` when the result can
+ * be presented without the tool's declared UI resource. Hosts should suppress
+ * a pending View or gracefully tear down an initialized View for that specific
+ * invocation.
+ */
+export const UI_CLOSE_META_KEY = "ui/close";
+
+/**
  * MIME type for MCP UI resources.
  *
  * Identifies HTML content as an MCP App UI resource.

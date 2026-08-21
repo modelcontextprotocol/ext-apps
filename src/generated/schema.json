@@ -5320,6 +5320,19 @@
         "resourceUri": {
           "type": "string"
         },
+        "preload": {
+          "description": "Whether the host may preload the UI resource. Default: \"optional\"\n- \"optional\": Host may preload or defer loading the UI resource\n- \"disabled\": Host waits for the tool result before loading the UI resource",
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "optional"
+            },
+            {
+              "type": "string",
+              "const": "disabled"
+            }
+          ]
+        },
         "visibility": {
           "description": "Who can access this tool. Default: [\"model\", \"app\"]\n- \"model\": Tool visible to and callable by the agent\n- \"app\": Tool callable by the app from this server only",
           "type": "array",
@@ -5342,6 +5355,31 @@
         },
         "permissions": {
           "not": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "McpUiToolPreload": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "optional"
+        },
+        {
+          "type": "string",
+          "const": "disabled"
+        }
+      ],
+      "description": "Controls whether the host may preload a tool's UI resource."
+    },
+    "McpUiToolResultMeta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "ui/close": {
+          "description": "Whether the host should close or suppress the View associated\nwith this tool invocation. Default: false",
+          "type": "boolean"
         }
       },
       "additionalProperties": false

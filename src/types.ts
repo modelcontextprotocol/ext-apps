@@ -64,8 +64,10 @@ export {
   type McpUiResourceMeta,
   type McpUiRequestDisplayModeRequest,
   type McpUiRequestDisplayModeResult,
+  type McpUiToolPreload,
   type McpUiToolVisibility,
   type McpUiToolMeta,
+  type McpUiToolResultMeta,
   type McpUiClientCapabilities,
 } from "./spec.types.js";
 
@@ -132,8 +134,10 @@ export {
   McpUiResourceMetaSchema,
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResultSchema,
+  McpUiToolPreloadSchema,
   McpUiToolVisibilitySchema,
   McpUiToolMetaSchema,
+  McpUiToolResultMetaSchema,
 } from "./generated/schema.js";
 
 // Re-export SDK types used in protocol type unions
