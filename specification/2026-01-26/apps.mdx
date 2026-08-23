@@ -1495,13 +1495,49 @@ Clients and servers negotiate MCP Apps support through the standard MCP extensio
 
 #### Client (Host) Capabilities
 
-Clients advertise MCP Apps support in the initialize request using the extension identifier `io.modelcontextprotocol/ui`:
+Clients advertise MCP Apps support using the extension identifier `io.modelcontextprotocol/ui`.
+
+For MCP protocol version [`2026-07-28`](https://modelcontextprotocol.io/specification/2026-07-28/basic/index#meta), client capabilities are request-scoped. A client that supports MCP Apps MUST include the UI extension under `_meta["io.modelcontextprotocol/clientCapabilities"].extensions` on every request:
 
 ```json
 {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "get_weather",
+    "arguments": {
+      "location": "New York"
+    },
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {
+        "extensions": {
+          "io.modelcontextprotocol/ui": {
+            "mimeTypes": ["text/html;profile=mcp-app"]
+          }
+        }
+      },
+      "io.modelcontextprotocol/clientInfo": {
+        "name": "example-host",
+        "version": "1.0.0"
+      }
+    }
+  }
+}
+```
+
+The server MUST evaluate this value for each request and MUST NOT infer capabilities from an earlier request.
+
+For earlier MCP protocol versions that use initialization, clients advertise the same extension once in the `initialize` request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
   "method": "initialize",
   "params": {
-    "protocolVersion": "2024-11-05",
+    "protocolVersion": "2025-11-25",
     "capabilities": {
       "extensions": {
         "io.modelcontextprotocol/ui": {
@@ -1517,6 +1553,8 @@ Clients advertise MCP Apps support in the initialize request using the extension
 }
 ```
 
+These client-to-server messages are separate from the View-to-Host `ui/initialize` handshake. A View declares its capabilities in `params.appCapabilities`; a Host advertises MCP Apps support to the MCP server through the client capabilities shown above.
+
 **Extension Settings:**
 
 - `mimeTypes`: Array of supported content types (REQUIRED, e.g., `["text/html;profile=mcp-app"]`)
@@ -1528,36 +1566,23 @@ Future versions may add additional settings:
 
 #### Server Behavior
 
-Servers SHOULD check client capabilities before registering UI-enabled tools. The SDK provides the `getUiCapability` helper for this:
+Servers SHOULD check the client capabilities associated with the current request before exposing UI-enabled tool metadata. For MCP `2026-07-28`, `clientCapabilities` below is `_meta["io.modelcontextprotocol/clientCapabilities"]` from that request; for earlier protocol versions, it is the value negotiated during initialization. The SDK provides the `getUiCapability` helper for this:
 
 ```typescript
 import { getUiCapability, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 
 const uiCap = getUiCapability(clientCapabilities);
-if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
-  // Register tools with UI templates
-  server.registerTool("get_weather", {
-    description: "Get weather with interactive dashboard",
-    inputSchema: { /* ... */ },
-    _meta: {
-      ui: { resourceUri: "ui://weather-server/dashboard" }
-    }
-  });
-} else {
-  // Register text-only version
-  server.registerTool("get_weather", {
-    description: "Get weather as text",
-    inputSchema: { /* ... */ }
-    // No UI metadata
-  });
-}
+const supportsUi =
+  uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
 ```
+
+When `supportsUi` is `true`, servers can include `_meta.ui.resourceUri` in tool definitions returned for the current request. Otherwise they should omit UI metadata and provide text-only behavior.
 
 **Graceful Degradation:**
 
 - Servers SHOULD provide text-only fallback behavior for all UI-enabled tools
 - Tools MUST return meaningful content array even when UI is available
-- Servers MAY register different tool variants based on host capabilities
+- Servers MAY adapt tool metadata or results based on the current request's client capabilities
 
 ### Extensibility
 
