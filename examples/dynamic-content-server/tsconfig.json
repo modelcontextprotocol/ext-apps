@@ -15,5 +15,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "server.ts", "dynamic-ui.ts"]
+  "include": ["server.ts", "dynamic-ui.ts", "main.ts"]
 }

@@ -23,7 +23,7 @@ import type {
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { DYNAMIC_UI_MIME_TYPE, type UiSurface } from "./dynamic-ui.js";
+import { A2UI_MIME_TYPE } from "./dynamic-ui.js";
 
 // Works both from source (server.ts) and compiled (dist/server.js)
 const DIST_DIR = import.meta.filename.endsWith(".ts")
@@ -65,77 +65,242 @@ const FLIGHTS: Flight[] = [
 ];
 
 /** Build the flight results surface — the server generates UI at call time. */
-function flightResultsSurface(destination: string): UiSurface {
-  return {
-    surface: [
-      { kind: "text", variant: "title", text: `Flights to ${destination}` },
-      {
-        kind: "column",
-        children: FLIGHTS.map((flight) => ({
-          kind: "card" as const,
-          children: [
+function flightResultsSurface(destination: string): any[] {
+  return [
+    {
+      surfaceUpdate: {
+        surfaceId: "flights-surface",
+        components: [
+          {
+            id: "root",
+            component: {
+              Card: {
+                child: "main-column",
+              },
+            },
+          },
+          {
+            id: "main-column",
+            component: {
+              Column: {
+                children: {
+                  explicitList: ["title", "flights-list", "note"],
+                },
+              },
+            },
+          },
+          {
+            id: "title",
+            component: {
+              Text: {
+                text: { literalString: `Flights to ${destination}` },
+                usageHint: "h1",
+              },
+            },
+          },
+          {
+            id: "note",
+            component: {
+              Text: {
+                text: { literalString: "Prices include taxes and fees." },
+                usageHint: "caption",
+              },
+            },
+          },
+          {
+            id: "flights-list",
+            component: {
+              Column: {
+                children: {
+                  explicitList: FLIGHTS.map((f) => `flight-card-${f.id}`),
+                },
+              },
+            },
+          },
+          ...FLIGHTS.flatMap((flight) => [
             {
-              kind: "row" as const,
-              children: [
-                {
-                  kind: "text" as const,
-                  text: `${flight.airline} ${flight.id}`,
-                },
-                {
-                  kind: "text" as const,
-                  variant: "note" as const,
-                  text: `${flight.departure} → ${flight.arrival}`,
-                },
-                { kind: "text" as const, text: `$${flight.price}` },
-                {
-                  kind: "button" as const,
-                  label: "Select",
-                  // The renderer's event bridge turns this into a tools/call
-                  action: {
-                    tool: "select-flight",
-                    arguments: { flightId: flight.id },
+              id: `flight-card-${flight.id}`,
+              component: {
+                Card: { child: `flight-row-${flight.id}` },
+              },
+            },
+            {
+              id: `flight-row-${flight.id}`,
+              component: {
+                Row: {
+                  children: {
+                    explicitList: [
+                      `flight-airline-${flight.id}`,
+                      `flight-time-${flight.id}`,
+                      `flight-price-${flight.id}`,
+                      `flight-btn-${flight.id}`,
+                    ],
                   },
                 },
-              ],
+              },
             },
-          ],
-        })),
+            {
+              id: `flight-airline-${flight.id}`,
+              component: {
+                Text: {
+                  text: { literalString: `${flight.airline} ${flight.id}` },
+                },
+              },
+            },
+            {
+              id: `flight-time-${flight.id}`,
+              component: {
+                Text: {
+                  text: {
+                    literalString: `${flight.departure} → ${flight.arrival}`,
+                  },
+                  usageHint: "body",
+                },
+              },
+            },
+            {
+              id: `flight-price-${flight.id}`,
+              component: {
+                Text: { text: { literalString: `$${flight.price}` } },
+              },
+            },
+            {
+              id: `flight-btn-${flight.id}`,
+              component: {
+                Button: {
+                  child: `flight-btn-text-${flight.id}`,
+                  action: {
+                    name: "select-flight",
+                    context: [
+                      { key: "flightId", value: { literalString: flight.id } },
+                    ],
+                  },
+                },
+              },
+            },
+            {
+              id: `flight-btn-text-${flight.id}`,
+              component: { Text: { text: { literalString: "Select" } } },
+            },
+          ]),
+        ],
       },
-      { kind: "text", variant: "note", text: "Prices include taxes and fees." },
-    ],
-  };
+    },
+    {
+      beginRendering: {
+        surfaceId: "flights-surface",
+        root: "root",
+      },
+    },
+  ];
 }
 
 /** Build the confirmation surface returned by the app-visibility tool. */
-function confirmationSurface(flight: Flight): UiSurface {
-  return {
-    surface: [
-      { kind: "text", variant: "title", text: "Flight selected" },
-      {
-        kind: "card",
-        children: [
+function confirmationSurface(flight: Flight): any[] {
+  return [
+    {
+      surfaceUpdate: {
+        surfaceId: "flights-surface",
+        components: [
           {
-            kind: "text",
-            text: `${flight.airline} ${flight.id}, departs ${flight.departure}`,
+            id: "root",
+            component: {
+              Card: {
+                child: "main-column",
+              },
+            },
           },
-          { kind: "text", text: `Total: $${flight.price}` },
           {
-            kind: "text",
-            variant: "note",
-            text: "This is a demo — nothing was booked.",
+            id: "main-column",
+            component: {
+              Column: {
+                children: {
+                  explicitList: ["title", "card", "back-btn"],
+                },
+              },
+            },
+          },
+          {
+            id: "title",
+            component: {
+              Text: {
+                text: { literalString: "Flight selected" },
+                usageHint: "h1",
+              },
+            },
+          },
+          {
+            id: "card",
+            component: {
+              Card: { child: "card-col" },
+            },
+          },
+          {
+            id: "card-col",
+            component: {
+              Column: {
+                children: {
+                  explicitList: ["text1", "text2", "text3"],
+                },
+              },
+            },
+          },
+          {
+            id: "text1",
+            component: {
+              Text: {
+                text: {
+                  literalString: `${flight.airline} ${flight.id}, departs ${flight.departure}`,
+                },
+              },
+            },
+          },
+          {
+            id: "text2",
+            component: {
+              Text: { text: { literalString: `Total: $${flight.price}` } },
+            },
+          },
+          {
+            id: "text3",
+            component: {
+              Text: {
+                text: { literalString: "This is a demo — nothing was booked." },
+                usageHint: "caption",
+              },
+            },
+          },
+          {
+            id: "back-btn",
+            component: {
+              Button: {
+                child: "back-btn-text",
+                action: {
+                  name: "search-flights",
+                  context: [
+                    {
+                      key: "destination",
+                      value: { literalString: "San Francisco" },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          {
+            id: "back-btn-text",
+            component: { Text: { text: { literalString: "Back to results" } } },
           },
         ],
       },
-      {
-        kind: "button",
-        label: "Back to results",
-        action: {
-          tool: "search-flights",
-          arguments: { destination: "San Francisco" },
-        },
+    },
+    {
+      beginRendering: {
+        surfaceId: "flights-surface",
+        root: "root",
       },
-    ],
-  };
+    },
+  ];
 }
 
 /**
@@ -181,7 +346,7 @@ export function createServer(): McpServer {
           // excluded from model context
           createViewContentBlock({
             uri: `dynamic-ui://dynamic-content-server/surfaces/${encodeURIComponent(destination)}`,
-            mimeType: DYNAMIC_UI_MIME_TYPE,
+            mimeType: A2UI_MIME_TYPE,
             text: JSON.stringify(flightResultsSurface(destination)),
           }),
         ],
@@ -218,7 +383,7 @@ export function createServer(): McpServer {
           },
           createViewContentBlock({
             uri: `dynamic-ui://dynamic-content-server/surfaces/confirmation-${flight.id}`,
-            mimeType: DYNAMIC_UI_MIME_TYPE,
+            mimeType: A2UI_MIME_TYPE,
             text: JSON.stringify(confirmationSurface(flight)),
           }),
         ],
@@ -236,7 +401,7 @@ export function createServer(): McpServer {
       mimeType: RESOURCE_MIME_TYPE,
       _meta: {
         ui: {
-          contentMimeTypes: [DYNAMIC_UI_MIME_TYPE],
+          contentMimeTypes: [A2UI_MIME_TYPE],
           prefersBorder: true,
         },
       },
@@ -254,7 +419,7 @@ export function createServer(): McpServer {
             text: html,
             _meta: {
               ui: {
-                contentMimeTypes: [DYNAMIC_UI_MIME_TYPE],
+                contentMimeTypes: [A2UI_MIME_TYPE],
                 prefersBorder: true,
               },
             },
