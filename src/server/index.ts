@@ -53,9 +53,12 @@ import type {
   ZodRawShapeCompat,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { StandardSchemaWithJSON } from "../standard-schema";
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type {
   ClientCapabilities,
   ReadResourceResult,
+  Tool,
   ToolAnnotations,
 } from "@modelcontextprotocol/sdk/types.js";
 
@@ -468,4 +471,108 @@ export function getUiCapability(
   return clientCapabilities.extensions?.[EXTENSION_ID] as
     | McpUiClientCapabilities
     | undefined;
+}
+
+/**
+ * JSON Schema `$schema` dialect URI that `@modelcontextprotocol/sdk` always emits for
+ * Zod-based tool schemas, regardless of which JSON Schema draft the schema actually
+ * conforms to.
+ */
+const DRAFT_07_DIALECT = "http://json-schema.org/draft-07/schema#";
+
+/**
+ * JSON Schema dialect that MCP's `inputSchema`/`outputSchema` fields actually document
+ * (2020-12), and that strict validators expect to see in `$schema`.
+ */
+const DRAFT_2020_12_DIALECT = "https://json-schema.org/draft/2020-12/schema";
+
+function rewriteDraft07Dialect(schema: unknown): void {
+  if (
+    schema &&
+    typeof schema === "object" &&
+    (schema as { $schema?: unknown }).$schema === DRAFT_07_DIALECT
+  ) {
+    (schema as { $schema: string }).$schema = DRAFT_2020_12_DIALECT;
+  }
+}
+
+/**
+ * Work around an `@modelcontextprotocol/sdk` bug where `tools/list` always reports
+ * `"$schema": "http://json-schema.org/draft-07/schema#"` on `inputSchema`/`outputSchema`
+ * for Zod-based tool schemas, even though the emitted schema is actually 2020-12. The SDK
+ * hardcodes this because it never passes a `target` through to `zod-to-json-schema`
+ * internals — there is no `registerTool`/`registerAppTool` option to configure it.
+ *
+ * Clients with a strict, dialect-aware 2020-12 output-schema validator (e.g. Claude
+ * Desktop, Claude Code) reject the mismatched `$schema` before a tool call ever reaches
+ * the server, breaking every tool in the list — not just the ones with an
+ * `outputSchema`. See {@link https://github.com/modelcontextprotocol/typescript-sdk/issues/2721}
+ * for the upstream tracking issue (open as of this writing, no released fix).
+ *
+ * This patches the low-level `Server.setRequestHandler` to intercept the handler that
+ * `McpServer` registers for `ListToolsRequestSchema`, rewriting the `$schema` dialect on
+ * every tool's `inputSchema`/`outputSchema` in the result before it's returned.
+ *
+ * `McpServer` only calls `server.setRequestHandler(ListToolsRequestSchema, ...)` once,
+ * lazily, the first time a tool is registered — so this must be called immediately after
+ * constructing `McpServer`, **before** registering any tools, or the patch will be
+ * installed too late to intercept the real handler.
+ *
+ * @param server - The MCP server instance (only its low-level `server` is used)
+ *
+ * @example Basic usage
+ * ```ts source="./index.examples.ts#fixOutputSchemaDialect_basicUsage"
+ * const server = new McpServer({ name: "my-server", version: "1.0.0" });
+ * fixOutputSchemaDialect(server);
+ *
+ * // Tool registration must happen after fixOutputSchemaDialect(server) above.
+ * registerAppTool(
+ *   server,
+ *   "get-weather",
+ *   {
+ *     description: "Get current weather for a location",
+ *     inputSchema: { location: z.string() },
+ *     outputSchema: { temp: z.number(), conditions: z.string() },
+ *     _meta: { ui: { resourceUri: "ui://weather/view.html" } },
+ *   },
+ *   async ({ location }) => {
+ *     const weather = await fetchWeather(location);
+ *     return {
+ *       content: [{ type: "text", text: JSON.stringify(weather) }],
+ *       structuredContent: weather,
+ *     };
+ *   },
+ * );
+ * ```
+ */
+export function fixOutputSchemaDialect(
+  server: Pick<McpServer, "server">,
+): void {
+  const lowLevelServer: Server = server.server;
+  const originalSetRequestHandler =
+    lowLevelServer.setRequestHandler.bind(lowLevelServer);
+
+  lowLevelServer.setRequestHandler = (<T extends { method: unknown }>(
+    requestSchema: T,
+    handler: (...args: unknown[]) => unknown,
+  ) => {
+    if ((requestSchema as unknown) !== ListToolsRequestSchema) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return originalSetRequestHandler(requestSchema as any, handler as any);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return originalSetRequestHandler(
+      requestSchema as any,
+      (async (...args: unknown[]) => {
+        const result = (await handler(...args)) as { tools?: Tool[] };
+        for (const tool of result?.tools ?? []) {
+          rewriteDraft07Dialect(tool.inputSchema);
+          rewriteDraft07Dialect(tool.outputSchema);
+        }
+        return result;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any,
+    );
+  }) as typeof lowLevelServer.setRequestHandler;
 }
