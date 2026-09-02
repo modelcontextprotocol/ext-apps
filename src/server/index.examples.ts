@@ -9,8 +9,8 @@
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
-  McpServer,
   ToolCallback,
   ReadResourceCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -19,6 +19,7 @@ import {
   registerAppTool,
   registerAppResource,
   getUiCapability,
+  fixOutputSchemaDialect,
   RESOURCE_MIME_TYPE,
 } from "./index.js";
 
@@ -288,4 +289,34 @@ function getUiCapability_checkSupport(
     }
   };
   //#endregion getUiCapability_checkSupport
+}
+
+/**
+ * Example: Work around the upstream SDK bug that always reports a draft-07
+ * `$schema` dialect for Zod-based `inputSchema`/`outputSchema`.
+ */
+function fixOutputSchemaDialect_basicUsage() {
+  //#region fixOutputSchemaDialect_basicUsage
+  const server = new McpServer({ name: "my-server", version: "1.0.0" });
+  fixOutputSchemaDialect(server);
+
+  // Tool registration must happen after fixOutputSchemaDialect(server) above.
+  registerAppTool(
+    server,
+    "get-weather",
+    {
+      description: "Get current weather for a location",
+      inputSchema: { location: z.string() },
+      outputSchema: { temp: z.number(), conditions: z.string() },
+      _meta: { ui: { resourceUri: "ui://weather/view.html" } },
+    },
+    async ({ location }) => {
+      const weather = await fetchWeather(location);
+      return {
+        content: [{ type: "text", text: JSON.stringify(weather) }],
+        structuredContent: weather,
+      };
+    },
+  );
+  //#endregion fixOutputSchemaDialect_basicUsage
 }

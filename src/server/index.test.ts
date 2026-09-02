@@ -5,9 +5,11 @@ import {
   RESOURCE_URI_META_KEY,
   RESOURCE_MIME_TYPE,
   getUiCapability,
+  fixOutputSchemaDialect,
   EXTENSION_ID,
 } from "./index";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 describe("registerAppTool", () => {
   it("should pass through config to server.registerTool", () => {
@@ -354,5 +356,77 @@ describe("getUiCapability", () => {
       },
     };
     expect(getUiCapability(caps)).toBeUndefined();
+  });
+});
+
+describe("fixOutputSchemaDialect", () => {
+  it("should rewrite the draft-07 $schema on tools/list results", async () => {
+    let capturedHandler: ((...args: unknown[]) => Promise<unknown>) | undefined;
+
+    const mockServer = {
+      server: {
+        setRequestHandler: mock((_requestSchema: unknown, handler: unknown) => {
+          capturedHandler = handler as (...args: unknown[]) => Promise<unknown>;
+        }),
+      },
+    };
+
+    fixOutputSchemaDialect(mockServer as unknown as Pick<McpServer, "server">);
+
+    // Simulate McpServer registering its tools/list handler after the patch.
+    const fakeToolsListResult = {
+      tools: [
+        {
+          name: "my-tool",
+          inputSchema: {
+            $schema: "http://json-schema.org/draft-07/schema#",
+            type: "object",
+            properties: {},
+          },
+          outputSchema: {
+            $schema: "http://json-schema.org/draft-07/schema#",
+            type: "object",
+            properties: { result: { type: "string" } },
+          },
+        },
+      ],
+    };
+    const innerHandler = mock(async () => fakeToolsListResult);
+    mockServer.server.setRequestHandler(ListToolsRequestSchema, innerHandler);
+
+    expect(capturedHandler).toBeDefined();
+    const result = (await capturedHandler!()) as typeof fakeToolsListResult;
+
+    expect(innerHandler).toHaveBeenCalledTimes(1);
+    expect(result.tools[0].inputSchema.$schema).toBe(
+      "https://json-schema.org/draft/2020-12/schema",
+    );
+    expect(result.tools[0].outputSchema?.$schema).toBe(
+      "https://json-schema.org/draft/2020-12/schema",
+    );
+  });
+
+  it("should pass through handlers for other request schemas unmodified", () => {
+    const OtherRequestSchema = { method: "other/thing" };
+    const originalSetRequestHandler = mock(
+      (_requestSchema: unknown, _handler: unknown) => {},
+    );
+
+    const mockServer = {
+      server: {
+        setRequestHandler: originalSetRequestHandler,
+      },
+    };
+
+    fixOutputSchemaDialect(mockServer as unknown as Pick<McpServer, "server">);
+
+    const handler = async () => ({ ok: true });
+    mockServer.server.setRequestHandler(OtherRequestSchema, handler);
+
+    expect(originalSetRequestHandler).toHaveBeenCalledTimes(1);
+    expect(originalSetRequestHandler).toHaveBeenCalledWith(
+      OtherRequestSchema,
+      handler,
+    );
   });
 });

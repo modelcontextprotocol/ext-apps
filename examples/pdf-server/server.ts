@@ -16,6 +16,7 @@ import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
+  fixOutputSchemaDialect,
   registerAppResource,
   registerAppTool,
   RESOURCE_MIME_TYPE,
@@ -1275,6 +1276,11 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   const debug = options.debug ?? false;
   const disableInteract = !enableInteract;
   const server = new McpServer({ name: "PDF Server", version: "2.0.0" });
+  // Work around an upstream SDK bug where tool schemas always report a
+  // draft-07 $schema dialect, which strict 2020-12-only validators (e.g.
+  // Claude Desktop, Claude Code) reject: must run before any tool
+  // registration. See https://github.com/modelcontextprotocol/typescript-sdk/issues/2721
+  fixOutputSchemaDialect(server);
 
   if (useClientRoots) {
     // Fetch roots on initialization and subscribe to changes
