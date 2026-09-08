@@ -23,6 +23,9 @@
 <pre><code class="bash"><span class="hl-2">git</span><span class="hl-0"> </span><span class="hl-3">clone</span><span class="hl-0"> </span><span class="hl-3">https://github.com/modelcontextprotocol/ext-apps.git</span><br/><span class="hl-2">cd</span><span class="hl-0"> </span><span class="hl-3">ext-apps</span><br/><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-3">install</span><br/><span class="hl-2">cd</span><span class="hl-0"> </span><span class="hl-3">examples/basic-host</span>
 </code><button type="button">Copy</button></pre>
 
+<p>The root install runs the package build, including type-checking the
+documentation snippets against the pinned base MCP SDK 2.x packages. Do
+not bypass a failed build before testing the host.</p>
 </li>
 <li>
 <p>Start basic-host, pointing it to your MCP server:</p>

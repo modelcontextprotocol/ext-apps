@@ -28,6 +28,10 @@ The [`basic-host`](https://github.com/modelcontextprotocol/ext-apps/tree/main/ex
    cd examples/basic-host
    ```
 
+   The root install runs the package build, including type-checking the
+   documentation snippets against the pinned base MCP SDK 2.x packages. Do
+   not bypass a failed build before testing the host.
+
 2. Start basic-host, pointing it to your MCP server:
 
    ```bash

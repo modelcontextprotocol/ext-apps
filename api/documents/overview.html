@@ -103,7 +103,11 @@ flowchart LR
 <li><strong>Host</strong> — The chat client (e.g., Claude Desktop) that connects to servers, embeds Views in iframes, and proxies communication between them.</li>
 <li><strong>View</strong> — The UI running inside a sandboxed iframe. It receives tool data from the Host and can call server tools or send messages back to the chat.</li>
 </ul>
-<p>The View acts as an MCP client, the Host acts as a proxy, and the Server is a standard MCP server.</p>
+<p>The View's <code>App</code> and the Host's <code>AppBridge</code> both subclass the <code>Protocol</code> class
+exported by <code>@modelcontextprotocol/client</code> for the iframe channel. A separate outer <code>Client</code> connects
+the Host to the actual MCP Server. Keeping those two connections separate
+preserves the Apps-only iframe handshake and prevents iframe capabilities from
+leaking into the server connection.</p>
 <h2 id="lifecycle" class="tsd-anchor-link">Lifecycle<a href="#lifecycle" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <div class="mermaid-block"><div class="mermaid" style="display: block">%%{init:{"theme":"default"}}%%
 sequenceDiagram
@@ -166,7 +170,7 @@ sequenceDiagram
 
 <ol>
 <li><strong>Discovery</strong> — The Host learns about tools and their UI resources when connecting to the server.</li>
-<li><strong>Initialization</strong> — When a UI tool is called, the Host renders the iframe. The View sends <code>ui/initialize</code> and receives host context (theme, capabilities, container dimensions). This handshake ensures the View is ready before receiving data.</li>
+<li><strong>Initialization</strong> — When a UI tool is called, the Host renders the iframe. The View sends <code>ui/initialize</code> (the only handshake on the iframe channel) and receives host context (theme, capabilities, container dimensions). <code>ui/initialize</code> is authoritative for Apps capabilities and identity, and <code>ui/notifications/initialized</code> is the public View-ready signal.</li>
 <li><strong>Data delivery</strong> — The Host sends tool arguments and, once available, tool results to the View. Results include both <code>content</code> (text for the model's context) and optionally <code>structuredContent</code> (data optimized for UI rendering). This separation lets servers provide rich data to the UI without bloating the model's context.</li>
 <li><strong>Interactive phase</strong> — The user interacts with the View. The View can call tools, send messages, or update context.</li>
 <li><strong>Teardown</strong> — Before unmounting, the Host notifies the View so it can save state or release resources.</li>
@@ -183,7 +187,7 @@ sequenceDiagram
 <p>See the <a href="https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#ui-resource-format" target="_blank" class="external">UI Resource Format</a> section of the specification for the full schema.</p>
 <h2 id="tool-ui-linkage" class="tsd-anchor-link">Tool-UI Linkage<a href="#tool-ui-linkage" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>Tools reference their UI templates through metadata. When a server registers a tool, it includes a <code>_meta.ui</code> object pointing to a <code>ui://</code> resource:</p>
-<pre><code class="json"><span class="hl-3">&quot;_meta&quot;</span><span class="hl-0">: {</span><br/><span class="hl-0">  </span><span class="hl-5">&quot;ui&quot;</span><span class="hl-0">: { </span><span class="hl-5">&quot;resourceUri&quot;</span><span class="hl-0">: </span><span class="hl-3">&quot;ui://weather/forecast&quot;</span><span class="hl-0"> }</span><br/><span class="hl-0">}</span>
+<pre><code class="json"><span class="hl-3">&quot;_meta&quot;</span><span class="hl-0">: {</span><br/><span class="hl-0">  </span><span class="hl-6">&quot;ui&quot;</span><span class="hl-0">: { </span><span class="hl-6">&quot;resourceUri&quot;</span><span class="hl-0">: </span><span class="hl-3">&quot;ui://weather/forecast&quot;</span><span class="hl-0"> }</span><br/><span class="hl-0">}</span>
 </code><button type="button">Copy</button></pre>
 
 <p>When this tool is called, the Host:</p>
@@ -227,7 +231,7 @@ sequenceDiagram
 <p>See the <a href="https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#host-context-in-mcpuiinitializeresult" target="_blank" class="external">Host Context</a> section of the specification for the full schema.</p>
 <h2 id="theming" class="tsd-anchor-link">Theming<a href="#theming" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>Hosts provide CSS custom properties for colors, typography, and borders. Views use these variables with fallbacks to match the host's visual style:</p>
-<pre><code class="css"><span class="hl-6">.container</span><span class="hl-0"> {</span><br/><span class="hl-0">  </span><span class="hl-7">background</span><span class="hl-0">: </span><span class="hl-2">var</span><span class="hl-0">(</span><span class="hl-7">--color-background-primary</span><span class="hl-0">, </span><span class="hl-8">#ffffff</span><span class="hl-0">);</span><br/><span class="hl-0">  </span><span class="hl-7">color</span><span class="hl-0">: </span><span class="hl-2">var</span><span class="hl-0">(</span><span class="hl-7">--color-text-primary</span><span class="hl-0">, </span><span class="hl-8">#000000</span><span class="hl-0">);</span><br/><span class="hl-0">}</span>
+<pre><code class="css"><span class="hl-7">.container</span><span class="hl-0"> {</span><br/><span class="hl-0">  </span><span class="hl-8">background</span><span class="hl-0">: </span><span class="hl-2">var</span><span class="hl-0">(</span><span class="hl-8">--color-background-primary</span><span class="hl-0">, </span><span class="hl-9">#ffffff</span><span class="hl-0">);</span><br/><span class="hl-0">  </span><span class="hl-8">color</span><span class="hl-0">: </span><span class="hl-2">var</span><span class="hl-0">(</span><span class="hl-8">--color-text-primary</span><span class="hl-0">, </span><span class="hl-9">#000000</span><span class="hl-0">);</span><br/><span class="hl-0">}</span>
 </code><button type="button">Copy</button></pre>
 
 <p>Theme changes (light/dark toggle) are sent via notifications, allowing Views to update dynamically.</p>
