@@ -249,6 +249,18 @@ export const McpUiResourceCspSchema = z.object({
       "Origins for static resources (images, scripts, stylesheets, fonts, media).\n\n- Maps to CSP `img-src`, `script-src`, `style-src`, `font-src`, `media-src` directives\n- Wildcard subdomains supported: `https://*.example.com`\n- Empty or omitted \u2192 no network resources (secure default)",
     ),
   /**
+   * @description Whether the UI requires WebAssembly compilation.
+   *
+   * - Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`
+   * - Empty or false → WebAssembly compilation remains blocked by default
+   */
+  wasmUnsafeEval: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the UI requires WebAssembly compilation.\n\n- Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`\n- Empty or false \u2192 WebAssembly compilation remains blocked by default",
+    ),
+  /**
    * @description Origins for nested iframes.
    *
    * - Maps to CSP `frame-src` directive
