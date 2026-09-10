@@ -284,7 +284,8 @@ export function registerAppTool(
   // Normalize metadata for backward compatibility:
   // - If _meta.ui.resourceUri is set, also set the legacy flat key
   // - If the legacy flat key is set, also set _meta.ui.resourceUri
-  const meta = config._meta;
+  // `ToolConfig._meta` is optional; default it before reading `meta.ui`.
+  const meta = config._meta ?? {};
   const uiMeta = meta.ui as McpUiToolMeta | undefined;
   const legacyUri = meta[RESOURCE_URI_META_KEY] as string | undefined;
 
