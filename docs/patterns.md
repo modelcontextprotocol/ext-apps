@@ -19,7 +19,7 @@ registerAppTool(
   "update-quantity",
   {
     description: "Update item quantity in cart",
-    inputSchema: { itemId: z.string(), quantity: z.number() },
+    inputSchema: z.object({ itemId: z.string(), quantity: z.number() }),
     _meta: {
       ui: {
         resourceUri: "ui://shop/cart.html",
@@ -127,14 +127,14 @@ registerAppTool(
   {
     title: "Read Data Bytes",
     description: "Load binary data in chunks",
-    inputSchema: {
+    inputSchema: z.object({
       id: z.string().describe("Resource identifier"),
       offset: z.number().min(0).default(0).describe("Byte offset"),
       byteCount: z
         .number()
         .default(MAX_CHUNK_BYTES)
         .describe("Bytes to read"),
-    },
+    }),
     outputSchema: DataChunkSchema,
     // Hidden from model - only callable by the App
     _meta: { ui: { visibility: ["app"] } },
@@ -281,10 +281,7 @@ server.registerResource(
 
 <!-- prettier-ignore -->
 ```ts source="./patterns.tsx#binaryBlobResourceClient"
-const result = await app.request(
-  { method: "resources/read", params: { uri: `video://${videoId}` } },
-  ReadResourceResultSchema,
-);
+const result = await app.readServerResource({ uri: `video://${videoId}` });
 
 const content = result.contents[0];
 if (!content || !("blob" in content)) {

@@ -12,11 +12,9 @@ import {
 import {
   McpServer,
   ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -135,14 +133,14 @@ Available videos:
 ${Object.entries(VIDEO_LIBRARY)
   .map(([id, v]) => `- ${id}: ${v.description}`)
   .join("\n")}`,
-      inputSchema: {
+      inputSchema: z.object({
         videoId: z
           .enum(Object.keys(VIDEO_LIBRARY) as [string, ...string[]])
           .default("bunny-1mb")
           .describe(
             `Video ID to play. Available: ${Object.keys(VIDEO_LIBRARY).join(", ")}`,
           ),
-      },
+      }),
       outputSchema: z.object({
         videoUri: z.string(),
         description: z.string(),

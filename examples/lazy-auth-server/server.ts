@@ -21,13 +21,13 @@ import {
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { UrlElicitationRequiredError } from "@modelcontextprotocol/sdk/types.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import {
+  McpServer,
+  UrlElicitationRequiredError,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import cors from "cors";
 import express, { type Express, type Request, type Response } from "express";
 import { SignJWT, jwtVerify } from "jose";
@@ -35,6 +35,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 
 // Works both from source (server.ts) and compiled (dist/server.js). Derived
 // from import.meta.url rather than import.meta.filename/dirname, which are
@@ -414,20 +415,36 @@ async function handleAuthorize(req: Request, res: Response) {
     if (state) denyUrl.searchParams.set("state", state);
     res.type("text/html").send(/*html*/ `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Authorize</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>body{font-family:system-ui,sans-serif;max-width:420px;margin:40px auto;padding:0 16px;color-scheme:light dark}
-.box{border:1px solid #ccc;border-radius:8px;padding:20px}dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;margin:16px 0}
+.box{border:1px solid #ccc;border-radius:8px;padding:20px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;margin:16px 0}
 dt{color:#888}dd{margin:0;word-break:break-all}
-button{padding:10px 20px;margin:4px;font-size:15px;font-weight:bold;border:none;border-radius:6px;cursor:pointer}
-.approve{background:#1a7a3e;color:#fff}.deny{background:#b91c1c;color:#fff}</style></head>
+.actions{display:flex;flex-wrap:wrap;gap:12px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.btn{box-sizing:border-box;flex:1;min-height:56px;min-width:56px;display:flex;align-items:center;justify-content:center;
+padding:12px 20px;font-size:16px;font-weight:bold;border:none;border-radius:8px;cursor:pointer;
+text-decoration:none;color:#fff;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.btn:active{filter:brightness(0.8)}
+.approve{background:#1a7a3e}.deny{background:#b91c1c}</style></head>
 <body><div class="box">
 <h2>🔑 Mock Authorization</h2>
 <p>An application is requesting access:</p>
 <dl><dt>Client</dt><dd>${escapeHtml(client_id ?? "(none)")}</dd>
 <dt>Scope</dt><dd>${escapeHtml(scope ?? "(default)")}</dd>
 <dt>Redirect</dt><dd>${escapeHtml(redirect_uri)}</dd></dl>
-<a href="${escapeHtml(approveUrl.href)}"><button class="approve">Approve</button></a>
-<a href="${escapeHtml(denyUrl.href)}"><button class="deny">Deny</button></a>
-</div></body></html>`);
+<div class="actions">
+<a class="btn approve" role="button" href="${escapeHtml(approveUrl.href)}">Approve</a>
+<a class="btn deny" role="button" href="${escapeHtml(denyUrl.href)}">Deny</a>
+</div>
+</div>
+<script>
+// Anchors only activate on Enter; role="button" promises Space too.
+for (const a of document.querySelectorAll(".btn"))
+  a.addEventListener("keydown", (e) => {
+    if (e.key === " ") { e.preventDefault(); a.click(); }
+  });
+</script>
+</body></html>`);
     return;
   }
 
@@ -605,7 +622,7 @@ export function createServer(authInfo?: AuthInfo, req?: Request): McpServer {
       title: "Show Auth Button",
       description:
         "Public tool: shows a button that triggers the protected get_secret tool.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       _meta: { ui: { resourceUri: buttonUri } },
     },
     async (): Promise<CallToolResult> => ({
@@ -638,7 +655,7 @@ export function createServer(authInfo?: AuthInfo, req?: Request): McpServer {
       title: "Get Secret",
       description:
         "Protected tool: returns secret data. Requires authentication.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       _meta: { ui: { resourceUri: secretUri } },
     },
     async (): Promise<CallToolResult> => {
@@ -682,7 +699,7 @@ export function createServer(authInfo?: AuthInfo, req?: Request): McpServer {
       title: "Revoke Auth Token",
       description:
         "Protected tool: revokes the caller's entire auth session (access + refresh token).",
-      inputSchema: {},
+      inputSchema: z.object({}),
     },
     async (): Promise<CallToolResult> => {
       if (!authInfo) {
@@ -720,7 +737,7 @@ export function createServer(authInfo?: AuthInfo, req?: Request): McpServer {
       title: "Elicit URL (session-callback)",
       description:
         "URL elicitation via elicitInput. Blocks until the client accepts; sends ElicitCompleteNotification before returning.",
-      inputSchema: {},
+      inputSchema: z.object({}),
     },
     async (_args, extra): Promise<CallToolResult> => {
       const eid = crypto.randomUUID();
@@ -735,7 +752,7 @@ export function createServer(authInfo?: AuthInfo, req?: Request): McpServer {
           message: "Please open this URL to continue.",
           elicitationId: eid,
         },
-        { relatedRequestId: extra.requestId, timeout: 300_000 },
+        { relatedRequestId: extra.mcpReq.id, timeout: 300_000 },
       );
       // Send completion notification before returning — lands on the same SSE
       // stream as this tool response. For Streamable HTTP this is the ONLY
@@ -767,7 +784,7 @@ export function createServer(authInfo?: AuthInfo, req?: Request): McpServer {
       title: "Elicit by -32042 Error",
       description:
         "Throws UrlElicitationRequiredError (-32042). Client must open the URL, then retry. On retry, if the last-issued elicitationId was completed, sends ElicitCompleteNotification and succeeds.",
-      inputSchema: {},
+      inputSchema: z.object({}),
     },
     async (): Promise<CallToolResult> => {
       // Retry path: check if the user completed the elicitation we last issued.
@@ -1031,7 +1048,7 @@ export function createApp(): Express {
     }
 
     const server = createServer(authInfo, req);
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });
     res.on("close", () => {

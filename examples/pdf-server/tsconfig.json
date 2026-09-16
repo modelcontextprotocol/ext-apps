@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["node", "vite/client", "bun"],
     "target": "ESNext",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",

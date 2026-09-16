@@ -1,8 +1,8 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
@@ -10,6 +10,7 @@ import {
   registerAppResource,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
+import { z } from "zod";
 // Works both from source (server.ts) and compiled (dist/server.js)
 const DIST_DIR = import.meta.filename.endsWith(".ts")
   ? path.join(import.meta.dirname, "dist")
@@ -33,7 +34,7 @@ export function createServer(): McpServer {
       title: "Transcribe Speech",
       description:
         "Opens a live speech transcription interface using the Web Speech API.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       _meta: { ui: { resourceUri } },
     },
     async (): Promise<CallToolResult> => {

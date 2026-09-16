@@ -3,9 +3,10 @@ import {
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { z } from "zod";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 
@@ -30,7 +31,7 @@ export function createServer(): McpServer {
     {
       title: "Get Time",
       description: "Returns the current server time.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       _meta: { ui: { resourceUri } }, // Links this tool to its UI resource
     },
     async () => {

@@ -6,7 +6,7 @@
  * a navigate-to tool for the host to control navigation.
  */
 import { App } from "@modelcontextprotocol/ext-apps";
-import type { ContentBlock } from "@modelcontextprotocol/sdk/spec.types.js";
+import type { ContentBlock } from "@modelcontextprotocol/client";
 import { z } from "zod";
 
 // TypeScript declaration for Cesium loaded from CDN

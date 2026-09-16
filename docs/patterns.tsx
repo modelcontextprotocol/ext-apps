@@ -17,16 +17,12 @@ import { randomUUID } from "node:crypto";
 import type {
   CallToolResult,
   ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 import type { McpUiHostContext } from "../src/types.js";
 import { useEffect, useState } from "react";
 import { useApp } from "../src/react/index.js";
 import { registerAppTool } from "../src/server/index.js";
-import {
-  McpServer,
-  ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 /**
@@ -117,14 +113,14 @@ function chunkedDataServer(server: McpServer) {
     {
       title: "Read Data Bytes",
       description: "Load binary data in chunks",
-      inputSchema: {
+      inputSchema: z.object({
         id: z.string().describe("Resource identifier"),
         offset: z.number().min(0).default(0).describe("Byte offset"),
         byteCount: z
           .number()
           .default(MAX_CHUNK_BYTES)
           .describe("Bytes to read"),
-      },
+      }),
       outputSchema: DataChunkSchema,
       // Hidden from model - only callable by the App
       _meta: { ui: { visibility: ["app"] } },
@@ -252,10 +248,7 @@ function binaryBlobResourceServer(
  */
 async function binaryBlobResourceClient(app: App, videoId: string) {
   //#region binaryBlobResourceClient
-  const result = await app.request(
-    { method: "resources/read", params: { uri: `video://${videoId}` } },
-    ReadResourceResultSchema,
-  );
+  const result = await app.readServerResource({ uri: `video://${videoId}` });
 
   const content = result.contents[0];
   if (!content || !("blob" in content)) {
