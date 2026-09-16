@@ -8,13 +8,13 @@
  * @module
  */
 
-import type { App } from "./app";
+import type { App } from "./app.js";
 import {
   createViewContentBlock,
   getViewContentBlocks,
   supportsContentMimeType,
-} from "./ui-content";
-import type { McpUiClientCapabilities } from "./spec.types";
+} from "./ui-content.js";
+import type { McpUiClientCapabilities } from "./spec.types.js";
 
 declare const app: App;
 declare const uiCap: McpUiClientCapabilities | undefined;

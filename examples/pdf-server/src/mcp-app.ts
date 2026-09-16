@@ -12,8 +12,10 @@ import {
   applyDocumentTheme,
   applyHostStyleVariables,
 } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type { ContentBlock } from "@modelcontextprotocol/sdk/spec.types.js";
+import type {
+  CallToolResult,
+  ContentBlock,
+} from "@modelcontextprotocol/client";
 import { z } from "zod";
 import * as pdfjsLib from "pdfjs-dist";
 import { AnnotationLayer, AnnotationMode, TextLayer } from "pdfjs-dist";

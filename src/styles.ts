@@ -1,4 +1,4 @@
-import { McpUiStyles, McpUiTheme } from "./types";
+import { McpUiStyles, McpUiTheme } from "./types.js";
 
 /**
  * Get the current document theme from the root HTML element.

@@ -13,18 +13,19 @@
 import { randomUUID } from "crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   registerAppResource,
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import {
-  RootsListChangedNotificationSchema,
+  McpServer,
   type CallToolResult,
+  type ElicitResult,
+  type PrimitiveSchemaDefinition,
   type ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+  type Server,
+} from "@modelcontextprotocol/server";
 // Stub DOMMatrix/ImageData/Path2D before pdfjs-dist loads — its legacy
 // build instantiates DOMMatrix at module scope and the @napi-rs/canvas
 // polyfill is unreliable under npx. See ./pdfjs-polyfill.ts for details.
@@ -62,10 +63,6 @@ class FetchStandardFontDataFactory {
     return new Uint8Array(await res.arrayBuffer());
   }
 }
-import type {
-  PrimitiveSchemaDefinition,
-  ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 // =============================================================================
@@ -1282,7 +1279,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       refreshRoots(server.server);
     };
     server.server.setNotificationHandler(
-      RootsListChangedNotificationSchema,
+      "notifications/roots/list_changed",
       async () => {
         await refreshRoots(server.server);
       },
@@ -1292,10 +1289,12 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   const { readPdfRange } = sharedPdfCache;
 
   // Tool: list_pdfs - List available PDFs
-  server.tool(
+  server.registerTool(
     "list_pdfs",
-    "List available PDFs that can be displayed",
-    {},
+    {
+      description: "List available PDFs that can be displayed",
+      inputSchema: z.object({}),
+    },
     async (): Promise<CallToolResult> => {
       const seen = new Set<string>();
       const localFiles: string[] = [];
@@ -1377,7 +1376,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       title: "Read PDF Bytes",
       description:
         "Read a range of bytes from a PDF (max 512KB per request). The model should NOT call this tool directly.",
-      inputSchema: {
+      inputSchema: z.object({
         url: z.string().describe("PDF URL or local file path"),
         offset: z.number().min(0).default(0).describe("Byte offset"),
         byteCount: z
@@ -1386,7 +1385,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
           .max(MAX_CHUNK_BYTES)
           .default(MAX_CHUNK_BYTES)
           .describe("Bytes to read"),
-      },
+      }),
       outputSchema: z.object({
         url: z.string(),
         bytes: z.string().describe("Base64 encoded bytes"),
@@ -1473,7 +1472,7 @@ Returns a viewUUID in structuredContent. Pass it to \`interact\`:
 
 Accepts local files (use list_pdfs), client MCP root directories, or any HTTPS URL.
 Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before display.`,
-      inputSchema: {
+      inputSchema: z.object({
         url: z
           .string()
           .default(DEFAULT_PDF)
@@ -1489,7 +1488,7 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
                   "If true and the PDF has form fields, prompt the user to fill them before displaying",
                 ),
             }),
-      },
+      }),
       outputSchema: z.object({
         viewUUID: z
           .string()
@@ -2426,7 +2425,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
 **FORMS** — fill_form: fill fields with \`fields\` array of {name, value}.
 
 **SAVE** — save_as: write the annotated PDF (annotations + form values) to a file. Pass \`path\` (absolute path or file://) for a new location, or omit \`path\` to overwrite the original. Set \`overwrite: true\` to replace an existing file (always required when omitting \`path\`).`,
-        inputSchema: {
+        inputSchema: z.object({
           viewUUID: z
             .string()
             .describe(
@@ -2523,7 +2522,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
             .describe(
               "Array of commands to execute sequentially. More efficient than separate calls. Tip: end with get_pages+getScreenshots to verify changes.",
             ),
-        },
+        }),
       },
       async (
         {
@@ -2600,7 +2599,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
           const result = await processInteractCommand(
             uuid,
             commandList[i],
-            extra.signal,
+            extra.mcpReq.signal,
           );
           if (result.isError) {
             const errText = result.content
@@ -2657,7 +2656,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
         title: "Submit Page Data",
         description:
           "Submit rendered page data for a get_pages request (used by viewer). The model should NOT call this tool directly.",
-        inputSchema: {
+        inputSchema: z.object({
           requestId: z
             .string()
             .describe("The request ID from the get_pages command"),
@@ -2670,7 +2669,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
               }),
             )
             .describe("Page data entries"),
-        },
+        }),
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ requestId, pages }): Promise<CallToolResult> => {
@@ -2700,7 +2699,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
         title: "Submit Save Data",
         description:
           "Submit annotated PDF bytes for a save_as request (used by viewer). The model should NOT call this tool directly.",
-        inputSchema: {
+        inputSchema: z.object({
           requestId: z
             .string()
             .describe("The request ID from the save_as command"),
@@ -2709,7 +2708,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
             .string()
             .optional()
             .describe("Error message if the viewer failed to build bytes"),
-        },
+        }),
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ requestId, data, error }): Promise<CallToolResult> => {
@@ -2739,7 +2738,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
         title: "Submit Viewer State",
         description:
           "Submit a viewer-state snapshot for a get_viewer_state request (used by viewer). The model should NOT call this tool directly.",
-        inputSchema: {
+        inputSchema: z.object({
           requestId: z
             .string()
             .describe("The request ID from the get_viewer_state command"),
@@ -2751,7 +2750,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
             .string()
             .optional()
             .describe("Error message if the viewer failed to read state"),
-        },
+        }),
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ requestId, state, error }): Promise<CallToolResult> => {
@@ -2781,9 +2780,9 @@ Example — add a signature image and a stamp, then screenshot to verify:
         title: "Poll PDF Commands",
         description:
           "Poll for pending commands for a PDF viewer. The model should NOT call this tool directly.",
-        inputSchema: {
+        inputSchema: z.object({
           viewUUID: z.string().describe("The viewUUID of the PDF viewer"),
-        },
+        }),
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ viewUUID: uuid }): Promise<CallToolResult> => {
@@ -2828,10 +2827,10 @@ Example — add a signature image and a stamp, then screenshot to verify:
       title: "Save PDF",
       description:
         "Save annotated PDF bytes back to a local file. The model should NOT call this tool directly — use interact with action: save_as instead.",
-      inputSchema: {
+      inputSchema: z.object({
         url: z.string().describe("Original PDF URL or local file path"),
         data: z.string().describe("Base64-encoded PDF bytes"),
-      },
+      }),
       outputSchema: z.object({
         filePath: z.string(),
         mtimeMs: z.number(),

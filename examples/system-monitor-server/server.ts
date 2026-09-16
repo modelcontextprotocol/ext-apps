@@ -3,11 +3,11 @@ import {
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -135,8 +135,8 @@ export function createServer(): McpServer {
       title: "Get System Info",
       description:
         "Returns system information, including hostname, platform, CPU info, and memory.",
-      inputSchema: {},
-      outputSchema: SystemInfoSchema.shape,
+      inputSchema: z.object({}),
+      outputSchema: SystemInfoSchema,
       _meta: { ui: { resourceUri } },
     },
     (): CallToolResult => {
@@ -156,8 +156,8 @@ export function createServer(): McpServer {
       title: "Poll System Stats",
       description:
         "Returns dynamic system metrics for polling: per-core CPU timing, memory usage, and uptime. App-only.",
-      inputSchema: {},
-      outputSchema: PollStatsSchema.shape,
+      inputSchema: z.object({}),
+      outputSchema: PollStatsSchema,
       _meta: { ui: { visibility: ["app"] } },
     },
     async (): Promise<CallToolResult> => {

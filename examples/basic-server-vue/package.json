@@ -1,11 +1,11 @@
 {
   "name": "@modelcontextprotocol/server-basic-vue",
-  "version": "1.7.4",
+  "version": "2.0.0",
   "type": "module",
   "description": "Basic MCP App Server example using Vue",
   "repository": {
     "type": "git",
-    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "url": "git+https://github.com/modelcontextprotocol/ext-apps.git",
     "directory": "examples/basic-server-vue"
   },
   "license": "MIT",
@@ -24,12 +24,15 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.7.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/express": "2.0.0",
+    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "vue": "^3.5.0",
-    "zod": "^4.1.13"
+    "zod": "^4.2.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

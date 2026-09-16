@@ -9,10 +9,19 @@
       "type": "object",
       "properties": {
         "experimental": {
-          "description": "Experimental features (structure TBD).",
+          "description": "Experimental features keyed by identifier.",
           "type": "object",
-          "properties": {},
-          "additionalProperties": false
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Experimental features keyed by identifier."
+          }
         },
         "tools": {
           "description": "App exposes MCP-style tools that the host can call.",
@@ -315,10 +324,19 @@
       "type": "object",
       "properties": {
         "experimental": {
-          "description": "Experimental features (structure TBD).",
+          "description": "Experimental features keyed by identifier.",
           "type": "object",
-          "properties": {},
-          "additionalProperties": false
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Experimental features keyed by identifier."
+          }
         },
         "openLinks": {
           "description": "Host supports opening external URLs.",
@@ -613,7 +631,9 @@
                           "propertyNames": {
                             "type": "string"
                           },
-                          "additionalProperties": {}
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
                         },
                         "required": {
                           "type": "array",
@@ -628,25 +648,10 @@
                     "outputSchema": {
                       "type": "object",
                       "properties": {
-                        "type": {
-                          "type": "string",
-                          "const": "object"
-                        },
-                        "properties": {
-                          "type": "object",
-                          "propertyNames": {
-                            "type": "string"
-                          },
-                          "additionalProperties": {}
-                        },
-                        "required": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
+                        "$schema": {
+                          "type": "string"
                         }
                       },
-                      "required": ["type"],
                       "additionalProperties": {}
                     },
                     "annotations": {
@@ -1303,7 +1308,40 @@
         }
       },
       "required": ["method", "params"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          ]
+        }
+      }
     },
     "McpUiHostContext": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1376,7 +1414,9 @@
                       "propertyNames": {
                         "type": "string"
                       },
-                      "additionalProperties": {}
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      }
                     },
                     "required": {
                       "type": "array",
@@ -1391,25 +1431,10 @@
                 "outputSchema": {
                   "type": "object",
                   "properties": {
-                    "type": {
-                      "type": "string",
-                      "const": "object"
-                    },
-                    "properties": {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    },
-                    "required": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
+                    "$schema": {
+                      "type": "string"
                     }
                   },
-                  "required": ["type"],
                   "additionalProperties": {}
                 },
                 "annotations": {
@@ -2061,7 +2086,40 @@
           "additionalProperties": false
         }
       },
-      "additionalProperties": {}
+      "additionalProperties": {},
+      "$defs": {
+        "__schema0": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          ]
+        }
+      }
     },
     "McpUiHostCss": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2554,10 +2612,19 @@
               "type": "object",
               "properties": {
                 "experimental": {
-                  "description": "Experimental features (structure TBD).",
+                  "description": "Experimental features keyed by identifier.",
                   "type": "object",
-                  "properties": {},
-                  "additionalProperties": false
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {},
+                    "description": "Experimental features keyed by identifier."
+                  }
                 },
                 "tools": {
                   "description": "App exposes MCP-style tools that the host can call.",
@@ -2668,10 +2735,19 @@
           "type": "object",
           "properties": {
             "experimental": {
-              "description": "Experimental features (structure TBD).",
+              "description": "Experimental features keyed by identifier.",
               "type": "object",
-              "properties": {},
-              "additionalProperties": false
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Experimental features keyed by identifier."
+              }
             },
             "openLinks": {
               "description": "Host supports opening external URLs.",
@@ -2959,7 +3035,9 @@
                           "propertyNames": {
                             "type": "string"
                           },
-                          "additionalProperties": {}
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
                         },
                         "required": {
                           "type": "array",
@@ -2974,25 +3052,10 @@
                     "outputSchema": {
                       "type": "object",
                       "properties": {
-                        "type": {
-                          "type": "string",
-                          "const": "object"
-                        },
-                        "properties": {
-                          "type": "object",
-                          "propertyNames": {
-                            "type": "string"
-                          },
-                          "additionalProperties": {}
-                        },
-                        "required": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
+                        "$schema": {
+                          "type": "string"
                         }
                       },
-                      "required": ["type"],
                       "additionalProperties": {}
                     },
                     "annotations": {
@@ -3654,7 +3717,40 @@
         "hostCapabilities",
         "hostContext"
       ],
-      "additionalProperties": {}
+      "additionalProperties": {},
+      "$defs": {
+        "__schema0": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          ]
+        }
+      }
     },
     "McpUiInitializedNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -5347,26 +5443,52 @@
             "_meta": {
               "type": "object",
               "properties": {
-                "progressToken": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    }
-                  ]
-                },
-                "io.modelcontextprotocol/related-task": {
+                "io.modelcontextprotocol/serverInfo": {
                   "type": "object",
                   "properties": {
-                    "taskId": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "icons": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "src": {
+                            "type": "string"
+                          },
+                          "mimeType": {
+                            "type": "string"
+                          },
+                          "sizes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "theme": {
+                            "type": "string",
+                            "enum": ["light", "dark"]
+                          }
+                        },
+                        "required": ["src"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "websiteUrl": {
+                      "type": "string"
+                    },
+                    "description": {
                       "type": "string"
                     }
                   },
-                  "required": ["taskId"],
+                  "required": ["name", "version"],
                   "additionalProperties": false
                 }
               },
@@ -5692,13 +5814,7 @@
                 ]
               }
             },
-            "structuredContent": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {}
-            },
+            "structuredContent": {},
             "isError": {
               "type": "boolean"
             }

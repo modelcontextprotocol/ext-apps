@@ -31,7 +31,7 @@
  * }
  * ```
  */
-export * from "./useApp";
-export * from "./useAutoResize";
-export * from "./useDocumentTheme";
-export * from "./useHostStyles";
+export * from "./useApp.js";
+export * from "./useAutoResize.js";
+export * from "./useDocumentTheme.js";
+export * from "./useHostStyles.js";

@@ -1,11 +1,11 @@
 {
   "name": "@modelcontextprotocol/server-threejs",
-  "version": "1.7.4",
+  "version": "2.0.0",
   "type": "module",
   "description": "Three.js 3D visualization MCP App Server",
   "repository": {
     "type": "git",
-    "url": "https://github.com/modelcontextprotocol/ext-apps",
+    "url": "git+https://github.com/modelcontextprotocol/ext-apps.git",
     "directory": "examples/threejs-server"
   },
   "license": "MIT",
@@ -26,14 +26,17 @@
     "serve": "bun --watch main.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.7.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/express": "2.0.0",
+    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "three": "^0.181.0",
-    "zod": "^4.1.13"
+    "zod": "^4.2.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

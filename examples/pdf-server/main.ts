@@ -6,10 +6,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMcpExpressApp } from "@modelcontextprotocol/express";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import type { McpServer } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import cors from "cors";
 import type { Request, Response } from "express";
 import {
@@ -39,7 +39,7 @@ export async function startStreamableHTTPServer(
 
   app.all("/mcp", async (req: Request, res: Response) => {
     const server = createServer();
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env bun
 import { $ } from "bun";
-import { cpSync, mkdirSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync } from "node:fs";
+
+// Avoid publishing artifacts left behind by an earlier build or branch.
+rmSync("dist", { recursive: true, force: true });
 
 // Run TypeScript compiler for type declarations
 await $`tsc`;
@@ -31,9 +34,15 @@ function buildJs(
   });
 }
 
-// zod is a peerDependency — keep it external so consumers share a single
-// zod instance (instanceof ZodError / schema.extend() break with duplicate copies).
-const PEER_EXTERNALS = ["@modelcontextprotocol/sdk", "zod"];
+// Peer dependencies stay external in the standard entry points so consumers
+// share one base MCP SDK and Zod instance. The *-with-deps entry points keep
+// bundling these dependencies for standalone browser use.
+const PEER_EXTERNALS = [
+  "@modelcontextprotocol/client",
+  "@modelcontextprotocol/core",
+  "@modelcontextprotocol/server",
+  "zod",
+];
 
 await Promise.all([
   buildJs("src/app.ts", {

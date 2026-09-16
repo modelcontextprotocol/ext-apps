@@ -7,17 +7,11 @@
  * @module
  */
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import {
-  CallToolResult,
-  CallToolResultSchema,
+import { Client, type Transport } from "@modelcontextprotocol/client";
+import type {
   CreateMessageRequest,
   CreateMessageResult,
-  ListResourcesResultSchema,
-  ReadResourceResultSchema,
-  ListPromptsResultSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 import { AppBridge, PostMessageTransport } from "./app-bridge.js";
 import type { McpUiDisplayMode } from "./types.js";
 
@@ -223,8 +217,7 @@ function AppBridge_oncalltool_forwardToServer(
   bridge.oncalltool = async (params, extra) => {
     return mcpClient.request(
       { method: "tools/call", params },
-      CallToolResultSchema,
-      { signal: extra.signal },
+      { signal: extra.mcpReq.signal },
     );
   };
   //#endregion AppBridge_oncalltool_forwardToServer
@@ -245,7 +238,9 @@ function AppBridge_oncreatesamplingmessage_forwardToLlm(
   //#region AppBridge_oncreatesamplingmessage_forwardToLlm
   bridge.oncreatesamplingmessage = async (params, extra) => {
     // Apply rate limiting, user approval, cost controls here
-    return await myLlmProvider.complete(params, { signal: extra.signal });
+    return await myLlmProvider.complete(params, {
+      signal: extra.mcpReq.signal,
+    });
   };
   //#endregion AppBridge_oncreatesamplingmessage_forwardToLlm
 }
@@ -261,8 +256,7 @@ function AppBridge_onlistresources_returnResources(
   bridge.onlistresources = async (params, extra) => {
     return mcpClient.request(
       { method: "resources/list", params },
-      ListResourcesResultSchema,
-      { signal: extra.signal },
+      { signal: extra.mcpReq.signal },
     );
   };
   //#endregion AppBridge_onlistresources_returnResources
@@ -279,8 +273,7 @@ function AppBridge_onreadresource_returnResource(
   bridge.onreadresource = async (params, extra) => {
     return mcpClient.request(
       { method: "resources/read", params },
-      ReadResourceResultSchema,
-      { signal: extra.signal },
+      { signal: extra.mcpReq.signal },
     );
   };
   //#endregion AppBridge_onreadresource_returnResource
@@ -297,8 +290,7 @@ function AppBridge_onlistprompts_returnPrompts(
   bridge.onlistprompts = async (params, extra) => {
     return mcpClient.request(
       { method: "prompts/list", params },
-      ListPromptsResultSchema,
-      { signal: extra.signal },
+      { signal: extra.mcpReq.signal },
     );
   };
   //#endregion AppBridge_onlistprompts_returnPrompts
@@ -444,10 +436,10 @@ async function AppBridge_sendToolResult_afterExecution(
   args: Record<string, unknown>,
 ) {
   //#region AppBridge_sendToolResult_afterExecution
-  const result = await mcpClient.request(
-    { method: "tools/call", params: { name: "get_weather", arguments: args } },
-    CallToolResultSchema,
-  );
+  const result = await mcpClient.request({
+    method: "tools/call",
+    params: { name: "get_weather", arguments: args },
+  });
   bridge.sendToolResult(result);
   //#endregion AppBridge_sendToolResult_afterExecution
 }

@@ -17,7 +17,7 @@ import type {
   ContentBlock,
   EmbeddedResource,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { McpUiContentBlockMeta } from "./spec.types";
+import type { McpUiContentBlockMeta } from "./spec.types.js";
 
 /**
  * An embedded resource content block marked as a dynamic view content payload.

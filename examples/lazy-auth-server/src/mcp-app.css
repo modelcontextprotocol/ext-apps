@@ -17,9 +17,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
+  /* Keep a long press on or near the buttons from starting text selection
+     or raising the iOS callout menu instead of a click. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 button {
+  /* Match the consent page's 56px tap targets (server.ts .btn). */
+  min-height: 56px;
+  min-width: 56px;
   padding: var(--spacing-sm) var(--spacing-md);
   border: none;
   border-radius: var(--border-radius-md);
@@ -27,10 +35,18 @@ button {
   font-weight: var(--font-weight-bold);
   background-color: var(--color-accent);
   cursor: pointer;
+  /* Suppress the double-tap-to-zoom gesture so a tap resolves to a click
+     immediately instead of waiting to see if a second tap follows. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    filter: brightness(0.85);
   }
 
   &:hover:not(:disabled) {

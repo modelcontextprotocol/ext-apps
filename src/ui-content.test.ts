@@ -4,7 +4,7 @@ import {
   getViewContentBlocks,
   isViewContentBlock,
   supportsContentMimeType,
-} from "./ui-content";
+} from "./ui-content.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 const A2UI_MIME_TYPE = "application/a2ui+json";
