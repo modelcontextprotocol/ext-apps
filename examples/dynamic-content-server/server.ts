@@ -15,11 +15,11 @@ import {
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -160,12 +160,12 @@ export function createServer(): McpServer {
       title: "Search Flights",
       description:
         "Search for flights to a destination and present the options.",
-      inputSchema: {
+      inputSchema: z.object({
         destination: z
           .string()
           .describe("Destination city")
           .default("San Francisco"),
-      },
+      }),
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
     async ({ destination }): Promise<CallToolResult> => {
@@ -197,9 +197,9 @@ export function createServer(): McpServer {
     {
       title: "Select Flight",
       description: "Select a flight from previously presented options.",
-      inputSchema: {
+      inputSchema: z.object({
         flightId: z.string().describe("Flight id from the presented options"),
-      },
+      }),
       _meta: { ui: { resourceUri: RESOURCE_URI, visibility: ["app"] } },
     },
     async ({ flightId }): Promise<CallToolResult> => {

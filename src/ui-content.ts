@@ -7,8 +7,15 @@
  * {@link types!McpUiResourceMeta.contentMimeTypes `contentMimeTypes`} on its UI
  * resource. Tools associated with that view return payloads as marked embedded
  * resources ({@link createViewContentBlock `createViewContentBlock`}), hosts
- * forward them unmodified, and the view extracts them from tool results
- * ({@link getViewContentBlocks `getViewContentBlocks`}).
+ * forward them unmodified to the calling tool's view, and the view extracts
+ * them from tool results ({@link getViewContentBlocks `getViewContentBlocks`}).
+ *
+ * Routing is implicit: a marked payload is delivered to the view of the tool
+ * that returned it (its `_meta.ui.resourceUri`). `contentMimeTypes` is a
+ * validation guardrail, not a routing mechanism: hosts may drop payloads whose
+ * MIME type is not declared by the target view or not covered by the host's
+ * advertised `contentMimeTypes` extension setting
+ * ({@link supportsContentMimeType `supportsContentMimeType`}).
  *
  * @module
  */
@@ -16,7 +23,7 @@ import type {
   CallToolResult,
   ContentBlock,
   EmbeddedResource,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import type { McpUiContentBlockMeta } from "./spec.types.js";
 
 /**
@@ -44,27 +51,24 @@ export type CreateViewContentBlockOptions = {
    */
   uri: string;
   /**
-   * Payload MIME type. Must be declared in the target view's
-   * `contentMimeTypes`.
+   * Payload MIME type. Must be declared in the `contentMimeTypes` of the
+   * calling tool's view (its `_meta.ui.resourceUri`).
    */
   mimeType: string;
   /** Payload as a string. Exactly one of `text` or `blob` must be provided. */
   text?: string;
   /** Base64-encoded payload. Exactly one of `text` or `blob` must be provided. */
   blob?: string;
-  /**
-   * URI of the `ui://` renderer resource this payload targets. If omitted,
-   * the payload targets the calling tool's `_meta.ui.resourceUri`.
-   */
-  rendererUri?: string;
 };
 
 /**
  * Create an embedded resource content block marked as dynamic view content.
  *
  * Servers include the returned block in `CallToolResult.content`. Hosts that
- * negotiated dynamic content support forward it unmodified to the tool's view
- * (and exclude it from model context).
+ * negotiated dynamic content support (a non-empty `contentMimeTypes` extension
+ * setting) forward it unmodified to the calling tool's view and exclude it
+ * from model context. Servers should not rely on delivery when support was
+ * not negotiated; see {@link supportsContentMimeType `supportsContentMimeType`}.
  *
  * @example
  * ```ts source="./ui-content.examples.ts#createViewContentBlock_toolResult"
@@ -87,7 +91,7 @@ export type CreateViewContentBlockOptions = {
 export function createViewContentBlock(
   options: CreateViewContentBlockOptions,
 ): ViewContentBlock {
-  const { uri, mimeType, text, blob, rendererUri } = options;
+  const { uri, mimeType, text, blob } = options;
   if ((text === undefined) === (blob === undefined)) {
     throw new Error(
       "createViewContentBlock: exactly one of `text` or `blob` must be provided",
@@ -106,7 +110,7 @@ export function createViewContentBlock(
         : { uri, mimeType, blob: blob! },
     _meta: {
       ui: {
-        content: rendererUri !== undefined ? { rendererUri } : {},
+        content: {},
       },
     },
   };
@@ -138,12 +142,6 @@ export function isViewContentBlock(
 export type GetViewContentBlocksOptions = {
   /** Only return payloads with this MIME type. */
   mimeType?: string;
-  /**
-   * Only return payloads targeting this renderer: blocks whose
-   * `_meta.ui.content.rendererUri` equals this URI, plus blocks with no
-   * explicit `rendererUri` (which target the calling tool's default view).
-   */
-  rendererUri?: string;
 };
 
 /**
@@ -174,17 +172,12 @@ export function getViewContentBlocks(
   result: Pick<CallToolResult, "content">,
   options: GetViewContentBlocksOptions = {},
 ): ViewContentBlock[] {
-  const { mimeType, rendererUri } = options;
-  return (result.content ?? []).filter(isViewContentBlock).filter((block) => {
-    if (mimeType !== undefined && block.resource.mimeType !== mimeType) {
-      return false;
-    }
-    if (rendererUri !== undefined) {
-      const target = block._meta.ui.content.rendererUri;
-      return target === undefined || target === rendererUri;
-    }
-    return true;
-  });
+  const { mimeType } = options;
+  return (result.content ?? [])
+    .filter(isViewContentBlock)
+    .filter(
+      (block) => mimeType === undefined || block.resource.mimeType === mimeType,
+    );
 }
 
 /**
@@ -193,8 +186,9 @@ export function getViewContentBlocks(
  *
  * Servers use this against the host's negotiated
  * {@link types!McpUiClientCapabilities.contentMimeTypes `contentMimeTypes`}
- * extension setting before registering renderer-pattern tools; hosts can use
- * it against a view's declared `contentMimeTypes` to type-filter payloads.
+ * extension setting before registering renderer-pattern tools (an absent or
+ * empty setting means dynamic content support was not negotiated); hosts can
+ * use it against a view's declared `contentMimeTypes` to type-filter payloads.
  *
  * @example
  * ```ts source="./ui-content.examples.ts#supportsContentMimeType_checkSupport"

@@ -5,7 +5,7 @@ import {
   isViewContentBlock,
   supportsContentMimeType,
 } from "./ui-content.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/client";
 
 const A2UI_MIME_TYPE = "application/a2ui+json";
 
@@ -37,18 +37,6 @@ describe("createViewContentBlock", () => {
       uri: "data://server/1",
       mimeType: "application/octet-stream",
       blob: "AAAA",
-    });
-  });
-
-  it("should include rendererUri in the marker when provided", () => {
-    const block = createViewContentBlock({
-      uri: "a2ui://server/surfaces/1",
-      mimeType: A2UI_MIME_TYPE,
-      text: "{}",
-      rendererUri: "ui://server/renderer",
-    });
-    expect(block._meta.ui.content).toEqual({
-      rendererUri: "ui://server/renderer",
     });
   });
 
@@ -122,7 +110,6 @@ describe("getViewContentBlocks", () => {
         uri: "custom://server/2",
         mimeType: "application/vnd.custom+json",
         text: "{}",
-        rendererUri: "ui://server/other-renderer",
       }),
     ],
   };
@@ -140,19 +127,6 @@ describe("getViewContentBlocks", () => {
     expect(blocks.map((b) => b.resource.uri)).toEqual([
       "a2ui://server/surfaces/1",
     ]);
-  });
-
-  it("should filter by rendererUri, including untargeted blocks", () => {
-    expect(
-      getViewContentBlocks(result, {
-        rendererUri: "ui://server/other-renderer",
-      }).map((b) => b.resource.uri),
-    ).toEqual(["a2ui://server/surfaces/1", "custom://server/2"]);
-    expect(
-      getViewContentBlocks(result, {
-        rendererUri: "ui://server/renderer",
-      }).map((b) => b.resource.uri),
-    ).toEqual(["a2ui://server/surfaces/1"]);
   });
 
   it("should handle results with no content", () => {

@@ -81,13 +81,10 @@
     "McpUiContentBlockMeta": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
-      "properties": {
-        "rendererUri": {
-          "description": "URI of the `ui://` renderer resource this payload targets.\n\nIf omitted, the payload targets the calling tool's `_meta.ui.resourceUri`.\nExplicit targeting supports future multi-view tool results.",
-          "type": "string"
-        }
+      "propertyNames": {
+        "type": "string"
       },
-      "additionalProperties": false
+      "additionalProperties": {}
     },
     "McpUiDisplayMode": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",

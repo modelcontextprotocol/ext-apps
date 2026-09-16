@@ -19,7 +19,7 @@ import {
   getViewContentBlocks,
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/client";
 import {
   DYNAMIC_UI_MIME_TYPE,
   type UiComponent,

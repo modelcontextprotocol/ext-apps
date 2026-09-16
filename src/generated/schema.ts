@@ -688,6 +688,15 @@ export const McpUiResourceMetaSchema = z.object({
    * affect the resource's own `mimeType`, which remains
    * `"text/html;profile=mcp-app"`.
    *
+   * This is a validation contract, not a routing mechanism: it declares what
+   * the view can parse so hosts can review, prefetch, type-filter, and
+   * size-limit at connection time. Routing is implicit: payloads are delivered
+   * to the calling tool's declared view (`_meta.ui.resourceUri`).
+   *
+   * Single-format renderers declare one entry. Multiple entries support
+   * distinct payload types rendered by one view, format version migration, or
+   * separate full-document and incremental-update types.
+   *
    * @example
    * ```ts
    * ["application/a2ui+json"]
@@ -768,30 +777,23 @@ export const McpUiToolMetaSchema = z.object({
 });
 
 /**
- * @description Metadata marking an embedded resource content block in a tool
- * result as a dynamic view content payload.
+ * @description Marker for dynamic view content payloads: an embedded resource
+ * content block in a tool result carrying presentation data for the tool's view.
  *
  * Placed at `_meta.ui.content` on `type: "resource"` content blocks within
- * `CallToolResult.content`. Marked payloads are presentation data for the
- * tool's view: hosts forward them unmodified to the view (via
+ * `CallToolResult.content`. Routing is implicit: marked payloads are delivered
+ * to the view of the calling tool (its `_meta.ui.resourceUri`). Hosts that
+ * negotiated dynamic content support forward them unmodified to that view (via
  * `ui/notifications/tool-result` and proxied `tools/call` responses) and
  * exclude them from model context. The payload's `mimeType` must be declared
- * in the target view's {@link McpUiResourceMeta.contentMimeTypes `contentMimeTypes`}.
+ * in the target view's {@link McpUiResourceMeta.contentMimeTypes `contentMimeTypes`};
+ * hosts may drop blocks whose type is not declared there or not covered by the
+ * host's advertised {@link McpUiClientCapabilities.contentMimeTypes `contentMimeTypes`}.
+ *
+ * Currently empty; future fields (e.g., renderer targeting for multi-view tool
+ * results) may be added.
  */
-export const McpUiContentBlockMetaSchema = z.object({
-  /**
-   * @description URI of the `ui://` renderer resource this payload targets.
-   *
-   * If omitted, the payload targets the calling tool's `_meta.ui.resourceUri`.
-   * Explicit targeting supports future multi-view tool results.
-   */
-  rendererUri: z
-    .string()
-    .optional()
-    .describe(
-      "URI of the `ui://` renderer resource this payload targets.\n\nIf omitted, the payload targets the calling tool's `_meta.ui.resourceUri`.\nExplicit targeting supports future multi-view tool results.",
-    ),
-});
+export const McpUiContentBlockMetaSchema = z.record(z.string(), z.unknown());
 
 /**
  * @description MCP Apps capability settings advertised by clients to servers.
@@ -815,8 +817,9 @@ export const McpUiClientCapabilitiesSchema = z.object({
    * @description Dynamic content payload MIME types the host will forward to
    * views (see {@link McpUiContentBlockMeta `McpUiContentBlockMeta`}).
    *
+   * Advertising a non-empty value is what negotiates dynamic content support.
    * Hosts may advertise `["*"]` to indicate they forward any payload type
-   * declared by a view's `contentMimeTypes` — hosts never need to interpret
+   * declared by a view's `contentMimeTypes`; hosts never need to interpret
    * payloads, only route them into the sandboxed view. Servers should check
    * this setting before registering renderer-pattern tools and degrade to
    * text-only or `structuredContent`-driven variants when absent.
