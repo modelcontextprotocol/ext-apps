@@ -112,6 +112,7 @@ export type {
 
 export { PostMessageTransport } from "./message-transport.js";
 export * from "./types.js";
+export * from "./ui-content.js";
 export {
   applyHostStyleVariables,
   applyHostFonts,

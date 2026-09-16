@@ -94,6 +94,7 @@ import {
   McpUiToolMeta,
 } from "./types.js";
 export * from "./types.js";
+export * from "./ui-content.js";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./constants.js";
 import { RESOURCE_URI_META_KEY } from "./constants.js";
 

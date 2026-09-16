@@ -117,6 +117,11 @@ const ALL_SERVERS = [
     dir: "customer-segmentation-server",
   },
   { key: "debug-server", name: "Debug MCP App Server", dir: "debug-server" },
+  {
+    key: "dynamic-content",
+    name: "Dynamic View Content Example Server",
+    dir: "dynamic-content-server",
+  },
   { key: "map-server", name: "CesiumJS Map Server", dir: "map-server" },
   { key: "pdf-server", name: "PDF Server", dir: "pdf-server" },
   { key: "qr-server", name: "QR Code Server", dir: "qr-server" },

@@ -127,6 +127,10 @@ export type McpUiToolMetaSchemaInferredType = z.infer<
   typeof generated.McpUiToolMetaSchema
 >;
 
+export type McpUiContentBlockMetaSchemaInferredType = z.infer<
+  typeof generated.McpUiContentBlockMetaSchema
+>;
+
 export type McpUiClientCapabilitiesSchemaInferredType = z.infer<
   typeof generated.McpUiClientCapabilitiesSchema
 >;
@@ -305,6 +309,12 @@ expectType<McpUiToolVisibilitySchemaInferredType>(
 );
 expectType<spec.McpUiToolMeta>({} as McpUiToolMetaSchemaInferredType);
 expectType<McpUiToolMetaSchemaInferredType>({} as spec.McpUiToolMeta);
+expectType<spec.McpUiContentBlockMeta>(
+  {} as McpUiContentBlockMetaSchemaInferredType,
+);
+expectType<McpUiContentBlockMetaSchemaInferredType>(
+  {} as spec.McpUiContentBlockMeta,
+);
 expectType<spec.McpUiClientCapabilities>(
   {} as McpUiClientCapabilitiesSchemaInferredType,
 );
