@@ -458,9 +458,9 @@ function onNotification(method: string, handler: (params: any) => void) {
 }
 
 
-const initializeResult = await sendRequest("initialize", {
-  capabilities: {},
-  clientInfo: {name: "My UI", version: "1.0.0"},
+const initializeResult = await sendRequest("ui/initialize", {
+  appCapabilities: {},
+  appInfo: { name: "My UI", version: "1.0.0" },
   protocolVersion: "2026-01-26",
 });
 ```
