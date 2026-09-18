@@ -99,6 +99,9 @@ export const allowedLocalDirs = new Set<string>();
  */
 export const cliLocalFiles = new Set<string>();
 
+/** Directory paths explicitly passed as CLI args. */
+export const cliLocalDirs = new Set<string>();
+
 /**
  * Write-permission flags. Object wrapper (not a bare `let`) so main.ts can
  * mutate via the exported binding without re-import gymnastics — same
@@ -954,6 +957,7 @@ async function refreshRoots(server: Server): Promise<void> {
   try {
     const { roots } = await server.listRoots();
     allowedLocalDirs.clear();
+    for (const dir of cliLocalDirs) allowedLocalDirs.add(dir);
     for (const root of roots) {
       if (isFileUrl(root.uri)) {
         const dir = fileUrlToPath(root.uri);
@@ -1275,8 +1279,8 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
 
   if (useClientRoots) {
     // Fetch roots on initialization and subscribe to changes
-    server.server.oninitialized = () => {
-      refreshRoots(server.server);
+    server.server.oninitialized = async () => {
+      await refreshRoots(server.server);
     };
     server.server.setNotificationHandler(
       "notifications/roots/list_changed",
