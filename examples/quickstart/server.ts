@@ -6,9 +6,13 @@ import {
 import { McpServer } from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-const DIST_DIR = path.join(import.meta.dirname, "dist");
+const DIST_DIR = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "dist",
+);
 
 /**
  * Creates a new MCP server instance with tools and resources registered.

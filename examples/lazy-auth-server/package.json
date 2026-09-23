@@ -9,6 +9,9 @@
     "directory": "examples/lazy-auth-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"

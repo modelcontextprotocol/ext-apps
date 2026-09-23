@@ -9,6 +9,9 @@
     "directory": "examples/shadertoy-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"

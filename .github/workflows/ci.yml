@@ -114,6 +114,21 @@ jobs:
           grep -q "Ready" /tmp/mcpb-smoke.log
         working-directory: examples/pdf-server
 
+      # import.meta.filename/dirname are undefined before Node 20.11; servers
+      # must still start on the oldest Node their package.json engines allows.
+      - uses: actions/setup-node@v6
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        with:
+          node-version: "20.0.0"
+
+      - name: Smoke-test pdf-server starts on the oldest supported Node
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: |
+          node --version
+          node .mcpb-smoke/dist/index.js --stdio < /dev/null 2>&1 | tee /tmp/mcpb-smoke-node20.log
+          grep -q "Ready" /tmp/mcpb-smoke-node20.log
+        working-directory: examples/pdf-server
+
   dependency-isolation:
     name: Dependency isolation
     runs-on: ubuntu-latest

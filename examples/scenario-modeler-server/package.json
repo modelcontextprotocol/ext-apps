@@ -9,6 +9,9 @@
     "directory": "examples/scenario-modeler-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"

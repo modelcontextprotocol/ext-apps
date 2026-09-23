@@ -9,6 +9,9 @@
     "directory": "examples/customer-segmentation-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"

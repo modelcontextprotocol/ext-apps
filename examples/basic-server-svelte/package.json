@@ -9,6 +9,9 @@
     "directory": "examples/basic-server-svelte"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"
