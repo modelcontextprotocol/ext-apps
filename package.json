@@ -5,7 +5,7 @@
     "url": "git+https://github.com/modelcontextprotocol/ext-apps.git"
   },
   "homepage": "https://github.com/modelcontextprotocol/ext-apps",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "license": "MIT",
   "description": "MCP Apps SDK — Enable MCP servers to display interactive user interfaces in conversational clients.",
   "type": "module",

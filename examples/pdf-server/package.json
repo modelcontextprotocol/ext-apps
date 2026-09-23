@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-pdf",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "description": "MCP server for loading and extracting text from PDF files with chunked pagination and interactive viewer",
   "repository": {
