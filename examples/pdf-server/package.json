@@ -36,7 +36,7 @@
     "@modelcontextprotocol/server": "2.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "pdfjs-dist": "^5.0.0",
+    "pdfjs-dist": "5.4.530",
     "zod": "^4.2.0"
   },
   "devDependencies": {
