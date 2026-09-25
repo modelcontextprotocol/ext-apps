@@ -133,9 +133,7 @@
     }
   },
   "overrides": {
-    "seroval": "1.4.1",
-    "seroval-plugins": "1.4.2",
-    "solid-js": "1.9.10",
+    "solid-js": "1.9.15",
     "@types/node": "20.19.27"
   },
   "dependencies": {
