@@ -4,6 +4,7 @@ import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, u
 import { createRoot } from "react-dom/client";
 import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
+import { getToolDisplayName } from "./tool-display-name";
 import styles from "./index.module.css";
 
 /**
@@ -341,7 +342,7 @@ function ToolCallInfoPanel({ toolCallInfo, isDestroying, onRequestClose, onClose
     >
       {/* Row 1: Header with server:tool name and close button */}
       <div className={styles.appHeader}>
-        <span>{toolCallInfo.serverInfo.name}:<span className={styles.toolName}>{toolCallInfo.tool.name}</span></span>
+        <span>{toolCallInfo.serverInfo.name}:<span className={styles.toolName}>{getToolDisplayName(toolCallInfo.tool)}</span></span>
         {onRequestClose && !isDestroying && (
           <button
             className={styles.closeButton}
