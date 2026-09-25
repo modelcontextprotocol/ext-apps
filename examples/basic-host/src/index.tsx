@@ -185,12 +185,12 @@ function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool
   };
 
   // Submit with optional override for server/tool (used by auto-call)
-  const handleSubmit = (overrideServer?: ServerInfo, overrideTool?: string) => {
+  const handleSubmit = async (overrideServer?: ServerInfo, overrideTool?: string) => {
     const server = overrideServer ?? selectedServer;
     const tool = overrideTool ?? selectedTool;
     if (!server) return;
 
-    const toolCallInfo = callTool(server, tool, JSON.parse(inputJson));
+    const toolCallInfo = await callTool(server, tool, JSON.parse(inputJson));
     addToolCall(toolCallInfo);
 
     // Update URL for easy refresh/sharing (without triggering navigation)
@@ -203,7 +203,7 @@ function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool
 
   return (
     <div className={styles.callToolPanel}>
-      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+      <form onSubmit={async (e) => { e.preventDefault(); await handleSubmit(); }}>
         <label>
           Server
           <Suspense fallback={<select disabled><option>Loading...</option></select>}>
