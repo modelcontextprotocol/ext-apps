@@ -28,7 +28,7 @@
     "build:mcpb": "npm run build && node build-mcpb.mjs"
   },
   "dependencies": {
-    "@cantoo/pdf-lib": "^2.6.5",
+    "@cantoo/pdf-lib": "2.6.5",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/express": "2.0.0",
     "@modelcontextprotocol/ext-apps": "^2.0.0",
