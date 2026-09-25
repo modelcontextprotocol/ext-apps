@@ -1420,22 +1420,20 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
         // Base64 encode for JSON transport
         const bytes = Buffer.from(data).toString("base64");
         const hasMore = offset + data.length < totalBytes;
+        const chunk = {
+          url: normalized,
+          bytes,
+          offset,
+          byteCount: data.length,
+          totalBytes,
+          hasMore,
+        };
 
         return {
-          content: [
-            {
-              type: "text",
-              text: `${data.length} bytes at ${offset}/${totalBytes}`,
-            },
-          ],
-          structuredContent: {
-            url: normalized,
-            bytes,
-            offset,
-            byteCount: data.length,
-            totalBytes,
-            hasMore,
-          },
+          // Per the MCP spec, also return the serialized structured content
+          // as text so clients that only read content[] still get the bytes.
+          content: [{ type: "text", text: JSON.stringify(chunk) }],
+          structuredContent: chunk,
         };
       } catch (err) {
         return {
