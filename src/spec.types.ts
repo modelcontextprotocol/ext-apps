@@ -508,6 +508,11 @@ export interface McpUiHostCapabilities {
     /** @description Host supports resources/list_changed notifications. */
     listChanged?: boolean;
   };
+  /** @description Host supports calling tools declared by the app (oncalltool/onlisttools). When present, the host will call tools/list on the app after connect, surface the results to the LLM, and route matching tool calls back to the app via tools/call. */
+  tools?: {
+    /** @description Host supports tools/list_changed notifications from the app and will re-query tools/list when received. */
+    listChanged?: boolean;
+  };
   /** @description Host accepts log messages. */
   logging?: {};
   /** @description Sandbox configuration applied by the host. */
