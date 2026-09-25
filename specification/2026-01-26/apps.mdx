@@ -1152,7 +1152,25 @@ View behavior (optional):
 }
 ```
 
-Host MUST send this notification when tool execution completes (if the View is displayed during tool execution).
+Host MUST send this notification when tool execution returns a `CallToolResult`, provided the View is still displayed. If the View was closed before execution completes, the Host MAY skip this notification.
+
+##### Tool error results
+
+A `CallToolResult` with `isError: true` is a completed tool execution that reported an error. It is not a JSON-RPC error response and is not, by itself, a cancellation.
+
+If the Host keeps the View displayed, it MUST deliver the error result through `ui/notifications/tool-result`, preserving `isError`, `content`, `structuredContent`, and `_meta` when present. The Host MUST NOT substitute `ui/notifications/tool-cancelled` solely because `isError` is `true`. This allows a displayed View to leave its loading state and present an appropriate error or recovery UI.
+
+The presence of a UI resource does not require the Host to display a View for every result. Hosts MAY choose not to display a View for an error result. A Host removing an already initialized View follows the resource teardown lifecycle below; a View that is no longer displayed need not receive subsequent tool results. Servers MUST NOT rely on an error result causing a View to be mounted or retained.
+
+| View state             | Host behavior for `isError: true`                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| Not displayed          | The Host may show its own error presentation without mounting the View.                   |
+| Displayed and retained | Deliver `ui/notifications/tool-result`, including `isError: true`.                        |
+| Displayed and removed  | Follow resource teardown; do not leave a retained View waiting indefinitely for a result. |
+
+Views SHOULD handle both successful and error results, even when the Host usually suppresses error Views. A server may return a successful result whose `structuredContent` describes an application state requiring user input, such as a form with validation feedback. This is distinct from a failed tool execution: servers SHOULD follow the MCP tool error semantics when deciding whether to set `isError`, rather than clear the flag solely to influence rendering.
+
+Failures that do not produce a `CallToolResult`, such as a JSON-RPC error or transport failure, do not have a tool result to forward. Hosts must still resolve any displayed loading state, using the applicable cancellation or teardown lifecycle.
 
 `ui/notifications/tool-cancelled` - Tool execution was cancelled
 

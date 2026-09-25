@@ -1789,10 +1789,14 @@ export class AppBridge extends Protocol<BaseContext> {
   /**
    * Send tool execution result to the view.
    *
-   * The host MUST send this notification when tool execution completes successfully,
+   * The host MUST send this notification when tool execution returns a result,
    * provided the view is still displayed. If the view was closed before execution
    * completes, the host MAY skip this notification. This must be sent after
    * {@link sendToolInput `sendToolInput`}.
+   * Results with `isError: true` are included: preserve the error flag and result
+   * payload so the view can stop loading and display recovery UI. An error result
+   * is not a cancellation. Hosts may choose not to display a view for an error;
+   * removing an initialized view follows {@link teardownResource `teardownResource`}.
    *
    * @param params - Standard MCP tool execution result
    *
