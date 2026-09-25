@@ -193,6 +193,12 @@ interface UIResourceMeta {
      * Maps to Permission Policy `clipboard-write` feature
      */
     clipboardWrite?: {},
+    /**
+     * Request WebMCP tools access
+     *
+     * Maps to Permission Policy `tools` feature
+     */
+    tools?: {},
   },
   /**
    * Dedicated origin for view
@@ -251,6 +257,7 @@ The resource content is returned via `resources/read`:
           microphone?: {};       // Request microphone access
           geolocation?: {};      // Request geolocation access
           clipboardWrite?: {};   // Request clipboard write access
+          tools?: {};            // Request WebMCP tools access
         };
         domain?: string;
         prefersBorder?: boolean;
@@ -703,6 +710,7 @@ interface HostCapabilities {
       microphone?: {};
       geolocation?: {};
       clipboardWrite?: {};
+      tools?: {};
     };
     /** CSP domains approved by the host. */
     csp?: {
@@ -1504,6 +1512,7 @@ These messages are reserved for web-based hosts that implement the recommended d
       microphone?: {},
       geolocation?: {},
       clipboardWrite?: {},
+      tools?: {},
     }
   }
 }
