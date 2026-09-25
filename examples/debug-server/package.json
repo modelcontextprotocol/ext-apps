@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-debug",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "type": "module",
   "description": "Debug MCP App Server for testing all SDK capabilities",
   "repository": {

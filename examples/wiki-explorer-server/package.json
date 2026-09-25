@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-wiki-explorer",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "type": "module",
   "description": "Wikipedia link explorer MCP App Server with graph visualization",
   "repository": {

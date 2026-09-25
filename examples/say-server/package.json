@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-say",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "private": true,
   "description": "Streaming TTS MCP App Server with karaoke-style text highlighting",
   "repository": {
