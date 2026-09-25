@@ -486,24 +486,76 @@ const initializeResult = await sendRequest("initialize", {
 
 Hosts act as MCP servers (that can proxy the actual MCP server), receiving and handling requests from UI iframes.
 
-### Sandbox proxy
+### <span id=sandbox-proxy>Rendering the MCP App</span>
 
-If the Host is a web page, it MUST wrap the View and communicate with it through an intermediate Sandbox proxy.
+There have emerged a number of ways to render MCP Apps securely, including using a [single sandboxed iframe](#single-sandboxed-iframe) or a [double sandboxed iframe](#double-sandboxed-iframe) architecture. This specification does not require Hosts to use any one particular framing mechanism, because it does not impact compatibility between the Host and the View. Instead, this specification defines the generic security requirements that must be met by any framing architecture:
 
-1. The Host and the Sandbox MUST have different origins.
-2. The Sandbox MUST have the following permissions: `allow-scripts`, `allow-same-origin`.
-3. The Sandbox SHOULD send a `ui/notifications/sandbox-proxy-ready` notification to the host when it's ready to process an `ui/notifications/sandbox-resource-ready` notification.
-4. Once the Sandbox is ready, the Host SHOULD send the raw HTML resource to load in a `ui/notifications/sandbox-resource-ready` notification.
-5. The Sandbox MUST load the raw HTML of the View with CSP settings that:
+ - If the Host is a web page, it MUST wrap the View in an iframe.
+ - The Host and the iframe MUST have different origins.
+ - The iframe MUST have the following sandbox flags: `allow-scripts`, `allow-same-origin`.
+ - The Host MUST NOT send any request or notification to the View before it receives an `ui/notifications/initialized` notification from the iframe.
+ - The document loaded in the iframe must be served with CSP headers that:
    - Enforce the domains declared in `ui.csp` metadata
    - If `frameDomains` is provided, allow nested iframes from declared origins; otherwise use `frame-src 'none'`
    - If `baseUriDomains` is provided, allow base URIs from declared origins; otherwise use `base-uri 'self'`
-   - Block dangerous features (`object-src 'none'`)
+   - Set `object-src 'none'`
    - Apply restrictive defaults if no CSP metadata is provided
-   - If `permissions` is declared, the Sandbox MAY set the inner iframe's `allow` attribute accordingly
-6. The Sandbox MUST forward messages sent by the Host to the View, and vice versa, for any method that doesn't start with `ui/notifications/sandbox-`. This includes lifecycle messages, e.g., `ui/initialize` request & `ui/notifications/initialized` notification both sent by the View. The Host MUST NOT send any request or notification to the View before it receives an `initialized` notification.
-7. The Sandbox SHOULD NOT create/send any requests to the Host or to the View (this would require synthesizing new request ids).
-8. The Host MAY forward any message from the View (coming via the Sandbox) to the MCP Apps server, for any method that doesn't start with `ui/`. While the Host SHOULD ensure the View's MCP connection is spec-compliant, it MAY decide to block some messages or subject them to further user approval.
+ - If `permissions` is declared in `UIResourceMeta`, the Host MAY set the iframe's `allow` attribute accordingly
+
+> [!WARNING]
+> The document in the iframe that will host the MCP App view content MUST be served by a server the Host controls, in order to guarantee that the security properties specified by the tool definition (e.g., CSP) are set via HTTP headers properly. Relying on a third-party MCP server to serve the document in this iframe is not permitted by this specification, as Hosts would forfeit control over the app's most sensitive security properties.
+
+#### Single Sandboxed Iframe
+
+> [!NOTE]
+> This subsection is non-normative, and is meant to provide examples for prospective Hosts.
+
+A Host might render an MCP App in a single sandboxed iframe; the simplest approach might look like this:
+
+ 1. Host server obtains the MCP App contents either via `resources/read` on a third-party MCP server, or by retrieving a pre-cached copy from its own database
+ 2. Host server sends the MCP App contents to its front-end
+ 3. Host front-end creates an iframe that adheres to the security requirements in <a href=#rendering-the-mcp-app>Rendering the MCP App</a>.
+    - The document in this frame is a universal shim that accepts a `postMessage()` from its parent
+ 4. Host front-end sends the MCP App contents to the iframe via `postMessage()`
+ 5. The iframe accepts the bytes, creates a `blob:` URL referencing them, and navigates itself to the URL
+
+This example approach is similar to what Google Gemini does with its [SafeContentFrame](https://bughunters.google.com/blog/beyond-sandbox-domains-rendering-untrusted-web-content-with-safecontentframe) implementation.
+
+Alternatively, a more complicated but more performant approach might look like this:
+
+ 1. Host server obtains the MCP App contents either via `resources/read` on a third-party MCP server, or by retrieving a pre-cached copy from its own database
+ 2. Host server establishes a cross-origin endpoint whose:
+    - CSP headers comply with the requirements in <a href=#rendering-the-mcp-app>Rendering the MCP App</a>; and
+    - Body is the MCP App contents, with `Content-Type: text/html`
+ 3. Host server sends the URL of this endpoint to the Host front-end
+ 4. Host front-end creates an iframe that adheres to the security requirements in <a href=#rendering-the-mcp-app>Rendering the MCP App</a>, by setting its `src` to the given cross-origin URL
+ 6. The iframe progressively loads the HTML bytes of the MCP App
+
+This second example approach is more performant because the contents of the MCP App do not get copied multiple times across OS process via `postMessage()`, and rather enjoy the benefits of incremental, chunked streaming into the iframe's HTML parser.
+
+#### Double Sandboxed Iframe
+
+> [!NOTE]
+> This subsection is non-normative, and is meant to provide examples for prospective Hosts.
+
+At inception, this specification required Hosts to use two iframes to render MCP Apps:
+
+ - The "outer" iframe, which is cross-origin to the Host, but loads a trusted shim under the Host's control. It acts as an intermediate proxy between the Host and the View
+ - The "innermost" iframe, which comprises the View, and hosts the actual MCP App contents
+
+In this rendering architecture, the Host and "outer" iframe proxy perform an asynchronous initialization ritual with the [sandbox proxy messages](#reserved-messages-sandbox-proxy). The flow looks like this:
+
+ 1. Host server obtains the MCP App contents either via `resources/read` on a third-party MCP server, or by retrieving a pre-cached copy from its own database
+ 2. Host server sends the MCP App contents to its front-end
+ 3. Host front-end creates an intermediate proxy iframe that adheres to the security requirements in <a href=#rendering-the-mcp-app>Rendering the MCP App</a>.
+ 4. The sandbox proxy sends a `ui/notifications/sandbox-proxy-ready` notification to the host when it's ready to process a `ui/notifications/sandbox-resource-ready` notification.
+ 5. The Host sends the raw HTML resource to the proxy in a `ui/notifications/sandbox-resource-ready` notification.
+ 6. The sandbox proxy creates an "innermost" iframe and injects the raw HTML contents into it via something like `document.write()`.
+
+In this architecture, the sandbox proxy is expected to behave like so:
+ - It forwards messages sent by the Host to the View, and vice versa, for any method that doesn't start with `ui/notifications/sandbox-`. This includes lifecycle messages, e.g., `ui/initialize` request & `ui/notifications/initialized` notification both sent by the View.
+ - It does not create/send any requests to the Host or to the View (this would require synthesizing new request ids).
+ - The Host could forward any message from the View (coming via the sandbox proxy) to the MCP Apps server, for any method that doesn't start with `ui/`. While the Host would ensure the View's MCP connection is spec-compliant, it could block some messages or subject them to further user approval.
 
 ### Standard MCP Messages
 
@@ -1527,28 +1579,19 @@ sequenceDiagram
   S -->> H: tools/list (includes tools with _meta.ui metadata)
 ```
 
-#### 2. UI Initialization (Desktop/Native Hosts)
+#### 2. Embedding the MCP App View
 
 ```mermaid
 sequenceDiagram
   participant H as Host
   participant UI as View (iframe)
-  participant P as Sandbox Proxy
   participant S as MCP Server
 
   autonumber
   par UI Tool call
     H ->> S: tools/call to Tool with _meta.ui metadata
   and UI initialization
-    alt Desktop/Native hosts
-      H ->> H: Render View in an iframe (HTML from the ui:// resource)
-    else Web hosts
-      H ->> H: Render Sandbox Proxy in an iframe (different origin)
-      P ->> H: ui/notifications/sandbox-proxy-ready
-      H -->> P: ui/notifications/sandbox-resource-ready (HTML content)
-      P -> P: Render inner iframe with HTML
-
-    end
+    H ->> H: Render View in an iframe
     UI ->> H: ui/initialize
     H -->> UI: McpUiInitializeResult (e.g., host-context, capabilities, etc.)
     UI ->> H: ui/notifications/initialized
@@ -1564,7 +1607,7 @@ sequenceDiagram
   end
 ```
 
-Note: when the View is rendered inside a sandbox, the sandbox transparently passes messages between the View and the Host, except for messages named `ui/notifications/sandbox-*`.
+Note: when the View is rendered inside a [double sandboxed iframe](#double-sandboxed-iframe) architecture, the sandbox transparently passes messages between the View and the Host, except for messages named `ui/notifications/sandbox-*`. Other framing architectures do not require such proxying coordination.
 
 #### 3. Interactive Phase
 
