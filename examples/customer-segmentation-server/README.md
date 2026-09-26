@@ -61,9 +61,10 @@ To test local modifications, use this configuration (replace `~/code/ext-apps` w
 
 ## Running
 
-1. Install dependencies:
+1. Install dependencies from the repository root (the examples are npm workspaces that share the SDK built there):
 
    ```bash
+   # from the repository root
    npm install
    ```
 
