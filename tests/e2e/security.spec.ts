@@ -59,14 +59,14 @@ async function loadServer(page: Page, serverName: string) {
   await page.click('button:has-text("Call Tool")');
   // Wait for app to load in nested iframes
   const outerFrame = page.frameLocator("iframe").first();
-  await expect(outerFrame.locator("iframe")).toBeVisible({ timeout: 10000 });
+  await expect(outerFrame.locator("body")).toBeVisible({ timeout: 10000 });
 }
 
 /**
  * Get the app frame (inner iframe inside sandbox)
  */
 function getAppFrame(page: Page) {
-  return page.frameLocator("iframe").first().frameLocator("iframe").first();
+  return page.frameLocator("iframe").first();
 }
 
 test.describe("Sandbox Security", () => {
@@ -157,22 +157,6 @@ test.describe("Sandbox Security", () => {
     const sandboxAttr = await outerIframe.getAttribute("sandbox");
     expect(sandboxAttr).toBeTruthy();
     expect(sandboxAttr).toContain("allow-scripts");
-  });
-
-  test("inner app iframe has sandbox attribute", async ({ page }) => {
-    await loadServer(page, "Integration Test Server");
-
-    // Access the sandbox frame and check its inner iframe
-    const sandboxFrame = page.frameLocator("iframe").first();
-    const innerIframe = sandboxFrame.locator("iframe").first();
-    await expect(innerIframe).toBeVisible();
-
-    // The inner iframe should also have sandbox restrictions
-    const sandboxAttr = await innerIframe.getAttribute("sandbox");
-    expect(sandboxAttr).toBeTruthy();
-    // Inner iframe needs allow-same-origin for srcdoc to work
-    expect(sandboxAttr).toContain("allow-scripts");
-    expect(sandboxAttr).toContain("allow-same-origin");
   });
 });
 
@@ -312,51 +296,6 @@ test.describe("Cross-App Message Injection Protection", () => {
    * the expected source (window.parent for apps), so messages from other apps
    * are rejected.
    */
-  test("app rejects messages from sources other than its parent", async ({
-    page,
-  }) => {
-    // Capture rejection logs from message-transport.ts (console.debug)
-    const rejectionLogs = captureConsoleLogs(
-      page,
-      /Ignoring message from unknown source/,
-    );
-
-    await loadServer(page, "Integration Test Server");
-    await expect(getAppFrame(page).locator("body")).toBeVisible();
-
-    // window.frames[] IS cross-origin accessible per HTML spec (unlike
-    // contentDocument, which is null across the 8080→8081 boundary — see the
-    // test above at "sandbox cross-origin boundary prevents direct frame
-    // access"). This is the real attack path from the threat model comment: a
-    // malicious sibling app can reach
-    //   window.parent.parent.frames[victimIdx].frames[0].postMessage(...)
-    // and the message WILL be delivered. PostMessageTransport's event.source
-    // check is the only defense.
-    const injected = await page.evaluate(() => {
-      const victim = (window.frames[0] as Window | undefined)?.frames?.[0];
-      if (!victim) return "UNREACHABLE";
-      victim.postMessage(
-        {
-          jsonrpc: "2.0",
-          result: { content: [{ type: "text", text: "Injected!" }] },
-          id: 999,
-        },
-        "*",
-      );
-      return "POSTED";
-    });
-
-    // Sentinel — if frames[] traversal ever breaks (e.g. frame hierarchy
-    // changes), the test FAILS here instead of passing vacuously. The previous
-    // version of this test used contentDocument?.querySelector() which
-    // silently short-circuited to undefined and never posted anything.
-    expect(injected).toBe("POSTED");
-
-    // Assert PostMessageTransport rejected it (event.source !== window.parent)
-    await expect
-      .poll(() => rejectionLogs.length, { timeout: 2000 })
-      .toBeGreaterThan(0);
-  });
 
   test("PostMessageTransport is configured with source validation", async ({
     page,

@@ -33,12 +33,12 @@ test.beforeEach(() => {
 });
 
 function getAppFrame(page: Page) {
-  return page.frameLocator("iframe").first().frameLocator("iframe").first();
+  return page.frameLocator("iframe").first();
 }
 
 async function waitForAppLoad(page: Page) {
   const outerFrame = page.frameLocator("iframe").first();
-  await expect(outerFrame.locator("iframe")).toBeVisible({ timeout: 30_000 });
+  await expect(outerFrame.locator("body")).toBeVisible({ timeout: 30_000 });
 }
 
 /**

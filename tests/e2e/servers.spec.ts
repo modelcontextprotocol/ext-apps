@@ -152,7 +152,7 @@ const SERVERS = EXAMPLE_FILTER
  * Helper to get the app frame locator (nested: sandbox > app)
  */
 function getAppFrame(page: Page) {
-  return page.frameLocator("iframe").first().frameLocator("iframe").first();
+  return page.frameLocator("iframe").first();
 }
 
 /**
@@ -175,7 +175,7 @@ function captureHostLogs(page: Page): string[] {
  */
 async function waitForAppLoad(page: Page) {
   const outerFrame = page.frameLocator("iframe").first();
-  await expect(outerFrame.locator("iframe")).toBeVisible({ timeout: 30000 });
+  await expect(outerFrame.locator("body")).toBeVisible({ timeout: 30000 });
 }
 
 /**
