@@ -16,6 +16,34 @@ import { Client } from "@modelcontextprotocol/client";
 import { z } from "zod/v4";
 
 describe("registerAppTool", () => {
+  it("registers a tool without _meta (optional per ToolConfig)", () => {
+    let capturedConfig: Record<string, unknown> | undefined;
+    const mockServer = {
+      registerTool: mock(
+        (name: string, config: Record<string, unknown>, handler: unknown) => {
+          capturedConfig = config;
+        },
+      ),
+      registerResource: mock(() => {}),
+    };
+
+    const handler = async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+    });
+
+    // No _meta at all — previously crashed reading `.ui` of undefined.
+    expect(() =>
+      registerAppTool(
+        mockServer as unknown as Pick<McpServer, "registerTool">,
+        "plain-tool",
+        { title: "Plain Tool", description: "No UI metadata" },
+        handler,
+      ),
+    ).not.toThrow();
+    expect(mockServer.registerTool).toHaveBeenCalledTimes(1);
+    expect(capturedConfig?._meta).toEqual({});
+  });
+
   it("should pass through config to server.registerTool", () => {
     let capturedName: string | undefined;
     let capturedConfig: Record<string, unknown> | undefined;
