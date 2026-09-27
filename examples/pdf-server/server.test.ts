@@ -20,6 +20,7 @@ import {
   startFileWatch,
   stopFileWatch,
   cliLocalFiles,
+  cliLocalDirs,
   isWritablePath,
   writeFlags,
   viewSourcePaths,
@@ -785,6 +786,31 @@ describe("createServer useClientRoots option", () => {
     // the roots refresh handler.
     expect(server.server.oninitialized).toBeFunction();
     server.close();
+  });
+
+  it("preserves CLI directories when the client returns no roots", async () => {
+    const cliDir = "/cli/documents";
+    const previousClientDir = "/client/documents";
+    cliLocalDirs.add(cliDir);
+    allowedLocalDirs.add(cliDir);
+    allowedLocalDirs.add(previousClientDir);
+
+    const server = createServer({ useClientRoots: true });
+    try {
+      spyOn(server.server, "getClientCapabilities").mockReturnValue({
+        roots: {},
+      });
+      spyOn(server.server, "listRoots").mockResolvedValue({ roots: [] });
+
+      await server.server.oninitialized?.();
+
+      expect(allowedLocalDirs).toEqual(new Set([cliDir]));
+    } finally {
+      allowedLocalDirs.delete(cliDir);
+      allowedLocalDirs.delete(previousClientDir);
+      cliLocalDirs.delete(cliDir);
+      await server.close();
+    }
   });
 });
 

@@ -23,6 +23,7 @@ import {
   cliLocalFiles,
   DEFAULT_PDF,
   allowedLocalDirs,
+  cliLocalDirs,
   writeFlags,
 } from "./server.js";
 
@@ -162,6 +163,7 @@ async function main() {
           console.error(`[pdf-server] Registered local file: ${filePath}`);
         } else if (s.isDirectory()) {
           allowedLocalDirs.add(filePath);
+          cliLocalDirs.add(filePath);
           console.error(`[pdf-server] Registered local directory: ${filePath}`);
         }
       } else {
