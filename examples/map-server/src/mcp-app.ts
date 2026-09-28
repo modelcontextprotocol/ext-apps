@@ -41,6 +41,38 @@ async function loadCesium(): Promise<void> {
     script.onload = () => {
       // Set CESIUM_BASE_URL for asset loading
       (window as any).CESIUM_BASE_URL = CESIUM_BASE_URL;
+
+      const CGlobal = (window as any).Cesium;
+      if (CGlobal?.TaskProcessor) {
+        // Run terrain geometry tasks synchronously on the main thread for sandboxed iframes
+        const origSchedule = CGlobal.TaskProcessor.prototype.scheduleTask;
+        CGlobal.TaskProcessor.prototype.scheduleTask = function (params: any) {
+          if (this._workerPath?.includes("transferTypedArrayTest")) {
+            return Promise.resolve(new ArrayBuffer(1));
+          }
+          if (this._workerPath?.includes("createVerticesFromHeightmap")) {
+            try {
+              const D = { ...params };
+              if (D.ellipsoid)
+                D.ellipsoid = CGlobal.Ellipsoid.clone(D.ellipsoid);
+              if (D.rectangle)
+                D.rectangle = CGlobal.Rectangle.clone(D.rectangle);
+              const r = CGlobal.HeightmapTessellator.computeVertices(D);
+              return Promise.resolve({
+                ...r,
+                vertices: r.vertices.buffer,
+                numberOfAttributes: r.encoding.stride,
+                gridWidth: D.width,
+                gridHeight: D.height,
+              });
+            } catch (err) {
+              log.error("Sync computeVertices error:", err);
+            }
+          }
+          return origSchedule.call(this, params);
+        };
+      }
+
       resolve();
     };
     script.onerror = () =>
@@ -373,6 +405,9 @@ async function initCesium(): Promise<any> {
     sceneModePicker: false,
     navigationHelpButton: false,
     fullscreenButton: false,
+    // Disable Knockout.js UI widgets to avoid EvalError under strict CSP without 'unsafe-eval'
+    infoBox: false,
+    selectionIndicator: false,
     // Disable terrain (requires Ion)
     terrainProvider: undefined,
     // WebGL context options for sandboxed iframe rendering
@@ -831,11 +866,18 @@ app.ontoolinput = async (params) => {
     | undefined;
 
   if (args && viewer) {
-    // Handle both nested boundingBox and flat format
+    const DEFAULT_BBOX: BoundingBox = {
+      west: -0.5,
+      south: 51.3,
+      east: 0.3,
+      north: 51.7,
+    }; // London
     let bbox: BoundingBox | null = null;
-
+    let isExplicitInput = false;
+    // 1. Check if model provided explicit coordinates
     if (args.boundingBox) {
       bbox = args.boundingBox;
+      isExplicitInput = true;
     } else if (
       args.west !== undefined &&
       args.south !== undefined &&
@@ -848,27 +890,40 @@ app.ontoolinput = async (params) => {
         east: args.east,
         north: args.north,
       };
+      isExplicitInput = true;
     }
 
-    if (bbox) {
-      // Mark that we received explicit tool input (overrides persisted state)
+    if (isExplicitInput && bbox) {
+      // Model told us exactly where to look
       hasReceivedToolInput = true;
-      log.info("Positioning camera to bbox:", bbox);
-
-      // Position camera instantly (no animation)
+      log.info("Positioning camera to explicit bbox:", bbox);
       setViewToBoundingBox(viewer, bbox);
+    } else {
+      // Model didn't provide coordinates (just requested to open the map).
+      // The View determines its own default state.
 
-      // Wait for tiles to load at this location
-      await waitForTilesLoaded(viewer);
-
-      // Now hide loading indicator
-      hideLoading();
-
-      log.info(
-        "Camera positioned, tiles loaded. Height:",
-        viewer.camera.positionCartographic.height,
-      );
+      // First try to restore persisted user state
+      if (restorePersistedView(viewer)) {
+        hasReceivedToolInput = true; // Count restoration as having an initial position
+        log.info("Restored persisted view on startup");
+      } else {
+        // Fallback to the app's default home location (London)
+        hasReceivedToolInput = true; // We've positioned the camera
+        log.info("Using default app home location (London)");
+        setViewToBoundingBox(viewer, DEFAULT_BBOX);
+      }
     }
+
+    // Wait for tiles to load at the new location
+    await waitForTilesLoaded(viewer);
+
+    // Now hide loading indicator
+    hideLoading();
+
+    log.info(
+      "Camera positioned, tiles loaded. Height:",
+      viewer.camera.positionCartographic.height,
+    );
   }
 };
 
