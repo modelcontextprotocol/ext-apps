@@ -85,7 +85,7 @@ function App_constructor_basic() {
   //#region App_constructor_basic
   const app = new App(
     { name: "MyApp", version: "1.0.0" },
-    { tools: { listChanged: true } }, // capabilities
+    { availableDisplayModes: ["inline"] }, // capabilities
     { autoResize: true }, // options
   );
   //#endregion App_constructor_basic

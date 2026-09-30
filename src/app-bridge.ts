@@ -31,7 +31,9 @@ import {
   type Transport,
 } from "@modelcontextprotocol/client";
 import {
+  CallToolResultSchema,
   EmptyResultSchema,
+  ListToolsResultSchema,
   LoggingMessageNotificationSchema,
 } from "@modelcontextprotocol/core";
 import { EventDispatcher, MethodRegistry } from "./events.js";
@@ -48,6 +50,8 @@ type MethodSchema = ZodObject<{
 }>;
 
 import {
+  type McpUiSandboxCallToolRequest,
+  type McpUiSandboxListToolsRequest,
   type McpUiSandboxResourceReadyNotification,
   type McpUiSizeChangedNotification,
   type McpUiToolCancelledNotification,
@@ -85,6 +89,8 @@ import {
   McpUiRequestTeardownNotificationSchema,
   McpUiSandboxProxyReadyNotification,
   McpUiSandboxProxyReadyNotificationSchema,
+  McpUiSandboxToolsChangedNotification,
+  McpUiSandboxToolsChangedNotificationSchema,
   McpUiSizeChangedNotificationSchema,
   McpUiRequestDisplayModeRequest,
   McpUiRequestDisplayModeRequestSchema,
@@ -99,6 +105,12 @@ import { RESOURCE_URI_META_KEY } from "./constants.js";
 
 type UntypedHandlerSetter = (this: unknown, ...args: unknown[]) => void;
 export { PostMessageTransport } from "./message-transport.js";
+export {
+  createModelContextRelay,
+  type ModelContextRelay,
+  type ModelContextRelayOptions,
+} from "./model-context-host.js";
+import { injectModelContextPolyfill } from "./model-context-host.js";
 
 /**
  * Extract UI resource URI from tool metadata.
@@ -204,12 +216,17 @@ export function buildAllowAttribute(
  * Options for configuring {@link AppBridge `AppBridge`} behavior.
  *
  * @property hostContext - Optional initial host context to provide to the view
+ * @property modelContextPolyfill - Whether {@link AppBridge.sendSandboxResourceReady `sendSandboxResourceReady`}
+ *   injects a WebMCP `document.modelContext` polyfill into the View HTML
+ *   (default `true`). It is a no-op where the View's document already has one.
+ *   Set to `false` if the Host provides `document.modelContext` some other way.
  *
  * @see `ProtocolOptions` from @modelcontextprotocol/client for available options
  * @see {@link McpUiHostContext `McpUiHostContext`} for the hostContext structure
  */
 export type HostOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
   hostContext?: McpUiHostContext;
+  modelContextPolyfill?: boolean;
 };
 
 /**
@@ -240,6 +257,7 @@ type RequestHandlerExtra = BaseContext;
 export type AppBridgeEventMap = {
   sizechange: McpUiSizeChangedNotification["params"];
   sandboxready: McpUiSandboxProxyReadyNotification["params"];
+  webmcptoolschange: McpUiSandboxToolsChangedNotification["params"];
   initialized: McpUiInitializedNotification["params"];
   requestteardown: McpUiRequestTeardownNotification["params"];
   loggingmessage: LoggingMessageNotification["params"];
@@ -307,6 +325,7 @@ export class AppBridge extends Protocol<BaseContext> {
   private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
   private _initializedReceived = false;
+  private readonly _modelContextPolyfill: boolean;
   private readonly _registeredEvents = new Set<keyof AppBridgeEventMap>();
   private readonly _events = new EventDispatcher<AppBridgeEventMap>();
   private readonly _methods = new MethodRegistry();
@@ -423,6 +442,7 @@ export class AppBridge extends Protocol<BaseContext> {
   } = {
     sizechange: McpUiSizeChangedNotificationSchema,
     sandboxready: McpUiSandboxProxyReadyNotificationSchema,
+    webmcptoolschange: McpUiSandboxToolsChangedNotificationSchema,
     initialized: McpUiInitializedNotificationSchema,
     requestteardown: McpUiRequestTeardownNotificationSchema,
     loggingmessage: LoggingMessageNotificationSchema,
@@ -540,6 +560,7 @@ export class AppBridge extends Protocol<BaseContext> {
     this._ensureEventSlot("initialized");
 
     this._hostContext = options?.hostContext || {};
+    this._modelContextPolyfill = options?.modelContextPolyfill !== false;
 
     this.replaceRequestHandler(
       "ui/initialize",
@@ -748,6 +769,30 @@ export class AppBridge extends Protocol<BaseContext> {
       | undefined,
   ) {
     this.setEventHandler("sandboxready", callback);
+  }
+
+  /**
+   * Called when the tools the view exposes through WebMCP change (the Sandbox
+   * proxy sends `ui/notifications/sandbox-tools-changed`). Re-list them with
+   * {@link listWebMcpTools `listWebMcpTools`}.
+   *
+   * Assigning replaces the previous handler; assigning `undefined` clears it.
+   * For several listeners use
+   * {@link addEventListener `addEventListener("webmcptoolschange", handler)`}.
+   *
+   * @see {@link McpUiSandboxToolsChangedNotification `McpUiSandboxToolsChangedNotification`} for the notification type
+   */
+  get onwebmcptoolschange():
+    | ((params: McpUiSandboxToolsChangedNotification["params"]) => void)
+    | undefined {
+    return this.getEventHandler("webmcptoolschange");
+  }
+  set onwebmcptoolschange(
+    callback:
+      | ((params: McpUiSandboxToolsChangedNotification["params"]) => void)
+      | undefined,
+  ) {
+    this.setEventHandler("webmcptoolschange", callback);
   }
 
   /**
@@ -1860,6 +1905,11 @@ export class AppBridge extends Protocol<BaseContext> {
    * via `ui/notifications/sandbox-proxy-ready`, the host sends this notification
    * with the HTML content to load.
    *
+   * By default the View HTML is sent with a WebMCP `document.modelContext`
+   * polyfill prepended (see {@link HostOptions.modelContextPolyfill `modelContextPolyfill`}),
+   * so Views can register tools with WebMCP in any browser. The Sandbox proxy
+   * reads them with {@link createModelContextRelay `createModelContextRelay`}.
+   *
    * @param params - HTML content and sandbox configuration:
    *   - `html`: The HTML content to load into the sandboxed iframe
    *   - `sandbox`: Optional sandbox attribute value (e.g., "allow-scripts")
@@ -1872,7 +1922,10 @@ export class AppBridge extends Protocol<BaseContext> {
   ) {
     return this.notification({
       method: "ui/notifications/sandbox-resource-ready" as const,
-      params,
+      params:
+        this._modelContextPolyfill && typeof params.html === "string"
+          ? { ...params, html: injectModelContextPolyfill(params.html) }
+          : params,
     });
   }
 
@@ -1925,6 +1978,9 @@ export class AppBridge extends Protocol<BaseContext> {
    * @param params - Tool call parameters (name and arguments)
    * @param options - Request options (timeout, abort signal, etc.)
    * @returns Promise resolving to the tool call result
+   * @deprecated This reaches only tools the View answers for itself (the
+   * deprecated `tools` app capability). Use {@link callWebMcpTool `callWebMcpTool`}
+   * for tools registered with WebMCP.
    */
   callTool(params: CallToolRequest["params"], options?: RequestOptions) {
     return this.request({ method: "tools/call", params }, options);
@@ -1938,9 +1994,60 @@ export class AppBridge extends Protocol<BaseContext> {
    * @param params - List tools parameters (may include cursor for pagination)
    * @param options - Request options (timeout, abort signal, etc.)
    * @returns Promise resolving to the list of tools
+   * @deprecated This reaches only tools the View answers for itself (the
+   * deprecated `tools` app capability). Use
+   * {@link listWebMcpTools `listWebMcpTools`} for tools registered with WebMCP.
    */
   listTools(params: ListToolsRequest["params"], options?: RequestOptions) {
     return this.request({ method: "tools/list", params }, options);
+  }
+
+  /**
+   * List the tools the view exposes through WebMCP (`document.modelContext`).
+   *
+   * Sends a `ui/sandbox-list-tools` request, which the Sandbox proxy answers
+   * by reading the view's `document.modelContext` (see
+   * {@link createModelContextRelay `createModelContextRelay`}); the view never
+   * sees it. Rejects with an error if the Sandbox does not implement it.
+   *
+   * @param params - May include a pagination cursor
+   * @param options - Request options (timeout, abort signal, etc.)
+   * @returns Promise resolving to the list of tools
+   */
+  listWebMcpTools(
+    params?: McpUiSandboxListToolsRequest["params"],
+    options?: RequestOptions,
+  ) {
+    return this.request(
+      { method: "ui/sandbox-list-tools" as const, params },
+      ListToolsResultSchema,
+      options,
+    );
+  }
+
+  /**
+   * Call a tool the view exposes through WebMCP (`document.modelContext`).
+   *
+   * Sends a `ui/sandbox-call-tool` request, which the Sandbox proxy answers by
+   * executing the tool in the view (see
+   * {@link createModelContextRelay `createModelContextRelay`}). The result has
+   * an empty `content` and the value the tool returned as `structuredContent`
+   * (a non-object value `v` as `{ result: v }`); a tool that throws yields
+   * `isError: true` with its message as text.
+   *
+   * @param params - Tool call parameters (name and arguments)
+   * @param options - Request options (timeout, abort signal, etc.)
+   * @returns Promise resolving to the tool call result
+   */
+  callWebMcpTool(
+    params: McpUiSandboxCallToolRequest["params"],
+    options?: RequestOptions,
+  ) {
+    return this.request(
+      { method: "ui/sandbox-call-tool" as const, params },
+      CallToolResultSchema,
+      options,
+    );
   }
 
   /**

@@ -41,6 +41,11 @@ export { EventDispatcher } from "./events.js";
 
 import { PostMessageTransport } from "./message-transport.js";
 import {
+  callToolResultText,
+  getWebMcpModelContext,
+  type WebMcpModelContext,
+} from "./webmcp.js";
+import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
   McpUiUpdateModelContextRequest,
@@ -87,23 +92,6 @@ type MethodSchema = ZodObject<{
   method: ZodLiteral<string>;
   params: ZodType;
 }>;
-
-function mergeAppCapabilities(
-  base: McpUiAppCapabilities,
-  additional: McpUiAppCapabilities,
-): McpUiAppCapabilities {
-  const result = { ...base, ...additional };
-  if (additional.experimental !== undefined) {
-    result.experimental = {
-      ...base.experimental,
-      ...additional.experimental,
-    };
-  }
-  if (additional.tools !== undefined) {
-    result.tools = { ...base.tools, ...additional.tools };
-  }
-  return result;
-}
 
 export type {
   StandardSchemaV1,
@@ -307,6 +295,10 @@ export class App extends Protocol<BaseContext> {
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
   private _registeredTools: { [name: string]: RegisteredAppTool } = {};
+  /** Tools currently mirrored into `document.modelContext`, by name. */
+  private readonly _webMcpRegistrations = new Map<string, AbortController>();
+  private _webMcpCallCount = 0;
+  private readonly _warned = new Set<string>();
   private _initializedSent = false;
   private readonly _registeredEvents = new Set<keyof AppEventMap>();
   private readonly _events = new EventDispatcher<AppEventMap>();
@@ -535,7 +527,7 @@ export class App extends Protocol<BaseContext> {
    * ```ts source="./app.examples.ts#App_constructor_basic"
    * const app = new App(
    *   { name: "MyApp", version: "1.0.0" },
-   *   { tools: { listChanged: true } }, // capabilities
+   *   { availableDisplayModes: ["inline"] }, // capabilities
    *   { autoResize: true }, // options
    * );
    * ```
@@ -570,18 +562,27 @@ export class App extends Protocol<BaseContext> {
     return ctx;
   }
 
-  private registerAppCapabilities(capabilities: McpUiAppCapabilities): void {
-    if (this.transport) {
-      throw new Error(
-        "Cannot register capabilities after transport is established",
-      );
-    }
-    this._appCapabilities = mergeAppCapabilities(
-      this._appCapabilities,
-      capabilities,
-    );
-  }
-
+  /**
+   * Register a tool that the host can list and call.
+   *
+   * @deprecated Use `document.modelContext.registerTool()`
+   * ({@link https://webmachinelearning.github.io/webmcp/ WebMCP}) instead, as
+   * {@link https://github.com/modelcontextprotocol/ext-apps/issues/797 #797}
+   * converges View-registered tools on it. See the "Tools exposed by the View
+   * (WebMCP)" section of the 3.x migration guide.
+   *
+   * This is a thin wrapper over `document.modelContext.registerTool()`, which
+   * the host provides (natively, or via a polyfill it injects into the View's
+   * HTML). This App no longer serves the tool over `tools/list` /
+   * `tools/call` or declares the `tools` app capability; without a
+   * `document.modelContext` the tool is not exposed and a warning is logged.
+   *
+   * The callback keeps returning a `CallToolResult`: `structuredContent` (or
+   * `{ content }` when absent) becomes the WebMCP result, and `isError: true`
+   * rejects with the text of its content. Input is validated with
+   * `inputSchema` on every call. `outputSchema` only validates the result, and
+   * `_meta` and all annotations but `readOnlyHint` are not exposed.
+   */
   registerTool<
     OutputArgs extends undefined | StandardSchemaV1 = undefined,
     InputArgs extends undefined | StandardSchemaV1 = undefined,
@@ -601,11 +602,7 @@ export class App extends Protocol<BaseContext> {
       throw new Error(`Tool ${name} is already registered`);
     }
     const app = this;
-    const notify = () => {
-      if (app._initializedSent && app._appCapabilities.tools?.listChanged) {
-        void app.sendToolListChanged();
-      }
-    };
+    const notify = () => app.syncWebMcpTool(name);
     // Arity is fixed at registration time even if inputSchema is later
     // update()d, since cb's signature can't change.
     const cbTakesArgs = config.inputSchema !== undefined;
@@ -669,71 +666,129 @@ export class App extends Protocol<BaseContext> {
 
     this._registeredTools[name] = registeredTool;
 
-    // Auto-register tools capability so setRequestHandler's capability check
-    // passes. Mirrors McpServer.registerTool behavior — callers shouldn't need
-    // to declare { tools: {} } in the constructor just to use registerTool.
-    // Only do this pre-connect; post-connect the capability was already
-    // advertised (or wasn't) and can't change.
-    if (!this._appCapabilities.tools && !this.transport) {
-      this.registerAppCapabilities({ tools: { listChanged: true } });
-    }
-
-    this.ensureToolHandlersInitialized();
+    this.warnDeprecated("registerTool()");
     notify();
     return registeredTool;
   }
 
-  private _toolHandlersInitialized = false;
-  private ensureToolHandlersInitialized(): void {
-    if (this._toolHandlersInitialized) {
+  /**
+   * Bring the `document.modelContext` mirror of the tool registered under
+   * `name` in line with its current state: (re-)registered when present and
+   * enabled, unregistered otherwise.
+   */
+  private syncWebMcpTool(name: string): void {
+    this._webMcpRegistrations.get(name)?.abort();
+    this._webMcpRegistrations.delete(name);
+
+    const tool = this._registeredTools[name];
+    if (!tool?.enabled) return;
+    const modelContext = getWebMcpModelContext();
+    if (!modelContext) {
+      this.warnOnce(
+        "no-model-context",
+        "document.modelContext is not available, so tools registered with " +
+          "App.registerTool() are not exposed to the host. The host is " +
+          "expected to provide it (natively or via a polyfill injected into " +
+          "the View's HTML).",
+      );
       return;
     }
-    this._toolHandlersInitialized = true;
 
-    this.oncalltool = async (params, extra) => {
-      const tool = this._registeredTools[params.name];
-      if (!tool) {
-        throw new Error(`Tool ${params.name} not found`);
-      }
-      return tool.handler(params.arguments, extra);
-    };
-    this.onlisttools = async (_params, _extra) => {
-      const tools: Tool[] = await Promise.all(
-        Object.entries(this._registeredTools)
-          .filter(([_, tool]) => tool.enabled)
-          .map(async ([name, tool]) => {
-            const result: Tool = {
-              name,
-              title: tool.title,
-              description: tool.description,
-              inputSchema: (tool.inputSchema
-                ? await standardSchemaToJsonSchema(tool.inputSchema, "input")
-                : {
-                    type: "object" as const,
-                    properties: {},
-                  }) as Tool["inputSchema"],
-            };
-            // outputSchema is optional in core MCP — only emit when the app
-            // provided one, otherwise hosts would assume structuredContent.
-            if (tool.outputSchema) {
-              result.outputSchema = (await standardSchemaToJsonSchema(
-                tool.outputSchema,
-                "output",
-              )) as Tool["outputSchema"];
-            }
-            if (tool.annotations) {
-              result.annotations = tool.annotations;
-            }
-            if (tool._meta) {
-              result._meta = tool._meta;
-            }
-            return result;
-          }),
+    const controller = new AbortController();
+    this._webMcpRegistrations.set(name, controller);
+    void this.mirrorToWebMcp(name, tool, modelContext, controller.signal);
+  }
+
+  private warnDeprecated(api: string): void {
+    this.warnOnce(
+      api,
+      `App.${api} is deprecated: expose tools with document.modelContext.registerTool() (WebMCP) instead.`,
+    );
+  }
+
+  private warnOnce(key: string, message: string): void {
+    if (this._warned.has(key)) return;
+    this._warned.add(key);
+    console.warn(`[MCP Apps] ${message}`);
+  }
+
+  private async mirrorToWebMcp(
+    name: string,
+    tool: RegisteredAppTool,
+    modelContext: WebMcpModelContext,
+    signal: AbortSignal,
+  ): Promise<void> {
+    try {
+      const inputSchema = tool.inputSchema
+        ? await standardSchemaToJsonSchema(tool.inputSchema, "input")
+        : undefined;
+      if (signal.aborted) return;
+      await modelContext.registerTool(
+        {
+          name,
+          title: tool.title,
+          description: tool.description || tool.title || name,
+          inputSchema,
+          annotations:
+            tool.annotations?.readOnlyHint === undefined
+              ? undefined
+              : { readOnlyHint: tool.annotations.readOnlyHint },
+          execute: async (input, options) => {
+            const result = await tool.handler(
+              input,
+              this.buildWebMcpContext(options.signal),
+            );
+            if (result.isError) throw new Error(callToolResultText(result));
+            return result.structuredContent ?? { content: result.content };
+          },
+        },
+        { signal },
       );
-      return { tools };
+    } catch (error) {
+      // A failed registration (invalid name, unserializable schema, duplicate…)
+      // means the tool does not exist for the host.
+      if (!signal.aborted) {
+        console.warn(
+          `[MCP Apps] Tool "${name}" could not be registered with document.modelContext and is not exposed to the host:`,
+          error,
+        );
+      }
+    }
+  }
+
+  /**
+   * Handler context for a tool call that arrived through WebMCP rather than a
+   * `tools/call` request: same shape as the wire path, with a synthetic
+   * request id and `send`/`notify` going out over this App's own transport.
+   */
+  private buildWebMcpContext(signal: AbortSignal): RequestHandlerExtra {
+    return {
+      mcpReq: {
+        id: `webmcp-${++this._webMcpCallCount}`,
+        method: "tools/call",
+        signal,
+        requestState: () => undefined,
+        send: ((...args: [never, ...never[]]) =>
+          (this.request as (...a: unknown[]) => unknown)(
+            ...args,
+          )) as RequestHandlerExtra["mcpReq"]["send"],
+        notify: (notification) => this.notification(notification),
+      },
     };
   }
 
+  protected override _onclose(): void {
+    for (const controller of this._webMcpRegistrations.values()) {
+      controller.abort();
+    }
+    this._webMcpRegistrations.clear();
+    super._onclose();
+  }
+
+  /**
+   * @deprecated WebMCP announces tool changes itself (`toolchange`); only
+   * useful with the deprecated `oncalltool` / `onlisttools` handlers.
+   */
   async sendToolListChanged(
     params: ToolListChangedNotification["params"] = {},
   ): Promise<void> {
@@ -1127,11 +1182,14 @@ export class App extends Protocol<BaseContext> {
    *   throw new Error(`Unknown tool: ${params.name}`);
    * };
    * ```
+   *
+   * @deprecated Expose tools with `document.modelContext.registerTool()` (WebMCP) instead; see {@link registerTool `registerTool`}.
    */
   private _oncalltool?: (
     params: CallToolRequest["params"],
     extra: RequestHandlerExtra,
   ) => Promise<CallToolResult>;
+  /** @deprecated Expose tools with `document.modelContext.registerTool()` (WebMCP) instead; see {@link registerTool `registerTool`}. */
   get oncalltool() {
     return this._oncalltool;
   }
@@ -1143,6 +1201,7 @@ export class App extends Protocol<BaseContext> {
         ) => Promise<CallToolResult>)
       | undefined,
   ) {
+    if (callback) this.warnDeprecated("oncalltool");
     this.warnIfRequestHandlerReplaced("oncalltool", this._oncalltool, callback);
     this._oncalltool = callback;
     this.replaceRequestHandler("tools/call", (request, extra) => {
@@ -1194,11 +1253,14 @@ export class App extends Protocol<BaseContext> {
    * ```
    *
    * @see {@link oncalltool `oncalltool`} for handling tool execution
+   *
+   * @deprecated Expose tools with `document.modelContext.registerTool()` (WebMCP) instead; see {@link registerTool `registerTool`}.
    */
   private _onlisttools?: (
     params: ListToolsRequest["params"],
     extra: RequestHandlerExtra,
   ) => Promise<ListToolsResult>;
+  /** @deprecated Expose tools with `document.modelContext.registerTool()` (WebMCP) instead; see {@link registerTool `registerTool`}. */
   get onlisttools() {
     return this._onlisttools;
   }
@@ -1210,6 +1272,7 @@ export class App extends Protocol<BaseContext> {
         ) => Promise<ListToolsResult>)
       | undefined,
   ) {
+    if (callback) this.warnDeprecated("onlisttools");
     this.warnIfRequestHandlerReplaced(
       "onlisttools",
       this._onlisttools,
