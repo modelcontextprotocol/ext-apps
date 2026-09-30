@@ -1,5 +1,5 @@
 import type { McpUiSandboxProxyReadyNotification, McpUiSandboxResourceReadyNotification } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { buildAllowAttribute } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { buildAllowAttribute, createModelContextRelay } from "@modelcontextprotocol/ext-apps/app-bridge";
 
 const ALLOWED_REFERRER_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/;
 
@@ -47,6 +47,17 @@ inner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
 // Note: allow attribute is set later when receiving sandbox-resource-ready notification
 // based on the permissions requested by the app
 document.body.appendChild(inner);
+
+// WebMCP: the View registers tools on its own `document.modelContext` (the
+// polyfill is prepended to the View HTML by AppBridge on the Host side). This
+// proxy is the only party same-origin with the View (the Host page is not), so
+// it is the one that reads those tools: the relay answers the Host's reserved
+// `ui/sandbox-list-tools` / `ui/sandbox-call-tool` requests and sends
+// `ui/notifications/sandbox-tools-changed` when the View's tools change.
+const relay = createModelContextRelay({
+  getViewDocument: () => inner.contentDocument,
+  postToHost: (message) => window.parent.postMessage(message, EXPECTED_HOST_ORIGIN),
+});
 
 const RESOURCE_READY_NOTIFICATION: McpUiSandboxResourceReadyNotification["method"] =
   "ui/notifications/sandbox-resource-ready";
@@ -108,6 +119,8 @@ window.addEventListener("message", async (event) => {
         }
       }
     } else {
+      // Answered here from the View's `document.modelContext`: don't forward.
+      if (relay.handleHostMessage(event.data)) return;
       if (inner && inner.contentWindow) {
         inner.contentWindow.postMessage(event.data, "*");
       }
@@ -122,6 +135,8 @@ window.addEventListener("message", async (event) => {
       );
       return;
     }
+    // Lets the relay start watching the View's tools once it has initialized.
+    relay.handleViewMessage(event.data);
     // Relay messages from inner frame to parent window.
     // Use specific origin instead of "*" to prevent message interception.
     window.parent.postMessage(event.data, EXPECTED_HOST_ORIGIN);

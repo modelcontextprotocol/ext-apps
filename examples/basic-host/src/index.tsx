@@ -1,8 +1,8 @@
 import { getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Tool } from "@modelcontextprotocol/client";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/client";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { callTool, connectToServer, hasAppHtml, initializeApp, listViewTools, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
 import styles from "./index.module.css";
 
@@ -417,6 +417,54 @@ function CollapsiblePanel({ icon, label, content, badge, defaultExpanded = false
 }
 
 
+/**
+ * Lists the tools the View registered (WebMCP `document.modelContext`, or the
+ * deprecated `App.registerTool`) and lets you call them with JSON input.
+ */
+interface AppToolsPanelProps {
+  tools: Tool[];
+  onCall: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>;
+}
+function AppToolsPanel({ tools, onCall }: AppToolsPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={styles.collapsiblePanel}>
+      <div className={styles.collapsibleHeader} onClick={() => setExpanded(!expanded)}>
+        <span className={styles.collapsibleLabel}>🧰 App tools (WebMCP)</span>
+        <span className={styles.collapsibleSize}>{tools.length} tool{tools.length > 1 ? "s" : ""}</span>
+        <span className={styles.collapsibleToggle}>{expanded ? "▼" : "▶"}</span>
+      </div>
+      {expanded && tools.map((tool) => <AppToolRow key={tool.name} tool={tool} onCall={onCall} />)}
+    </div>
+  );
+}
+
+function AppToolRow({ tool, onCall }: { tool: Tool; onCall: AppToolsPanelProps["onCall"] }) {
+  const [input, setInput] = useState(() => getToolDefaults(tool));
+  const [result, setResult] = useState("");
+
+  const call = async () => {
+    try {
+      setResult(JSON.stringify(await onCall(tool.name, JSON.parse(input)), null, 2));
+    } catch (error) {
+      setResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  return (
+    <div className={styles.appTool}>
+      <div><span className={styles.appToolName}>{tool.name}</span> {tool.description}</div>
+      <div className={styles.appToolCall}>
+        <textarea rows={2} value={input} onChange={(e) => setInput(e.target.value)} aria-label={`${tool.name} input JSON`} />
+        <button onClick={call}>Call</button>
+      </div>
+      {result && <pre className={styles.collapsibleFull}>{result}</pre>}
+    </div>
+  );
+}
+
+
 interface AppIFramePanelProps {
   toolCallInfo: Required<ToolCallInfo>;
   isDestroying?: boolean;
@@ -428,6 +476,22 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
   const [modelContext, setModelContext] = useState<ModelContext | null>(null);
   const [messages, setMessages] = useState<AppMessage[]>([]);
   const [displayMode, setDisplayMode] = useState<"inline" | "fullscreen">("inline");
+  const [appTools, setAppTools] = useState<Tool[]>([]);
+
+  const refreshAppTools = () => {
+    const appBridge = appBridgeRef.current;
+    if (!appBridge) return;
+    listViewTools(appBridge).then(setAppTools, (err) => log.warn("Listing View tools failed:", err));
+  };
+
+  // A View registering several tools at once (e.g. 5 in a row) triggers one
+  // `webmcptoolschange` per tool: coalesce the burst into a single refresh.
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const scheduleRefreshAppTools = () => {
+    clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(refreshAppTools, 100);
+  };
+  useEffect(() => () => clearTimeout(refreshTimerRef.current), []);
 
   useEffect(() => {
     const iframe = iframeRef.current!;
@@ -445,13 +509,14 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
             onContextUpdate: setModelContext,
             onMessage: (msg) => setMessages((prev) => [...prev, msg]),
             onDisplayModeChange: setDisplayMode,
+            onAppToolsChanged: scheduleRefreshAppTools,
           }, {
             // Provide container dimensions - maxHeight for flexible sizing
             containerDimensions: { maxHeight: 6000 },
             displayMode: "inline",
           });
           appBridgeRef.current = appBridge;
-          initializeApp(iframe, appBridge, toolCallInfo);
+          initializeApp(iframe, appBridge, toolCallInfo).then(refreshAppTools);
         }
       });
     });
@@ -527,6 +592,12 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
       )}
       {modelContext && (
         <CollapsiblePanel icon="📋" label="Model Context" content={fullContext} />
+      )}
+      {appTools.length > 0 && (
+        <AppToolsPanel
+          tools={appTools}
+          onCall={(name, args) => appBridgeRef.current!.callWebMcpTool({ name, arguments: args })}
+        />
       )}
     </div>
   );

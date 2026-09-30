@@ -41,3 +41,12 @@ Host (port 8080)
 - Messages flow through the outer iframe which validates and relays them bidirectionally
 
 This architecture ensures that even if tool UI code is malicious, it cannot access the host application's DOM, cookies, or JavaScript context.
+
+## App tools (WebMCP)
+
+Views can register tools with [WebMCP](https://webmachinelearning.github.io/webmcp/) (`document.modelContext.registerTool()`). The host lists them in an "App tools (WebMCP)" panel, where they can be called with JSON input.
+
+- `AppBridge.sendSandboxResourceReady()` prepends a WebMCP polyfill to the View HTML by default (a native `document.modelContext` is left untouched), so the sandbox proxy injects nothing. For native WebMCP, `loadSandboxProxy` also delegates the `tools` permissions policy to the sandbox iframe (`allow="tools"`).
+- The host reaches the tools with `appBridge.listWebMcpTools()` / `appBridge.callWebMcpTool()`, which send the reserved sandbox messages `ui/sandbox-list-tools` / `ui/sandbox-call-tool`. The panel refreshes (debounced) on `appBridge.onwebmcptoolschange` (`ui/notifications/sandbox-tools-changed`).
+- Only the sandbox proxy is same-origin with the View, so it reads the tools: `createModelContextRelay()` (from `@modelcontextprotocol/ext-apps/app-bridge`) answers those reserved requests in `sandbox.ts` via `handleHostMessage()` (they are not forwarded to the View), and `handleViewMessage()` lets it start watching the View's tools once the View has initialized.
+- `tools/list` / `tools/call` (`appBridge.listTools()` / `callTool()`, deprecated) still go straight to the View, which only answers them if it handles them itself.

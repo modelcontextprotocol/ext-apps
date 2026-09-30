@@ -170,11 +170,13 @@ export function loadSandboxProxy(
 
   iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
 
-  // Set Permission Policy allow attribute based on requested permissions
-  const allowAttribute = buildAllowAttribute(permissions);
-  if (allowAttribute) {
-    iframe.setAttribute("allow", allowAttribute);
-  }
+  // Set Permission Policy allow attribute based on requested permissions, plus
+  // `tools`: in a browser with native WebMCP, the View's `document.modelContext`
+  // only works in nested cross-origin frames if the policy is delegated.
+  const allowAttribute = [buildAllowAttribute(permissions), "tools"]
+    .filter(Boolean)
+    .join("; ");
+  iframe.setAttribute("allow", allowAttribute);
 
   const readyNotification: McpUiSandboxProxyReadyNotification["method"] =
     "ui/notifications/sandbox-proxy-ready";
@@ -248,6 +250,17 @@ export async function initializeApp(
 }
 
 /**
+ * Lists the tools the View registered with WebMCP (`document.modelContext`).
+ * The sandbox proxy answers from the View's document, so the View does not need
+ * to declare anything.
+ */
+export async function listViewTools(appBridge: AppBridge): Promise<Tool[]> {
+  const { tools } = await appBridge.listWebMcpTools({});
+  log.info("View tools (WebMCP):", tools.map((tool) => tool.name));
+  return tools;
+}
+
+/**
  * Hooks into `AppBridge.oninitialized` and returns a Promise that resolves when
  * the MCP App is initialized (i.e., when the inner iframe is ready).
  */
@@ -270,6 +283,7 @@ export interface AppBridgeCallbacks {
   onContextUpdate?: (context: ModelContext | null) => void;
   onMessage?: (message: AppMessage) => void;
   onDisplayModeChange?: (mode: "inline" | "fullscreen") => void;
+  onAppToolsChanged?: () => void;
 }
 
 export interface AppBridgeOptions {
@@ -346,6 +360,11 @@ export function newAppBridge(
     log.info("Open link request:", params);
     window.open(params.url, "_blank", "noopener,noreferrer");
     return {};
+  };
+
+  appBridge.onwebmcptoolschange = () => {
+    log.info("View tools (WebMCP) changed");
+    callbacks?.onAppToolsChanged?.();
   };
 
   appBridge.onloggingmessage = (params) => {
