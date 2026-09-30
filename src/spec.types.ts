@@ -259,6 +259,50 @@ export interface McpUiSandboxResourceReadyNotification {
 }
 
 /**
+ * @description Request (Host -> Sandbox proxy) for the tools the View exposes
+ * through WebMCP (`document.modelContext`). Answered by the Sandbox proxy, not
+ * forwarded to the View. The result is a `ListToolsResult`.
+ * @internal
+ * @see {@link app-bridge!AppBridge.listWebMcpTools `AppBridge.listWebMcpTools`} for the method that sends this request
+ */
+export interface McpUiSandboxListToolsRequest {
+  method: "ui/sandbox-list-tools";
+  params?: {
+    /** @description Pagination cursor from a previous result. */
+    cursor?: string;
+  };
+}
+
+/**
+ * @description Request (Host -> Sandbox proxy) to call a tool the View exposes
+ * through WebMCP. Answered by the Sandbox proxy, not forwarded to the View. The
+ * result is a `CallToolResult`: `content` is empty and `structuredContent` is
+ * the value the tool returned.
+ * @internal
+ * @see {@link app-bridge!AppBridge.callWebMcpTool `AppBridge.callWebMcpTool`} for the method that sends this request
+ */
+export interface McpUiSandboxCallToolRequest {
+  method: "ui/sandbox-call-tool";
+  params: {
+    /** @description Name of the tool to call. */
+    name: string;
+    /** @description Arguments of the call. */
+    arguments?: { [key: string]: unknown };
+  };
+}
+
+/**
+ * @description Notification (Sandbox proxy -> Host) that the tools the View
+ * exposes through WebMCP changed.
+ * @internal
+ * @see {@link app-bridge!AppBridge.onwebmcptoolschange `AppBridge.onwebmcptoolschange`}
+ */
+export interface McpUiSandboxToolsChangedNotification {
+  method: "ui/notifications/sandbox-tools-changed";
+  params?: {};
+}
+
+/**
  * @description Notification of UI size changes (View -> Host).
  * @see {@link app!App.sendSizeChanged `App.sendSizeChanged`} for the method to send this from View
  */
@@ -538,7 +582,11 @@ export interface McpUiHostCapabilities {
 export interface McpUiAppCapabilities {
   /** @description Experimental features keyed by identifier. */
   experimental?: Record<string, object>;
-  /** @description App exposes MCP-style tools that the host can call. */
+  /**
+   * @description App exposes MCP-style tools that the host can call.
+   * @deprecated Expose tools with WebMCP (`document.modelContext.registerTool()`)
+   *   instead. Hosts should not gate `tools/list` / `tools/call` on this capability.
+   */
   tools?: {
     /** @description App supports tools/list_changed notifications. */
     listChanged?: boolean;
@@ -819,6 +867,12 @@ export const SANDBOX_PROXY_READY_METHOD: McpUiSandboxProxyReadyNotification["met
   "ui/notifications/sandbox-proxy-ready";
 export const SANDBOX_RESOURCE_READY_METHOD: McpUiSandboxResourceReadyNotification["method"] =
   "ui/notifications/sandbox-resource-ready";
+export const SANDBOX_LIST_TOOLS_METHOD: McpUiSandboxListToolsRequest["method"] =
+  "ui/sandbox-list-tools";
+export const SANDBOX_CALL_TOOL_METHOD: McpUiSandboxCallToolRequest["method"] =
+  "ui/sandbox-call-tool";
+export const SANDBOX_TOOLS_CHANGED_METHOD: McpUiSandboxToolsChangedNotification["method"] =
+  "ui/notifications/sandbox-tools-changed";
 export const SIZE_CHANGED_METHOD: McpUiSizeChangedNotification["method"] =
   "ui/notifications/size-changed";
 export const TOOL_INPUT_METHOD: McpUiToolInputNotification["method"] =

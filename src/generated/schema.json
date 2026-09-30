@@ -4391,6 +4391,59 @@
       },
       "additionalProperties": {}
     },
+    "McpUiSandboxCallToolRequest": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/sandbox-call-tool"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the tool to call."
+            },
+            "arguments": {
+              "description": "Arguments of the call.",
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiSandboxListToolsRequest": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/sandbox-list-tools"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "cursor": {
+              "description": "Pagination cursor from a previous result.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["method"],
+      "additionalProperties": false
+    },
     "McpUiSandboxProxyReadyNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4499,6 +4552,23 @@
         }
       },
       "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiSandboxToolsChangedNotification": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/notifications/sandbox-tools-changed"
+        },
+        "params": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      "required": ["method"],
       "additionalProperties": false
     },
     "McpUiSizeChangedNotification": {
