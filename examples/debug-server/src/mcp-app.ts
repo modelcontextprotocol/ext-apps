@@ -45,8 +45,8 @@ const CALLBACKS = [
   "ontoolcancelled",
   "onhostcontextchanged",
   "onteardown",
-  "oncalltool",
-  "onlisttools",
+  "webmcp-execute",
+  "webmcp-toolchange",
   "onerror",
 ] as const;
 
@@ -200,7 +200,11 @@ function renderCallbackStatus(): void {
   callbackTableBodyEl.innerHTML = CALLBACKS.map((name) => {
     const count = state.callbackCounts.get(name) ?? 0;
     const lastPayload = state.lastPayloads.get(name);
-    const registered = name !== "onerror"; // All callbacks are registered
+    // All callbacks are registered, except that the WebMCP events need
+    // `document.modelContext`.
+    const registered = name.startsWith("webmcp-")
+      ? document.modelContext !== undefined
+      : name !== "onerror";
 
     return `
       <tr>
@@ -347,7 +351,7 @@ function handleHostContextChanged(ctx: McpUiHostContext): void {
 
 const app = new App(
   { name: "Debug App", version: "1.0.0" },
-  { tools: { listChanged: true } }, // Declare tools capability for oncalltool/onlisttools
+  {}, // Tools are exposed through document.modelContext (WebMCP), not app capabilities
   { autoResize: false }, // We'll manage auto-resize ourselves for toggle demo
 );
 
@@ -378,21 +382,69 @@ app.onteardown = async (params) => {
   return {};
 };
 
-app.oncalltool = async (params) => {
-  logEvent("oncalltool", params);
-  return {
-    content: [{ type: "text", text: "App handled tool call" }],
-  };
-};
-
-app.onlisttools = async (params) => {
-  logEvent("onlisttools", params);
-  return { tools: [] };
-};
-
 app.onerror = (error) => {
   logEvent("onerror", error);
 };
+
+// ============================================================================
+// WebMCP Tools (tools exposed by the View)
+// ============================================================================
+
+/**
+ * Expose a couple of demo tools to the host with WebMCP. The host provides
+ * `document.modelContext` (AppBridge injects a polyfill by default) and reads
+ * the tools from there; `execute()` return values reach it as
+ * `structuredContent`, a throw as `isError: true`.
+ */
+function registerWebMcpTools(): void {
+  const modelContext = document.modelContext;
+  if (!modelContext) {
+    logEvent("webmcp-unavailable", {
+      reason: "document.modelContext is not defined",
+    });
+    return;
+  }
+
+  // Listen before registering so the registrations below are logged too.
+  modelContext.addEventListener("toolchange", async () => {
+    try {
+      const tools = await modelContext.getTools();
+      logEvent("webmcp-toolchange", { tools: tools.map((t) => t.name) });
+    } catch (e) {
+      logEvent("error", e);
+    }
+  });
+
+  modelContext
+    .registerTool({
+      name: "view-echo",
+      title: "Echo (View)",
+      description: "Echo a message back with a timestamp.",
+      inputSchema: {
+        type: "object",
+        properties: { message: { type: "string" } },
+        required: ["message"],
+      },
+      annotations: { readOnlyHint: true },
+      execute: ({ message }) => {
+        logEvent("webmcp-execute", { name: "view-echo", input: { message } });
+        return { message, receivedAt: new Date().toISOString() };
+      },
+    })
+    .catch((e) => logEvent("error", e));
+
+  modelContext
+    .registerTool({
+      name: "view-fail",
+      title: "Fail (View)",
+      description: "Always throws, to show how errors reach the host.",
+      execute: (input) => {
+        logEvent("webmcp-execute", { name: "view-fail", input });
+        throw new Error("view-fail always fails");
+      },
+    })
+    .catch((e) => logEvent("error", e));
+}
 
 // ============================================================================
 // Section Collapsing
@@ -624,6 +676,8 @@ app
   .connect()
   .then(() => {
     logEvent("connected", { success: true });
+
+    registerWebMcpTools();
 
     const ctx = app.getHostContext();
     if (ctx) {

@@ -53,6 +53,7 @@
     "express": "^5.1.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
-    "vite-plugin-singlefile": "^2.3.0"
+    "vite-plugin-singlefile": "^2.3.0",
+    "webmcp-types": "0.1.10"
   }
 }

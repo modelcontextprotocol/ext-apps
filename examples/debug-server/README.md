@@ -22,6 +22,10 @@ Configurable tool for testing all result variations:
 
 App-only tool (hidden from model) for polling server state. Returns current timestamp and call counter.
 
+### View tools (WebMCP)
+
+The View exposes two demo tools to the host through WebMCP (`document.modelContext.registerTool()`): `view-echo` (read-only, echoes a message) and `view-fail` (always throws, to show how errors reach the host). Each `execute()` call is logged as `webmcp-execute` and each `toolchange` event as `webmcp-toolchange`; if the host provides no `document.modelContext`, a `webmcp-unavailable` event is logged instead.
+
 ## App UI
 
 The debug app provides a dashboard with:

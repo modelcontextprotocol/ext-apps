@@ -175,7 +175,7 @@ function McpAppWrapper() {
 
   const { app, error } = useApp({
     appInfo: { name: "Three.js View", version: "1.0.0" },
-    capabilities: { tools: {} },
+    capabilities: {},
     onAppCreated: (app) => {
       appRef.current = app;
 

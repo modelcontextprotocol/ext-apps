@@ -12,6 +12,7 @@ Chart.register(...registerables);
 
 const log = {
   info: console.log.bind(console, "[APP]"),
+  warn: console.warn.bind(console, "[APP]"),
   error: console.error.bind(console, "[APP]"),
 };
 
@@ -627,22 +628,33 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
 
 app.onhostcontextchanged = handleHostContextChanged;
 
-// Register tools for model interaction
-app.registerTool(
-  "get-allocations",
-  {
-    title: "Get Budget Allocations",
-    description:
-      "Get the current budget allocations including total budget, percentages, and amounts per category",
-  },
-  async () => {
+// ---------------------------------------------------------------------------
+// WebMCP tools (model interaction)
+// ---------------------------------------------------------------------------
+
+/**
+ * Register a tool via WebMCP (`document.modelContext`). The Host backfills
+ * `document.modelContext` into the View; without it, tools are simply skipped.
+ */
+function registerTool(tool: WebMCP.ModelContextTool): void {
+  if (!document.modelContext) {
+    log.warn(`document.modelContext unavailable; not registering ${tool.name}`);
+    return;
+  }
+  document.modelContext.registerTool(tool).catch((err) => {
+    log.warn(`Failed to register tool ${tool.name}:`, err);
+  });
+}
+
+registerTool({
+  name: "get-allocations",
+  title: "Get Budget Allocations",
+  description:
+    "Get the current budget allocations including total budget, percentages, and amounts per category",
+  annotations: { readOnlyHint: true },
+  async execute() {
     if (!state.config) {
-      return {
-        content: [
-          { type: "text" as const, text: "Error: Configuration not loaded" },
-        ],
-        isError: true,
-      };
+      throw new Error("Configuration not loaded");
     }
 
     const allocations: Record<string, { percent: number; amount: number }> = {};
@@ -654,7 +666,7 @@ app.registerTool(
       };
     }
 
-    const result = {
+    return {
       totalBudget: state.totalBudget,
       currency: state.config.currency,
       currencySymbol: state.config.currencySymbol,
@@ -666,57 +678,36 @@ app.registerTool(
         color: c.color,
       })),
     };
-
-    return {
-      content: [
-        { type: "text" as const, text: JSON.stringify(result, null, 2) },
-      ],
-      structuredContent: result,
-    };
   },
-);
+});
 
-app.registerTool(
-  "set-allocation",
-  {
-    title: "Set Category Allocation",
-    description: "Set the allocation percentage for a specific budget category",
-    inputSchema: z.object({
-      categoryId: z
-        .string()
-        .describe(
-          "Category ID (e.g., 'marketing', 'engineering', 'operations', 'sales', 'rd')",
-        ),
-      percent: z
-        .number()
-        .min(0)
-        .max(100)
-        .describe("Allocation percentage (0-100)"),
-    }),
-  },
-  async (args) => {
+const SetAllocationInput = z.object({
+  categoryId: z
+    .string()
+    .describe(
+      "Category ID (e.g., 'marketing', 'engineering', 'operations', 'sales', 'rd')",
+    ),
+  percent: z.number().min(0).max(100).describe("Allocation percentage (0-100)"),
+});
+
+registerTool({
+  name: "set-allocation",
+  title: "Set Category Allocation",
+  description: "Set the allocation percentage for a specific budget category",
+  inputSchema: z.toJSONSchema(SetAllocationInput),
+  async execute(input) {
+    const args = SetAllocationInput.parse(input);
     if (!state.config) {
-      return {
-        content: [
-          { type: "text" as const, text: "Error: Configuration not loaded" },
-        ],
-        isError: true,
-      };
+      throw new Error("Configuration not loaded");
     }
 
     const category = state.config.categories.find(
       (c) => c.id === args.categoryId,
     );
     if (!category) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: Category "${args.categoryId}" not found. Available: ${state.config.categories.map((c) => c.id).join(", ")}`,
-          },
-        ],
-        isError: true,
-      };
+      throw new Error(
+        `Category "${args.categoryId}" not found. Available: ${state.config.categories.map((c) => c.id).join(", ")}`,
+      );
     }
 
     handleSliderChange(args.categoryId, args.percent);
@@ -731,33 +722,24 @@ app.registerTool(
 
     const amount = (args.percent / 100) * state.totalBudget;
     return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Set ${category.name} allocation to ${args.percent.toFixed(1)}% (${state.config.currencySymbol}${amount.toLocaleString()})`,
-        },
-      ],
+      message: `Set ${category.name} allocation to ${args.percent.toFixed(1)}% (${state.config.currencySymbol}${amount.toLocaleString()})`,
     };
   },
-);
+});
 
-app.registerTool(
-  "set-total-budget",
-  {
-    title: "Set Total Budget",
-    description: "Set the total budget amount",
-    inputSchema: z.object({
-      amount: z.number().positive().describe("Total budget amount"),
-    }),
-  },
-  async (args) => {
+const SetTotalBudgetInput = z.object({
+  amount: z.number().positive().describe("Total budget amount"),
+});
+
+registerTool({
+  name: "set-total-budget",
+  title: "Set Total Budget",
+  description: "Set the total budget amount",
+  inputSchema: z.toJSONSchema(SetTotalBudgetInput),
+  async execute(input) {
+    const args = SetTotalBudgetInput.parse(input);
     if (!state.config) {
-      return {
-        content: [
-          { type: "text" as const, text: "Error: Configuration not loaded" },
-        ],
-        isError: true,
-      };
+      throw new Error("Configuration not loaded");
     }
 
     state.totalBudget = args.amount;
@@ -780,46 +762,31 @@ app.registerTool(
     updateComparisonSummary();
 
     return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Total budget set to ${state.config.currencySymbol}${args.amount.toLocaleString()}`,
-        },
-      ],
+      message: `Total budget set to ${state.config.currencySymbol}${args.amount.toLocaleString()}`,
     };
   },
-);
+});
 
-app.registerTool(
-  "set-company-stage",
-  {
-    title: "Set Company Stage",
-    description:
-      "Set the company stage for benchmark comparison (e.g., 'Seed', 'Series A', 'Series B', 'Growth')",
-    inputSchema: z.object({
-      stage: z.string().describe("Company stage ID"),
-    }),
-  },
-  async (args) => {
+const SetCompanyStageInput = z.object({
+  stage: z.string().describe("Company stage ID"),
+});
+
+registerTool({
+  name: "set-company-stage",
+  title: "Set Company Stage",
+  description:
+    "Set the company stage for benchmark comparison (e.g., 'Seed', 'Series A', 'Series B', 'Growth')",
+  inputSchema: z.toJSONSchema(SetCompanyStageInput),
+  async execute(input) {
+    const args = SetCompanyStageInput.parse(input);
     if (!state.analytics) {
-      return {
-        content: [
-          { type: "text" as const, text: "Error: Analytics not loaded" },
-        ],
-        isError: true,
-      };
+      throw new Error("Analytics not loaded");
     }
 
     if (!state.analytics.stages.includes(args.stage)) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: Stage "${args.stage}" not found. Available: ${state.analytics.stages.join(", ")}`,
-          },
-        ],
-        isError: true,
-      };
+      throw new Error(
+        `Stage "${args.stage}" not found. Available: ${state.analytics.stages.join(", ")}`,
+      );
     }
 
     state.selectedStage = args.stage;
@@ -840,45 +807,26 @@ app.registerTool(
       updateComparisonSummary();
     }
 
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Company stage set to "${args.stage}"`,
-        },
-      ],
-    };
+    return { message: `Company stage set to "${args.stage}"` };
   },
-);
+});
 
-app.registerTool(
-  "get-benchmark-comparison",
-  {
-    title: "Get Benchmark Comparison",
-    description:
-      "Compare current allocations against industry benchmarks for the selected stage",
-  },
-  async () => {
+registerTool({
+  name: "get-benchmark-comparison",
+  title: "Get Benchmark Comparison",
+  description:
+    "Compare current allocations against industry benchmarks for the selected stage",
+  annotations: { readOnlyHint: true },
+  async execute() {
     if (!state.config || !state.analytics) {
-      return {
-        content: [{ type: "text" as const, text: "Error: Data not loaded" }],
-        isError: true,
-      };
+      throw new Error("Data not loaded");
     }
 
     const benchmark = state.analytics.benchmarks.find(
       (b) => b.stage === state.selectedStage,
     );
     if (!benchmark) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: No benchmark data for stage "${state.selectedStage}"`,
-          },
-        ],
-        isError: true,
-      };
+      throw new Error(`No benchmark data for stage "${state.selectedStage}"`);
     }
 
     const comparison: Record<
@@ -902,19 +850,9 @@ app.registerTool(
       };
     }
 
-    const result = {
-      stage: state.selectedStage,
-      comparison,
-    };
-
-    return {
-      content: [
-        { type: "text" as const, text: JSON.stringify(result, null, 2) },
-      ],
-      structuredContent: result,
-    };
+    return { stage: state.selectedStage, comparison };
   },
-);
+});
 
 // Handle theme changes
 window
