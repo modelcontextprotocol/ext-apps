@@ -20,6 +20,7 @@ const config = {
     "docs/csp-cors.md",
     "docs/migrate_from_openai_apps.md",
     "docs/migrate-to-2.md",
+    "docs/migrate-to-3.md",
   ],
   entryPoints: [
     "src/server/index.ts",
