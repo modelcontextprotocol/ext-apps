@@ -1,0 +1,16 @@
+<div
+  class="collapsible-panel"
+  (click)="toggle()"
+  [title]="expanded() ? 'Click to collapse' : 'Click to expand'"
+>
+  <div class="collapsible-header">
+    <span class="collapsible-label">{{ icon() }} {{ label() }}</span>
+    <span class="collapsible-size">{{ displayBadge() }}</span>
+    <span class="collapsible-toggle">{{ expanded() ? '▼' : '▶' }}</span>
+  </div>
+  @if (expanded()) {
+    <pre class="collapsible-full">{{ content() }}</pre>
+  } @else {
+    <div class="collapsible-preview">{{ preview() }}</div>
+  }
+</div>

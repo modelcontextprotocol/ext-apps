@@ -1,0 +1,48 @@
+<div class="call-tool-panel">
+  <form (ngSubmit)="submit()">
+    <label>
+      Server
+      @if (servers().length === 0) {
+        <select disabled>
+          <option>Loading...</option>
+        </select>
+      } @else {
+        <select
+          [value]="selectedServerIndex()"
+          (change)="onServerChange($any($event.target).value)"
+        >
+          @for (server of servers(); track server.name; let i = $index) {
+            <option [value]="i">{{ server.name }}</option>
+          }
+        </select>
+      }
+    </label>
+
+    <label>
+      Tool
+      <select
+        class="tool-select"
+        [value]="selectedTool()"
+        (change)="onToolChange($any($event.target).value)"
+      >
+        @for (name of toolNames(); track name) {
+          <option [value]="name">{{ name }}</option>
+        }
+      </select>
+    </label>
+
+    <label>
+      Input
+      <textarea
+        class="tool-input"
+        [attr.aria-invalid]="!isValidJson() || null"
+        [value]="inputJson()"
+        (input)="inputJson.set($any($event.target).value)"
+      ></textarea>
+    </label>
+
+    <button type="submit" [disabled]="!selectedTool() || !isValidJson()">
+      Call Tool
+    </button>
+  </form>
+</div>
