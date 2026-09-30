@@ -161,14 +161,15 @@ _Tool input:_
 
 ## Mouse & Touch Interaction
 
-The `iMouse` uniform provides interactive input, compatible with the official Shadertoy specification:
+The `iMouse` uniform provides interactive input, fully compatible with the official Shadertoy specification:
 
-| Component   | When Button Down       | After Release    | Never Clicked |
-| ----------- | ---------------------- | ---------------- | ------------- |
-| `iMouse.xy` | Current position       | Last position    | `(0, 0)`      |
-| `iMouse.zw` | Click start (positive) | Negated (-x, -y) | `(0, 0)`      |
+| Component   | Just Clicked (frame 1) | Held Down (frame 2+) | After Release | Never Clicked |
+| ----------- | ---------------------- | -------------------- | ------------- | ------------- |
+| `iMouse.xy` | Click position         | Current position     | Last position | `(0, 0)`      |
+| `iMouse.z`  | `+clickX`              | `+clickX`            | `-clickX`     | `0`           |
+| `iMouse.w`  | `+clickY`              | `-clickY`            | `-clickY`     | `0`           |
 
-**Detecting button state:**
+**Detecting button state (full compatibility):**
 
 ```glsl
 if (iMouse.z > 0.0) {
