@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP Apps Protocol Test</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 8px; font-size: 14px; }
+    h3 { margin: 8px 0; font-size: 16px; }
+    .log { background: #f5f5f5; padding: 8px; border-radius: 4px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
+    .log-entry { margin: 2px 0; padding: 2px 4px; border-radius: 2px; }
+    .log-in { background: #e3f2fd; }
+    .log-out { background: #e8f5e9; }
+    .log-error { background: #ffebee; color: #c62828; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+    button { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; }
+    button:hover { background: #f0f0f0; }
+    .status { padding: 4px 8px; border-radius: 4px; display: inline-block; margin: 4px 0; }
+    .status.connected { background: #c8e6c9; }
+    .status.disconnected { background: #ffcdd2; }
+    #state { background: #fff9c4; padding: 8px; border-radius: 4px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h3>MCP Apps Protocol Test</h3>
+
+  <div id="connection-status" class="status disconnected">Disconnected</div>
+
+  <div id="state">
+    <strong>State:</strong>
+    <div>Host: <span id="host-info">-</span></div>
+    <div>Tool Input: <span id="tool-input">-</span></div>
+    <div>Tool Result: <span id="tool-result">-</span></div>
+  </div>
+
+  <div class="buttons">
+    <button onclick="sendSizeChanged()">Send Size</button>
+    <button onclick="sendMessage()">Send Message</button>
+    <button onclick="sendOpenLink()">Open Link</button>
+    <button onclick="sendLog()">Send Log</button>
+    <button onclick="callServerTool()">Call Tool</button>
+    <button onclick="clearLog()">Clear Log</button>
+  </div>
+
+  <h3>Protocol Log</h3>
+  <div id="log" class="log"></div>
+
+  <script>
+    // Test app state
+    const state = {
+      initialized: false,
+      hostInfo: null,
+      hostCapabilities: null,
+      toolInput: null,
+      toolResult: null,
+      requestId: 1000
+    };
+
+    const logEl = document.getElementById('log');
+    const statusEl = document.getElementById('connection-status');
+
+    function log(direction, msg) {
+      const entry = document.createElement('div');
+      entry.className = 'log-entry log-' + direction;
+      entry.textContent = `[${direction.toUpperCase()}] ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(`[TestApp:${direction}]`, msg);
+    }
+
+    function clearLog() {
+      logEl.innerHTML = '';
+    }
+
+    function updateState() {
+      document.getElementById('host-info').textContent = state.hostInfo ? JSON.stringify(state.hostInfo) : '-';
+      document.getElementById('tool-input').textContent = state.toolInput ? JSON.stringify(state.toolInput) : '-';
+      document.getElementById('tool-result').textContent = state.toolResult ? JSON.stringify(state.toolResult).slice(0, 100) : '-';
+    }
+
+    // Send message to host via Android bridge
+    function sendToHost(msg) {
+      log('out', msg);
+      if (window.mcpBridge && window.mcpBridge.receiveMessage) {
+        window.mcpBridge.receiveMessage(JSON.stringify(msg));
+      } else {
+        log('error', 'mcpBridge not available');
+      }
+    }
+
+    // Generate next request ID
+    function nextId() {
+      return state.requestId++;
+    }
+
+    // Protocol: Send ui/initialize request
+    function sendInitialize() {
+      const msg = {
+        jsonrpc: '2.0',
+        id: nextId(),
+        method: 'ui/initialize',
+        params: {
+          protocolVersion: '2025-11-21',
+          appInfo: { name: 'TestApp', version: '1.0.0' },
+          appCapabilities: {}
+        }
+      };
+      sendToHost(msg);
+    }
+
+    // Protocol: Send initialized notification
+    function sendInitialized() {
+      const msg = {
+        jsonrpc: '2.0',
+        method: 'ui/notifications/initialized',
+        params: {}
+      };
+      sendToHost(msg);
+    }
+
+    // Test: Send size changed notification
+    function sendSizeChanged() {
+      const msg = {
+        jsonrpc: '2.0',
+        method: 'ui/notifications/size-changed',
+        params: { width: 300, height: 400 }
+      };
+      sendToHost(msg);
+    }
+
+    // Test: Send message request
+    function sendMessage() {
+      const msg = {
+        jsonrpc: '2.0',
+        id: nextId(),
+        method: 'ui/message',
+        params: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Hello from TestApp!' }]
+        }
+      };
+      sendToHost(msg);
+    }
+
+    // Test: Send open-link request
+    function sendOpenLink() {
+      const msg = {
+        jsonrpc: '2.0',
+        id: nextId(),
+        method: 'ui/open-link',
+        params: { url: 'https://example.com' }
+      };
+      sendToHost(msg);
+    }
+
+    // Test: Send log notification
+    function sendLog() {
+      const msg = {
+        jsonrpc: '2.0',
+        method: 'notifications/message',
+        params: {
+          level: 'info',
+          data: 'Test log message from app'
+        }
+      };
+      sendToHost(msg);
+    }
+
+    // Test: Call a server tool
+    function callServerTool() {
+      const msg = {
+        jsonrpc: '2.0',
+        id: nextId(),
+        method: 'tools/call',
+        params: {
+          name: 'get_time',
+          arguments: {}
+        }
+      };
+      sendToHost(msg);
+    }
+
+    // Handle incoming messages from host
+    function handleMessage(data) {
+      log('in', data);
+
+      // Handle JSON-RPC response (has result or error, no method)
+      if (data.result !== undefined && data.method === undefined) {
+        // This is a response to our request
+        if (data.id === state.initializeRequestId) {
+          // Initialize response
+          state.hostInfo = data.result.hostInfo;
+          state.hostCapabilities = data.result.hostCapabilities;
+          state.initialized = true;
+          statusEl.textContent = 'Connected';
+          statusEl.className = 'status connected';
+          updateState();
+          // Send initialized notification
+          sendInitialized();
+        }
+        return;
+      }
+
+      // Handle notifications and requests
+      const method = data.method;
+      const params = data.params || {};
+      const id = data.id;
+
+      switch (method) {
+        case 'ui/notifications/tool-input':
+          state.toolInput = params.arguments;
+          updateState();
+          break;
+
+        case 'ui/notifications/tool-result':
+          state.toolResult = params;
+          updateState();
+          break;
+
+        case 'ui/notifications/tool-cancelled':
+          log('in', 'Tool cancelled: ' + (params.reason || 'no reason'));
+          break;
+
+        case 'ui/notifications/host-context-changed':
+          log('in', 'Host context changed: ' + JSON.stringify(params));
+          break;
+
+        case 'ui/resource-teardown':
+          // Respond to teardown request
+          log('in', 'Teardown requested, performing cleanup...');
+          setTimeout(() => {
+            const response = { jsonrpc: '2.0', id: id, result: {} };
+            sendToHost(response);
+          }, 100); // Simulate brief cleanup
+          break;
+
+        default:
+          log('error', 'Unknown method: ' + method);
+      }
+    }
+
+    // Listen for messages from host (dispatched via MessageEvent)
+    window.addEventListener('message', (event) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        handleMessage(data);
+      } catch (e) {
+        log('error', 'Failed to parse message: ' + e.message);
+      }
+    });
+
+    // Start initialization when the page loads
+    window.onload = function() {
+      log('out', 'TestApp loaded, sending initialize...');
+      state.initializeRequestId = nextId();
+      const msg = {
+        jsonrpc: '2.0',
+        id: state.initializeRequestId,
+        method: 'ui/initialize',
+        params: {
+          protocolVersion: '2025-11-21',
+          appInfo: { name: 'TestApp', version: '1.0.0' },
+          appCapabilities: {}
+        }
+      };
+      sendToHost(msg);
+    };
+  </script>
+</body>
+</html>
