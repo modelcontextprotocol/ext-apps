@@ -429,3 +429,4 @@ Configure `SERVERS` with a JSON array of your server URLs (default: `http://loca
 3. `ontoolinput` handler fires with tool arguments
 4. `ontoolresult` handler fires with tool result
 5. Host styling (theme, fonts, colors) applies correctly
+6. Optionally, `npx mcp-app-lint --dir . --format text` reports no errors for the declared CSP

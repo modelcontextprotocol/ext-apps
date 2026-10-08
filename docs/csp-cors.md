@@ -62,3 +62,18 @@ Note that `_meta.ui.csp` and `_meta.ui.domain` are set in the `contents[]` objec
 
 > [!NOTE]
 > For full examples that configures CSP, see: [`examples/sheet-music-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/sheet-music-server) (`connectDomains`) and [`examples/map-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/map-server) (`connectDomains` and `resourceDomains`).
+
+## Check the policy before publishing
+
+The host enforces the CSP the server declares, so a mistake in it either breaks the App or widens what script running in it can reach:
+
+- **Every origin the App uses is declared.** Missing origins fail silently in the sandboxed iframe. An App that loads nothing from the network needs no `csp` at all: the host's restrictive default fits it.
+- **No `*` or scheme-only entries** such as `https:`. The specification describes origins, optionally with a subdomain wildcard. Hosts may drop other values, and where they apply them, they allow every host, so the App can send what it holds anywhere.
+- **Wildcards stay narrow.** `https://*.example.com` allows every subdomain. On a shared service (cloud storage, tunnels, serverless hosting) that includes hosts anyone can create.
+- **Development origins stay in development builds.** Drive the `localhost` entry and the runtime URL from the same setting, so the published metadata does not carry it.
+
+[`mcp-app-lint`](https://www.npmjs.com/package/mcp-app-lint) (a third-party MIT tool) checks the declared entries statically over a server's source or build, and can report to GitHub code scanning in CI:
+
+```bash
+npx mcp-app-lint --dir . --format text
+```
