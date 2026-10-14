@@ -13,6 +13,7 @@ import {
   type ListResourcesResult,
   type ListToolsRequest,
   type ListToolsResult,
+  type LoggingLevel,
   type LoggingMessageNotification,
   type ReadResourceRequest,
   type ReadResourceResult,
@@ -110,7 +111,10 @@ export type {
   StandardSchemaWithJSON,
 } from "./standard-schema.js";
 
-export { PostMessageTransport } from "./message-transport.js";
+export {
+  PostMessageTransport,
+  type PostMessageTransportOptions,
+} from "./message-transport.js";
 export * from "./types.js";
 export {
   applyHostStyleVariables,
@@ -164,6 +168,15 @@ export type AppOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
    * @default false
    */
   allowUnsafeEval?: boolean;
+  /**
+   * Console log level of the {@link PostMessageTransport `PostMessageTransport`}
+   * that {@link App.connect `connect`} creates when called without a
+   * transport. A transport you pass in keeps its own setting.
+   *
+   * @see {@link PostMessageTransportOptions.logLevel `PostMessageTransportOptions.logLevel`}
+   * @default "warning"
+   */
+  logLevel?: LoggingLevel;
 };
 
 type RequestHandlerExtra = BaseContext;
@@ -2002,6 +2015,7 @@ export class App extends Protocol<BaseContext> {
     transport: Transport = new PostMessageTransport(
       window.parent,
       window.parent,
+      { logLevel: this.options?.logLevel },
     ),
     options?: RequestOptions,
   ): Promise<void> {

@@ -36,6 +36,17 @@ async function PostMessageTransport_host(bridge: AppBridge) {
 }
 
 /**
+ * Example: Logging message traffic while debugging.
+ */
+function PostMessageTransport_logLevel() {
+  //#region PostMessageTransport_logLevel
+  const transport = new PostMessageTransport(window.parent, window.parent, {
+    logLevel: "debug",
+  });
+  //#endregion PostMessageTransport_logLevel
+}
+
+/**
  * Example: Creating transport for view (constructor only).
  */
 function PostMessageTransport_constructor_view() {

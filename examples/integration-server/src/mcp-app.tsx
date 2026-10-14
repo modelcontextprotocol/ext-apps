@@ -29,6 +29,8 @@ function GetTimeApp() {
   const { app, error } = useApp({
     appInfo: IMPLEMENTATION,
     capabilities: {},
+    // tests/e2e/security.spec.ts reads the transport's debug lines.
+    logLevel: "debug",
     onAppCreated: (app) => {
       app.onteardown = async () => {
         log.info("App is being torn down");

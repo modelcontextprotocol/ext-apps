@@ -20,7 +20,7 @@ export * from "../app.js";
  */
 export interface UseAppOptions extends Pick<
   AppOptions,
-  "autoResize" | "strict"
+  "autoResize" | "strict" | "logLevel"
 > {
   /** App identification (name and version) */
   appInfo: Implementation;
@@ -130,6 +130,7 @@ export function useApp({
   onAppCreated,
   autoResize = true,
   strict,
+  logLevel,
 }: UseAppOptions): AppState {
   const [app, setApp] = useState<App | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -144,6 +145,7 @@ export function useApp({
         const transport = new PostMessageTransport(
           window.parent,
           window.parent,
+          { logLevel },
         );
         appInstance = new App(appInfo, capabilities, { autoResize, strict });
 

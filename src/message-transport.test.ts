@@ -1,7 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import type { JSONRPCMessage } from "@modelcontextprotocol/client";
+import type {
+  JSONRPCMessage,
+  LoggingLevel,
+} from "@modelcontextprotocol/client";
 
-import { PostMessageTransport } from "./message-transport.js";
+import { App } from "./app.js";
+import {
+  PostMessageTransport,
+  type PostMessageTransportOptions,
+} from "./message-transport.js";
+import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types.js";
 
 /**
  * Minimal `window` stub for bun's DOM-less test environment.
@@ -53,8 +61,8 @@ describe("PostMessageTransport", () => {
   let targetPostMessage: ReturnType<typeof mock>;
   let eventTarget: { postMessage: typeof targetPostMessage };
 
-  // The transport logs liberally at debug/error level. Silence during tests
-  // so failures are readable; restore afterwards so we don't leak state.
+  // The transport logs at debug/error level. Silence during tests so failures
+  // are readable; restore afterwards so we don't leak state.
   let restoreConsole: () => void;
 
   beforeEach(() => {
@@ -84,10 +92,11 @@ describe("PostMessageTransport", () => {
   });
 
   /** Create and start a transport wired to the shared fakes. */
-  async function createStartedTransport() {
+  async function createStartedTransport(options?: PostMessageTransportOptions) {
     const transport = new PostMessageTransport(
       eventTarget as unknown as Window,
       trustedSource as MessageEventSource,
+      options,
     );
     await transport.start();
     return transport;
@@ -385,6 +394,116 @@ describe("PostMessageTransport", () => {
 
       await transportA.close();
       await transportB.close();
+    });
+  });
+
+  // ==========================================================================
+  // Logging — traffic is logged at "debug", below the default level.
+  // ==========================================================================
+
+  describe("logging", () => {
+    let debug: ReturnType<typeof mock>;
+    let error: ReturnType<typeof mock>;
+
+    beforeEach(() => {
+      debug = mock(() => {});
+      error = mock(() => {});
+      console.debug = debug;
+      console.error = error;
+    });
+
+    /** One send, plus one receive down each branch of the listener. */
+    async function exchangeTraffic(transport: PostMessageTransport) {
+      await transport.send(validRequest);
+      for (const event of [
+        { source: trustedSource, data: validRequest },
+        { source: untrustedSource, data: validRequest },
+        { source: trustedSource, data: "not JSON-RPC" },
+      ]) {
+        fakeWindow.dispatch("message", event);
+      }
+    }
+
+    function dispatchMalformed() {
+      fakeWindow.dispatch("message", {
+        source: trustedSource,
+        data: { jsonrpc: "2.0" },
+      });
+    }
+
+    it.each([
+      ["the default level", undefined],
+      ["an unrecognized level", "warn" as LoggingLevel],
+    ])(
+      "keeps message traffic out of the console at %s",
+      async (_, logLevel) => {
+        await exchangeTraffic(await createStartedTransport({ logLevel }));
+
+        expect(debug).not.toHaveBeenCalled();
+      },
+    );
+
+    it('logs message traffic at logLevel "debug"', async () => {
+      await exchangeTraffic(
+        await createStartedTransport({ logLevel: "debug" }),
+      );
+
+      expect(debug.mock.calls.map(([label]) => label)).toEqual([
+        "Sending message",
+        "Parsed message",
+        "Ignoring message from unknown source",
+        "Ignoring non-JSON-RPC message",
+      ]);
+    });
+
+    it('does not log tool-input-partial sends, even at "debug"', async () => {
+      const transport = await createStartedTransport({ logLevel: "debug" });
+
+      await transport.send({
+        jsonrpc: "2.0",
+        method: TOOL_INPUT_PARTIAL_METHOD,
+        params: { arguments: {} },
+      });
+
+      expect(debug).not.toHaveBeenCalled();
+      expect(targetPostMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [undefined, 1],
+      ["error", 1],
+      ["critical", 0],
+    ] as const)(
+      "at logLevel %p, logs a malformed message %p time(s) and still calls onerror",
+      async (logLevel, logged) => {
+        const transport = await createStartedTransport({ logLevel });
+        const errors: Error[] = [];
+        transport.onerror = (err) => errors.push(err);
+
+        dispatchMalformed();
+
+        expect(error).toHaveBeenCalledTimes(logged);
+        expect(errors).toHaveLength(1);
+      },
+    );
+
+    it("App.connect() creates its transport at the App's logLevel", async () => {
+      (fakeWindow as { parent?: unknown }).parent = eventTarget;
+      const app = new App(
+        { name: "test", version: "1.0.0" },
+        {},
+        { logLevel: "debug" },
+      );
+
+      const connecting = app.connect().catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await app.close();
+      await connecting;
+
+      expect(debug).toHaveBeenCalledWith(
+        "Sending message",
+        expect.objectContaining({ method: "ui/initialize" }),
+      );
     });
   });
 });
