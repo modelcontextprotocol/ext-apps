@@ -124,7 +124,9 @@ sandboxApp.get(["/", "/sandbox.html"], (req, res) => {
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
 
-  res.sendFile(join(DIRECTORY, "sandbox.html"));
+  // With `root`, only the relative path is checked for dotfiles. An absolute path would 404
+  // whenever any directory above DIRECTORY starts with a dot (e.g. `.cache/`).
+  res.sendFile("sandbox.html", { root: DIRECTORY });
 });
 
 sandboxApp.use((_req, res) => {
