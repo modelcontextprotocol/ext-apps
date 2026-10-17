@@ -41,6 +41,7 @@ import { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "../constants.js";
 import type {
   CallToolResult,
   ClientCapabilities,
+  Icon,
   InputRequiredResult,
   McpServer,
   ReadResourceResult,
@@ -103,6 +104,8 @@ export interface ToolConfig {
   inputSchema?: ZodRawShape | StandardSchemaWithJSON;
   outputSchema?: ZodRawShape | StandardSchemaWithJSON;
   annotations?: ToolAnnotations;
+  /** Icons a client can show for the tool, listed in `tools/list` as given. */
+  icons?: Icon[];
   _meta?: Record<string, unknown>;
 }
 
