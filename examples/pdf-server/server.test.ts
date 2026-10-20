@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { PDFDocument } from "@cantoo/pdf-lib";
@@ -17,6 +18,7 @@ import {
   allowedLocalFiles,
   allowedLocalDirs,
   pathToFileUrl,
+  fileUrlToPath,
   startFileWatch,
   stopFileWatch,
   cliLocalFiles,
@@ -762,6 +764,78 @@ describe("isAncestorDir", () => {
       true,
     );
   });
+});
+
+describe("fileUrlToPath", () => {
+  it("should drop the slash before a Windows drive letter", () => {
+    expect(fileUrlToPath("file:///C:/Users/test/file.pdf", "win32")).toBe(
+      "C:/Users/test/file.pdf",
+    );
+    expect(fileUrlToPath("file:///c:/", "win32")).toBe("c:/");
+    expect(fileUrlToPath("file:///D:", "win32")).toBe("D:");
+  });
+
+  it("should decode percent-encoding before checking for a drive letter", () => {
+    expect(fileUrlToPath("file:///C:/My%20Docs/a%23b.pdf", "win32")).toBe(
+      "C:/My Docs/a#b.pdf",
+    );
+    expect(fileUrlToPath("file:///C%3A/x.pdf", "win32")).toBe("C:/x.pdf");
+  });
+
+  it("should handle computer:// URLs the same way", () => {
+    expect(fileUrlToPath("computer:///C:/x.pdf", "win32")).toBe("C:/x.pdf");
+  });
+
+  it("should leave the URLs pathToFileUrl builds on Windows unchanged", () => {
+    // pathToFileUrl encodes the whole Windows path, drive letter included
+    expect(fileUrlToPath("file://C%3A%5CUsers%5Ctest", "win32")).toBe(
+      "C:\\Users\\test",
+    );
+  });
+
+  it("should leave POSIX paths unchanged", () => {
+    expect(fileUrlToPath("file:///tmp/x.pdf", "win32")).toBe("/tmp/x.pdf");
+    expect(fileUrlToPath("file:///tmp/x.pdf", "linux")).toBe("/tmp/x.pdf");
+    expect(fileUrlToPath("file:///C:/x", "darwin")).toBe("/C:/x");
+  });
+
+  it("should round-trip both node:url's pathToFileURL and pathToFileUrl", () => {
+    const file = path.resolve(import.meta.dirname, "server.ts");
+    expect(path.resolve(fileUrlToPath(pathToFileURL(file).href))).toBe(file);
+    expect(path.resolve(fileUrlToPath(pathToFileUrl(file)))).toBe(file);
+  });
+
+  it.skipIf(process.platform !== "win32")(
+    "should register a client root sent as a standard Windows file URL",
+    async () => {
+      const savedDirs = new Set(allowedLocalDirs);
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf-root-"));
+      const server = createServer({ useClientRoots: true });
+      const client = new Client(
+        { name: "t", version: "1" },
+        { capabilities: { roots: { listChanged: true } } },
+      );
+      client.setRequestHandler("roots/list", async () => ({
+        roots: [{ uri: pathToFileURL(dir).href }],
+      }));
+      const [ct, st] = InMemoryTransport.createLinkedPair();
+      try {
+        await Promise.all([server.connect(st), client.connect(ct)]);
+        // refreshRoots runs fire-and-forget from oninitialized
+        const deadline = Date.now() + 3000;
+        while (!allowedLocalDirs.has(dir) && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        expect(allowedLocalDirs.has(dir)).toBe(true);
+      } finally {
+        await client.close();
+        await server.close();
+        allowedLocalDirs.clear();
+        for (const d of savedDirs) allowedLocalDirs.add(d);
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });
 
 describe("createServer useClientRoots option", () => {
