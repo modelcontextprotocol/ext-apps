@@ -1658,6 +1658,8 @@ export class AppBridge extends Protocol<BaseContext> {
    * `ui/notifications/host-context-changed` notification containing only fields
    * that have been added or modified. If no fields have changed, no notification is sent.
    * The new context fully replaces the internal state.
+   * While disconnected, the context is saved for the next initialization handshake.
+   * Notification failures are reported through {@link onerror `onerror`}.
    *
    * Common use cases include notifying the view when:
    * - Theme changes (light/dark mode toggle)
@@ -1699,7 +1701,11 @@ export class AppBridge extends Protocol<BaseContext> {
     }
     if (hasChanges) {
       this._hostContext = hostContext;
-      this.sendHostContextChange(changes);
+      if (this.transport) {
+        Promise.resolve(this.sendHostContextChange(changes)).catch((error) => {
+          this.onerror?.(error);
+        });
+      }
     }
   }
 

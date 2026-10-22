@@ -71,6 +71,56 @@ describe("App <-> AppBridge integration", () => {
     await bridgeTransport.close();
   });
 
+  describe("host context lifecycle", () => {
+    it("retains context set before connection for the initialization handshake", async () => {
+      const errors: Error[] = [];
+      bridge.onerror = (error) => errors.push(error);
+
+      bridge.setHostContext({ theme: "dark", locale: "en-US" });
+      await flush();
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      expect(app.getHostContext()).toEqual({ theme: "dark", locale: "en-US" });
+      expect(errors).toEqual([]);
+    });
+
+    it("retains context set after disconnect for the next view", async () => {
+      const errors: Error[] = [];
+      bridge.onerror = (error) => errors.push(error);
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      await app.close();
+
+      bridge.setHostContext({ theme: "light" });
+      await flush();
+
+      [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+      app = new App(testAppInfo, {}, { autoResize: false });
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      expect(app.getHostContext()).toEqual({ theme: "light" });
+      expect(errors).toEqual([]);
+    });
+
+    it("reports a context notification send failure through onerror", async () => {
+      const errors: Error[] = [];
+      bridge.onerror = (error) => errors.push(error);
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      const failure = new Error("Context transport failed");
+      const send = spyOn(bridgeTransport, "send").mockRejectedValue(failure);
+      try {
+        bridge.setHostContext({ theme: "dark" });
+        await flush();
+        expect(errors).toEqual([failure]);
+      } finally {
+        send.mockRestore();
+      }
+    });
+  });
+
   describe("initialization handshake", () => {
     it("App.connect() triggers bridge.oninitialized", async () => {
       let initializedFired = false;
