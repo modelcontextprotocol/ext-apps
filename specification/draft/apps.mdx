@@ -501,9 +501,10 @@ If the Host is a web page, it MUST wrap the View and communicate with it through
    - Block dangerous features (`object-src 'none'`)
    - Apply restrictive defaults if no CSP metadata is provided
    - If `permissions` is declared, the Sandbox MAY set the inner iframe's `allow` attribute accordingly
-6. The Sandbox MUST forward messages sent by the Host to the View, and vice versa, for any method that doesn't start with `ui/notifications/sandbox-`. This includes lifecycle messages, e.g., `ui/initialize` request & `ui/notifications/initialized` notification both sent by the View. The Host MUST NOT send any request or notification to the View before it receives an `initialized` notification.
+6. The Sandbox MUST forward messages sent by the Host to the View, and vice versa, for any method that doesn't start with `ui/notifications/sandbox-` or `ui/sandbox-`. This includes lifecycle messages, e.g., `ui/initialize` request & `ui/notifications/initialized` notification both sent by the View. The Host MUST NOT send any request or notification to the View before it receives an `initialized` notification.
 7. The Sandbox SHOULD NOT create/send any requests to the Host or to the View (this would require synthesizing new request ids).
 8. The Host MAY forward any message from the View (coming via the Sandbox) to the MCP Apps server, for any method that doesn't start with `ui/`. While the Host SHOULD ensure the View's MCP connection is spec-compliant, it MAY decide to block some messages or subject them to further user approval.
+9. The Sandbox SHOULD serve the reserved `ui/sandbox-list-tools` and `ui/sandbox-call-tool` requests and send the `ui/notifications/sandbox-tools-changed` notification itself, from the View's WebMCP tools (see [Reserved Messages](#reserved-messages-sandbox-proxy) and [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp)). It MUST NOT forward these messages to the View.
 
 ### Standard MCP Messages
 
@@ -511,19 +512,21 @@ UI iframes can use the following subset of standard MCP protocol messages.
 
 Note that `tools/call` and `tools/list` flow **bidirectionally**:
 - **App → Host → Server**: Apps call server tools (requires host `serverTools` capability)
-- **Host → App**: Host calls app-registered tools (requires app `tools` capability)
+- **Host → App** (**Deprecated**): Host calls app-registered tools (requires app `tools` capability)
+
+> **Deprecated:** The Host → App and App → Host directions below (app-registered tools handled by the View) are deprecated in favor of [WebMCP](https://webmachinelearning.github.io/webmcp/). Tools a View registers with WebMCP are reached through [reserved Sandbox messages](#reserved-messages-sandbox-proxy) instead. See [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp).
 
 **Tools:**
 
 - `tools/call` - Execute a tool (bidirectional)
   - **App → Host**: Call server tool via host proxy
-  - **Host → App**: Call app-registered tool
+  - **Host → App** (Deprecated): Call app-registered tool
 - `tools/list` - List available tools (bidirectional)
   - **App → Host**: List server tools
-  - **Host → App**: List app-registered tools
+  - **Host → App** (Deprecated): List app-registered tools
 - `notifications/tools/list_changed` - Notify when tool list changes (bidirectional)
   - **Server → Host → App**: Server tools changed
-  - **App → Host**: App-registered tools changed
+  - **App → Host** (Deprecated): App-registered tools changed
 
 **Resources:**
 
@@ -550,7 +553,11 @@ When the View sends an `ui/initialize` request to the Host, it MUST include its 
 interface McpUiAppCapabilities {
   /** Experimental features keyed by identifier. */
   experimental?: Record<string, object>;
-  /** App exposes MCP-style tools that the host can call. */
+  /**
+   * App exposes MCP-style tools that the host can call.
+   * @deprecated Register tools with WebMCP (`document.modelContext.registerTool()`)
+   * instead. See "App-Registered Tools and WebMCP".
+   */
   tools?: {
     /** App supports tools/list_changed notifications. */
     listChanged?: boolean;
@@ -1236,7 +1243,69 @@ Host behavior:
 - If multiple updates are received before the next user message, Host SHOULD only send the last update to the model
 - MAY display context updates to the user
 
+#### App-Registered Tools and WebMCP
+
+> **Deprecated:** App-registered tools (the `tools` app capability, Host → App `tools/list` and `tools/call` handled by the View, and App → Host `notifications/tools/list_changed`) are deprecated in favor of [WebMCP](https://webmachinelearning.github.io/webmcp/); see [ext-apps#797](https://github.com/modelcontextprotocol/ext-apps/issues/797). The legacy messages are unchanged, so Views that still use them keep working, but they MAY be removed in a future revision of this specification.
+
+**Views:**
+
+- Views SHOULD expose tools to the Host with `document.modelContext.registerTool()` and SHOULD NOT declare the `tools` app capability.
+- Views SHOULD feature-detect `document.modelContext`, which is provided by the Host (see below), not by the View.
+- Views SHOULD return plain data from `execute()`; it is relayed to the Host as `structuredContent` (see the mapping below).
+
+```typescript
+const controller = new AbortController();
+document.modelContext.registerTool(
+  {
+    name: "tictactoe_move",
+    description: "Make a move in the tic-tac-toe game",
+    inputSchema: { type: "object", properties: { position: { type: "number" } } },
+    annotations: { readOnlyHint: false },
+    async execute({ position }) {
+      return { board: makeMove(position) };
+    },
+  },
+  { signal: controller.signal }, // abort the signal to unregister
+);
+```
+
+> Non-normative: the SDK's deprecated `app.registerTool()` is a thin wrapper over `document.modelContext.registerTool()`.
+
+**Providing `document.modelContext`.** A View cannot polyfill WebMCP on its own: a registry that only the View can see is of no use to the Host. A Host that wants to surface View tools therefore provides `document.modelContext` to the View:
+
+- If the browser implements WebMCP, the native implementation is used (it wins over any polyfill). The Host MUST delegate the `tools` Permissions Policy feature to the nested frames (e.g. `allow="tools"` on the Sandbox iframe, which sets it on the inner View iframe), otherwise native registration is rejected.
+- Otherwise the Host SHOULD inject a polyfill into the View HTML it passes to the Sandbox in `ui/notifications/sandbox-resource-ready`, before the View's own scripts.
+
+**Reserved Sandbox messages.** The Sandbox proxy is the only party that shares an origin with the View: the Host and Sandbox MUST have different origins (see [Sandbox proxy](#sandbox-proxy)), so the Host page cannot reach into the View's document. The Host therefore reads View tools through three [reserved messages](#reserved-messages-sandbox-proxy): the requests `ui/sandbox-list-tools` and `ui/sandbox-call-tool` (Host → Sandbox) and the notification `ui/notifications/sandbox-tools-changed` (Sandbox → Host). They are not `tools/list` and `tools/call`.
+
+- The Sandbox SHOULD answer them from the `document.modelContext` of the View's own frame, using WebMCP's consumer API (`getTools()`, `executeTool()` and the `toolchange` event), and send the notification when `toolchange` fires. It MUST NOT forward them to the View.
+- The Sandbox MUST only expose tools registered in the View's own frame (WebMCP's native `getTools()` also returns tools of other frames).
+- A Sandbox that cannot access the View's document (for instance, an inner iframe whose `sandbox` attribute omits `allow-same-origin`) cannot serve them. If it forwards them instead, the View, which does not implement them, answers with a method-not-found error.
+- `tools/list` and `tools/call` are untouched: they still flow Host → Sandbox → View, where a View that declares the `tools` app capability answers them itself. A Host SHOULD NOT conclude that a View has no tools from the absence of that capability.
+- A Host that embeds the View without a Sandbox proxy MAY access `document.modelContext` directly and apply the same mapping.
+
+**Mapping.** WebMCP tools and results map to MCP as follows:
+
+| WebMCP | MCP |
+|--------|-----|
+| `name`, `description` | `Tool.name`, `Tool.description` |
+| `title` | `Tool.title`, only if non-empty |
+| `inputSchema` | `Tool.inputSchema`, which MUST have `type: "object"`: a schema without it is completed, and an absent schema becomes `{ "type": "object", "properties": {} }` |
+| `annotations.readOnlyHint` | `Tool.annotations.readOnlyHint` (no other annotation maps) |
+| *(none)* | `Tool.outputSchema` is omitted, as WebMCP has none |
+| `execute()` returns an object `v` | `CallToolResult` `{ content: [], structuredContent: v }` |
+| `execute()` returns a non-object value `v` (including `null` and arrays) | `{ content: [], structuredContent: { "result": v } }` |
+| `execute()` returns nothing | `{ content: [], structuredContent: { "result": null } }` |
+| `execute()` throws or rejects | `{ content: [{ type: "text", text: <error message> }], isError: true }` (a native implementation may only expose a generic message) |
+| `ui/sandbox-call-tool` names an unknown tool | JSON-RPC error `-32602` |
+
+Tool descriptors from the View that are malformed (for example, an invalid name or a non-string description) are omitted from the list.
+
+> Non-normative: in the SDK, `AppBridge.listWebMcpTools()` and `callWebMcpTool()` send the reserved requests, while the deprecated `listTools()` and `callTool()` keep sending `tools/list` and `tools/call`.
+
 #### Requests (Host → App)
+
+> **Deprecated:** The requests below, handled by the View itself, are deprecated. New Views SHOULD use WebMCP, whose tools the Host reaches through reserved Sandbox messages instead (see [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp)).
 
 When Apps declare the `tools` capability, the Host can send standard MCP tool requests to the App:
 
@@ -1278,9 +1347,9 @@ When Apps declare the `tools` capability, the Host can send standard MCP tool re
 ```
 
 **App Behavior:**
-- Apps MUST implement `oncalltool` handler if they declare `tools` capability
+- Apps MUST implement `oncalltool` handler if they declare `tools` capability (deprecated; prefer WebMCP)
 - Apps SHOULD validate tool names and arguments
-- Apps MAY use `app.registerTool()` SDK helper for automatic validation
+- Apps MAY use the deprecated `app.registerTool()` SDK helper for automatic validation
 - Apps SHOULD return `isError: true` for tool execution failures
 
 `tools/list` - List App-registered tools
@@ -1321,7 +1390,7 @@ interface Tool {
 ```
 
 **App Behavior:**
-- Apps MUST implement `onlisttools` handler if they declare `tools` capability
+- Apps MUST implement `onlisttools` handler if they declare `tools` capability (deprecated; prefer WebMCP)
 - Apps SHOULD return complete tool metadata including schemas
 - Apps MAY filter tools based on context or permissions
 
@@ -1511,6 +1580,68 @@ These messages are reserved for web-based hosts that implement the recommended d
 
 These messages facilitate the communication between the outer sandbox proxy iframe and the host, enabling secure loading of untrusted HTML content. The `permissions` field maps to the inner iframe's `allow` attribute for Permission Policy features.
 
+`ui/sandbox-list-tools` (Host → Sandbox Proxy) - List the tools the View exposes through WebMCP
+
+```typescript
+// Request
+{
+  jsonrpc: "2.0",
+  id: 1,
+  method: "ui/sandbox-list-tools",
+  params: {
+    cursor?: string  // Optional pagination cursor
+  }
+}
+
+// Response: MCP ListToolsResult
+{
+  jsonrpc: "2.0",
+  id: 1,
+  result: {
+    tools: Array<Tool>,  // See the mapping in "App-Registered Tools and WebMCP"
+    nextCursor?: string
+  }
+}
+```
+
+`ui/sandbox-call-tool` (Host → Sandbox Proxy) - Call a tool the View exposes through WebMCP
+
+```typescript
+// Request
+{
+  jsonrpc: "2.0",
+  id: 2,
+  method: "ui/sandbox-call-tool",
+  params: {
+    name: string,        // Name of the tool to execute
+    arguments?: object   // Tool arguments
+  }
+}
+
+// Response: MCP CallToolResult
+{
+  jsonrpc: "2.0",
+  id: 2,
+  result: {
+    content: Array<ContentBlock>,
+    structuredContent?: object,
+    isError?: boolean
+  }
+}
+```
+
+`ui/notifications/sandbox-tools-changed` (Sandbox Proxy → Host) - The View's WebMCP tool list changed
+
+```typescript
+{
+  jsonrpc: "2.0",
+  method: "ui/notifications/sandbox-tools-changed",
+  params: {}
+}
+```
+
+The Sandbox proxy answers and sends these three messages itself, from the View's WebMCP tools, and MUST NOT forward them to the View. They are distinct from the standard `tools/list`, `tools/call` and `notifications/tools/list_changed`, which are forwarded to and from the View as usual. See [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp) for how WebMCP tools and results map to these messages.
+
 ### Lifecycle
 
 The typical lifecycle for rendering a UI resource:
@@ -1564,7 +1695,7 @@ sequenceDiagram
   end
 ```
 
-Note: when the View is rendered inside a sandbox, the sandbox transparently passes messages between the View and the Host, except for messages named `ui/notifications/sandbox-*`.
+Note: when the View is rendered inside a sandbox, the sandbox transparently passes messages between the View and the Host, except for messages named `ui/notifications/sandbox-*` or `ui/sandbox-*`.
 
 #### 3. Interactive Phase
 
@@ -1738,6 +1869,8 @@ Note: Tools with `visibility: ["app"]` are hidden from the agent but remain call
 
 ### App-Provided Tools
 
+> **Note:** Tools a View exposes now use [WebMCP](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`). The legacy mechanism (`tools` app capability, `app.registerTool()`, View-handled `tools/list` and `tools/call`) is deprecated and described under [Legacy: View-Handled Tools](#legacy-view-handled-tools-deprecated). See [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp).
+
 Apps can register their own tools that hosts and agents can call, making apps **introspectable and accessible** to the model. This complements the existing capability where apps call server tools (via host proxy).
 
 #### Motivation: Semantic Introspection
@@ -1747,7 +1880,7 @@ Without tool registration, apps are opaque to the model:
 - The model therefore cannot query app state or discover what operations the app supports
 
 With tool registration, apps expose a semantic interface:
-- The model discovers available operations via `tools/list`
+- The model discovers available operations via the Host's tool listing (`ui/sandbox-list-tools`)
 - The model queries app state via tools (e.g., `get_board_state`)
 - The model executes actions via tools (e.g., `make_move`)
 - Apps return structured data rather than relying on the host to interpret rendered output
@@ -1756,7 +1889,229 @@ This is *pull*-based and complements the *push*-based [`ui/update-model-context`
 
 #### App Tool Registration
 
-Apps register tools using the SDK's `registerTool()` method:
+Views register tools with [WebMCP](https://webmachinelearning.github.io/webmcp/); the Host reaches them through the Sandbox proxy (see [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp)):
+
+```typescript
+const { signal } = new AbortController();
+
+document.modelContext.registerTool(
+  {
+    name: "tictactoe_move",
+    description: "Make a move in the tic-tac-toe game",
+    inputSchema: {
+      type: "object",
+      properties: {
+        position: { type: "number", minimum: 0, maximum: 8 },
+        player: { type: "string", enum: ["X", "O"] },
+      },
+      required: ["position", "player"],
+    },
+    annotations: { readOnlyHint: false }, // This tool has side effects
+    async execute({ position, player }) {
+      const board = makeMove(position, player);
+      return { board, winner: checkWinner(board) }; // plain data, relayed as structuredContent
+    },
+  },
+  { signal },
+);
+```
+
+WebMCP tools have no `outputSchema` and Views return plain data from `execute()`. Views SHOULD validate the arguments they receive.
+
+#### Tool Lifecycle
+
+A tool is available while the View's document is loaded and the tool's registration signal has not been aborted. Aborting the signal unregisters the tool, and to change a tool's description or schema the View unregisters it and registers it again. Whenever the View's tool list changes, WebMCP fires `toolchange` and the Sandbox sends `ui/notifications/sandbox-tools-changed` to the Host.
+
+#### Complete Example: Introspectable Tic-Tac-Toe
+
+This example demonstrates how apps expose semantic interfaces through tools:
+
+```typescript
+// Game state
+let board: Array<"X" | "O" | null> = Array(9).fill(null);
+let currentPlayer: "X" | "O" = "X";
+let moveHistory: number[] = [];
+
+const { signal } = new AbortController();
+
+// Agent can query semantic state directly
+document.modelContext.registerTool(
+  {
+    name: "get_board_state",
+    description: "Get current game state including board, current player, and winner",
+    annotations: { readOnlyHint: true },
+    async execute() {
+      return { board, currentPlayer, winner: checkWinner(board), moveHistory };
+    },
+  },
+  { signal },
+);
+
+// Agent can execute moves
+document.modelContext.registerTool(
+  {
+    name: "make_move",
+    description: "Place a piece at the specified position",
+    inputSchema: {
+      type: "object",
+      properties: { position: { type: "number", minimum: 0, maximum: 8 } },
+      required: ["position"],
+    },
+    annotations: { readOnlyHint: false },
+    async execute({ position }) {
+      if (board[position] !== null) {
+        throw new Error("Position already taken"); // becomes isError: true
+      }
+
+      board[position] = currentPlayer;
+      moveHistory.push(position);
+      const winner = checkWinner(board);
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+
+      return { board, currentPlayer, winner, moveHistory };
+    },
+  },
+  { signal },
+);
+
+// Agent can reset game
+document.modelContext.registerTool(
+  {
+    name: "reset_game",
+    description: "Reset the game board to initial state",
+    annotations: { readOnlyHint: false },
+    async execute() {
+      board = Array(9).fill(null);
+      currentPlayer = "X";
+      moveHistory = [];
+      return { board, currentPlayer, moveHistory };
+    },
+  },
+  { signal },
+);
+
+function checkWinner(board: Array<"X" | "O" | null>): "X" | "O" | "draw" | null {
+  const lines = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],  // rows
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],  // columns
+    [0, 4, 8], [2, 4, 6]              // diagonals
+  ];
+
+  for (const [a, b, c] of lines) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      return board[a];
+    }
+  }
+
+  return board.every(cell => cell !== null) ? "draw" : null;
+}
+```
+
+**Agent Interaction** (Host side, using the SDK; these calls send `ui/sandbox-list-tools` and `ui/sandbox-call-tool`):
+
+```typescript
+// 1. Discover available operations
+const { tools } = await bridge.listWebMcpTools();
+// → ["get_board_state", "make_move", "reset_game"]
+
+// 2. Query semantic state (not visual/DOM)
+const state = await bridge.callWebMcpTool({
+  name: "get_board_state",
+  arguments: {}
+});
+// → structuredContent: { board: [null, null, null, ...], currentPlayer: 'X', winner: null, moveHistory: [] }
+
+// 3. Execute actions based on semantic understanding
+if (state.structuredContent.board[4] === null) {
+  await bridge.callWebMcpTool({
+    name: "make_move",
+    arguments: { position: 4 }
+  });
+}
+
+// 4. Query updated state
+const newState = await bridge.callWebMcpTool({
+  name: "get_board_state",
+  arguments: {}
+});
+// → structuredContent: { board: [null, null, null, null, 'X', null, ...], currentPlayer: 'O', ... }
+```
+
+The agent interacts with the app through semantic operations rather than visual interpretation.
+
+#### Tool Flow Directions
+
+**Existing Flow (unchanged): App → Host → Server**
+
+Apps call server tools (proxied by host):
+
+```typescript
+// App calls server tool
+const result = await app.callServerTool("get_weather", { location: "NYC" });
+```
+
+Requires host `serverTools` capability.
+
+**New Flow: Host/Agent → App**
+
+Host/Agent calls tools the View registered with WebMCP:
+
+```typescript
+// Host calls app tool (sends ui/sandbox-call-tool to the Sandbox)
+const result = await bridge.callWebMcpTool({
+  name: "tictactoe_move",
+  arguments: { position: 4 }
+});
+```
+
+Does not require the app `tools` capability. Requires a Sandbox proxy that serves the [reserved tool messages](#reserved-messages-sandbox-proxy).
+
+**Key Distinction:**
+
+| Aspect | Server Tools | App Tools |
+|--------|-------------|-----------|
+| **Lifetime** | Persistent (server process) | Ephemeral (while app loaded) |
+| **Source** | MCP Server | App JavaScript |
+| **Trust** | Trusted | Sandboxed (untrusted) |
+| **Discovery** | Server `tools/list` | `ui/sandbox-list-tools` (from the View's `document.modelContext`) |
+| **When Available** | Always | Only while app is loaded |
+
+#### Use Cases
+
+**Introspection:** Agent queries app state semantically — the app's DOM is not exposed to the host or model
+
+**Voice mode:** Agent drives app interactions programmatically based on voice commands
+
+**Accessibility:** Structured state and operations more accessible than visual rendering
+
+**Complex workflows:** Agent discovers available operations and coordinates multi-step interactions
+
+**Stateful apps:** Apps expose operations (move, reset, query) rather than pushing state updates via messages
+
+#### Security Implications
+
+App tools run in **sandboxed iframes** (untrusted). See Security Implications section for detailed mitigations.
+
+Key considerations:
+- App tools could provide misleading descriptions
+- Tool namespacing needed to avoid conflicts with server tools
+- Resource limits (max tools, execution timeouts)
+- Audit trail for app tool invocations
+- User confirmation for tools with side effects
+
+#### Relation to WebMCP
+
+This feature was inspired by [WebMCP](https://webmachinelearning.github.io/webmcp/), which lets web pages register JavaScript functions as tools via `document.modelContext.registerTool()`. Views now expose tools with WebMCP itself, and the parallel app-registered mechanism is deprecated; see [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp).
+
+See [ext-apps#35](https://github.com/modelcontextprotocol/ext-apps/issues/35) for discussion.
+
+#### Legacy: View-Handled Tools (Deprecated)
+
+> **Deprecated:** Everything in this subsection describes the legacy mechanism: the `tools` app capability, `app.registerTool()`, and `oncalltool`/`onlisttools` handlers that answer the standard `tools/list` and `tools/call` requests from the View. Use [WebMCP](#app-registered-tools-and-webmcp) instead. It is kept for Views built with older SDKs.
+
+##### SDK Registration
+
+Older SDKs let apps register tools with the SDK's `registerTool()` method, declaring the legacy `tools` capability:
 
 ```typescript
 import { App } from '@modelcontextprotocol/ext-apps';
@@ -1764,7 +2119,7 @@ import { z } from 'zod';
 
 const app = new App(
   { name: "TicTacToe", version: "1.0.0" },
-  { tools: { listChanged: true } }  // Declare tool capability
+  { tools: { listChanged: true } }  // Declare the legacy tool capability
 );
 
 // Register a tool with schema validation
@@ -1858,9 +2213,9 @@ app.onlisttools = async () => {
 };
 ```
 
-#### Tool Lifecycle
+##### Legacy Tool Lifecycle
 
-Registered tools support dynamic lifecycle management:
+Tools registered with `app.registerTool()` support dynamic lifecycle management:
 
 **Enable/Disable:**
 
@@ -1874,7 +2229,7 @@ tool.disable();
 tool.enable();
 ```
 
-When a tool is disabled/enabled, the app automatically sends `notifications/tools/list_changed` (if the app declared `listChanged: true` capability).
+When a tool is disabled/enabled, the app sends `notifications/tools/list_changed` (if the app declared the `listChanged: true` capability).
 
 **Update:**
 
@@ -1895,13 +2250,13 @@ Updates also trigger `notifications/tools/list_changed`.
 tool.remove();
 ```
 
-#### Long-Running App Tools
+##### Long-Running App Tools
 
-App tools are bounded by the app's render lifecycle. For work that may outlive a single render, app `tools/call` MAY be task-augmented per [core MCP Tasks](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks); hosts proxy the `tasks/*` methods to the app exactly as they proxy `tools/call`. Because the iframe can be torn down at any time, apps SHOULD delegate long-lived work to the server (via `callServerTool()`) and return the server's task handle, so the host can continue polling the server after teardown.
+This applies to View-handled `tools/call` only; `ui/sandbox-call-tool` defines no task augmentation. App tools are bounded by the app's render lifecycle. For work that may outlive a single render, app `tools/call` MAY be task-augmented per [core MCP Tasks](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks); hosts proxy the `tasks/*` methods to the app exactly as they proxy `tools/call`. Because the iframe can be torn down at any time, apps SHOULD delegate long-lived work to the server (via `callServerTool()`) and return the server's task handle, so the host can continue polling the server after teardown.
 
-#### Schema Validation
+##### Schema Validation
 
-The SDK validates input and output against any [Standard Schema](https://standardschema.dev/)–compatible library (Zod, ArkType, Valibot, …). Examples below use Zod:
+The SDK's `app.registerTool()` validates input and output against any [Standard Schema](https://standardschema.dev/)–compatible library (Zod, ArkType, Valibot, …). Examples below use Zod:
 
 **Input Validation:**
 
@@ -1948,233 +2303,6 @@ app.registerTool(
 ```
 
 If the callback returns data that doesn't match `outputSchema`, the tool returns an error.
-
-#### Complete Example: Introspectable Tic-Tac-Toe
-
-This example demonstrates how apps expose semantic interfaces through tools:
-
-```typescript
-import { App } from '@modelcontextprotocol/ext-apps';
-import { z } from 'zod';
-
-// Game state
-let board: Array<'X' | 'O' | null> = Array(9).fill(null);
-let currentPlayer: 'X' | 'O' = 'X';
-let moveHistory: number[] = [];
-
-const app = new App(
-  { name: "TicTacToe", version: "1.0.0" },
-  { tools: { listChanged: true } }
-);
-
-// Agent can query semantic state directly
-app.registerTool(
-  "get_board_state",
-  {
-    description: "Get current game state including board, current player, and winner",
-    outputSchema: z.object({
-      board: z.array(z.enum(['X', 'O', null])).length(9),
-      currentPlayer: z.enum(['X', 'O']),
-      winner: z.enum(['X', 'O', 'draw', null]).nullable(),
-      moveHistory: z.array(z.number())
-    })
-  },
-  async () => {
-    return {
-      content: [{
-        type: "text",
-        text: `Board: ${board.map(c => c || '-').join('')}, Player: ${currentPlayer}`
-      }],
-      structuredContent: {
-        board,
-        currentPlayer,
-        winner: checkWinner(board),
-        moveHistory
-      }
-    };
-  }
-);
-
-// Agent can execute moves
-app.registerTool(
-  "make_move",
-  {
-    description: "Place a piece at the specified position",
-    inputSchema: z.object({
-      position: z.number().int().min(0).max(8)
-    }),
-    annotations: { readOnlyHint: false }
-  },
-  async ({ position }) => {
-    if (board[position] !== null) {
-      return {
-        content: [{ type: "text", text: "Position already taken" }],
-        isError: true
-      };
-    }
-
-    board[position] = currentPlayer;
-    moveHistory.push(position);
-    const winner = checkWinner(board);
-    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-
-    return {
-      content: [{
-        type: "text",
-        text: `Player ${board[position]} moved to position ${position}` +
-              (winner ? `. ${winner} wins!` : '')
-      }],
-      structuredContent: {
-        board,
-        currentPlayer,
-        winner,
-        moveHistory
-      }
-    };
-  }
-);
-
-// Agent can reset game
-app.registerTool(
-  "reset_game",
-  {
-    description: "Reset the game board to initial state",
-    annotations: { readOnlyHint: false }
-  },
-  async () => {
-    board = Array(9).fill(null);
-    currentPlayer = 'X';
-    moveHistory = [];
-
-    return {
-      content: [{ type: "text", text: "Game reset" }],
-      structuredContent: { board, currentPlayer, moveHistory }
-    };
-  }
-);
-
-await app.connect(new PostMessageTransport(window.parent));
-
-function checkWinner(board: Array<'X' | 'O' | null>): 'X' | 'O' | 'draw' | null {
-  const lines = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8],  // rows
-    [0, 3, 6], [1, 4, 7], [2, 5, 8],  // columns
-    [0, 4, 8], [2, 4, 6]              // diagonals
-  ];
-
-  for (const [a, b, c] of lines) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return board[a];
-    }
-  }
-
-  return board.every(cell => cell !== null) ? 'draw' : null;
-}
-```
-
-**Agent Interaction:**
-
-```typescript
-// 1. Discover available operations
-const { tools } = await bridge.sendListTools({});
-// → ["get_board_state", "make_move", "reset_game"]
-
-// 2. Query semantic state (not visual/DOM)
-const state = await bridge.sendCallTool({
-  name: "get_board_state",
-  arguments: {}
-});
-// → { board: [null, null, null, ...], currentPlayer: 'X', winner: null }
-
-// 3. Execute actions based on semantic understanding
-if (state.structuredContent.board[4] === null) {
-  await bridge.sendCallTool({
-    name: "make_move",
-    arguments: { position: 4 }
-  });
-}
-
-// 4. Query updated state
-const newState = await bridge.sendCallTool({
-  name: "get_board_state",
-  arguments: {}
-});
-// → { board: [null, null, null, null, 'X', null, ...], currentPlayer: 'O', ... }
-```
-
-The agent interacts with the app through semantic operations rather than visual interpretation.
-
-#### Tool Flow Directions
-
-**Existing Flow (unchanged): App → Host → Server**
-
-Apps call server tools (proxied by host):
-
-```typescript
-// App calls server tool
-const result = await app.callServerTool("get_weather", { location: "NYC" });
-```
-
-Requires host `serverTools` capability.
-
-**New Flow: Host/Agent → App**
-
-Host/Agent calls app-registered tools:
-
-```typescript
-// Host calls app tool
-const result = await bridge.sendCallTool({
-  name: "tictactoe_move",
-  arguments: { position: 4 }
-});
-```
-
-Requires app `tools` capability.
-
-**Key Distinction:**
-
-| Aspect | Server Tools | App Tools |
-|--------|-------------|-----------|
-| **Lifetime** | Persistent (server process) | Ephemeral (while app loaded) |
-| **Source** | MCP Server | App JavaScript |
-| **Trust** | Trusted | Sandboxed (untrusted) |
-| **Discovery** | Server `tools/list` | App `tools/list` (when app declares capability) |
-| **When Available** | Always | Only while app is loaded |
-
-#### Use Cases
-
-**Introspection:** Agent queries app state semantically — the app's DOM is not exposed to the host or model
-
-**Voice mode:** Agent drives app interactions programmatically based on voice commands
-
-**Accessibility:** Structured state and operations more accessible than visual rendering
-
-**Complex workflows:** Agent discovers available operations and coordinates multi-step interactions
-
-**Stateful apps:** Apps expose operations (move, reset, query) rather than pushing state updates via messages
-
-#### Security Implications
-
-App tools run in **sandboxed iframes** (untrusted). See Security Implications section for detailed mitigations.
-
-Key considerations:
-- App tools could provide misleading descriptions
-- Tool namespacing needed to avoid conflicts with server tools
-- Resource limits (max tools, execution timeouts)
-- Audit trail for app tool invocations
-- User confirmation for tools with side effects
-
-#### Relation to WebMCP
-
-This feature is inspired by [WebMCP](https://github.com/webmachinelearning/webmcp) (W3C incubation), which proposes allowing web pages to register JavaScript functions as tools via `navigator.modelContext.registerTool()`.
-
-Key differences:
-- **WebMCP**: General web pages, browser API, manifest-based discovery
-- **This spec**: MCP Apps, standard MCP messages, capability-based negotiation
-
-Similar to WebMCP but without turning the App (embedded page) into an MCP server - apps register tools within the App/Host architecture.
-
-See [ext-apps#35](https://github.com/modelcontextprotocol/ext-apps/issues/35) for discussion.
 
 ### Client\<\>Server Capability Negotiation
 
@@ -2287,9 +2415,11 @@ The host responds with its own capabilities, including support for proxying serv
 }
 ```
 
-**App Capability: `tools`**
+**App Capability: `tools`** (Deprecated)
 
-When present, the app can register tools that the host and agent can call.
+> **Deprecated:** Prefer WebMCP (`document.modelContext`). Hosts SHOULD NOT conclude that a View has no tools from the absence of this capability, since WebMCP tools are reached through reserved Sandbox messages. See [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp).
+
+When present, the app handles `tools/list` and `tools/call` itself, so that the host and agent can call its tools.
 
 - `listChanged` (boolean, optional): If `true`, the app will send `notifications/tools/list_changed` when tools are added, removed, or modified
 
@@ -2305,6 +2435,7 @@ These capabilities are independent - an app can have one, both, or neither.
 
 ```typescript
 interface McpUiAppCapabilities {
+  /** @deprecated Use WebMCP (`document.modelContext`) instead. */
   tools?: {
     listChanged?: boolean;
   };
@@ -2325,11 +2456,10 @@ This specification defines the Minimum Viable Product (MVP) for MCP Apps.
 
 **Included in MVP:**
 
-- **App-Provided Tools:** Apps can register tools via `app.registerTool()` that agents can call
+- **App-Provided Tools:** Views expose tools via WebMCP (`document.modelContext.registerTool()`) that agents can call through reserved Sandbox messages. The legacy `app.registerTool()` / `tools` app capability mechanism is deprecated in favor of WebMCP.
   - Bidirectional tool flow (Apps consume server tools AND provide app tools)
-  - Full lifecycle management (enable/disable/update/remove)
-  - Schema validation via [Standard Schema](https://standardschema.dev/) (Zod, ArkType, Valibot, …)
-  - Tool list change notifications
+  - Registration lifecycle (register / unregister via `AbortSignal`)
+  - Tool list change notifications (`ui/notifications/sandbox-tools-changed`)
 
 **Content Types (deferred from MVP):**
 
@@ -2444,6 +2574,8 @@ This proposal synthesizes feedback from the UI CWG and MCP-UI community, host im
 - **Flat `ui/visibility` key:** Rejected in favor of nested structure for consistency with future `_meta.ui` fields.
 
 #### 6. App Tool Registration Support
+
+> **Deprecated:** This decision is superseded by adopting WebMCP for tools a View exposes. The Host reaches them through reserved Sandbox messages (`ui/sandbox-list-tools`, `ui/sandbox-call-tool`), while the standard `tools/list` and `tools/call` described here remain for Views that declare the deprecated `tools` capability. See [App-Registered Tools and WebMCP](#app-registered-tools-and-webmcp).
 
 **Decision:** Enable Apps to register tools using standard MCP `tools/call` and `tools/list` messages, making tools flow bidirectionally between Apps and Hosts.
 
@@ -2568,6 +2700,8 @@ const allowAttribute = allowList.join(' ');
 
 #### 5. App-Provided Tools Security
 
+> **Deprecated:** App-provided tools are deprecated in favor of WebMCP. The considerations below apply equally to tools a Host surfaces from a View's `document.modelContext` (through the reserved Sandbox messages).
+
 Apps can register their own tools that agents can call. Apps are forward-deployed emanations of server tools, running in the client context. Hosts need to decide how to handle approval for app tool calls.
 
 **Approval Considerations:**
@@ -2612,7 +2746,7 @@ Hosts SHOULD implement the following protections for app-provided tools:
    - Limit maximum number of tools per app (recommended: 50)
    - Enforce execution timeouts for tool callbacks (recommended: 30 seconds)
    - Limit tool result sizes (recommended: 10 MB)
-   - Throttle `tools/list_changed` notifications to prevent spam
+   - Throttle tool list change notifications (`ui/notifications/sandbox-tools-changed`, `notifications/tools/list_changed`) to prevent spam
 
 5. **Audit Trail:**
    - Log all app tool registrations with timestamps
@@ -2638,7 +2772,7 @@ Hosts MAY implement different permission levels based on tool annotations:
 
 App tools MUST be tied to the app's lifecycle:
 
-- Tools become available once the app advertises the `tools` capability in `ui/initialize` and the host issues `tools/list`; subsequent changes are signaled via `notifications/tools/list_changed`
+- Tools become available once the View registers them with WebMCP and the host issues `ui/sandbox-list-tools`; subsequent changes are signaled via `ui/notifications/sandbox-tools-changed`. (Legacy: once the app advertises the `tools` capability in `ui/initialize` and the host issues `tools/list`; changes are signaled via `notifications/tools/list_changed`.)
 - Tools automatically disappear when app iframe is torn down
 - Hosts MUST NOT persist app tool registrations across sessions
 - Calling a tool from a closed app MUST return an error

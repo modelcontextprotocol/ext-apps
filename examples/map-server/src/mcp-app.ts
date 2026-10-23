@@ -692,11 +692,11 @@ const PREFERRED_INLINE_HEIGHT = 400;
 // Current display mode
 let currentDisplayMode: "inline" | "fullscreen" | "pip" = "inline";
 
-// Create App instance with tool capabilities
+// Create App instance
 // autoResize: false - we manually send size since map fills its container
 const app = new App(
   { name: "CesiumJS Globe", version: "1.0.0" },
-  { tools: { listChanged: true } },
+  {},
   { autoResize: false },
 );
 
@@ -884,32 +884,42 @@ app.ontoolinput = async (params) => {
   }
 };
 
+/**
+ * Register a tool via WebMCP (`document.modelContext`). The Host backfills
+ * `document.modelContext` into the View; without it, tools are simply skipped.
+ */
+function registerTool(tool: WebMCP.ModelContextTool): void {
+  if (!document.modelContext) {
+    log.warn(`document.modelContext unavailable; not registering ${tool.name}`);
+    return;
+  }
+  document.modelContext.registerTool(tool).catch((err) => {
+    log.warn(`Failed to register tool ${tool.name}:`, err);
+  });
+}
+
 // Register tools for the model to interact with this component
-app.registerTool(
-  "navigate-to",
-  {
-    title: "Navigate To",
-    description: "Navigate the globe to a new bounding box location",
-    inputSchema: z.object({
-      west: z.number().describe("Western longitude (-180 to 180)"),
-      south: z.number().describe("Southern latitude (-90 to 90)"),
-      east: z.number().describe("Eastern longitude (-180 to 180)"),
-      north: z.number().describe("Northern latitude (-90 to 90)"),
-      duration: z
-        .number()
-        .optional()
-        .describe("Animation duration in seconds (default: 2)"),
-      label: z.string().optional().describe("Optional label to display"),
-    }),
-  },
-  async (args) => {
+const NavigateToInput = z.object({
+  west: z.number().describe("Western longitude (-180 to 180)"),
+  south: z.number().describe("Southern latitude (-90 to 90)"),
+  east: z.number().describe("Eastern longitude (-180 to 180)"),
+  north: z.number().describe("Northern latitude (-90 to 90)"),
+  duration: z
+    .number()
+    .optional()
+    .describe("Animation duration in seconds (default: 2)"),
+  label: z.string().optional().describe("Optional label to display"),
+});
+
+registerTool({
+  name: "navigate-to",
+  title: "Navigate To",
+  description: "Navigate the globe to a new bounding box location",
+  inputSchema: z.toJSONSchema(NavigateToInput),
+  async execute(input) {
+    const args = NavigateToInput.parse(input);
     if (!viewer) {
-      return {
-        content: [
-          { type: "text" as const, text: "Error: Viewer not initialized" },
-        ],
-        isError: true,
-      };
+      throw new Error("Viewer not initialized");
     }
 
     const bbox: BoundingBox = {
@@ -923,31 +933,20 @@ app.registerTool(
     setLabel(args.label);
 
     return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Navigated to: W:${bbox.west.toFixed(4)}, S:${bbox.south.toFixed(4)}, E:${bbox.east.toFixed(4)}, N:${bbox.north.toFixed(4)}${args.label ? ` (${args.label})` : ""}`,
-        },
-      ],
+      message: `Navigated to: W:${bbox.west.toFixed(4)}, S:${bbox.south.toFixed(4)}, E:${bbox.east.toFixed(4)}, N:${bbox.north.toFixed(4)}${args.label ? ` (${args.label})` : ""}`,
     };
   },
-);
+});
 
-app.registerTool(
-  "get-current-view",
-  {
-    title: "Get Current View",
-    description:
-      "Get the current camera position and bounding box visible on the globe",
-  },
-  async () => {
+registerTool({
+  name: "get-current-view",
+  title: "Get Current View",
+  description:
+    "Get the current camera position and bounding box visible on the globe",
+  annotations: { readOnlyHint: true },
+  async execute() {
     if (!viewer) {
-      return {
-        content: [
-          { type: "text" as const, text: "Error: Viewer not initialized" },
-        ],
-        isError: true,
-      };
+      throw new Error("Viewer not initialized");
     }
 
     const camera = viewer.camera;
@@ -968,7 +967,7 @@ app.registerTool(
       };
     }
 
-    const viewData = {
+    return {
       camera: {
         latitude,
         longitude,
@@ -976,18 +975,8 @@ app.registerTool(
       },
       bbox,
     };
-
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify(viewData, null, 2),
-        },
-      ],
-      structuredContent: viewData,
-    };
   },
-);
+});
 
 app.registerTool(
   "get-screenshot",

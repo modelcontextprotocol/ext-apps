@@ -7,7 +7,7 @@
  * wire protocol is meant to be unchanged across the major bump; the few
  * host-side error deltas are pinned here so they stay deliberate.
  */
-import { describe, it, expect, afterEach } from "bun:test";
+import { describe, it, expect, afterEach, spyOn } from "bun:test";
 import {
   Client,
   InMemoryTransport,
@@ -477,13 +477,26 @@ describe("wire compatibility: 2.x App with a 1.x host", () => {
 
   it("answers 1.x tools/list (no params) and tools/call requests from the host", async () => {
     const { channel } = await handshake({ tools: { listChanged: true } });
-    app.registerTool(
-      "viewtool",
-      { description: "view tool", inputSchema: z.object({ x: z.number() }) },
-      async ({ x }) => ({
-        content: [{ type: "text", text: `view got ${x}` }],
-      }),
-    );
+    // registerTool() no longer serves tools over the wire (it goes through
+    // WebMCP); a View that still answers them does so with the raw handlers.
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    app.onlisttools = async () => ({
+      tools: [
+        {
+          name: "viewtool",
+          description: "view tool",
+          inputSchema: {
+            type: "object",
+            properties: { x: { type: "number" } },
+            required: ["x"],
+          },
+        },
+      ],
+    });
+    app.oncalltool = async (params) => ({
+      content: [{ type: "text", text: `view got ${params.arguments?.x}` }],
+    });
+    warn.mockRestore();
     await flush();
     const mark = channel.sent.length;
 

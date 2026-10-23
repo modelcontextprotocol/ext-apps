@@ -339,6 +339,58 @@ export const McpUiResourcePermissionsSchema = z.object({
 });
 
 /**
+ * @description Request (Host -> Sandbox proxy) for the tools the View exposes
+ * through WebMCP (`document.modelContext`). Answered by the Sandbox proxy, not
+ * forwarded to the View. The result is a `ListToolsResult`.
+ * @internal
+ * @see {@link app-bridge!AppBridge.listWebMcpTools `AppBridge.listWebMcpTools`} for the method that sends this request
+ */
+export const McpUiSandboxListToolsRequestSchema = z.object({
+  method: z.literal("ui/sandbox-list-tools"),
+  params: z
+    .object({
+      /** @description Pagination cursor from a previous result. */
+      cursor: z
+        .string()
+        .optional()
+        .describe("Pagination cursor from a previous result."),
+    })
+    .optional(),
+});
+
+/**
+ * @description Request (Host -> Sandbox proxy) to call a tool the View exposes
+ * through WebMCP. Answered by the Sandbox proxy, not forwarded to the View. The
+ * result is a `CallToolResult`: `content` is empty and `structuredContent` is
+ * the value the tool returned.
+ * @internal
+ * @see {@link app-bridge!AppBridge.callWebMcpTool `AppBridge.callWebMcpTool`} for the method that sends this request
+ */
+export const McpUiSandboxCallToolRequestSchema = z.object({
+  method: z.literal("ui/sandbox-call-tool"),
+  params: z.object({
+    /** @description Name of the tool to call. */
+    name: z.string().describe("Name of the tool to call."),
+    /** @description Arguments of the call. */
+    arguments: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Arguments of the call."),
+  }),
+});
+
+/**
+ * @description Notification (Sandbox proxy -> Host) that the tools the View
+ * exposes through WebMCP changed.
+ * @internal
+ * @see {@link app-bridge!AppBridge.onwebmcptoolschange `AppBridge.onwebmcptoolschange`}
+ */
+export const McpUiSandboxToolsChangedNotificationSchema = z.object({
+  method: z.literal("ui/notifications/sandbox-tools-changed"),
+  params: z.object({}).optional(),
+});
+
+/**
  * @description Notification of UI size changes (View -> Host).
  * @see {@link app!App.sendSizeChanged `App.sendSizeChanged`} for the method to send this from View
  */
@@ -598,7 +650,11 @@ export const McpUiAppCapabilitiesSchema = z.object({
     )
     .optional()
     .describe("Experimental features keyed by identifier."),
-  /** @description App exposes MCP-style tools that the host can call. */
+  /**
+   * @description App exposes MCP-style tools that the host can call.
+   * @deprecated Expose tools with WebMCP (`document.modelContext.registerTool()`)
+   *   instead. Hosts should not gate `tools/list` / `tools/call` on this capability.
+   */
   tools: z
     .object({
       /** @description App supports tools/list_changed notifications. */

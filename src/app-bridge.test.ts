@@ -4,6 +4,7 @@ import { Server, type ServerCapabilities } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
 import { App } from "./app.js";
+import { injectModelContextPolyfill } from "./model-context-host.js";
 import { LATEST_PROTOCOL_VERSION } from "./types.js";
 import {
   AppBridge,
@@ -766,289 +767,21 @@ describe("App <-> AppBridge integration", () => {
     });
   });
 
-  describe("App tool registration", () => {
+  describe("App tools over the wire (deprecated raw handlers)", () => {
+    let warn: ReturnType<typeof spyOn<Console, "warn">>;
+
     beforeEach(async () => {
-      app = new App(
-        testAppInfo,
-        { tools: { listChanged: true } },
-        { autoResize: false },
-      );
+      // Assigning oncalltool/onlisttools logs a one-time deprecation warning.
+      warn = spyOn(console, "warn").mockImplementation(() => {});
       await bridge.connect(bridgeTransport);
     });
 
-    it("registerTool creates a registered tool", async () => {
-      const InputSchema = z.object({ name: z.string() });
-      const OutputSchema = z.object({ greeting: z.string() });
-
-      const tool = app.registerTool(
-        "greet",
-        {
-          title: "Greet User",
-          description: "Greets a user by name",
-          inputSchema: InputSchema,
-          outputSchema: OutputSchema,
-        },
-        async (args: any) => ({
-          content: [{ type: "text" as const, text: `Hello, ${args.name}!` }],
-          structuredContent: { greeting: `Hello, ${args.name}!` },
-        }),
-      );
-
-      expect(tool.title).toBe("Greet User");
-      expect(tool.description).toBe("Greets a user by name");
-      expect(tool.enabled).toBe(true);
-    });
-
-    it("registered tool can be enabled and disabled", async () => {
-      await app.connect(appTransport);
-
-      const tool = app.registerTool(
-        "test-tool",
-        {
-          description: "Test tool",
-        },
-        async (_extra: any) => ({ content: [] }),
-      );
-
-      expect(tool.enabled).toBe(true);
-
-      tool.disable();
-      expect(tool.enabled).toBe(false);
-
-      tool.enable();
-      expect(tool.enabled).toBe(true);
-    });
-
-    it("registered tool can be updated", async () => {
-      await app.connect(appTransport);
-
-      const tool = app.registerTool(
-        "test-tool",
-        {
-          description: "Original description",
-        },
-        async (_extra: any) => ({ content: [] }),
-      );
-
-      expect(tool.description).toBe("Original description");
-
-      tool.update({ description: "Updated description" });
-      expect(tool.description).toBe("Updated description");
-    });
-
-    it("registered tool can be removed", async () => {
-      await app.connect(appTransport);
-
-      const tool = app.registerTool(
-        "test-tool",
-        {
-          description: "Test tool",
-        },
-        async (_extra: any) => ({ content: [] }),
-      );
-
-      tool.remove();
-      // Tool should no longer be registered (internal check)
-    });
-
-    it("registerTool throws on duplicate name", () => {
-      app.registerTool("dup", {}, async () => ({ content: [] }));
-      expect(() =>
-        app.registerTool("dup", {}, async () => ({ content: [] })),
-      ).toThrow(/already registered/);
-    });
-
-    it("enable/disable/update/remove pre-connect do not throw", () => {
-      const tool = app.registerTool("t", {}, async () => ({ content: [] }));
-      expect(() => tool.disable()).not.toThrow();
-      expect(() => tool.enable()).not.toThrow();
-      expect(() => tool.update({ description: "x" })).not.toThrow();
-      expect(() => tool.remove()).not.toThrow();
-    });
-
-    it("callback without inputSchema receives extra as first arg", async () => {
-      await app.connect(appTransport);
-      let receivedExtra: any;
-      app.registerTool("noargs", {}, async (extra: any) => {
-        receivedExtra = extra;
-        return { content: [] };
-      });
-      await bridge.callTool({ name: "noargs", arguments: {} });
-      expect(receivedExtra).toBeDefined();
-      expect(receivedExtra.mcpReq.signal).toBeInstanceOf(AbortSignal);
-    });
-
-    it("isError result skips output schema validation", async () => {
-      await app.connect(appTransport);
-      app.registerTool(
-        "errs",
-        { outputSchema: z.object({ ok: z.boolean() }) },
-        async () => ({
-          content: [{ type: "text" as const, text: "boom" }],
-          isError: true,
-        }),
-      );
-      const res = await bridge.callTool({ name: "errs", arguments: {} });
-      expect(res.isError).toBe(true);
-      expect(res.structuredContent).toBeUndefined();
-    });
-
-    it("stale handle remove() does not delete a re-registered tool", async () => {
-      const t1 = app.registerTool("phoenix", {}, async () => ({ content: [] }));
-      t1.remove();
-      app.registerTool("phoenix", {}, async () => ({ content: [] }));
-      t1.remove();
-      await app.connect(appTransport);
-      const list = await bridge.listTools({});
-      expect(list.tools.map((t) => t.name)).toContain("phoenix");
-    });
-
-    it("host omitting arguments defaults to empty object", async () => {
-      await app.connect(appTransport);
-      let received: unknown;
-      app.registerTool(
-        "noargs2",
-        { inputSchema: z.object({}) },
-        async (args) => {
-          received = args;
-          return { content: [] };
-        },
-      );
-      await bridge.callTool({ name: "noargs2" });
-      expect(received).toEqual({});
-    });
-
-    it("update({inputSchema}) is honored by handler validation", async () => {
-      await app.connect(appTransport);
-      const tool = app.registerTool(
-        "evolving",
-        { inputSchema: z.object({ a: z.string() }) },
-        async (args: any) => ({
-          content: [{ type: "text" as const, text: JSON.stringify(args) }],
-        }),
-      );
-      expect(
-        bridge.callTool({ name: "evolving", arguments: { a: 123 } }),
-      ).rejects.toThrow(/Invalid input/);
-      tool.update({ inputSchema: z.object({ a: z.number() }) });
-      const result = await bridge.callTool({
-        name: "evolving",
-        arguments: { a: 123 },
-      });
-      expect(result.content[0]).toEqual({ type: "text", text: '{"a":123}' });
-    });
-
-    it("tool throws error when disabled and called", async () => {
-      await app.connect(appTransport);
-
-      const tool = app.registerTool(
-        "test-tool",
-        {
-          description: "Test tool",
-        },
-        async (_extra: any) => ({ content: [] }),
-      );
-
-      tool.disable();
-
-      const mockExtra = {
-        signal: new AbortController().signal,
-        requestId: "test",
-        sendNotification: async () => {},
-        sendRequest: async () => ({}),
-      } as any;
-
-      expect((tool.handler as any)(mockExtra)).rejects.toThrow(
-        "Tool test-tool is disabled",
-      );
-    });
-
-    it("tool validates input schema", async () => {
-      const InputSchema = z.object({ name: z.string() });
-
-      const tool = app.registerTool(
-        "greet",
-        {
-          inputSchema: InputSchema,
-        },
-        async (args: any) => ({
-          content: [{ type: "text" as const, text: `Hello, ${args.name}!` }],
-        }),
-      );
-
-      // Create a mock RequestHandlerExtra
-      const mockExtra = {
-        signal: new AbortController().signal,
-        requestId: "test",
-        sendNotification: async () => {},
-        sendRequest: async () => ({}),
-      } as any;
-
-      // Valid input should work
-      expect(
-        (tool.handler as any)({ name: "Alice" }, mockExtra),
-      ).resolves.toBeDefined();
-
-      // Invalid input should fail
-      expect(
-        (tool.handler as any)({ invalid: "field" }, mockExtra),
-      ).rejects.toThrow("Invalid input for tool greet");
-    });
-
-    it("tool validates output schema", async () => {
-      const OutputSchema = z.object({ greeting: z.string() });
-
-      const tool = app.registerTool(
-        "greet",
-        {
-          outputSchema: OutputSchema,
-        },
-        async (_extra: any) => ({
-          content: [{ type: "text" as const, text: "Hello!" }],
-          structuredContent: { greeting: "Hello!" },
-        }),
-      );
-
-      // Create a mock RequestHandlerExtra
-      const mockExtra = {
-        signal: new AbortController().signal,
-        requestId: "test",
-        sendNotification: async () => {},
-        sendRequest: async () => ({}),
-      } as any;
-
-      // Valid output should work
-      expect((tool.handler as any)(mockExtra)).resolves.toBeDefined();
-    });
-
-    it("tool enable/disable/update/remove trigger sendToolListChanged", async () => {
-      await app.connect(appTransport);
-
-      const tool = app.registerTool(
-        "test-tool",
-        {
-          description: "Test tool",
-        },
-        async (_extra: any) => ({ content: [] }),
-      );
-
-      // The methods should not throw when connected
-      expect(() => tool.disable()).not.toThrow();
-      expect(() => tool.enable()).not.toThrow();
-      expect(() => tool.update({ description: "Updated" })).not.toThrow();
-      expect(() => tool.remove()).not.toThrow();
-    });
-  });
-
-  describe("AppBridge -> App tool requests", () => {
-    beforeEach(async () => {
-      await bridge.connect(bridgeTransport);
+    afterEach(() => {
+      warn.mockRestore();
     });
 
     it("bridge.callTool calls app.oncalltool handler", async () => {
-      // App needs tool capabilities to handle tool calls
-      const appCapabilities = { tools: {} };
-      app = new App(testAppInfo, appCapabilities, { autoResize: false });
+      app = new App(testAppInfo, { tools: {} }, { autoResize: false });
 
       const receivedCalls: unknown[] = [];
 
@@ -1077,32 +810,18 @@ describe("App <-> AppBridge integration", () => {
     });
 
     it("bridge.listTools calls app.onlisttools handler", async () => {
-      // App needs tool capabilities to handle tool list requests
-      const appCapabilities = { tools: {} };
-      app = new App(testAppInfo, appCapabilities, { autoResize: false });
+      app = new App(testAppInfo, { tools: {} }, { autoResize: false });
 
       const receivedCalls: unknown[] = [];
 
       app.onlisttools = async (params, _extra) => {
         receivedCalls.push(params);
         return {
-          tools: [
-            {
-              name: "tool1",
-              description: "First tool",
-              inputSchema: { type: "object", properties: {} },
-            },
-            {
-              name: "tool2",
-              description: "Second tool",
-              inputSchema: { type: "object", properties: {} },
-            },
-            {
-              name: "tool3",
-              description: "Third tool",
-              inputSchema: { type: "object", properties: {} },
-            },
-          ],
+          tools: ["tool1", "tool2", "tool3"].map((name) => ({
+            name,
+            description: `The ${name} tool`,
+            inputSchema: { type: "object" as const, properties: {} },
+          })),
         };
       };
 
@@ -1111,715 +830,294 @@ describe("App <-> AppBridge integration", () => {
       const result = await bridge.listTools({});
 
       expect(receivedCalls).toHaveLength(1);
-      expect(result.tools).toHaveLength(3);
-      expect(result.tools[0].name).toBe("tool1");
-      expect(result.tools[1].name).toBe("tool2");
-      expect(result.tools[2].name).toBe("tool3");
+      expect(result.tools.map((t) => t.name)).toEqual([
+        "tool1",
+        "tool2",
+        "tool3",
+      ]);
     });
-  });
 
-  describe("App tool capabilities", () => {
-    it("App with tool capabilities can handle tool calls", async () => {
-      const appCapabilities = { tools: { listChanged: true } };
-      app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-      const receivedCalls: unknown[] = [];
+    it("surfaces an error thrown by the oncalltool handler to the host", async () => {
+      app = new App(testAppInfo, { tools: {} }, { autoResize: false });
       app.oncalltool = async (params) => {
-        receivedCalls.push(params);
-        return {
-          content: [{ type: "text", text: "Success" }],
-        };
-      };
-
-      await bridge.connect(bridgeTransport);
-      await app.connect(appTransport);
-
-      await bridge.callTool({
-        name: "test-tool",
-        arguments: {},
-      });
-
-      expect(receivedCalls).toHaveLength(1);
-    });
-
-    it("registered tool is invoked via oncalltool", async () => {
-      const appCapabilities = { tools: { listChanged: true } };
-      app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-      const tool = app.registerTool(
-        "greet",
-        {
-          description: "Greets user",
-          inputSchema: z.object({ name: z.string() }),
-        },
-        async (args: any) => ({
-          content: [{ type: "text" as const, text: `Hello, ${args.name}!` }],
-        }),
-      );
-
-      app.oncalltool = async (params, extra) => {
-        if (params.name === "greet") {
-          return await (tool.handler as any)(params.arguments || {}, extra);
-        }
         throw new Error(`Unknown tool: ${params.name}`);
       };
-
-      await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
 
-      const result = await bridge.callTool({
-        name: "greet",
-        arguments: { name: "Alice" },
-      });
+      await expect(bridge.callTool({ name: "nope" })).rejects.toThrow(
+        "Unknown tool: nope",
+      );
+    });
 
-      expect(result.content).toEqual([{ type: "text", text: "Hello, Alice!" }]);
+    it("leaves declaring the tools capability to the caller: the raw handlers need it, the host sees it", async () => {
+      expect(() => {
+        app.oncalltool = async () => ({ content: [] });
+      }).toThrow(/tool capability/);
+      expect(() => {
+        app.onlisttools = async () => ({ tools: [] });
+      }).toThrow(/tool capability/);
+
+      const capabilities = { tools: { listChanged: true } };
+      app = new App(testAppInfo, capabilities, { autoResize: false });
+      app.oncalltool = async () => ({ content: [] });
+      await app.connect(appTransport);
+      expect(bridge.getAppCapabilities()?.tools).toEqual({ listChanged: true });
+    });
+
+    it("app.sendToolListChanged() notifies the host", async () => {
+      app = new App(
+        testAppInfo,
+        { tools: { listChanged: true } },
+        { autoResize: false },
+      );
+      const received: unknown[] = [];
+      bridge.setNotificationHandler(
+        "notifications/tools/list_changed",
+        (notification) => void received.push(notification.params),
+      );
+      await app.connect(appTransport);
+
+      await app.sendToolListChanged();
+      await flush();
+
+      expect(received).toHaveLength(1);
     });
   });
 
-  describe("Automatic request handlers", () => {
+  describe("WebMCP tools (reserved Sandbox requests)", () => {
+    /** Stand-in for the Sandbox proxy's relay: answers the reserved requests. */
+    const answerWith = (
+      method: "ui/sandbox-list-tools" | "ui/sandbox-call-tool",
+      handler: (params: any) => unknown,
+    ) =>
+      app.setRequestHandler(
+        method,
+        { params: z.any(), result: z.any() },
+        handler,
+      );
+
     beforeEach(async () => {
       await bridge.connect(bridgeTransport);
     });
 
-    describe("oncalltool automatic handler", () => {
-      it("automatically calls registered tool without manual oncalltool setup", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        // Register a tool
-        app.registerTool(
-          "greet",
-          {
-            description: "Greets user",
-            inputSchema: z.object({ name: z.string() }),
-          },
-          async (args: any) => ({
-            content: [{ type: "text" as const, text: `Hello, ${args.name}!` }],
-          }),
-        );
-
-        await app.connect(appTransport);
-
-        // Call the tool through bridge - should work automatically
-        const result = await bridge.callTool({
-          name: "greet",
-          arguments: { name: "Bob" },
-        });
-
-        expect(result.content).toEqual([{ type: "text", text: "Hello, Bob!" }]);
-      });
-
-      it("throws error when calling non-existent tool", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        // Register a tool to initialize handlers
-        app.registerTool("existing-tool", {}, async (_args: any) => ({
-          content: [],
-        }));
-
-        await app.connect(appTransport);
-
-        // Try to call a tool that doesn't exist
-        expect(
-          bridge.callTool({
-            name: "nonexistent",
-            arguments: {},
-          }),
-        ).rejects.toThrow("Tool nonexistent not found");
-      });
-
-      it("handles multiple registered tools correctly", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        // Register multiple tools
-        app.registerTool(
-          "add",
-          {
-            description: "Add two numbers",
-            inputSchema: z.object({ a: z.number(), b: z.number() }),
-          },
-          async (args: any) => ({
-            content: [
-              {
-                type: "text" as const,
-                text: `Result: ${args.a + args.b}`,
-              },
-            ],
-            structuredContent: { result: args.a + args.b },
-          }),
-        );
-
-        app.registerTool(
-          "multiply",
-          {
-            description: "Multiply two numbers",
-            inputSchema: z.object({ a: z.number(), b: z.number() }),
-          },
-          async (args: any) => ({
-            content: [
-              {
-                type: "text" as const,
-                text: `Result: ${args.a * args.b}`,
-              },
-            ],
-            structuredContent: { result: args.a * args.b },
-          }),
-        );
-
-        await app.connect(appTransport);
-
-        // Call first tool
-        const addResult = await bridge.callTool({
-          name: "add",
-          arguments: { a: 5, b: 3 },
-        });
-        expect(addResult.content).toEqual([
-          { type: "text", text: "Result: 8" },
-        ]);
-
-        // Call second tool
-        const multiplyResult = await bridge.callTool({
-          name: "multiply",
-          arguments: { a: 5, b: 3 },
-        });
-        expect(multiplyResult.content).toEqual([
-          { type: "text", text: "Result: 15" },
-        ]);
-      });
-
-      it("respects tool enable/disable state", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        const tool = app.registerTool(
-          "test-tool",
-          {
-            description: "Test tool",
-          },
-          async (_args: any) => ({
-            content: [{ type: "text" as const, text: "Success" }],
-          }),
-        );
-
-        await app.connect(appTransport);
-
-        // Should work when enabled
-        expect(
-          bridge.callTool({ name: "test-tool", arguments: {} }),
-        ).resolves.toBeDefined();
-
-        // Disable tool
-        tool.disable();
-
-        // Should throw when disabled
-        expect(
-          bridge.callTool({ name: "test-tool", arguments: {} }),
-        ).rejects.toThrow("Tool test-tool is disabled");
-      });
-
-      it("validates input schema through automatic handler", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        app.registerTool(
-          "strict-tool",
-          {
-            description: "Requires specific input",
-            inputSchema: z.object({
-              required: z.string(),
-              optional: z.number().optional(),
-            }) as any,
-          },
-          async (args: any) => ({
-            content: [{ type: "text" as const, text: `Got: ${args.required}` }],
-          }),
-        );
-
-        await app.connect(appTransport);
-
-        // Valid input should work
-        expect(
-          bridge.callTool({
-            name: "strict-tool",
-            arguments: { required: "hello" },
-          }),
-        ).resolves.toBeDefined();
-
-        // Invalid input should fail
-        expect(
-          bridge.callTool({
-            name: "strict-tool",
-            arguments: { wrong: "field" },
-          }),
-        ).rejects.toThrow("Invalid input for tool strict-tool");
-      });
-
-      it("validates output schema through automatic handler", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        app.registerTool(
-          "validated-output",
-          {
-            description: "Has output validation",
-            outputSchema: z.object({
-              status: z.enum(["success", "error"]),
-            }) as any,
-          },
-          async (_args: any) => ({
-            content: [{ type: "text" as const, text: "Done" }],
-            structuredContent: { status: "success" },
-          }),
-        );
-
-        await app.connect(appTransport);
-
-        // Valid output should work
-        const result = await bridge.callTool({
-          name: "validated-output",
-          arguments: {},
-        });
-        expect(result).toBeDefined();
-      });
-
-      it("works after tool is removed and re-registered", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        const tool = app.registerTool(
-          "dynamic-tool",
-          {},
-          async (_args: any) => ({
-            content: [{ type: "text" as const, text: "Version 1" }],
-          }),
-        );
-
-        await app.connect(appTransport);
-
-        // First version
-        let result = await bridge.callTool({
-          name: "dynamic-tool",
-          arguments: {},
-        });
-        expect(result.content).toEqual([{ type: "text", text: "Version 1" }]);
-
-        // Remove tool
-        tool.remove();
-
-        // Should fail after removal
-        expect(
-          bridge.callTool({ name: "dynamic-tool", arguments: {} }),
-        ).rejects.toThrow("Tool dynamic-tool not found");
-
-        // Re-register with different behavior
-        app.registerTool("dynamic-tool", {}, async (_args: any) => ({
-          content: [{ type: "text" as const, text: "Version 2" }],
-        }));
-
-        // Should work with new version
-        result = await bridge.callTool({
-          name: "dynamic-tool",
-          arguments: {},
-        });
-        expect(result.content).toEqual([{ type: "text", text: "Version 2" }]);
-      });
-    });
-
-    describe("onlisttools automatic handler", () => {
-      it("automatically returns list of registered tool names", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        // Register some tools
-        app.registerTool("tool1", {}, async (_args: any) => ({
-          content: [],
-        }));
-        app.registerTool("tool2", {}, async (_args: any) => ({
-          content: [],
-        }));
-        app.registerTool("tool3", {}, async (_args: any) => ({
-          content: [],
-        }));
-
-        await app.connect(appTransport);
-
-        const result = await bridge.listTools({});
-
-        expect(result.tools).toHaveLength(3);
-        expect(result.tools.map((t) => t.name)).toContain("tool1");
-        expect(result.tools.map((t) => t.name)).toContain("tool2");
-        expect(result.tools.map((t) => t.name)).toContain("tool3");
-      });
-
-      it("emits core MCP Tool fields (title, outputSchema only when provided)", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        app.registerTool(
-          "with-output",
-          {
-            title: "With Output",
-            description: "has structured output",
-            outputSchema: z.object({ ok: z.boolean() }),
-          },
-          async () => ({
-            content: [],
-            structuredContent: { ok: true },
-          }),
-        );
-        app.registerTool(
-          "no-output",
-          { description: "no structured output" },
-          async () => ({ content: [] }),
-        );
-
-        await app.connect(appTransport);
-        const result = await bridge.listTools({});
-        const byName = Object.fromEntries(result.tools.map((t) => [t.name, t]));
-
-        expect(byName["with-output"].title).toBe("With Output");
-        expect(byName["with-output"].inputSchema).toBeDefined();
-        expect(byName["with-output"].outputSchema).toBeDefined();
-        // outputSchema is optional in core MCP — omitted when not declared
-        expect(byName["no-output"]).not.toHaveProperty("outputSchema");
-        expect(byName["no-output"].inputSchema).toBeDefined();
-      });
-
-      it("accepts any Standard Schema implementation, not only zod", async () => {
-        // Hand-rolled StandardSchemaWithJSON — proves registerTool has no
-        // zod-specific runtime path. Any library implementing the spec
-        // (ArkType, Valibot, …) works the same way.
-        type Point = { x: number; y: number };
-        const PointSchema = {
-          "~standard": {
-            version: 1 as const,
-            vendor: "test",
-            types: undefined as
-              | undefined
-              | { readonly input: Point; readonly output: Point },
-            validate: (v: unknown) =>
-              typeof v === "object" &&
-              v !== null &&
-              typeof (v as any).x === "number" &&
-              typeof (v as any).y === "number"
-                ? { value: v as { x: number; y: number } }
-                : { issues: [{ message: "expected {x:number,y:number}" }] },
-            jsonSchema: {
-              input: () => ({
-                type: "object",
-                properties: { x: { type: "number" }, y: { type: "number" } },
-                required: ["x", "y"],
-              }),
-              output: () => ({
-                type: "object",
-                properties: { x: { type: "number" }, y: { type: "number" } },
-              }),
-            },
-          },
+    it("listWebMcpTools sends ui/sandbox-list-tools and parses a ListToolsResult", async () => {
+      const received: unknown[] = [];
+      answerWith("ui/sandbox-list-tools", (params) => {
+        received.push(params);
+        return {
+          tools: [{ name: "t", inputSchema: { type: "object" } }],
+          nextCursor: "next",
         };
-
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-        app.registerTool(
-          "translate",
-          { inputSchema: PointSchema, outputSchema: PointSchema },
-          async ({ x, y }) => ({
-            content: [],
-            structuredContent: { x: x + 1, y: y + 1 },
-          }),
-        );
-        await app.connect(appTransport);
-
-        const list = await bridge.listTools({});
-        expect(list.tools[0].inputSchema).toEqual({
-          type: "object",
-          properties: { x: { type: "number" }, y: { type: "number" } },
-          required: ["x", "y"],
-        });
-        expect(list.tools[0].outputSchema).toBeDefined();
-
-        const ok = await bridge.callTool({
-          name: "translate",
-          arguments: { x: 1, y: 2 },
-        });
-        expect(ok.structuredContent).toEqual({ x: 2, y: 3 });
-
-        expect(
-          bridge.callTool({ name: "translate", arguments: { x: "bad" } }),
-        ).rejects.toThrow(/Invalid input for tool translate/);
       });
+      await app.connect(appTransport);
 
-      it("rejects listTools when a tool schema does not implement Standard JSON Schema", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-        app.registerTool(
-          "broken",
-          {
-            inputSchema: {
-              "~standard": {
-                version: 1 as const,
-                vendor: "mystery",
-                validate: () => ({ value: {} }),
-              },
-            },
-          },
-          async () => ({ content: [] }),
-        );
-        await app.connect(appTransport);
+      const result = await bridge.listWebMcpTools({ cursor: "c1" });
+      expect(received).toEqual([{ cursor: "c1" }]);
+      expect(result.tools.map((t) => t.name)).toEqual(["t"]);
+      expect(result.nextCursor).toBe("next");
+      await bridge.listWebMcpTools(); // params are optional
+      expect(received).toHaveLength(2);
+    });
 
-        expect(bridge.listTools({})).rejects.toThrow(
-          /does not implement Standard JSON Schema/,
-        );
+    it("callWebMcpTool sends ui/sandbox-call-tool and parses a CallToolResult, isError included", async () => {
+      const received: any[] = [];
+      answerWith("ui/sandbox-call-tool", (params) => {
+        received.push(params);
+        return params.name === "fails"
+          ? { content: [{ type: "text", text: "no" }], isError: true }
+          : { content: [], structuredContent: { sum: 3 } };
       });
+      await app.connect(appTransport);
 
-      it("returns empty list when no tools registered", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        // Register a tool to ensure handlers are initialized
-        const dummyTool = app.registerTool("dummy", {}, async () => ({
-          content: [],
-        }));
-
-        await app.connect(appTransport);
-
-        // Remove the tool after connecting
-        dummyTool.remove();
-
-        const result = await bridge.listTools({});
-
-        expect(result.tools).toEqual([]);
+      expect(
+        await bridge.callWebMcpTool({ name: "add", arguments: { a: 1 } }),
+      ).toEqual({ content: [], structuredContent: { sum: 3 } });
+      expect(await bridge.callWebMcpTool({ name: "fails" })).toEqual({
+        content: [{ type: "text", text: "no" }],
+        isError: true,
       });
+      expect(received).toEqual([
+        { name: "add", arguments: { a: 1 } },
+        { name: "fails" },
+      ]);
+    });
 
-      it("updates list when tools are added", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
+    it("rejects when the peer does not implement the requests or answers with something else", async () => {
+      await app.connect(appTransport);
+      await expect(bridge.listWebMcpTools()).rejects.toThrow(
+        /method not found/i,
+      );
+      await expect(bridge.callWebMcpTool({ name: "t" })).rejects.toThrow(
+        /method not found/i,
+      );
 
-        await app.connect(appTransport);
+      answerWith("ui/sandbox-list-tools", () => ({ tools: "nope" }));
+      answerWith("ui/sandbox-call-tool", () => ({ content: "nope" }));
+      await expect(bridge.listWebMcpTools()).rejects.toThrow();
+      await expect(bridge.callWebMcpTool({ name: "t" })).rejects.toThrow();
+    });
 
-        // Register then remove a tool to initialize handlers
-        const dummy = app.registerTool("init", {}, async () => ({
-          content: [],
-        }));
-        dummy.remove();
+    it("onwebmcptoolschange and addEventListener fire on ui/notifications/sandbox-tools-changed", async () => {
+      const handled: unknown[] = [];
+      const listened: unknown[] = [];
+      const handler = (params: unknown) => void handled.push(params);
+      expect(bridge.onwebmcptoolschange).toBeUndefined();
+      bridge.onwebmcptoolschange = handler;
+      expect(bridge.onwebmcptoolschange).toBe(handler);
+      bridge.addEventListener(
+        "webmcptoolschange",
+        (p) => void listened.push(p),
+      );
+      await app.connect(appTransport);
 
-        // Initially no tools
-        let result = await bridge.listTools({});
-        expect(result.tools).toEqual([]);
+      const changed = {
+        jsonrpc: "2.0" as const,
+        method: "ui/notifications/sandbox-tools-changed",
+      };
+      await appTransport.send(changed);
+      await flush();
+      expect(handled).toHaveLength(1);
+      expect(listened).toHaveLength(1);
 
-        // Add a tool
-        app.registerTool("new-tool", {}, async (_args: any) => ({
-          content: [],
-        }));
+      bridge.onwebmcptoolschange = undefined;
+      expect(bridge.onwebmcptoolschange).toBeUndefined();
+      await appTransport.send(changed);
+      await flush();
+      expect(handled).toHaveLength(1);
+      expect(listened).toHaveLength(2);
+    });
+  });
 
-        // Should now include the new tool
-        result = await bridge.listTools({});
-        expect(result.tools.map((t) => t.name)).toEqual(["new-tool"]);
+  describe("App.registerTool does not use the wire", () => {
+    let warn: ReturnType<typeof spyOn<Console, "warn">>;
 
-        // Add another tool
-        app.registerTool("another-tool", {}, async (_args: any) => ({
-          content: [],
-        }));
-
-        // Should now include both tools
-        result = await bridge.listTools({});
-        expect(result.tools).toHaveLength(2);
-        expect(result.tools.map((t) => t.name)).toContain("new-tool");
-        expect(result.tools.map((t) => t.name)).toContain("another-tool");
-      });
-
-      it("updates list when tools are removed", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        const tool1 = app.registerTool("tool1", {}, async (_args: any) => ({
-          content: [],
-        }));
-        const tool2 = app.registerTool("tool2", {}, async (_args: any) => ({
-          content: [],
-        }));
-        app.registerTool("tool3", {}, async (_args: any) => ({
-          content: [],
-        }));
-
-        await app.connect(appTransport);
-
-        // Initially all three tools
-        let result = await bridge.listTools({});
-        expect(result.tools).toHaveLength(3);
-
-        // Remove one tool
-        tool2.remove();
-
-        // Should now have two tools
-        result = await bridge.listTools({});
-        expect(result.tools).toHaveLength(2);
-        expect(result.tools.map((t) => t.name)).toContain("tool1");
-        expect(result.tools.map((t) => t.name)).toContain("tool3");
-        expect(result.tools.map((t) => t.name)).not.toContain("tool2");
-
-        // Remove another tool
-        tool1.remove();
-
-        // Should now have one tool
-        result = await bridge.listTools({});
-        expect(result.tools.map((t) => t.name)).toEqual(["tool3"]);
-      });
-
-      it("only includes enabled tools in list", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
-
-        app.registerTool("enabled-tool", {}, async (_args: any) => ({
-          content: [],
-        }));
-        const tool2 = app.registerTool(
-          "disabled-tool",
-          {},
-          async (_args: any) => ({
-            content: [],
-          }),
-        );
-
-        await app.connect(appTransport);
-
-        // Disable one tool after connecting
-        tool2.disable();
-
-        const result = await bridge.listTools({});
-
-        // Only enabled tool should be in the list
-        expect(result.tools).toHaveLength(1);
-        expect(result.tools.map((t) => t.name)).toContain("enabled-tool");
-        expect(result.tools.map((t) => t.name)).not.toContain("disabled-tool");
+    beforeEach(() => {
+      warn = spyOn(console, "warn").mockImplementation(() => {});
+      // A View whose browser (or the host) provides WebMCP.
+      Object.assign(globalThis, {
+        document: { modelContext: { registerTool: async () => {} } },
       });
     });
 
-    describe("Integration: automatic handlers with tool lifecycle", () => {
-      it("handles complete tool lifecycle: register -> call -> update -> call -> remove", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
-        app = new App(testAppInfo, appCapabilities, { autoResize: false });
+    afterEach(() => {
+      warn.mockRestore();
+      Reflect.deleteProperty(globalThis, "document");
+    });
 
-        await app.connect(appTransport);
+    it("declares no tools capability and leaves tools/list, tools/call and list_changed unanswered/unsent", async () => {
+      app = new App(testAppInfo, {}, { autoResize: false });
+      const listChanged: unknown[] = [];
+      bridge.setNotificationHandler(
+        "notifications/tools/list_changed",
+        (notification) => void listChanged.push(notification),
+      );
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
 
-        // Register tool
-        const tool = app.registerTool(
-          "counter",
-          {
-            description: "A counter tool",
-          },
-          async (_args: any) => ({
-            content: [{ type: "text" as const, text: "Count: 1" }],
-            structuredContent: { count: 1 },
-          }),
-        );
+      const tool = app.registerTool("greet", {}, async () => ({ content: [] }));
+      tool.disable();
+      tool.enable();
+      tool.update({ description: "changed" });
+      await flush();
 
-        // List should include the tool
-        let listResult = await bridge.listTools({});
-        expect(listResult.tools.map((t) => t.name)).toContain("counter");
+      expect(bridge.getAppCapabilities()?.tools).toBeUndefined();
+      await expect(bridge.listTools({})).rejects.toThrow(/method not found/i);
+      await expect(bridge.callTool({ name: "greet" })).rejects.toThrow(
+        /method not found/i,
+      );
+      expect(listChanged).toEqual([]);
+    });
+  });
 
-        // Call the tool
-        let callResult = await bridge.callTool({
-          name: "counter",
-          arguments: {},
-        });
-        expect(callResult.content).toEqual([
-          { type: "text", text: "Count: 1" },
-        ]);
+  describe("sendSandboxResourceReady", () => {
+    const html = "<!DOCTYPE html><html><body>view</body></html>";
 
-        // Update tool description
-        tool.update({ description: "An updated counter tool" });
+    /** A host whose transport records what it sends to the sandbox. */
+    async function connectCapturingBridge(options?: {
+      modelContextPolyfill?: boolean;
+    }) {
+      const sent: Array<{ method?: string; params?: any }> = [];
+      const transport = {
+        async start() {},
+        async send(message: object) {
+          sent.push(message);
+        },
+        async close() {},
+      };
+      const capturing = new AppBridge(
+        null,
+        testHostInfo,
+        testHostCapabilities,
+        options,
+      );
+      await capturing.connect(transport);
+      return { bridge: capturing, sent };
+    }
+    /** The View HTML above has no script of its own. */
+    const countPolyfills = (text: string) =>
+      (text.match(/<script>/g) ?? []).length;
 
-        // Should still be callable
-        callResult = await bridge.callTool({
-          name: "counter",
-          arguments: {},
-        });
-        expect(callResult).toBeDefined();
+    it("injects the WebMCP polyfill into the HTML exactly once by default, keeping the doctype first", async () => {
+      const { bridge, sent } = await connectCapturingBridge();
+      await bridge.sendSandboxResourceReady({ html });
 
-        // Remove tool
-        tool.remove();
+      expect(sent).toHaveLength(1);
+      expect(sent[0].method).toBe("ui/notifications/sandbox-resource-ready");
+      const sentHtml = sent[0].params.html as string;
+      expect(sentHtml.startsWith("<!DOCTYPE html><script>")).toBe(true);
+      expect(sentHtml.endsWith("<html><body>view</body></html>")).toBe(true);
+      expect(countPolyfills(sentHtml)).toBe(1);
+      expect(sentHtml).toBe(injectModelContextPolyfill(html));
+    });
 
-        // Should no longer be in list
-        listResult = await bridge.listTools({});
-        expect(listResult.tools.map((t) => t.name)).not.toContain("counter");
+    it("injects into each send independently, never compounding", async () => {
+      const { bridge, sent } = await connectCapturingBridge();
+      await bridge.sendSandboxResourceReady({ html });
+      await bridge.sendSandboxResourceReady({ html });
 
-        // Should no longer be callable
-        expect(
-          bridge.callTool({ name: "counter", arguments: {} }),
-        ).rejects.toThrow("Tool counter not found");
+      expect(sent.map((m) => countPolyfills(m.params.html))).toEqual([1, 1]);
+      expect(sent[1].params.html).toBe(sent[0].params.html);
+    });
+
+    it("sends the HTML untouched when modelContextPolyfill is false", async () => {
+      const { bridge, sent } = await connectCapturingBridge({
+        modelContextPolyfill: false,
       });
+      await bridge.sendSandboxResourceReady({ html });
 
-      it("multiple apps can have separate tool registries", async () => {
-        const appCapabilities = { tools: { listChanged: true } };
+      expect(sent[0].params).toEqual({ html });
+    });
 
-        // Create two separate apps
-        const app1 = new App(
-          { name: "App1", version: "1.0.0" },
-          appCapabilities,
-          { autoResize: false },
-        );
-        const app2 = new App(
-          { name: "App2", version: "1.0.0" },
-          appCapabilities,
-          { autoResize: false },
-        );
-
-        // Create separate transports for each app
-        const [app1Transport, bridge1Transport] =
-          InMemoryTransport.createLinkedPair();
-        const [app2Transport, bridge2Transport] =
-          InMemoryTransport.createLinkedPair();
-
-        const bridge1 = new AppBridge(
-          createMockClient() as Client,
-          testHostInfo,
-          testHostCapabilities,
-        );
-        const bridge2 = new AppBridge(
-          createMockClient() as Client,
-          testHostInfo,
-          testHostCapabilities,
-        );
-
-        // Register different tools in each app
-        app1.registerTool("app1-tool", {}, async (_args: any) => ({
-          content: [{ type: "text" as const, text: "From App1" }],
-        }));
-
-        app2.registerTool("app2-tool", {}, async (_args: any) => ({
-          content: [{ type: "text" as const, text: "From App2" }],
-        }));
-
-        await bridge1.connect(bridge1Transport);
-        await bridge2.connect(bridge2Transport);
-        await app1.connect(app1Transport);
-        await app2.connect(app2Transport);
-
-        // Each app should only see its own tools
-        const list1 = await bridge1.listTools({});
-        expect(list1.tools.map((t) => t.name)).toEqual(["app1-tool"]);
-
-        const list2 = await bridge2.listTools({});
-        expect(list2.tools.map((t) => t.name)).toEqual(["app2-tool"]);
-
-        // Each app should only be able to call its own tools
-        expect(
-          bridge1.callTool({ name: "app1-tool", arguments: {} }),
-        ).resolves.toBeDefined();
-
-        expect(
-          bridge1.callTool({ name: "app2-tool", arguments: {} }),
-        ).rejects.toThrow("Tool app2-tool not found");
-
-        // Clean up
-        await app1Transport.close();
-        await bridge1Transport.close();
-        await app2Transport.close();
-        await bridge2Transport.close();
+    it("injects when modelContextPolyfill is explicitly true", async () => {
+      const { bridge, sent } = await connectCapturingBridge({
+        modelContextPolyfill: true,
       });
+      await bridge.sendSandboxResourceReady({ html });
+      expect(countPolyfills(sent[0].params.html)).toBe(1);
+    });
+
+    it("leaves params without a string html untouched instead of throwing", async () => {
+      const { bridge, sent } = await connectCapturingBridge();
+      const params = { html: undefined, sandbox: "allow-scripts" } as never;
+      await bridge.sendSandboxResourceReady(params);
+      expect(sent[0].params).toEqual({ sandbox: "allow-scripts" });
+    });
+
+    it("preserves the other params, and does not mutate the caller's object", async () => {
+      const { bridge, sent } = await connectCapturingBridge();
+      const params = Object.freeze({
+        html,
+        sandbox: "allow-scripts allow-same-origin",
+        csp: { connectDomains: ["https://api.example.com"] },
+        permissions: { camera: {} },
+      });
+      await bridge.sendSandboxResourceReady(params);
+
+      expect(sent[0].params).toEqual({
+        ...params,
+        html: injectModelContextPolyfill(html),
+      });
+      expect(params.html).toBe(html);
     });
   });
 

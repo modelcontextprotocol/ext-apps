@@ -2583,7 +2583,7 @@ async function handleGetViewerState(requestId: string): Promise<void> {
 /**
  * Collect text and/or screenshots for a set of page intervals.
  * Shared by the server-driven `get_pages` command (via handleGetPages)
- * and the app-registered `get_text` / `get_screenshot` tools.
+ * and the WebMCP `get_text` / `get_screenshot` tools.
  */
 async function collectPageData(
   intervals: Array<{ start?: number; end?: number }>,
@@ -5174,12 +5174,17 @@ app.onteardown = async () => {
 app.onhostcontextchanged = handleHostContextChanged;
 
 // =============================================================================
-// App-registered tools — 1:1 with the server's `interact` commands.
+// WebMCP tools — 1:1 with the server's `interact` commands.
 //
 // Each tool constructs the matching PdfCommand and dispatches through
 // processCommands(), so the command-handling logic lives in exactly one
 // place. The server-side `interact` tool remains for hosts that don't
-// support app-registered tools.
+// expose WebMCP tools from the View.
+//
+// Tools are registered on `document.modelContext` (WebMCP). The Host injects a
+// polyfill into the View and exposes each tool to the model as an MCP tool:
+// `execute()` returns plain data (surfaced as `structuredContent`) and throws
+// to report an error.
 // =============================================================================
 
 /** Shared zod shapes mirroring server.ts interact schema. */
@@ -5192,37 +5197,54 @@ const PageIntervalSchema = z.object({
   end: z.number().min(1).optional(),
 });
 
-/** Dispatch a command via processCommands and return a text result. */
+/**
+ * Register a WebMCP tool whose input is validated against a zod schema (the
+ * same schema also provides the tool's JSON Schema). No-op when the Host
+ * doesn't provide `document.modelContext`.
+ */
+function registerViewerTool<S extends z.ZodType>(
+  name: string,
+  config: Pick<WebMCP.ModelContextTool, "title" | "description">,
+  schema: S,
+  run: (input: z.output<S>) => Promise<unknown>,
+): void {
+  document.modelContext
+    ?.registerTool({
+      name,
+      ...config,
+      inputSchema: z.toJSONSchema(schema, { io: "input" }),
+      execute: async (input) => run(schema.parse(input)),
+    })
+    .catch((err: unknown) =>
+      log.error(`Failed to register tool "${name}":`, err),
+    );
+}
+
+function assertDocumentLoaded(): void {
+  if (!pdfDocument) throw new Error("No document loaded");
+}
+
+/** Dispatch a command via processCommands and return a short status message. */
 async function runCommand(
   cmd: PdfCommand,
   okText: string | (() => string),
-): Promise<CallToolResult> {
-  if (!pdfDocument) {
-    return {
-      content: [{ type: "text" as const, text: "Error: No document loaded" }],
-      isError: true,
-    };
-  }
+): Promise<{ message: string }> {
+  assertDocumentLoaded();
   await processCommands([cmd]);
-  const text = typeof okText === "function" ? okText() : okText;
-  return { content: [{ type: "text" as const, text }] };
+  return { message: typeof okText === "function" ? okText() : okText };
 }
 
-app.registerTool(
+registerViewerTool(
   "get-document-info",
   {
     title: "Get Document Info",
     description:
       "Get information about the current PDF document including title, current page, total pages, and zoom level",
   },
+  z.object({}),
   async () => {
-    if (!pdfDocument) {
-      return {
-        content: [{ type: "text" as const, text: "Error: No document loaded" }],
-        isError: true,
-      };
-    }
-    const info = {
+    assertDocumentLoaded();
+    return {
       title: pdfTitle || "Untitled",
       url: pdfUrl,
       currentPage,
@@ -5230,33 +5252,21 @@ app.registerTool(
       scale,
       displayMode: currentDisplayMode,
     };
-    return {
-      content: [{ type: "text" as const, text: JSON.stringify(info, null, 2) }],
-      structuredContent: info,
-    };
   },
 );
 
-app.registerTool(
+registerViewerTool(
   "navigate",
   {
     title: "Navigate",
     description: "Jump to a specific page in the document",
-    inputSchema: z.object({
-      page: z.number().int().min(1).describe("Page number (1-indexed)"),
-    }),
   },
+  z.object({
+    page: z.number().int().min(1).describe("Page number (1-indexed)"),
+  }),
   async ({ page }) => {
     if (pdfDocument && (page < 1 || page > totalPages)) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: Page ${page} out of range (1-${totalPages})`,
-          },
-        ],
-        isError: true,
-      };
+      throw new Error(`Page ${page} out of range (1-${totalPages})`);
     }
     return runCommand(
       { type: "navigate", page },
@@ -5265,16 +5275,16 @@ app.registerTool(
   },
 );
 
-app.registerTool(
+registerViewerTool(
   "search",
   {
     title: "Search",
     description:
       "Search for text and highlight matches in the viewer UI. Opens the search bar and jumps to the first match.",
-    inputSchema: z.object({
-      query: z.string().describe("Text to search for"),
-    }),
   },
+  z.object({
+    query: z.string().describe("Text to search for"),
+  }),
   async ({ query }) =>
     runCommand(
       { type: "search", query },
@@ -5282,16 +5292,16 @@ app.registerTool(
     ),
 );
 
-app.registerTool(
+registerViewerTool(
   "find",
   {
     title: "Find",
     description:
       "Silent search — locate matches without opening the search UI. Use before search_navigate.",
-    inputSchema: z.object({
-      query: z.string().describe("Text to search for"),
-    }),
   },
+  z.object({
+    query: z.string().describe("Text to search for"),
+  }),
   async ({ query }) =>
     runCommand(
       { type: "find", query },
@@ -5299,38 +5309,24 @@ app.registerTool(
     ),
 );
 
-app.registerTool(
+registerViewerTool(
   "search_navigate",
   {
     title: "Search Navigate",
     description:
       "Jump to the Nth search match (0-indexed). Call search or find first.",
-    inputSchema: z.object({
-      matchIndex: z.number().int().min(0).describe("Match index (0-indexed)"),
-    }),
   },
+  z.object({
+    matchIndex: z.number().int().min(0).describe("Match index (0-indexed)"),
+  }),
   async ({ matchIndex }) => {
     if (allMatches.length === 0) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: "Error: No search results. Call search or find first.",
-          },
-        ],
-        isError: true,
-      };
+      throw new Error("No search results. Call search or find first.");
     }
     if (matchIndex >= allMatches.length) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: matchIndex ${matchIndex} out of range (0-${allMatches.length - 1})`,
-          },
-        ],
-        isError: true,
-      };
+      throw new Error(
+        `matchIndex ${matchIndex} out of range (0-${allMatches.length - 1})`,
+      );
     }
     return runCommand(
       { type: "search_navigate", matchIndex },
@@ -5339,19 +5335,19 @@ app.registerTool(
   },
 );
 
-app.registerTool(
+registerViewerTool(
   "zoom",
   {
     title: "Zoom",
     description: "Set the zoom scale for the document",
-    inputSchema: z.object({
-      scale: z
-        .number()
-        .min(0.5)
-        .max(3.0)
-        .describe("Zoom scale, 1.0 = 100% (range: 0.5-3.0)"),
-    }),
   },
+  z.object({
+    scale: z
+      .number()
+      .min(0.5)
+      .max(3.0)
+      .describe("Zoom scale, 1.0 = 100% (range: 0.5-3.0)"),
+  }),
   async ({ scale }) =>
     runCommand(
       { type: "zoom", scale },
@@ -5359,21 +5355,21 @@ app.registerTool(
     ),
 );
 
-app.registerTool(
+registerViewerTool(
   "add_annotations",
   {
     title: "Add Annotations",
     description:
       "Add one or more annotations (highlight, note, rectangle, circle, line, stamp, image, freetext). Each needs id, type, page, and type-specific geometry.",
-    inputSchema: z.object({
-      annotations: z
-        .array(z.record(z.string(), z.any()))
-        .min(1)
-        .describe(
-          "Annotation objects. Each needs: id, type, page, plus type-specific fields (x, y, width, height, rects, color, content, etc.)",
-        ),
-    }),
   },
+  z.object({
+    annotations: z
+      .array(z.record(z.string(), z.any()))
+      .min(1)
+      .describe(
+        "Annotation objects. Each needs: id, type, page, plus type-specific fields (x, y, width, height, rects, color, content, etc.)",
+      ),
+  }),
   async ({ annotations }) =>
     runCommand(
       {
@@ -5384,19 +5380,19 @@ app.registerTool(
     ),
 );
 
-app.registerTool(
+registerViewerTool(
   "update_annotations",
   {
     title: "Update Annotations",
     description:
       "Patch existing annotations by id. Only id and type are required; other fields are merged.",
-    inputSchema: z.object({
-      annotations: z
-        .array(z.record(z.string(), z.any()))
-        .min(1)
-        .describe("Partial annotation objects. Each needs: id, type."),
-    }),
   },
+  z.object({
+    annotations: z
+      .array(z.record(z.string(), z.any()))
+      .min(1)
+      .describe("Partial annotation objects. Each needs: id, type."),
+  }),
   async ({ annotations }) =>
     runCommand(
       {
@@ -5410,15 +5406,15 @@ app.registerTool(
     ),
 );
 
-app.registerTool(
+registerViewerTool(
   "remove_annotations",
   {
     title: "Remove Annotations",
     description: "Delete annotations by id",
-    inputSchema: z.object({
-      ids: z.array(z.string()).min(1).describe("Annotation IDs to remove"),
-    }),
   },
+  z.object({
+    ids: z.array(z.string()).min(1).describe("Annotation IDs to remove"),
+  }),
   async ({ ids }) =>
     runCommand(
       { type: "remove_annotations", ids },
@@ -5426,24 +5422,24 @@ app.registerTool(
     ),
 );
 
-app.registerTool(
+registerViewerTool(
   "highlight_text",
   {
     title: "Highlight Text",
     description:
       "Auto-locate text and add a highlight annotation. Searches the document (or a specific page) and highlights the first match.",
-    inputSchema: z.object({
-      query: z.string().describe("Text to locate and highlight"),
-      page: z
-        .number()
-        .int()
-        .min(1)
-        .optional()
-        .describe("Restrict search to this page"),
-      color: z.string().optional().describe("Highlight color (CSS color)"),
-      content: z.string().optional().describe("Tooltip/note content"),
-    }),
   },
+  z.object({
+    query: z.string().describe("Text to locate and highlight"),
+    page: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe("Restrict search to this page"),
+    color: z.string().optional().describe("Highlight color (CSS color)"),
+    content: z.string().optional().describe("Tooltip/note content"),
+  }),
   async ({ query, page, color, content }) => {
     const id = `ht_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     return runCommand(
@@ -5453,20 +5449,20 @@ app.registerTool(
   },
 );
 
-app.registerTool(
+registerViewerTool(
   "fill_form",
   {
     title: "Fill Form",
     description: "Fill PDF form fields by name",
-    inputSchema: z.object({
-      fields: z
-        .array(FormFieldSchema)
-        .min(1)
-        .describe(
-          "Form fields: { name, value } where value is string or boolean",
-        ),
-    }),
   },
+  z.object({
+    fields: z
+      .array(FormFieldSchema)
+      .min(1)
+      .describe(
+        "Form fields: { name, value } where value is string or boolean",
+      ),
+  }),
   async ({ fields }) =>
     runCommand(
       { type: "fill_form", fields },
@@ -5474,94 +5470,53 @@ app.registerTool(
     ),
 );
 
-app.registerTool(
+registerViewerTool(
   "get_text",
   {
     title: "Get Text",
     description:
-      "Extract text from one or more pages. Returns one text block per page.",
-    inputSchema: z.object({
-      page: z
-        .number()
-        .int()
-        .min(1)
-        .optional()
-        .describe("Single page (shorthand for intervals: [{start:N, end:N}])"),
-      intervals: z
-        .array(PageIntervalSchema)
-        .optional()
-        .describe(
-          "Page ranges. Each has optional start/end. [{start:1,end:5}], [{}] = all pages. Max 20 pages.",
-        ),
-    }),
+      "Extract text from one or more pages. Returns the text of each page in `pages`.",
   },
+  z.object({
+    page: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe("Single page (shorthand for intervals: [{start:N, end:N}])"),
+    intervals: z
+      .array(PageIntervalSchema)
+      .optional()
+      .describe(
+        "Page ranges. Each has optional start/end. [{start:1,end:5}], [{}] = all pages. Max 20 pages.",
+      ),
+  }),
   async ({ page, intervals }) => {
-    if (!pdfDocument) {
-      return {
-        content: [{ type: "text" as const, text: "Error: No document loaded" }],
-        isError: true,
-      };
-    }
+    assertDocumentLoaded();
     const resolved = intervals ?? (page ? [{ start: page, end: page }] : [{}]);
-    const data = await collectPageData(resolved, true, false);
-    const parts = data
-      .filter((e) => e.text != null)
-      .map((e) => ({
-        type: "text" as const,
-        text: `--- Page ${e.page} ---\n${e.text}`,
-      }));
-    return {
-      content:
-        parts.length > 0
-          ? parts
-          : [{ type: "text" as const, text: "No text content returned" }],
-      structuredContent: { pages: data },
-    };
+    return { pages: await collectPageData(resolved, true, false) };
   },
 );
 
-app.registerTool(
+registerViewerTool(
   "get_screenshot",
   {
     title: "Get Screenshot",
-    description: "Render a page to a JPEG image for visual analysis",
-    inputSchema: z.object({
-      page: z.number().int().min(1).describe("Page number to render"),
-    }),
+    description:
+      "Render a page to a JPEG image for visual analysis. Returns the base64-encoded image in `data`.",
   },
+  z.object({
+    page: z.number().int().min(1).describe("Page number to render"),
+  }),
   async ({ page }) => {
-    if (!pdfDocument) {
-      return {
-        content: [{ type: "text" as const, text: "Error: No document loaded" }],
-        isError: true,
-      };
-    }
-    const data = await collectPageData(
+    assertDocumentLoaded();
+    const [entry] = await collectPageData(
       [{ start: page, end: page }],
       false,
       true,
     );
-    const entry = data[0];
-    if (entry?.image) {
-      return {
-        content: [
-          {
-            type: "image" as const,
-            data: entry.image,
-            mimeType: "image/jpeg",
-          },
-        ],
-      };
-    }
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Error: screenshot failed for page ${page}`,
-        },
-      ],
-      isError: true,
-    };
+    if (!entry?.image) throw new Error(`Screenshot failed for page ${page}`);
+    return { page, mimeType: "image/jpeg", data: entry.image };
   },
 );
 

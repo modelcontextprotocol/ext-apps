@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, spyOn } from "bun:test";
 import {
   InMemoryTransport,
   Server,
@@ -144,19 +144,29 @@ describe("App base MCP SDK v2 Protocol migration", () => {
     });
   });
 
-  it("preserves registered App tools with the base MCP SDK v2 Client handler context", async () => {
+  it("preserves App tool handlers with the base MCP SDK v2 Client handler context", async () => {
     const pair = await connectPair();
     connected.push(pair);
     let receivedSignal: AbortSignal | undefined;
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
 
-    pair.app.registerTool(
-      "greet",
-      { description: "Greets a person" },
-      async (extra) => {
+    try {
+      pair.app.onlisttools = async () => ({
+        tools: [
+          {
+            name: "greet",
+            description: "Greets a person",
+            inputSchema: { type: "object" as const, properties: {} },
+          },
+        ],
+      });
+      pair.app.oncalltool = async (_params, extra) => {
         receivedSignal = extra.mcpReq.signal;
         return { content: [{ type: "text", text: "hello" }] };
-      },
-    );
+      };
+    } finally {
+      warn.mockRestore();
+    }
 
     const listed = await pair.server.request({
       method: "tools/list",

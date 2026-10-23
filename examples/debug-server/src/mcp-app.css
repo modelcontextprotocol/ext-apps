@@ -129,8 +129,9 @@
 .log-type.ontoolcancelled { color: var(--color-warning); }
 .log-type.onhostcontextchanged { color: #7c3aed; }
 .log-type.onteardown { color: #f97316; }
-.log-type.oncalltool { color: #ec4899; }
-.log-type.onlisttools { color: #14b8a6; }
+.log-type.webmcp-execute { color: #ec4899; }
+.log-type.webmcp-toolchange { color: #14b8a6; }
+.log-type.webmcp-unavailable { color: var(--color-warning); }
 .log-type.onerror { color: var(--color-error); }
 .log-type.connected { color: var(--color-success); }
 .log-type.update-context { color: #0891b2; }

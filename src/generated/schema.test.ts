@@ -55,6 +55,18 @@ export type McpUiResourcePermissionsSchemaInferredType = z.infer<
   typeof generated.McpUiResourcePermissionsSchema
 >;
 
+export type McpUiSandboxListToolsRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiSandboxListToolsRequestSchema
+>;
+
+export type McpUiSandboxCallToolRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiSandboxCallToolRequestSchema
+>;
+
+export type McpUiSandboxToolsChangedNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiSandboxToolsChangedNotificationSchema
+>;
+
 export type McpUiSizeChangedNotificationSchemaInferredType = z.infer<
   typeof generated.McpUiSizeChangedNotificationSchema
 >;
@@ -212,6 +224,24 @@ expectType<spec.McpUiResourcePermissions>(
 );
 expectType<McpUiResourcePermissionsSchemaInferredType>(
   {} as spec.McpUiResourcePermissions,
+);
+expectType<spec.McpUiSandboxListToolsRequest>(
+  {} as McpUiSandboxListToolsRequestSchemaInferredType,
+);
+expectType<McpUiSandboxListToolsRequestSchemaInferredType>(
+  {} as spec.McpUiSandboxListToolsRequest,
+);
+expectType<spec.McpUiSandboxCallToolRequest>(
+  {} as McpUiSandboxCallToolRequestSchemaInferredType,
+);
+expectType<McpUiSandboxCallToolRequestSchemaInferredType>(
+  {} as spec.McpUiSandboxCallToolRequest,
+);
+expectType<spec.McpUiSandboxToolsChangedNotification>(
+  {} as McpUiSandboxToolsChangedNotificationSchemaInferredType,
+);
+expectType<McpUiSandboxToolsChangedNotificationSchemaInferredType>(
+  {} as spec.McpUiSandboxToolsChangedNotification,
 );
 expectType<spec.McpUiSizeChangedNotification>(
   {} as McpUiSizeChangedNotificationSchemaInferredType,
