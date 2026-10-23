@@ -180,7 +180,23 @@ ${Object.entries(VIDEO_LIBRARY)
       );
       return {
         contents: [
-          { uri: RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: html },
+          {
+            uri: RESOURCE_URI,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: html,
+            _meta: {
+              ui: {
+                // Media permissions a video player requests; the native controls
+                // use fullscreen and picture-in-picture
+                permissions: {
+                  fullscreen: {},
+                  "picture-in-picture": {},
+                  autoplay: {},
+                  "encrypted-media": {},
+                },
+              },
+            },
+          },
         ],
       };
     },
