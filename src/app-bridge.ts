@@ -98,7 +98,10 @@ export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./constants.js";
 import { RESOURCE_URI_META_KEY } from "./constants.js";
 
 type UntypedHandlerSetter = (this: unknown, ...args: unknown[]) => void;
-export { PostMessageTransport } from "./message-transport.js";
+export {
+  PostMessageTransport,
+  type PostMessageTransportOptions,
+} from "./message-transport.js";
 
 /**
  * Extract UI resource URI from tool metadata.

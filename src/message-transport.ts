@@ -1,11 +1,38 @@
-import { JSONRPCMessageSchema } from "@modelcontextprotocol/core";
+import {
+  JSONRPCMessageSchema,
+  LoggingLevelSchema,
+} from "@modelcontextprotocol/core";
 import type {
   JSONRPCMessage,
+  LoggingLevel,
   MessageExtraInfo,
   Transport,
   TransportSendOptions,
 } from "@modelcontextprotocol/client";
 import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types.js";
+
+/**
+ * Options for {@link PostMessageTransport `PostMessageTransport`}.
+ */
+export interface PostMessageTransportOptions {
+  /**
+   * Lowest level the transport writes to the console, using MCP's
+   * {@link https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging#log-levels log levels}.
+   * Messages below it are dropped.
+   *
+   * The transport logs message traffic at `"debug"`, so it stays out of the
+   * console unless this is `"debug"`. A malformed JSON-RPC message is logged
+   * at `"error"`; {@link PostMessageTransport.onerror `onerror`} is called
+   * either way.
+   *
+   * An unrecognized level falls back to the default.
+   *
+   * @default "warning"
+   */
+  logLevel?: LoggingLevel;
+}
+
+const LOG_LEVELS = LoggingLevelSchema.options;
 
 /**
  * JSON-RPC transport using `window.postMessage` for iframe↔parent communication.
@@ -38,6 +65,17 @@ import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types.js";
  * await bridge.connect(transport);
  * ```
  *
+ * ## Logging
+ *
+ * Message traffic is logged at `"debug"` and is off by default. Pass a
+ * {@link PostMessageTransportOptions.logLevel `logLevel`} to see it:
+ *
+ * ```ts source="./message-transport.examples.ts#PostMessageTransport_logLevel"
+ * const transport = new PostMessageTransport(window.parent, window.parent, {
+ *   logLevel: "debug",
+ * });
+ * ```
+ *
  * @see {@link app!App.connect `App.connect`} for View usage
  * @see {@link app-bridge!AppBridge.connect `AppBridge.connect`} for Host usage
  */
@@ -46,6 +84,7 @@ export class PostMessageTransport implements Transport {
     this: Window,
     ev: WindowEventMap["message"],
   ) => any | undefined;
+  private readonly minLogSeverity: number;
 
   /**
    * Create a new PostMessageTransport.
@@ -53,6 +92,8 @@ export class PostMessageTransport implements Transport {
    * @param eventTarget - Target window to send messages to (default: `window.parent`)
    * @param eventSource - Source window for message validation. For views, pass
    *   `window.parent`. For hosts, pass `iframe.contentWindow`.
+   * @param options - Transport options, such as the console
+   *   {@link PostMessageTransportOptions.logLevel `logLevel`}
    *
    * @example View connecting to parent
    * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_view"
@@ -71,28 +112,40 @@ export class PostMessageTransport implements Transport {
   constructor(
     private eventTarget: Window = window.parent,
     private eventSource: MessageEventSource,
+    { logLevel = "warning" }: PostMessageTransportOptions = {},
   ) {
+    const severity = LOG_LEVELS.indexOf(logLevel);
+    this.minLogSeverity =
+      severity < 0 ? LOG_LEVELS.indexOf("warning") : severity;
     this.messageListener = (event) => {
       if (eventSource && event.source !== this.eventSource) {
-        console.debug("Ignoring message from unknown source", event);
+        if (this.logs("debug")) {
+          console.debug("Ignoring message from unknown source", event);
+        }
         return;
       }
       const parsed = JSONRPCMessageSchema.safeParse(event.data);
       if (parsed.success) {
-        console.debug("Parsed message", parsed.data);
+        if (this.logs("debug")) {
+          console.debug("Parsed message", parsed.data);
+        }
         this.onmessage?.(parsed.data);
       } else if (event.data?.jsonrpc !== "2.0") {
         // Not a JSON-RPC message at all (e.g. internal frames injected by
         // the host environment). Ignore silently so the transport stays alive.
-        console.debug(
-          "Ignoring non-JSON-RPC message",
-          parsed.error.message,
-          event,
-        );
+        if (this.logs("debug")) {
+          console.debug(
+            "Ignoring non-JSON-RPC message",
+            parsed.error.message,
+            event,
+          );
+        }
       } else {
         // Has jsonrpc: "2.0" but is otherwise malformed — surface as a real
         // protocol error.
-        console.error("Failed to parse message", parsed.error.message, event);
+        if (this.logs("error")) {
+          console.error("Failed to parse message", parsed.error.message, event);
+        }
         this.onerror?.(
           new Error(
             "Invalid JSON-RPC message received: " + parsed.error.message,
@@ -100,6 +153,11 @@ export class PostMessageTransport implements Transport {
         );
       }
     };
+  }
+
+  /** Whether a message at `level` reaches the console. */
+  private logs(level: LoggingLevel): boolean {
+    return LOG_LEVELS.indexOf(level) >= this.minLogSeverity;
   }
 
   /**
@@ -124,7 +182,10 @@ export class PostMessageTransport implements Transport {
   async send(message: JSONRPCMessage, options?: TransportSendOptions) {
     // Skip debug log for high-frequency streaming notifications — these
     // can fire dozens of times per second and flood the console.
-    if ((message as { method?: string }).method !== TOOL_INPUT_PARTIAL_METHOD) {
+    if (
+      this.logs("debug") &&
+      (message as { method?: string }).method !== TOOL_INPUT_PARTIAL_METHOD
+    ) {
       console.debug("Sending message", message);
     }
     this.eventTarget.postMessage(message, "*");
