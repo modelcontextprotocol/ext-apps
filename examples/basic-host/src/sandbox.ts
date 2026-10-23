@@ -1,5 +1,4 @@
 import type { McpUiSandboxProxyReadyNotification, McpUiSandboxResourceReadyNotification } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { buildAllowAttribute } from "@modelcontextprotocol/ext-apps/app-bridge";
 
 const ALLOWED_REFERRER_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/;
 
@@ -21,8 +20,6 @@ if (!document.referrer.match(ALLOWED_REFERRER_PATTERN)) {
 // This is the origin we expect all parent messages to come from.
 const EXPECTED_HOST_ORIGIN = new URL(document.referrer).origin;
 
-const OWN_ORIGIN = new URL(window.location.href).origin;
-
 // Security self-test: verify iframe isolation is working correctly.
 // This MUST throw a SecurityError -- if `window.top` is accessible, the sandbox
 // configuration is dangerously broken and untrusted content could escape.
@@ -37,42 +34,21 @@ try {
   // Expected: SecurityError confirms proper sandboxing.
 }
 
-// Double-iframe sandbox architecture: THIS file is the outer sandbox proxy
-// iframe on a separate origin. It creates an inner iframe for untrusted HTML
-// content. Per the specification, the Host and the Sandbox MUST have different
-// origins.
-const inner = document.createElement("iframe");
-inner.style = "width:100%; height:100%; border:none;";
-inner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
-// Note: allow attribute is set later when receiving sandbox-resource-ready notification
-// based on the permissions requested by the app
-document.body.appendChild(inner);
+// Single-iframe sandbox architecture: THIS file is the shim on a separate origin.
+// It receives the HTML content, creates a Blob URL, and navigates itself to it.
+// The Blob URL inherits the CSP headers of this shim document, and because it
+// navigates the main frame of the iframe, it can communicate directly with the Host.
+//
+// Security: CSP is enforced via HTTP headers on sandbox.html (set by serve.ts
+// based on ?csp= query param). This is tamper-proof unlike meta tags.
 
 const RESOURCE_READY_NOTIFICATION: McpUiSandboxResourceReadyNotification["method"] =
   "ui/notifications/sandbox-resource-ready";
 const PROXY_READY_NOTIFICATION: McpUiSandboxProxyReadyNotification["method"] =
   "ui/notifications/sandbox-proxy-ready";
 
-// Message relay: This Sandbox (outer iframe) acts as a bidirectional bridge,
-// forwarding messages between:
-//
-//   Host (parent window) ↔ Sandbox (outer frame) ↔ View (inner iframe)
-//
-// Reason: the parent window and inner iframe have different origins and can't
-// communicate directly, so the outer iframe forwards messages in both
-// directions to connect them.
-//
-// Special case: The "ui/notifications/sandbox-proxy-ready" message is
-// intercepted here (not relayed) because the Sandbox uses it to configure and
-// load the inner iframe with the view HTML content.
-//
-// Security: CSP is enforced via HTTP headers on sandbox.html (set by serve.ts
-// based on ?csp= query param). This is tamper-proof unlike meta tags.
-
 window.addEventListener("message", async (event) => {
   if (event.source === window.parent) {
-    // Validate that messages from parent come from the expected host origin.
-    // This prevents malicious pages from sending messages to this sandbox.
     if (event.origin !== EXPECTED_HOST_ORIGIN) {
       console.error(
         "[Sandbox] Rejecting message from unexpected origin:",
@@ -84,47 +60,15 @@ window.addEventListener("message", async (event) => {
     }
 
     if (event.data && event.data.method === RESOURCE_READY_NOTIFICATION) {
-      const { html, sandbox, permissions } = event.data.params;
-      if (typeof sandbox === "string") {
-        inner.setAttribute("sandbox", sandbox);
-      }
-      // Set Permission Policy allow attribute if permissions are requested
-      const allowAttribute = buildAllowAttribute(permissions);
-      if (allowAttribute) {
-        console.log("[Sandbox] Setting allow attribute:", allowAttribute);
-        inner.setAttribute("allow", allowAttribute);
-      }
+      const { html } = event.data.params;
+
       if (typeof html === "string") {
-        // Use document.write instead of srcdoc (which the CesiumJS Map won't work with)
-        const doc = inner.contentDocument || inner.contentWindow?.document;
-        if (doc) {
-          doc.open();
-          doc.write(html);
-          doc.close();
-        } else {
-          // Fallback to srcdoc if document is not accessible
-          console.warn("[Sandbox] document.write not available, falling back to srcdoc");
-          inner.srcdoc = html;
-        }
-      }
-    } else {
-      if (inner && inner.contentWindow) {
-        inner.contentWindow.postMessage(event.data, "*");
+        console.log("[Sandbox] Received HTML, navigating to Blob URL...");
+        const blob = new Blob([html], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        window.location.replace(url);
       }
     }
-  } else if (event.source === inner.contentWindow) {
-    if (event.origin !== OWN_ORIGIN) {
-      console.error(
-        "[Sandbox] Rejecting message from inner iframe with unexpected origin:",
-        event.origin,
-        "expected:",
-        OWN_ORIGIN
-      );
-      return;
-    }
-    // Relay messages from inner frame to parent window.
-    // Use specific origin instead of "*" to prevent message interception.
-    window.parent.postMessage(event.data, EXPECTED_HOST_ORIGIN);
   }
 });
 

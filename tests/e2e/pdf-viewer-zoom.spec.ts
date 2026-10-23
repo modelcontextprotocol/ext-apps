@@ -12,7 +12,7 @@ import { test, expect, type Page } from "@playwright/test";
 test.setTimeout(120000);
 
 function getAppFrame(page: Page) {
-  return page.frameLocator("iframe").first().frameLocator("iframe").first();
+  return page.frameLocator("iframe").first();
 }
 
 async function loadPdfServer(page: Page) {
