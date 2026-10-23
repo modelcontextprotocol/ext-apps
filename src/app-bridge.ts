@@ -98,6 +98,46 @@ export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./constants.js";
 import { RESOURCE_URI_META_KEY } from "./constants.js";
 
 type UntypedHandlerSetter = (this: unknown, ...args: unknown[]) => void;
+
+type ServerListChangedNotification =
+  | ToolListChangedNotification
+  | ResourceListChangedNotification
+  | PromptListChangedNotification;
+type ServerListChangedListener = (
+  params: ServerListChangedNotification["params"],
+) => Promise<void>;
+
+// The Client has one handler slot per method. Install each dispatcher only
+// once, and keep its subscribers independent of any one bridge's lifecycle.
+// Empty sets deliberately remain installed: removing or reinstalling a handler
+// could overwrite a caller's subsequent registration, which we cannot inspect.
+const serverListChangedListeners = new WeakMap<
+  Client,
+  Map<ServerListChangedNotification["method"], Set<ServerListChangedListener>>
+>();
+
+function getServerListChangedListeners(
+  client: Client,
+  method: ServerListChangedNotification["method"],
+): Set<ServerListChangedListener> {
+  let methods = serverListChangedListeners.get(client);
+  if (!methods) {
+    methods = new Map();
+    serverListChangedListeners.set(client, methods);
+  }
+  let listeners = methods.get(method);
+  if (!listeners) {
+    const subscribers = new Set<ServerListChangedListener>();
+    client.setNotificationHandler(method, async (notification) => {
+      await Promise.all(
+        [...subscribers].map((listener) => listener(notification.params)),
+      );
+    });
+    methods.set(method, subscribers);
+    listeners = subscribers;
+  }
+  return listeners;
+}
 export { PostMessageTransport } from "./message-transport.js";
 
 /**
@@ -310,6 +350,31 @@ export class AppBridge extends Protocol<BaseContext> {
   private readonly _registeredEvents = new Set<keyof AppBridgeEventMap>();
   private readonly _events = new EventDispatcher<AppBridgeEventMap>();
   private readonly _methods = new MethodRegistry();
+  private readonly _serverNotificationCleanups: (() => void)[] = [];
+
+  private _forwardServerNotification(
+    method: ServerListChangedNotification["method"],
+    send: ServerListChangedListener,
+  ): void {
+    const listeners = getServerListChangedListeners(this._client!, method);
+    const listener: ServerListChangedListener = async (params) => {
+      if (this._initializedReceived && this.transport) {
+        await send(params);
+      }
+    };
+    listeners.add(listener);
+    this._serverNotificationCleanups.push(() => listeners.delete(listener));
+  }
+
+  private _stopServerNotifications(): void {
+    this._initializedReceived = false;
+    for (const cleanup of this._serverNotificationCleanups.splice(0)) cleanup();
+  }
+
+  protected override _onclose(): void {
+    this._stopServerNotifications();
+    super._onclose();
+  }
 
   // ── Handler registration with double-set protection ─────────────────
   //
@@ -1957,6 +2022,13 @@ export class AppBridge extends Protocol<BaseContext> {
    * and you must register handlers manually using the {@link oncalltool `oncalltool`}, {@link onlistresources `onlistresources`},
    * etc. setters.
    *
+   * Automatic list-changed forwarding owns the Client's single notification
+   * handler slots, replacing handlers present on first use. Subsequent bridges
+   * share those dispatchers. Closing or reconnecting a bridge does not remove
+   * or reinstall them; a caller that replaces a slot later takes over delivery
+   * for that method. For custom forwarding, construct the bridge with `null`
+   * and register handlers manually.
+   *
    * After calling connect, wait for the {@link oninitialized `oninitialized`} callback before sending
    * tool input and other data to the View.
    *
@@ -2004,74 +2076,80 @@ export class AppBridge extends Protocol<BaseContext> {
       );
     }
     this._initializedReceived = false;
-    if (this._client) {
-      // When a client was passed to the constructor, automatically forward
-      // MCP requests/notifications between the view and the server
-      const serverCapabilities = this._client.getServerCapabilities();
-      if (!serverCapabilities) {
-        throw new Error("Client server capabilities not available");
+    try {
+      if (this._client) {
+        // When a client was passed to the constructor, automatically forward
+        // MCP requests/notifications between the view and the server
+        const serverCapabilities = this._client.getServerCapabilities();
+        if (!serverCapabilities) {
+          throw new Error("Client server capabilities not available");
+        }
+
+        if (serverCapabilities.tools) {
+          this.oncalltool = async (params, extra) => {
+            return this._client!.request(
+              { method: "tools/call", params },
+              { signal: extra.mcpReq.signal },
+            );
+          };
+          if (serverCapabilities.tools.listChanged) {
+            this._forwardServerNotification(
+              "notifications/tools/list_changed",
+              (params) => this.sendToolListChanged(params),
+            );
+          }
+        }
+        if (serverCapabilities.resources) {
+          this.onlistresources = async (params, extra) => {
+            return this._client!.request(
+              { method: "resources/list", params },
+              { signal: extra.mcpReq.signal },
+            );
+          };
+          this.onlistresourcetemplates = async (params, extra) => {
+            return this._client!.request(
+              { method: "resources/templates/list", params },
+              { signal: extra.mcpReq.signal },
+            );
+          };
+          this.onreadresource = async (params, extra) => {
+            return this._client!.request(
+              { method: "resources/read", params },
+              { signal: extra.mcpReq.signal },
+            );
+          };
+          if (serverCapabilities.resources.listChanged) {
+            this._forwardServerNotification(
+              "notifications/resources/list_changed",
+              (params) => this.sendResourceListChanged(params),
+            );
+          }
+        }
+        if (serverCapabilities.prompts) {
+          this.onlistprompts = async (params, extra) => {
+            return this._client!.request(
+              { method: "prompts/list", params },
+              { signal: extra.mcpReq.signal },
+            );
+          };
+          if (serverCapabilities.prompts.listChanged) {
+            this._forwardServerNotification(
+              "notifications/prompts/list_changed",
+              (params) => this.sendPromptListChanged(params),
+            );
+          }
+        }
       }
 
-      if (serverCapabilities.tools) {
-        this.oncalltool = async (params, extra) => {
-          return this._client!.request(
-            { method: "tools/call", params },
-            { signal: extra.mcpReq.signal },
-          );
-        };
-        if (serverCapabilities.tools.listChanged) {
-          this._client.setNotificationHandler(
-            "notifications/tools/list_changed",
-            (n) => this.sendToolListChanged(n.params),
-          );
-        }
-      }
-      if (serverCapabilities.resources) {
-        this.onlistresources = async (params, extra) => {
-          return this._client!.request(
-            { method: "resources/list", params },
-            { signal: extra.mcpReq.signal },
-          );
-        };
-        this.onlistresourcetemplates = async (params, extra) => {
-          return this._client!.request(
-            { method: "resources/templates/list", params },
-            { signal: extra.mcpReq.signal },
-          );
-        };
-        this.onreadresource = async (params, extra) => {
-          return this._client!.request(
-            { method: "resources/read", params },
-            { signal: extra.mcpReq.signal },
-          );
-        };
-        if (serverCapabilities.resources.listChanged) {
-          this._client.setNotificationHandler(
-            "notifications/resources/list_changed",
-            (n) => this.sendResourceListChanged(n.params),
-          );
-        }
-      }
-      if (serverCapabilities.prompts) {
-        this.onlistprompts = async (params, extra) => {
-          return this._client!.request(
-            { method: "prompts/list", params },
-            { signal: extra.mcpReq.signal },
-          );
-        };
-        if (serverCapabilities.prompts.listChanged) {
-          this._client.setNotificationHandler(
-            "notifications/prompts/list_changed",
-            (n) => this.sendPromptListChanged(n.params),
-          );
-        }
-      }
+      // Protocol.connect only wires the transport — no MCP handshake happens on
+      // the iframe channel. The View drives ui/initialize;
+      // ui/notifications/initialized remains the public View-ready signal.
+      await super.connect(transport);
+    } catch (error) {
+      this._stopServerNotifications();
+      await this.close().catch(() => {});
+      throw error;
     }
-
-    // Protocol.connect only wires the transport — no MCP handshake happens on
-    // the iframe channel. The View drives ui/initialize;
-    // ui/notifications/initialized remains the public View-ready signal.
-    return super.connect(transport);
   }
 }
 
