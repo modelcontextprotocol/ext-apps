@@ -1675,6 +1675,102 @@ describe("interact tool", () => {
     });
   });
 
+  describe("get_current_pdf action", () => {
+    it("full roundtrip: enqueue → poll → submit → embedded resource returned", async () => {
+      const { server, client } = await connect();
+      const uuid = "getpdf-roundtrip";
+      const pdfBytes = "%PDF-1.4\nfake-current-contents\n%%EOF";
+
+      // interact blocks in waitForCurrentPdf until submit_current_pdf resolves it
+      const interactPromise = client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "get_current_pdf" },
+      });
+
+      // Viewer polls → receives the get_current_pdf command with a requestId
+      const cmds = await poll(client, uuid);
+      expect(cmds).toHaveLength(1);
+      expect(cmds[0].type).toBe("get_current_pdf");
+      const requestId = cmds[0].requestId as string;
+      expect(typeof requestId).toBe("string");
+
+      // Viewer submits bytes + metadata
+      const submit = await client.callTool({
+        name: "submit_current_pdf",
+        arguments: {
+          requestId,
+          data: Buffer.from(pdfBytes).toString("base64"),
+          fileName: "report - edited.pdf",
+          hasEdits: true,
+        },
+      });
+      expect(submit.isError).toBeFalsy();
+
+      // interact unblocks with a text summary + the embedded resource
+      const r = await interactPromise;
+      expect(r.isError).toBeFalsy();
+      const content = r.content as Array<{
+        type: string;
+        text?: string;
+        resource?: { uri: string; mimeType: string; blob: string };
+      }>;
+      expect(content[0].type).toBe("text");
+      expect(content[0].text).toContain("report - edited.pdf");
+      expect(content[0].text).toContain(`${pdfBytes.length} bytes`);
+      expect(content[0].text).toContain("includes in-viewer edits");
+      const resource = content.find((c) => c.type === "resource");
+      expect(resource).toBeTruthy();
+      expect(resource!.resource!.mimeType).toBe("application/pdf");
+      expect(resource!.resource!.uri).toBe(
+        `file:///${encodeURIComponent("report - edited.pdf")}`,
+      );
+      expect(Buffer.from(resource!.resource!.blob, "base64").toString()).toBe(
+        pdfBytes,
+      );
+
+      await client.close();
+      await server.close();
+    });
+
+    it("viewer-reported error propagates as isError", async () => {
+      const { server, client } = await connect();
+      const uuid = "getpdf-error";
+
+      const interactPromise = client.callTool({
+        name: "interact",
+        arguments: { viewUUID: uuid, action: "get_current_pdf" },
+      });
+
+      const cmds = await poll(client, uuid);
+      expect(cmds).toHaveLength(1);
+      const requestId = cmds[0].requestId as string;
+
+      await client.callTool({
+        name: "submit_current_pdf",
+        arguments: { requestId, error: "no document loaded" },
+      });
+
+      const r = await interactPromise;
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("no document loaded");
+
+      await client.close();
+      await server.close();
+    });
+
+    it("submit_current_pdf with unknown requestId returns isError", async () => {
+      const { server, client } = await connect();
+      const r = await client.callTool({
+        name: "submit_current_pdf",
+        arguments: { requestId: "never-created", data: "AAAA" },
+      });
+      expect(r.isError).toBe(true);
+      expect(firstText(r)).toContain("No pending request");
+      await client.close();
+      await server.close();
+    });
+  });
+
   describe("viewer liveness", () => {
     // get_screenshot/get_text fail fast when the iframe never polled, instead
     // of waiting 45s for a viewer that isn't there. Reproduces the case where

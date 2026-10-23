@@ -188,15 +188,28 @@ When roots are ignored the server logs:
 
 ## Tools
 
-| Tool             | Visibility | Purpose                                                             |
-| ---------------- | ---------- | ------------------------------------------------------------------- |
-| `list_pdfs`      | Model      | List available local files and origins                              |
-| `display_pdf`    | Model + UI | Display interactive viewer                                          |
-| `interact`¹      | Model      | Navigate, annotate, search, extract pages, fill forms, save to file |
-| `read_pdf_bytes` | App only   | Stream PDF data in chunks                                           |
-| `save_pdf`       | App only   | Save annotated PDF back to local file                               |
+| Tool             | Visibility | Purpose                                                            |
+| ---------------- | ---------- | ------------------------------------------------------------------ |
+| `list_pdfs`      | Model      | List available local files and origins                             |
+| `display_pdf`    | Model + UI | Display interactive viewer                                         |
+| `interact`¹      | Model      | Navigate, annotate, search, extract pages, fill forms, save/export |
+| `read_pdf_bytes` | App only   | Stream PDF data in chunks                                          |
+| `save_pdf`       | App only   | Save annotated PDF back to local file                              |
 
 ¹ stdio only by default; in HTTP mode requires `--enable-interact` — see [Deployment](#deployment).
+
+### App tools
+
+The viewer also registers tools on the view itself (via `app.registerTool`), for hosts that list and call view tools directly. These mirror the `interact` actions (navigate, search, zoom, annotations, form fill, `get_text`, `get_screenshot`, …) and include `get_current_pdf`.
+
+### Exporting the current document
+
+`get_current_pdf` is the viewer's "get output file" tool: it returns the current document — with annotations and form fills applied — as an embedded PDF resource in the tool result, so the model can retrieve the file whenever it needs it without a save to disk (as opposed to `ui/download-file`, which saves to the user's disk without the model seeing the bytes).
+
+It is available on both surfaces:
+
+- **App tool** (view-registered): the view builds the bytes and returns them directly in the `tools/call` response.
+- **`interact` action** (server-mediated, for stdio hosts such as Claude Desktop): the server enqueues a `get_current_pdf` command, the viewer builds the bytes and posts them back through the app-only `submit_current_pdf` tool, and the blocking `interact` call returns the same text + embedded resource.
 
 ## Example Prompts
 
