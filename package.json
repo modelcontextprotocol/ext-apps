@@ -38,7 +38,14 @@
       "types": "./dist/src/server/index.d.ts",
       "default": "./dist/src/server/index.js"
     },
+    "./validator": {
+      "types": "./dist/src/validator/index.d.ts",
+      "default": "./dist/src/validator/index.js"
+    },
     "./schema.json": "./dist/src/generated/schema.json"
+  },
+  "bin": {
+    "mcp-app-validator": "./dist/src/validator/cli.js"
   },
   "files": [
     "dist"
