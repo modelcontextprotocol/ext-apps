@@ -665,6 +665,27 @@ export const McpUiResourceMetaSchema = z.object({
       "Dedicated origin for view sandbox.\n\nUseful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.\n\n**Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:\n- Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)\n- URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)\n\nIf omitted, host uses default sandbox origin (typically per-conversation).",
     ),
   /**
+   * @description Public homepage URL for the app represented by this UI resource.
+   *
+   * This is distinct from `domain`, which configures the host-assigned sandbox
+   * origin. Hosts MAY expose this URL to
+   * help users learn more about or return to the app, but MUST treat it as an
+   * untrusted external link and apply their normal link validation, policy,
+   * and consent behavior. Its presence does not grant navigation permission
+   * or establish trust in the destination.
+   *
+   * @example
+   * ```ts
+   * "https://weather.example.com"
+   * ```
+   */
+  homepage: z
+    .string()
+    .optional()
+    .describe(
+      "Public homepage URL for the app represented by this UI resource.\n\nThis is distinct from `domain`, which configures the host-assigned sandbox\norigin. Hosts MAY expose this URL to\nhelp users learn more about or return to the app, but MUST treat it as an\nuntrusted external link and apply their normal link validation, policy,\nand consent behavior. Its presence does not grant navigation permission\nor establish trust in the destination.",
+    ),
+  /**
    * @description Visual boundary preference - true if view prefers a visible border.
    *
    * Boolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.
