@@ -339,9 +339,14 @@ function ToolCallInfoPanel({ toolCallInfo, isDestroying, onRequestClose, onClose
       className={styles.toolCallInfoPanel}
       style={isDestroying ? { opacity: 0.5, pointerEvents: "none" } : undefined}
     >
-      {/* Row 1: Header with server:tool name and close button */}
+      {/* Row 1: Header with server:tool title and close button */}
       <div className={styles.appHeader}>
-        <span>{toolCallInfo.serverInfo.name}:<span className={styles.toolName}>{toolCallInfo.tool.name}</span></span>
+        <span>
+          {toolCallInfo.serverInfo.name}:
+          <span className={styles.toolName}>
+            {toolCallInfo.tool.title ?? toolCallInfo.tool.name}
+          </span>
+        </span>
         {onRequestClose && !isDestroying && (
           <button
             className={styles.closeButton}
