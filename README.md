@@ -145,6 +145,15 @@ npm install -S @modelcontextprotocol/ext-apps \
   zod@^4.2.0
 ```
 
+Still on the v1 SDK (`@modelcontextprotocol/sdk` 1.x)? Stay on `ext-apps` 1.x,
+which peers on `@modelcontextprotocol/sdk@^1.29.0`; 2.x peers on the v2
+packages above instead, so `npm install @modelcontextprotocol/ext-apps` on its
+own pulls in a second SDK next to yours:
+
+```bash
+npm install -S @modelcontextprotocol/ext-apps@^1 @modelcontextprotocol/sdk@^1.29.0
+```
+
 The wire protocol is unchanged between `ext-apps` 1.x and 2.x: a 2.x View works
 in a 1.x host and a 2.x host renders 1.x Views. See the
 [migration guide](https://apps.extensions.modelcontextprotocol.io/api/documents/migrate-to-v2.html)
