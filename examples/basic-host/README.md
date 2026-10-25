@@ -12,8 +12,16 @@ This basic host can also be used to test MCP Apps during local development.
 
 ## Getting Started
 
+The examples are npm workspaces that share the SDK built at the repository root, so install from there first:
+
 ```bash
+# from the repository root
 npm install
+```
+
+Then run this example from its directory:
+
+```bash
 npm run start
 # Open http://localhost:8080
 ```
