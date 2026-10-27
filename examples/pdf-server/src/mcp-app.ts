@@ -1535,7 +1535,9 @@ function setupResizeHandle(
     e.preventDefault();
 
     const def = tracked.def as
-      RectangleAnnotation | CircleAnnotation | ImageAnnotation;
+      | RectangleAnnotation
+      | CircleAnnotation
+      | ImageAnnotation;
     const beforeDef = { ...def };
     const startX = e.clientX;
     const startY = e.clientY;
@@ -1642,7 +1644,9 @@ function setupRotateHandle(
     e.preventDefault();
 
     const def = tracked.def as
-      StampAnnotation | RectangleAnnotation | ImageAnnotation;
+      | StampAnnotation
+      | RectangleAnnotation
+      | ImageAnnotation;
     const beforeDef = { ...def };
     const el = tracked.elements[0];
     const rect = el.getBoundingClientRect();
@@ -3065,7 +3069,10 @@ function setFieldInStorage(name: string, value: string | boolean): void {
   for (const id of ids) {
     storage.setValue(id, { value: storageValue });
     const el = formLayerEl.querySelector(`[data-element-id="${id}"]`) as
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+      | HTMLInputElement
+      | HTMLSelectElement
+      | HTMLTextAreaElement
+      | null;
     if (!el) continue;
     if (el instanceof HTMLInputElement && el.type === "checkbox") {
       el.checked = !!value;
