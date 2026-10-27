@@ -7,12 +7,10 @@ export NVM_DIR="$HOME/.nvm"
 [ -d "/opt/homebrew/bin" ] && export PATH="/opt/homebrew/bin:$PATH"  # homebrew (macOS ARM)
 [ -d "/usr/local/bin" ] && export PATH="/usr/local/bin:$PATH"  # homebrew (macOS Intel)
 
-# Verify no private registry URLs in package-lock.json
-if grep -E '"resolved": "https?://' package-lock.json | grep -v registry.npmjs.org > /dev/null; then
-  echo "ERROR: package-lock.json contains non-npmjs.org URLs"
-  echo "Run: docker run --rm -i -v \$PWD:/src -w /src node:latest npm i --registry=https://registry.npmjs.org/"
-  exit 1
-fi
+# Verify no private registry URLs in package-lock.json. `npm install` records
+# whichever registry it resolved against (e.g. a corporate proxy from
+# ~/.npmrc); the committed lockfile must reference only the public registry.
+node scripts/check-lockfile-registry.mjs
 
 # Capture staged files so we only re-stage what the user intended to commit
 # (avoids sweeping unrelated WIP into the commit). --diff-filter=d skips
