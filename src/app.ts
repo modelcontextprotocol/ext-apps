@@ -2157,7 +2157,7 @@ export class App extends Protocol<BaseContext> {
    * option is true (default). You typically don't need to call this manually unless
    * you disabled autoResize and want to enable it later.
    *
-   * @returns Cleanup function to disconnect the observer
+   * @returns Cleanup function to disconnect the observer and cancel pending size notifications
    *
    * @example Manual setup for custom scenarios
    * ```ts source="./app.examples.ts#App_setupAutoResize_manual"
@@ -2176,17 +2176,16 @@ export class App extends Protocol<BaseContext> {
    * ```
    */
   setupSizeChangedNotifications() {
-    let scheduled = false;
+    let frame: number | undefined;
     let lastWidth = 0;
     let lastHeight = 0;
 
     const sendBodySizeChanged = () => {
-      if (scheduled) {
+      if (frame !== undefined) {
         return;
       }
-      scheduled = true;
-      requestAnimationFrame(() => {
-        scheduled = false;
+      frame = requestAnimationFrame(() => {
+        frame = undefined;
         const html = document.documentElement;
 
         // Measure actual content height by temporarily overriding html sizing.
@@ -2222,7 +2221,13 @@ export class App extends Protocol<BaseContext> {
     resizeObserver.observe(document.documentElement);
     resizeObserver.observe(document.body);
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame);
+        frame = undefined;
+      }
+    };
   }
 
   /**
