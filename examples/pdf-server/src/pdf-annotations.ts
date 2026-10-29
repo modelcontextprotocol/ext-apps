@@ -226,6 +226,63 @@ export function convertToModelCoords(
   return convertFromModelCoords(def, pageHeight);
 }
 
+/**
+ * Copy an annotation definition without sharing mutable geometry.
+ *
+ * PDF imports and the editable annotation map must remain independent: drag
+ * operations mutate definitions in place, so a shallow copy would let moving
+ * a native annotation also move the baseline that Revert restores.
+ */
+export function cloneAnnotationDef(def: PdfAnnotationDef): PdfAnnotationDef {
+  if (
+    def.type === "highlight" ||
+    def.type === "underline" ||
+    def.type === "strikethrough"
+  ) {
+    return { ...def, rects: def.rects.map((rect) => ({ ...rect })) };
+  }
+  return { ...def };
+}
+
+function annotationValueEquals(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (
+    typeof left !== "object" ||
+    left === null ||
+    typeof right !== "object" ||
+    right === null
+  ) {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    return (
+      left.length === right.length &&
+      left.every((value, i) => annotationValueEquals(value, right[i]))
+    );
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key) =>
+        Object.hasOwn(rightRecord, key) &&
+        annotationValueEquals(leftRecord[key], rightRecord[key]),
+    )
+  );
+}
+
+/** Compare annotation definitions by their complete plain-data contents. */
+export function annotationDefsEqual(
+  left: PdfAnnotationDef,
+  right: PdfAnnotationDef,
+): boolean {
+  return annotationValueEquals(left, right);
+}
+
 // =============================================================================
 // Diff-Based Persistence Model
 // =============================================================================
