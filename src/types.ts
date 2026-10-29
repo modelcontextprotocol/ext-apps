@@ -16,6 +16,8 @@ import type {
   CreateMessageResult,
   CreateMessageResultWithTools,
   EmptyResult,
+  ElicitRequest,
+  ElicitResult,
   ListPromptsRequest,
   ListPromptsResult,
   ListResourceTemplatesRequest,
@@ -116,6 +118,8 @@ export {
   type McpUiToolVisibility,
   type McpUiToolMeta,
   type McpUiClientCapabilities,
+  type McpUiServerCapabilities,
+  type McpUiElicitationMeta,
 } from "./spec.types.js";
 
 // Re-export all schemas from generated/schema.ts (already PascalCase)
@@ -156,6 +160,9 @@ export {
   McpUiRequestDisplayModeResultSchema,
   McpUiToolVisibilitySchema,
   McpUiToolMetaSchema,
+  McpUiClientCapabilitiesSchema,
+  McpUiServerCapabilitiesSchema,
+  McpUiElicitationMetaSchema,
 } from "./generated/schema.js";
 
 /**
@@ -179,6 +186,7 @@ export type AppRequest =
   | ReadResourceRequest
   | ListPromptsRequest
   | CreateMessageRequest
+  | ElicitRequest
   | PingRequest;
 
 /**
@@ -224,4 +232,5 @@ export type AppResult =
   | ListPromptsResult
   | CreateMessageResult
   | CreateMessageResultWithTools
+  | ElicitResult
   | EmptyResult;
