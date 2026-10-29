@@ -112,7 +112,14 @@ window.addEventListener("message", async (event) => {
         inner.contentWindow.postMessage(event.data, "*");
       }
     }
-  } else if (event.source === inner.contentWindow) {
+  } else if (
+    event.source === inner.contentWindow ||
+    // Safari/WebKit can surface inner-iframe messages with `event.source ===
+    // window` (the sandbox's own window) instead of `inner.contentWindow` in
+    // nested same-origin setups. Origin is the real security boundary here —
+    // the sandbox runs on its own dedicated origin — so accept that case too.
+    (event.origin === OWN_ORIGIN && event.source === window)
+  ) {
     if (event.origin !== OWN_ORIGIN) {
       console.error(
         "[Sandbox] Rejecting message from inner iframe with unexpected origin:",
