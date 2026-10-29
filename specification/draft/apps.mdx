@@ -477,9 +477,9 @@ function onNotification(method: string, handler: (params: any) => void) {
 }
 
 
-const initializeResult = await sendRequest("initialize", {
-  capabilities: {},
-  clientInfo: {name: "My UI", version: "1.0.0"},
+const initializeResult = await sendRequest("ui/initialize", {
+  appInfo: {name: "My UI", version: "1.0.0"},
+  appCapabilities: {},
   protocolVersion: "2025-06-18",
 });
 ```
@@ -1392,7 +1392,7 @@ Host MUST send this notification when tool execution completes (if the View is d
 
 Host MUST send this notification if the tool execution was cancelled, for any reason (which can optionally be specified), including user action, sampling error, classifier intervention, etc.
 
-`ui/resource-teardown` - Host notifies View before teardown
+`ui/resource-teardown` - Host requests graceful teardown of the View (a request: the View replies with a result)
 
 ```typescript
 {
@@ -2559,7 +2559,7 @@ const cspValue = `
   default-src 'none';
   script-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
   style-src 'self' 'unsafe-inline' ${csp?.resourceDomains?.join(' ') || ''};
-  connect-src 'self' ${csp?.connectDomains?.join(' ') || ''};
+  connect-src ${csp?.connectDomains?.join(' ') || "'none'"};
   img-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};
   font-src 'self' ${csp?.resourceDomains?.join(' ') || ''};
   media-src 'self' data: ${csp?.resourceDomains?.join(' ') || ''};
