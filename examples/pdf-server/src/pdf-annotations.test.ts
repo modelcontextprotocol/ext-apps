@@ -6,6 +6,8 @@ import {
   deserializeDiff,
   mergeAnnotations,
   computeDiff,
+  cloneAnnotationDef,
+  annotationDefsEqual,
   cssColorToRgb,
   defaultColor,
   importPdfjsAnnotation,
@@ -464,6 +466,104 @@ describe("computeDiff", () => {
 // =============================================================================
 // Color Conversion
 // =============================================================================
+
+describe("cloneAnnotationDef", () => {
+  it("detaches nested highlight geometry from the source definition", () => {
+    const baseline: PdfAnnotationDef = {
+      type: "highlight",
+      id: "pdf-42-0",
+      page: 1,
+      rects: [
+        { x: 72, y: 700, width: 200, height: 12 },
+        { x: 72, y: 680, width: 120, height: 12 },
+      ],
+      color: "#ffff00",
+    };
+
+    const editable = cloneAnnotationDef(baseline);
+    if (editable.type !== "highlight") throw new Error("wrong type");
+    editable.rects[0].x += 30;
+    editable.rects[1].y -= 20;
+
+    expect(baseline).toMatchObject({
+      rects: [
+        { x: 72, y: 700, width: 200, height: 12 },
+        { x: 72, y: 680, width: 120, height: 12 },
+      ],
+    });
+    expect(editable.rects).not.toBe(baseline.rects);
+    expect(editable.rects[0]).not.toBe(baseline.rects[0]);
+  });
+
+  it("detaches top-level placement for imported annotations", () => {
+    const baseline: PdfAnnotationDef = {
+      type: "imported",
+      id: "pdf-118R",
+      page: 1,
+      x: 420,
+      y: 760,
+      width: 94,
+      height: 32,
+      pdfjsId: "118R",
+      subtype: "Stamp",
+    };
+
+    const editable = cloneAnnotationDef(baseline);
+    if (editable.type !== "imported") throw new Error("wrong type");
+    editable.x += 24;
+    editable.y -= 18;
+
+    expect(baseline).toMatchObject({ x: 420, y: 760 });
+    expect(editable).toMatchObject({ x: 444, y: 742 });
+  });
+
+  it("supports repeated restores from one nested baseline definition", () => {
+    const baseline: PdfAnnotationDef = {
+      type: "highlight",
+      id: "pdf-42-0",
+      page: 1,
+      rects: [{ x: 72, y: 700, width: 200, height: 12 }],
+    };
+    const original = cloneAnnotationDef(baseline);
+
+    for (let i = 0; i < 2; i++) {
+      const editable = cloneAnnotationDef(baseline);
+      if (editable.type !== "highlight") throw new Error("wrong type");
+      editable.rects[0].x += 40 + i;
+      editable.rects[0].y -= 25;
+      expect(editable).not.toEqual(original);
+
+      const restored = cloneAnnotationDef(baseline);
+      expect(restored).toEqual(original);
+    }
+  });
+
+  it("recognizes current geometry returned to the baseline after undo", () => {
+    const baseline: PdfAnnotationDef = {
+      type: "imported",
+      id: "pdf-118R",
+      page: 1,
+      x: 420,
+      y: 760,
+      width: 94,
+      height: 32,
+      pdfjsId: "118R",
+      subtype: "Stamp",
+    };
+    const moved = cloneAnnotationDef(baseline);
+    if (moved.type !== "imported") throw new Error("wrong type");
+    moved.x += 40;
+    moved.y -= 25;
+
+    expect(annotationDefsEqual(baseline, moved)).toBe(false);
+    // Imported drags are UI-only: they must not become persisted diff entries.
+    const diff = computeDiff([baseline], [moved], new Map());
+    expect(isDiffEmpty(diff)).toBe(true);
+
+    const returned = cloneAnnotationDef(baseline);
+    expect(annotationDefsEqual(baseline, returned)).toBe(true);
+  });
+});
 
 describe("cssColorToRgb", () => {
   it("parses 6-digit hex", () => {
