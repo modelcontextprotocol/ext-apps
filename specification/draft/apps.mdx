@@ -165,7 +165,11 @@ interface UIResourceMeta {
    * Sandbox permissions requested by the UI
    *
    * Servers declare which browser capabilities their UI needs.
+   * Keys are Permission Policy feature names.
+   *
    * Hosts MAY honor these by setting appropriate iframe `allow` attributes.
+   * Hosts SHOULD recognize the named keys, MAY honor other feature names, and
+   * MUST NOT apply keys that are not valid Permission Policy feature names.
    * Apps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.
    */
   permissions?: {
@@ -192,7 +196,41 @@ interface UIResourceMeta {
      *
      * Maps to Permission Policy `clipboard-write` feature
      */
+    "clipboard-write"?: {},
+    /**
+     * Legacy alias for `clipboard-write`
+     *
+     * @deprecated Use `"clipboard-write"` instead
+     */
     clipboardWrite?: {},
+    /**
+     * Request Fullscreen API access
+     *
+     * Maps to Permission Policy `fullscreen` feature
+     */
+    fullscreen?: {},
+    /**
+     * Request Picture-in-Picture API access
+     *
+     * Maps to Permission Policy `picture-in-picture` feature
+     */
+    "picture-in-picture"?: {},
+    /**
+     * Request media autoplay with sound
+     *
+     * Maps to Permission Policy `autoplay` feature
+     */
+    autoplay?: {},
+    /**
+     * Request Encrypted Media Extensions access for DRM-protected media playback
+     *
+     * Maps to Permission Policy `encrypted-media` feature
+     */
+    "encrypted-media"?: {},
+    /**
+     * Any other Permission Policy feature, keyed by its feature name
+     */
+    [feature: string]: {},
   },
   /**
    * Dedicated origin for view
@@ -247,10 +285,16 @@ The resource content is returned via `resources/read`:
           baseUriDomains?: string[]; // Allowed base URIs for the document (base-uri directive).
         };
         permissions?: {
-          camera?: {};           // Request camera access
-          microphone?: {};       // Request microphone access
-          geolocation?: {};      // Request geolocation access
-          clipboardWrite?: {};   // Request clipboard write access
+          camera?: {};               // Request camera access
+          microphone?: {};           // Request microphone access
+          geolocation?: {};          // Request geolocation access
+          "clipboard-write"?: {};    // Request clipboard write access
+          clipboardWrite?: {};       // Legacy alias for clipboard-write
+          fullscreen?: {};           // Request Fullscreen API access
+          "picture-in-picture"?: {}; // Request Picture-in-Picture API access
+          autoplay?: {};             // Request media autoplay with sound
+          "encrypted-media"?: {};    // Request Encrypted Media Extensions access for DRM-protected media playback
+          [feature: string]: {};     // Any other Permission Policy feature, by name
         };
         domain?: string;
         prefersBorder?: boolean;
@@ -500,7 +544,7 @@ If the Host is a web page, it MUST wrap the View and communicate with it through
    - If `baseUriDomains` is provided, allow base URIs from declared origins; otherwise use `base-uri 'self'`
    - Block dangerous features (`object-src 'none'`)
    - Apply restrictive defaults if no CSP metadata is provided
-   - If `permissions` is declared, the Sandbox MAY set the inner iframe's `allow` attribute accordingly
+   - If `permissions` is declared, the Sandbox MAY set the inner iframe's `allow` attribute accordingly, applying only keys that are valid Permission Policy feature names
 6. The Sandbox MUST forward messages sent by the Host to the View, and vice versa, for any method that doesn't start with `ui/notifications/sandbox-`. This includes lifecycle messages, e.g., `ui/initialize` request & `ui/notifications/initialized` notification both sent by the View. The Host MUST NOT send any request or notification to the View before it receives an `initialized` notification.
 7. The Sandbox SHOULD NOT create/send any requests to the Host or to the View (this would require synthesizing new request ids).
 8. The Host MAY forward any message from the View (coming via the Sandbox) to the MCP Apps server, for any method that doesn't start with `ui/`. While the Host SHOULD ensure the View's MCP connection is spec-compliant, it MAY decide to block some messages or subject them to further user approval.
@@ -697,12 +741,18 @@ interface HostCapabilities {
   logging?: {};
   /** Sandbox configuration applied by the host. */
   sandbox?: {
-    /** Permissions granted by the host (camera, microphone, geolocation, clipboard-write). */
+    /** Permission Policy features granted by the host. */
     permissions?: {
       camera?: {};
       microphone?: {};
       geolocation?: {};
+      "clipboard-write"?: {};
       clipboardWrite?: {};
+      fullscreen?: {};
+      "picture-in-picture"?: {};
+      autoplay?: {};
+      "encrypted-media"?: {};
+      [feature: string]: {};
     };
     /** CSP domains approved by the host. */
     csp?: {
@@ -1503,7 +1553,13 @@ These messages are reserved for web-based hosts that implement the recommended d
       camera?: {},
       microphone?: {},
       geolocation?: {},
+      "clipboard-write"?: {},
       clipboardWrite?: {},
+      fullscreen?: {},
+      "picture-in-picture"?: {},
+      autoplay?: {},
+      "encrypted-media"?: {},
+      [feature: string]: {},
     }
   }
 }
