@@ -6,7 +6,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
-import { App } from "./app.js";
+import { App, type AppOptions } from "./app.js";
 import {
   LATEST_PROTOCOL_VERSION,
   McpUiInitializeRequestSchema,
@@ -216,23 +216,30 @@ describe("App base MCP SDK v2 Protocol migration", () => {
     });
   });
 
-  it("preserves auto-resize setup after Apps initialization", async () => {
-    const app = new App(
-      { name: "view-app", version: "1.0.0" },
-      {},
-      { autoResize: true },
-    );
-    let setupCalls = 0;
-    app.setupSizeChangedNotifications = () => {
-      setupCalls += 1;
-      return () => {};
-    };
+  it.each<[AppOptions, number]>([
+    [{ autoResize: true }, 1],
+    [{ autoResize: false }, 0],
+    // autoResize defaults to true when it is left out of the options object.
+    [{}, 1],
+    [{ strict: true }, 1],
+    [{ allowUnsafeEval: true }, 1],
+    [{ webMcpBridge: false }, 1],
+  ])(
+    "preserves auto-resize setup after Apps initialization with options %j",
+    async (options, expectedSetupCalls) => {
+      const app = new App({ name: "view-app", version: "1.0.0" }, {}, options);
+      let setupCalls = 0;
+      app.setupSizeChangedNotifications = () => {
+        setupCalls += 1;
+        return () => {};
+      };
 
-    const pair = await connectPair(app);
-    connected.push(pair);
+      const pair = await connectPair(app);
+      connected.push(pair);
 
-    expect(setupCalls).toBe(1);
-  });
+      expect(setupCalls).toBe(expectedSetupCalls);
+    },
+  );
 
   it("preserves strict late-handler timing errors", async () => {
     const app = new App(
