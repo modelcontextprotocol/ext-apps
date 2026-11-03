@@ -3887,8 +3887,9 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Ctrl/Cmd+Z: undo, Ctrl/Cmd+Shift+Z: redo
-  if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+  // Ctrl/Cmd+Z: undo, Ctrl/Cmd+Shift+Z: redo. With Shift (or Caps Lock)
+  // the browser reports e.key as "Z", so compare case-insensitively.
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
     // Don't intercept when typing in inputs
     if (
       document.activeElement instanceof HTMLInputElement ||
