@@ -56,6 +56,8 @@ import type {
   McpUiToolInputPartialNotification,
   McpUiToolResultNotification,
   McpUiUpdateModelContextRequest,
+  McpUiSetViewStateRequest,
+  McpUiSetViewStateResult,
 } from "./spec.types.js";
 
 // Re-export all types from spec.types.ts
@@ -90,6 +92,8 @@ export {
   type McpUiMessageRequest,
   type McpUiMessageResult,
   type McpUiUpdateModelContextRequest,
+  type McpUiSetViewStateRequest,
+  type McpUiSetViewStateResult,
   type McpUiSupportedContentBlockModalities,
   type McpUiSandboxProxyReadyNotification,
   type McpUiSandboxResourceReadyNotification,
@@ -131,6 +135,8 @@ export {
   McpUiMessageRequestSchema,
   McpUiMessageResultSchema,
   McpUiUpdateModelContextRequestSchema,
+  McpUiSetViewStateRequestSchema,
+  McpUiSetViewStateResultSchema,
   McpUiSupportedContentBlockModalitiesSchema,
   McpUiSandboxProxyReadyNotificationSchema,
   McpUiSandboxResourceReadyNotificationSchema,
@@ -170,6 +176,7 @@ export type AppRequest =
   | McpUiDownloadFileRequest
   | McpUiMessageRequest
   | McpUiUpdateModelContextRequest
+  | McpUiSetViewStateRequest
   | McpUiResourceTeardownRequest
   | McpUiRequestDisplayModeRequest
   | CallToolRequest
@@ -214,6 +221,7 @@ export type AppResult =
   | McpUiOpenLinkResult
   | McpUiDownloadFileResult
   | McpUiMessageResult
+  | McpUiSetViewStateResult
   | McpUiResourceTeardownResult
   | McpUiRequestDisplayModeResult
   | CallToolResult

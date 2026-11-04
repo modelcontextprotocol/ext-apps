@@ -79,6 +79,14 @@ export type McpUiHostStylesSchemaInferredType = z.infer<
   typeof generated.McpUiHostStylesSchema
 >;
 
+export type McpUiSetViewStateRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiSetViewStateRequestSchema
+>;
+
+export type McpUiSetViewStateResultSchemaInferredType = z.infer<
+  typeof generated.McpUiSetViewStateResultSchema
+>;
+
 export type McpUiResourceTeardownRequestSchemaInferredType = z.infer<
   typeof generated.McpUiResourceTeardownRequestSchema
 >;
@@ -241,6 +249,18 @@ expectType<spec.McpUiHostCss>({} as McpUiHostCssSchemaInferredType);
 expectType<McpUiHostCssSchemaInferredType>({} as spec.McpUiHostCss);
 expectType<spec.McpUiHostStyles>({} as McpUiHostStylesSchemaInferredType);
 expectType<McpUiHostStylesSchemaInferredType>({} as spec.McpUiHostStyles);
+expectType<spec.McpUiSetViewStateRequest>(
+  {} as McpUiSetViewStateRequestSchemaInferredType,
+);
+expectType<McpUiSetViewStateRequestSchemaInferredType>(
+  {} as spec.McpUiSetViewStateRequest,
+);
+expectType<spec.McpUiSetViewStateResult>(
+  {} as McpUiSetViewStateResultSchemaInferredType,
+);
+expectType<McpUiSetViewStateResultSchemaInferredType>(
+  {} as spec.McpUiSetViewStateResult,
+);
 expectType<spec.McpUiResourceTeardownRequest>(
   {} as McpUiResourceTeardownRequestSchemaInferredType,
 );
