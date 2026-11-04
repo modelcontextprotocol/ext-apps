@@ -863,7 +863,7 @@ The preference is a hint. The Host chooses how it first shows the View and how m
 
 A Host that applies the preference should do so before it first shows the View, so that the user does not see the View move. It tells the View either in the `hostContext.displayMode` of its `ui/initialize` result, or in a `ui/notifications/host-context-changed` sent after `ui/notifications/initialized`. A Host that has already shown the View, for example inline while the tool runs, may instead move it once, no later than when it sends the first `ui/notifications/tool-result`. After that, a Host should not use the preference to move the View without a user action: to change mode later, Views use `ui/request-display-mode`.
 
-Note: OpenAI's [MCP extensions](https://github.com/openai/mcp-extensions/blob/15e0f4745e7c95865ee2195de5b79f4148b21418/docs/spec.md#display-modes) define a field of the same name, `_meta["openai/ui"].preferredDisplayMode`, on the UI resource content item rather than in `ui/initialize`. This specification does not define that key.
+Note (non-normative): the name and the meaning of this field follow OpenAI's [MCP extensions](https://github.com/openai/mcp-extensions/blob/15e0f4745e7c95865ee2195de5b79f4148b21418/docs/spec.md#display-modes), which define `_meta["openai/ui"].preferredDisplayMode` as the preferred initial display mode. There it is on the UI resource content item rather than in `ui/initialize`; this specification does not define that key.
 
 #### Requesting Changes
 
