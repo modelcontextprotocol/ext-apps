@@ -436,8 +436,8 @@ A View is normally created when the agent calls its tool. With `entrypoints`, a 
 _Note (non-normative): prior art._ This section builds on two documents:
 
 - The entrypoints of OpenAI's [MCP extensions](https://github.com/openai/mcp-extensions/blob/15e0f4745e7c95865ee2195de5b79f4148b21418/docs/spec.md#mcp-app-entrypoints) specification, which declares the same list of typed objects, with the same three types (`"global"`, `"thread"` and `"file"`), under `_meta["openai/ui"].entrypoints`. A Server can declare both keys. This section differs from it in three ways:
-  - `"file"`: there, the tool receives the file's name and an opaque URI, on which resource methods are intercepted and handled by the Host, and the View can read, subscribe to and write the file through it. Here, the tool receives the file as a file argument (see below), and the View gets the content from its Server. `mimeTypes` is an addition
-  - Not defined here: writing to an opened file and subscribing to its changes, deep links into a global entrypoint, and an order of precedence for an entrypoint's icon
+  - `"file"`: there, the tool receives the file's name and an opaque URI that the Host serves. Here, the tool receives the file as a file argument (see below). `mimeTypes` is an addition
+  - Not defined here: deep links into a global entrypoint, and an order of precedence for an entrypoint's icon
   - That document ignores `visibility` when a tool is opened as an entrypoint; this specification does not say whether it applies to a call that Host makes itself
 - The File Uploads working group's draft [File Uploads extension](https://github.com/modelcontextprotocol/experimental-ext-file-uploads/pull/1) (`io.modelcontextprotocol/files`), which defines how a file reaches a tool. The `"file"` type uses it as it is
 
