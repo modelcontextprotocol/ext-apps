@@ -196,6 +196,144 @@ describe("App <-> AppBridge integration", () => {
     });
   });
 
+  describe("app-rendered elicitation", () => {
+    it("forwards the standard request to the bound app and returns its standard result", async () => {
+      const elicitationHostCapabilities: McpUiHostCapabilities = {
+        ...testHostCapabilities,
+        elicitation: {},
+      };
+      bridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        elicitationHostCapabilities,
+      );
+      app.onelicitation = async (params) => ({
+        action: "accept",
+        content: { choice: params.message },
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      expect(bridge.getAppCapabilities()?.elicitation).toEqual({});
+      await expect(
+        bridge.requestElicitation({
+          message: "Choose an option",
+          requestedSchema: {
+            type: "object",
+            properties: {
+              choice: { type: "string" },
+            },
+            required: ["choice"],
+          },
+        }),
+      ).resolves.toEqual({
+        action: "accept",
+        content: { choice: "Choose an option" },
+      });
+    });
+
+    it.each(["decline", "cancel"] as const)(
+      "preserves the user's %s result",
+      async (action) => {
+        bridge = new AppBridge(createMockClient() as Client, testHostInfo, {
+          ...testHostCapabilities,
+          elicitation: {},
+        });
+        app.onelicitation = async () => ({ action });
+        await bridge.connect(bridgeTransport);
+        await app.connect(appTransport);
+        await expect(
+          bridge.requestElicitation({
+            message: "Choose",
+            requestedSchema: { type: "object", properties: {} },
+          }),
+        ).resolves.toEqual({ action });
+      },
+    );
+
+    it("keeps metadata and cancellation bound to request ID zero", async () => {
+      bridge = new AppBridge(createMockClient() as Client, testHostInfo, {
+        ...testHostCapabilities,
+        elicitation: {},
+      });
+      const controller = new AbortController();
+      let received!: () => void;
+      const started = new Promise<void>((resolve) => {
+        received = resolve;
+      });
+      let cancelled!: () => void;
+      const aborted = new Promise<void>((resolve) => {
+        cancelled = resolve;
+      });
+      app.onelicitation = async (params, ctx) => {
+        expect(params._meta?.ui).toEqual({
+          resourceUri: "ui://delivery/choose.html",
+        });
+        expect(ctx.mcpReq.id).toBe(0);
+        ctx.mcpReq.signal.addEventListener("abort", cancelled, { once: true });
+        received();
+        await aborted;
+        return { action: "cancel" };
+      };
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      const pending = bridge.requestElicitation(
+        {
+          message: "Choose",
+          requestedSchema: { type: "object", properties: {} },
+          _meta: { ui: { resourceUri: "ui://delivery/choose.html" } },
+        },
+        { signal: controller.signal },
+      );
+      const rejection = pending.then(
+        () => {
+          throw new Error("Expected cancellation");
+        },
+        () => {},
+      );
+      await started;
+      controller.abort("test cancellation");
+      await rejection;
+      await aborted;
+    });
+
+    it("rejects URL-mode requests before forwarding them", async () => {
+      bridge = new AppBridge(createMockClient() as Client, testHostInfo, {
+        ...testHostCapabilities,
+        elicitation: {},
+      });
+      app.onelicitation = async () => ({ action: "cancel" });
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      expect(() =>
+        bridge.requestElicitation({
+          mode: "url",
+          message: "Open",
+          elicitationId: "test",
+          url: "https://example.com",
+        }),
+      ).toThrow("form-mode");
+    });
+
+    it("fails closed when the app did not advertise elicitation", async () => {
+      bridge = new AppBridge(createMockClient() as Client, testHostInfo, {
+        ...testHostCapabilities,
+        elicitation: {},
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      expect(() =>
+        bridge.requestElicitation({
+          message: "Choose an option",
+          requestedSchema: { type: "object", properties: {} },
+        }),
+      ).toThrow("App does not support elicitation");
+    });
+  });
+
   describe("Host -> App notifications", () => {
     beforeEach(async () => {
       await bridge.connect(bridgeTransport);

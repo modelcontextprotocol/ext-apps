@@ -9,6 +9,8 @@ import {
   type CreateMessageResult,
   type CreateMessageResultWithTools,
   type EmptyResult,
+  type ElicitRequest,
+  type ElicitResult,
   type Implementation,
   type JSONRPCRequest,
   type ListPromptsRequest,
@@ -32,6 +34,7 @@ import {
 } from "@modelcontextprotocol/client";
 import {
   EmptyResultSchema,
+  ElicitResultSchema,
   LoggingMessageNotificationSchema,
 } from "@modelcontextprotocol/core";
 import { EventDispatcher, MethodRegistry } from "./events.js";
@@ -579,8 +582,15 @@ export class AppBridge extends Protocol<BaseContext> {
    * Verify that the view supports the capability required for the given request method.
    * @internal
    */
-  protected assertCapabilityForMethod(_method: string): void {
-    // Host-to-view requests are not capability-gated.
+  protected assertCapabilityForMethod(method: string): void {
+    if (
+      method === "elicitation/create" &&
+      !this._appCapabilities?.elicitation
+    ) {
+      throw new Error(
+        `App does not support elicitation capability (required for ${method})`,
+      );
+    }
   }
 
   /**
@@ -622,6 +632,39 @@ export class AppBridge extends Protocol<BaseContext> {
    */
   getAppCapabilities(): McpUiAppCapabilities | undefined {
     return this._appCapabilities;
+  }
+
+  /**
+   * Forward a form-mode MCP elicitation to this exact app instance.
+   *
+   * Hosts should call this only from the core MCP client's handler for the
+   * originating `elicitation/create` request. The returned value is the
+   * standard MCP `ElicitResult`. Before returning an accepted result to the
+   * server, hosts must validate its content against `params.requestedSchema`.
+   * Invalid results should fall back to native form rendering; explicit
+   * `decline` and `cancel` results must be preserved.
+   */
+  requestElicitation(
+    params: ElicitRequest["params"],
+    options?: RequestOptions,
+  ): Promise<ElicitResult> {
+    if (!this._initializedReceived) {
+      throw new Error("App has not completed ui/initialize");
+    }
+    if (!this._hostCapabilities.elicitation) {
+      throw new Error("Host does not support app-rendered elicitation");
+    }
+    if (!this._appCapabilities?.elicitation) {
+      throw new Error("App does not support elicitation");
+    }
+    if (params.mode !== undefined && params.mode !== "form") {
+      throw new Error("MCP Apps only support form-mode elicitations");
+    }
+    return this.request(
+      { method: "elicitation/create", params },
+      ElicitResultSchema,
+      options,
+    );
   }
 
   /**

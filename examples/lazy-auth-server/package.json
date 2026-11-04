@@ -27,7 +27,7 @@
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^2.0.0",
     "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/server": "2.1.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "jose": "^6.0.0",
