@@ -92,6 +92,9 @@ import {
   McpUiRequestDisplayModeResultSchema,
   McpUiResourcePermissions,
   McpUiToolMeta,
+  McpUiEntrypoint,
+  McpUiEntrypointSchema,
+  McpUiFileEntrypointSchema,
 } from "./types.js";
 export * from "./types.js";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./constants.js";
@@ -140,6 +143,153 @@ export function getToolUiResourceUri(tool: Partial<Tool>): string | undefined {
     throw new Error(`Invalid UI resource URI: ${JSON.stringify(uri)}`);
   }
   return undefined;
+}
+
+/**
+ * Read the entrypoints that a tool declares in `_meta.ui.entrypoints`.
+ *
+ * Skips malformed entries (anything but an object with a string `type`) and
+ * keeps the rest, whereas `McpUiToolMetaSchema` rejects the whole `_meta.ui`
+ * object for one malformed entry. Returns an empty list for a tool without a
+ * valid UI resource. The caller still has to leave out the types that it does
+ * not support. Repeated types are kept: what a repeat means depends on the type.
+ *
+ * @param tool - A tool object with optional `_meta` property
+ * @returns The well-formed entrypoints, in the order in which the tool declares them
+ *
+ * @example List the tools that the user can open directly
+ * ```ts source="./app-bridge.examples.ts#getToolEntrypoints_listGlobal"
+ * const { tools } = await client.listTools();
+ *
+ * // Offer these in the host's own UI, e.g. in a list of apps
+ * const launchable = tools.filter((tool) =>
+ *   getToolEntrypoints(tool).some((entrypoint) => entrypoint.type === "global"),
+ * );
+ *
+ * // When the user picks one, open it with no arguments
+ * // and render its view as for any other tool call
+ * const result = await client.callTool({
+ *   name: launchable[0].name,
+ *   arguments: {},
+ * });
+ * ```
+ */
+export function getToolEntrypoints(tool: Partial<Tool>): McpUiEntrypoint[] {
+  try {
+    if (getToolUiResourceUri(tool) === undefined) return [];
+  } catch {
+    return [];
+  }
+  const declared = (tool._meta?.ui as { entrypoints?: unknown } | undefined)
+    ?.entrypoints;
+  if (!Array.isArray(declared)) return [];
+
+  return declared.flatMap((item) => {
+    const parsed = McpUiEntrypointSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+/** An item of `mimeTypes`: a media type without parameters, or `type/*`. */
+const MEDIA_TYPE_PATTERN = /^[^\s/*;]+\/([^\s/*;]+|\*)$/;
+
+/**
+ * Check whether a file matches a `"file"` entrypoint: an item of its
+ * `extensions` matches the end of the file's name, or an item of its
+ * `mimeTypes` matches the file's media type. Both are compared without regard
+ * to case, and parameters of the file's media type are ignored.
+ *
+ * Returns `false` for an entrypoint of another type or a malformed one, and
+ * skips list items that are neither a dot-prefixed extension nor a media type
+ * (`type/subtype`, or a whole type such as `image/*`; a wildcard in place of
+ * the type matches nothing).
+ *
+ * @param file - What the host knows of the file
+ * @param entrypoint - An entrypoint, as {@link getToolEntrypoints `getToolEntrypoints`} returns it
+ *
+ * @example Find the tools that can open a file
+ * ```ts source="./app-bridge.examples.ts#fileMatchesEntrypoint_findHandlers"
+ * const file = { name: "tune.abc", mimeType: "text/vnd.abc" };
+ * const { tools } = await client.listTools();
+ *
+ * // Let the user choose among these, next to the host's own viewer
+ * const handlers = tools.filter(
+ *   (tool) =>
+ *     getToolFileArgument(tool) !== undefined &&
+ *     getToolEntrypoints(tool).some((entrypoint) =>
+ *       fileMatchesEntrypoint(file, entrypoint),
+ *     ),
+ * );
+ * ```
+ */
+export function fileMatchesEntrypoint(
+  file: { name?: string; mimeType?: string },
+  entrypoint: McpUiEntrypoint,
+): boolean {
+  const parsed = McpUiFileEntrypointSchema.safeParse(entrypoint);
+  if (!parsed.success) return false;
+  const { extensions = [], mimeTypes = [] } = parsed.data;
+
+  const name = file.name?.toLowerCase();
+  const mimeType = file.mimeType?.split(";")[0].trim().toLowerCase();
+
+  return (
+    extensions.some(
+      (extension) =>
+        extension.length > 1 &&
+        extension.startsWith(".") &&
+        name?.endsWith(extension.toLowerCase()),
+    ) ||
+    mimeTypes.some((item) => {
+      if (!mimeType || !MEDIA_TYPE_PATTERN.test(item)) return false;
+      const pattern = item.toLowerCase();
+      return pattern.endsWith("/*")
+        ? mimeType.startsWith(pattern.slice(0, -1))
+        : mimeType === pattern;
+    })
+  );
+}
+
+/**
+ * Find the argument through which a tool takes a file when it is opened from
+ * a `"file"` entrypoint: its one top-level property marked with `x-mcp-file`
+ * (File Uploads extension, `io.modelcontextprotocol/files`).
+ *
+ * Returns `undefined` when the input schema marks no top-level property or
+ * several, or requires another property: the host cannot open such a tool with
+ * a file alone.
+ *
+ * @param tool - A tool object with an `inputSchema`
+ * @returns The name of the file argument, if the tool can be opened with a file alone
+ *
+ * @example Open a file with a tool
+ * ```ts source="./app-bridge.examples.ts#getToolFileArgument_openFile"
+ * const argument = getToolFileArgument(tool);
+ * if (argument === undefined) {
+ *   throw new Error(`${tool.name} cannot be opened with a file alone`);
+ * }
+ *
+ * // The file is the only argument
+ * const result = await client.callTool({
+ *   name: tool.name,
+ *   arguments: { [argument]: fileInput },
+ * });
+ * ```
+ */
+export function getToolFileArgument(tool: Partial<Tool>): string | undefined {
+  const { properties = {}, required = [] } = tool.inputSchema ?? {};
+  const marked = Object.entries(properties)
+    .filter(([, schema]) => {
+      const descriptor = (schema as Record<string, unknown> | null)?.[
+        "x-mcp-file"
+      ];
+      return typeof descriptor === "object" && descriptor !== null;
+    })
+    .map(([name]) => name);
+
+  if (marked.length !== 1) return undefined;
+  if (required.some((name) => name !== marked[0])) return undefined;
+  return marked[0];
 }
 
 /**

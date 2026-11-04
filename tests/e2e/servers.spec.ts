@@ -315,3 +315,93 @@ test.describe(`Integration Test Server - Interactions`, () => {
     expect(logs.some((log) => log.includes("Open link request"))).toBe(true);
   });
 });
+
+// Entrypoint tests: the user opens a tool's View from the host's own UI.
+// Each needs the example that declares that type of entrypoint, so it only
+// runs if that example is included (either no filter or EXAMPLE=<its folder>)
+test.describe("Entrypoints", () => {
+  const skipWithout = (key: string) =>
+    test.skip(
+      !SERVERS.some((s) => s.key === key),
+      `Skipped: ${key} not in EXAMPLE filter`,
+    );
+  const toolInputPanel = (page: Page) =>
+    page.locator('[class*="collapsiblePanel"]', { hasText: "Tool Input" });
+
+  test("global: user opens a tool's View directly, with no arguments", async ({
+    page,
+  }) => {
+    skipWithout("system-monitor");
+    await page.goto("/?theme=hide");
+    // The host lists the tool by its title, next to the name of its server
+    const entrypoint = page.getByRole("button", { name: /Get System Info/ });
+    await expect(entrypoint).toContainText("System Monitor Server");
+    await entrypoint.click();
+    await waitForAppLoad(page);
+
+    await expect(page.locator('[class*="appHeader"]')).toContainText(
+      "System Monitor Server:get-system-info",
+    );
+    await expect(toolInputPanel(page)).toContainText("{}");
+    await expect(
+      getAppFrame(page).getByText("System Monitor", { exact: true }),
+    ).toBeVisible();
+  });
+
+  test("thread: user opens a tool's View in the conversation", async ({
+    page,
+  }) => {
+    skipWithout("budget-allocator");
+    await page.goto("/?theme=hide");
+    await page
+      .locator('[class*="entrypoints"]', { hasText: "In this conversation" })
+      .getByRole("button", { name: /Get Budget Data/ })
+      .click();
+    await waitForAppLoad(page);
+
+    await expect(page.locator('[class*="appHeader"]')).toContainText(
+      "Budget Allocator Server:get-budget-data",
+    );
+    await expect(toolInputPanel(page)).toContainText("{}");
+  });
+
+  test("file: user opens a file with a tool that handles it", async ({
+    page,
+  }) => {
+    skipWithout("sheet-music");
+    await page.goto("/?theme=hide");
+    const picker = page.locator('input[type="file"]');
+    await expect(picker).toBeAttached({ timeout: 30000 });
+
+    // No entrypoint handles this one
+    await picker.setInputFiles({
+      name: "notes.xyz",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("hello"),
+    });
+    await expect(
+      page.getByText("No connected server opens notes.xyz"),
+    ).toBeVisible();
+
+    await picker.setInputFiles({
+      name: "scale.abc",
+      mimeType: "text/vnd.abc",
+      buffer: Buffer.from(
+        "X:1\nT:Scale\nM:4/4\nL:1/4\nK:C\nC D E F | G A B c |\n",
+      ),
+    });
+    // The user chooses the server that receives the file
+    await page.getByRole("button", { name: /Play Sheet Music File/ }).click();
+    await waitForAppLoad(page);
+
+    await expect(page.locator('[class*="appHeader"]')).toContainText(
+      "Sheet Music Server:play-sheet-music-file",
+    );
+    // The host shows the file's metadata, and keeps its bytes out of the tool input
+    await toolInputPanel(page).click();
+    await expect(toolInputPanel(page)).toContainText('"name": "scale.abc"');
+    await expect(toolInputPanel(page)).not.toContainText('"data"');
+    // The View renders the notation that the tool result carries
+    await expect(getAppFrame(page).locator("#sheet-music svg")).toBeVisible();
+  });
+});

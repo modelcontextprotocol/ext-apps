@@ -349,6 +349,15 @@ interface McpUiToolMeta {
    * - "app": Tool callable by the app from this server only
    */
   visibility?: Array<"model" | "app">;
+  /** Ways for the user to open this tool's View from the Host's own UI. See Entrypoints below. */
+  entrypoints?: McpUiEntrypoint[];
+}
+
+interface McpUiEntrypoint {
+  /** Kind of entrypoint. This specification defines "global", "thread" and "file". */
+  type: string;
+  /** The definition of a type can add fields. */
+  [key: string]: unknown;
 }
 
 interface Tool {
@@ -419,6 +428,181 @@ Example (app-only tool, hidden from model):
 - **tools/list behavior:** Host MUST NOT include tools in the agent's tool list when their visibility does not include `"model"` (e.g., `visibility: ["app"]`)
 - **tools/call behavior:** Host MUST reject `tools/call` requests from apps for tools that don't include `"app"` in visibility
 - Cross-server tool calls are always blocked for app-only tools
+
+#### Entrypoints:
+
+A View is normally created when the agent calls its tool. With `entrypoints`, a Server marks a tool whose View the user can also open directly from the Host's own UI.
+
+_Note (non-normative): prior art._ This section builds on two documents:
+
+- The entrypoints of OpenAI's [MCP extensions](https://github.com/openai/mcp-extensions/blob/15e0f4745e7c95865ee2195de5b79f4148b21418/docs/spec.md#mcp-app-entrypoints) specification, which declares the same list of typed objects, with the same three types (`"global"`, `"thread"` and `"file"`), under `_meta["openai/ui"].entrypoints`. A Server can declare both keys. This section differs from it in three ways:
+  - `"file"`: there, the tool receives the file's name and an opaque URI that the Host serves. Here, the tool receives the file as a file argument (see below). `mimeTypes` is an addition
+  - Not defined here: deep links into a global entrypoint, and an order of precedence for an entrypoint's icon
+  - That document ignores `visibility` when a tool is opened as an entrypoint; this specification does not say whether it applies to a call that Host makes itself
+- The File Uploads working group's draft [File Uploads extension](https://github.com/modelcontextprotocol/experimental-ext-file-uploads/pull/1) (`io.modelcontextprotocol/files`), which defines how a file reaches a tool. The `"file"` type uses it as it is
+
+This specification defines three types:
+
+| `type`     | The user opens the View...                      | Arguments of the call        |
+| ---------- | ----------------------------------------------- | ---------------------------- |
+| `"global"` | as a starting point, e.g. from a list of apps   | `{}`                         |
+| `"thread"` | inside the conversation that they are in        | `{}`                         |
+| `"file"`   | by opening a file that the entry says it handles | the file, as a file argument |
+
+Example (tool that the user can open directly):
+
+```json
+{
+  "name": "open_inbox",
+  "title": "Inbox",
+  "description": "Show the user's inbox",
+  "inputSchema": { "type": "object" },
+  "annotations": { "readOnlyHint": true },
+  "_meta": {
+    "ui": {
+      "resourceUri": "ui://mail-server/inbox",
+      "entrypoints": [{ "type": "global" }]
+    }
+  }
+}
+```
+
+- `entrypoints` is a list of objects, each with a `type`. It has an effect only on a tool that declares a UI resource
+- A tool MAY declare several types. Declaring the same `"global"` or `"thread"` entry twice is the same as declaring it once
+- A `type` without a `/` is reserved for this specification. A Host that defines its own SHOULD prefix it with a reversed domain name that it owns (e.g., `com.example/custom`)
+- Host reads the entries one by one. It MUST ignore an entry whose `type` it does not support or that is malformed (not an object with a string `type`, or not as its type requires), and MUST NOT reject the other entries or the tool because of it
+- "Conversation" below means one sequence of messages and tool calls between a user and the agent, which other documents and some Hosts call a thread. The type is named `"thread"` to match prior art
+
+The rules that follow apply to every type. The subsection of each type adds its own.
+
+**Server behavior:**
+
+- On success, a call made to open an entrypoint MUST return a result from which the View can render
+- Such a call SHOULD NOT change anything: opening a View is not a request to act. If every call of the tool is read-only, the Server SHOULD say so with `annotations.readOnlyHint: true`
+- Server MUST NOT assume that the result stays out of the model's context
+- The tool remains an ordinary tool. The agent can still call it, with or without arguments, as `visibility` allows
+
+**Host behavior:**
+
+- Host MAY offer entrypoints anywhere in its own UI, and MAY leave any of them out. It SHOULD label each with the tool's display name (`title`, then `annotations.title`, then `name`), and MAY show the tool's `icons` and `description`
+- Host MUST NOT open as an entrypoint a tool that its Server has not declared as one, with a type that Host supports: without the declaration, nothing says which arguments the tool accepts
+- Host MUST NOT offer or open an entrypoint of a tool that it would not otherwise allow to be called for that user
+- To open an entrypoint, Host calls the tool with the arguments that the type defines, or asks the agent to make that call, and renders the View as for any other tool call (see Lifecycle)
+- Host MUST NOT open an entrypoint except on a user action in Host's own UI; building or previewing the list does not count, and a View or Server cannot trigger it. Following a link in content that Host displays, or one passed to `ui/open-link`, is not such an action. Host MAY still prefetch the UI resource (see Behavior), and a View's own `tools/call` of the tool is governed by Visibility
+- A page reload or a restored session is not a user action: Host MAY show the result that it kept instead of calling the tool again, but only to the same user, and only while that user can still call the Server's tools. Whether opening an entrypoint again makes a new call or returns to a View that Host still shows is up to Host
+- A Host that opens entrypoints through the agent cannot open a tool whose `visibility` lacks `"model"`, so a Server that wants its entrypoint offered by every Host SHOULD keep `"model"`
+- The title, description and icons are chosen by the Server and appear in Host's own UI, where they can imitate the Host or another Server. Host SHOULD show which Server each entrypoint comes from, and SHOULD treat a new or changed entrypoint as it treats a new tool. Core MCP's precautions for `icons` apply
+- This section changes nothing in how a Host enables tools or handles consent for tool calls. Whether the user action also counts as consent is for the Host to decide
+
+**View behavior:**
+
+- View SHOULD render from the tool result that Host sends it (`ui/notifications/tool-result`), without calling the tool again
+
+##### `"global"`
+
+```typescript
+interface McpUiGlobalEntrypoint {
+  type: "global";
+}
+```
+
+The View is a useful starting point, with no earlier tool call or message from the agent, and belongs to no conversation that the user already has. A list of apps is the typical place for it.
+
+- **Server:** The tool MUST accept empty arguments (`{}`), so its `inputSchema` has no required properties
+- **Host:** Host opens the entrypoint with `{}` as arguments. It MAY leave out a tool whose `inputSchema` has required properties
+- **Host:** Whether Host starts a conversation for the View, and which conversation the View's `ui/message` and `ui/update-model-context` requests then reach, is up to Host
+
+##### `"thread"`
+
+```typescript
+interface McpUiThreadEntrypoint {
+  type: "thread";
+}
+```
+
+The View is useful inside a conversation that already exists, for instance in a panel or a tab beside it. The user opens it from within that conversation, and it belongs to that conversation.
+
+- **Server:** The tool MUST accept empty arguments (`{}`), so its `inputSchema` has no required properties. The call carries nothing that identifies the conversation
+- **Host:** Host offers the entrypoint inside a conversation, and opens it with `{}` as arguments
+- **Host:** The tool call and its result belong to the conversation in which the user opened the entrypoint. Host MAY add them to that conversation's context, and MUST NOT add them to another conversation's
+- **Host:** `ui/message` and `ui/update-model-context` requests from the View MUST reach that conversation and no other
+- **Host:** Each conversation has its own View. Host MUST NOT show in one conversation a View, or a tool result, that was opened from this entrypoint in another: opening it there is a new call
+
+##### `"file"`
+
+```typescript
+interface McpUiFileEntrypoint {
+  type: "file";
+  /** File name extensions that the View handles, each with its leading dot (e.g. ".csv"). */
+  extensions?: string[];
+  /** Media types that the View handles: exact (e.g. "text/csv") or a whole type (e.g. "image/*"). */
+  mimeTypes?: string[];
+}
+```
+
+The View handles files of some kinds. When the user opens such a file in Host's own UI, Host can show the View in place of, or beside, its own viewer.
+
+The file reaches the Server as a file argument of the tool call, as the File Uploads extension (`io.modelcontextprotocol/files`) defines it. **That extension is a [working draft](https://github.com/modelcontextprotocol/experimental-ext-file-uploads/pull/1), and this entry type depends on it**: the `x-mcp-file` keyword, the `FileInput` value, how the bytes move (inline, or by an upload that the Server requests), how the extension is negotiated, and what the user approves are all defined there and are not restated here. If that extension changes, this type follows it.
+
+Example (tool that opens spreadsheets):
+
+```json
+{
+  "name": "open_spreadsheet",
+  "title": "Spreadsheet",
+  "description": "Show a spreadsheet file",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "file": {
+        "type": "object",
+        "x-mcp-file": { "accept": [".csv", "text/csv"], "maxSize": 5242880 }
+      }
+    },
+    "required": ["file"]
+  },
+  "annotations": { "readOnlyHint": true },
+  "_meta": {
+    "ui": {
+      "resourceUri": "ui://sheets-server/viewer",
+      "entrypoints": [
+        { "type": "file", "extensions": [".csv"], "mimeTypes": ["text/csv"] }
+      ]
+    }
+  }
+}
+```
+
+Matching:
+
+- An item of `extensions` is a dot followed by at least one character (e.g. `.csv`, `.tar.gz`). It matches a file whose name ends with it, compared without regard to case
+- An item of `mimeTypes` is a media type without parameters (e.g. `text/csv`), or a type followed by `/*` (e.g. `image/*`). It matches a file whose media type, without its parameters, is that type or is of that type, compared without regard to case. `*/*` is not allowed
+- A file matches the entry if an item of either list matches it. An entry with no item in either list is malformed. Host MUST ignore an item that has neither form
+- These two lists are what Host matches on. The `accept` list of `x-mcp-file` is a hint for a file picker, and the Server SHOULD keep it consistent with them, so that a file that matches the entry is one that the argument accepts
+
+**Server behavior:**
+
+- The tool's `inputSchema` MUST mark exactly one top-level property with `x-mcp-file`, MUST require that property, and MUST NOT require any other
+- The name and media type that Host matched on are what Host knows of the file, not a guarantee of its content. Server validates the file as the File Uploads extension requires, and reports a file that it cannot show as a tool error (`isError: true`)
+- Server decides how the file's content reaches the View: in the result's `structuredContent`, as an embedded resource in `content`, or as a resource that the View reads from the Server with `resources/read`
+
+**Host behavior:**
+
+- Host MUST NOT open a `"file"` entrypoint unless the File Uploads extension is in effect with that Server, as that extension defines
+- Host opens the entrypoint with one argument: the marked property, set to the `FileInput` of the file that the user opened. It MUST NOT open a tool whose `inputSchema` is not as required above
+- Host that asks the agent to make the call binds the file to the argument itself, as that extension requires: the model never produces the file's bytes
+- That extension's rules on moving the bytes, on the user's approval before a file is sent to a Server, and on keeping bytes out of the model's context apply unchanged. Host MUST NOT send the file to any Server but that of the entrypoint that the user opened it with
+- When several entrypoints match a file, Host SHOULD let the user choose among them, and MAY remember the choice. Host SHOULD NOT replace its own way of showing a kind of file with a Server's View unless the user chose that
+- Host MAY leave the `data` member out of the file argument that it sends to the View in `ui/notifications/tool-input` and `ui/notifications/tool-input-partial`, and SHOULD do so for a large file
+- A file that the user opens inside a conversation belongs to that conversation, as a `"thread"` entrypoint does
+
+**View behavior:**
+
+- View MUST NOT rely on the file's bytes being in its tool input. It renders from the tool result, or from what the result refers to
+
+This type only opens a file. It defines no way for the View to save changes to the file, or to learn that the file changed.
+
+_Note (non-normative): files that Host and Server can both read._ When Host and Server run on the same machine, as with most stdio Servers, copying a file's bytes into the call is wasteful, and makes editing the file in place impossible. The File Uploads draft has no way to pass a file by reference. This specification defines none either, and the following is a sketch for discussion. An entry could say that the Server reads local files (for instance `"uriSchemes": ["file"]`), and a Host on the same machine could then pass a `file:` URI in place of the bytes. The user's own action of opening the file would be the grant: a later rule might say that Host SHOULD pass by reference only a file that the user opened or otherwise allowed for that Server, and that it MAY also limit this to locations that it already shares with the Server (for example [roots](https://modelcontextprotocol.io/specification/draft/client/roots), where both sides support them). Two lines would hold whatever the mechanism: a remote Server would never be given a `file:` URI, and neither the URI nor the path would reach the View, which runs untrusted code. This is a question for the File Uploads working group as much as for this specification.
 
 #### Benefits:
 
@@ -2701,6 +2885,17 @@ App tools MUST be tied to the app's lifecycle:
 - Tools automatically disappear when app iframe is torn down
 - Hosts MUST NOT persist app tool registrations across sessions
 - Calling a tool from a closed app MUST return an error
+
+#### 6. Entrypoints
+
+An entrypoint puts a Server's tool in the Host's own UI, and a `"file"` entrypoint sends a file of the user's to a Server.
+
+- **Imitation:** An entrypoint's title, description and icons are Server content. Hosts SHOULD show which Server each entrypoint comes from
+- **Unrequested calls:** Opening an entrypoint is a tool call. Hosts MUST make it only on a user action in their own UI (see Entrypoints), never because a View, a Server or displayed content asked for it
+- **Which Server receives a file:** A file that the user opens goes to the Server of the entrypoint that the user opened it with, and to no other. The user's approval that the File Uploads extension requires before a file is sent to a Server applies. Hosts SHOULD name that Server when they ask
+- **Claiming common file types:** A Server chooses its own `extensions` and `mimeTypes`, and can list common ones (`.pdf`, `image/*`) to receive files that the user did not mean for it. Hosts SHOULD let the user choose among the entrypoints that match a file, and SHOULD NOT let a Server's View replace their own viewer for a kind of file unless the user chose that
+- **File content:** A file is untrusted input to the Server and to the View. Its name and media type say nothing certain about its content
+- **Paths:** Hosts MUST NOT give a View the path of a file on the user's machine
 
 ### Other risks
 

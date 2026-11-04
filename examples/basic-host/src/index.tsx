@@ -3,17 +3,20 @@ import type { Tool } from "@modelcontextprotocol/client";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { Entrypoints } from "./entrypoints";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
 import styles from "./index.module.css";
 
 /**
  * Check if a tool is visible to the model (not app-only).
  * Tools with `visibility: ["app"]` should not be shown in tool lists.
+ * Parses `visibility` alone: a malformed sibling field must not make an app-only tool visible.
  */
 function isToolVisibleToModel(tool: { _meta?: Record<string, unknown> }): boolean {
-  const result = McpUiToolMetaSchema.safeParse(tool._meta?.ui);
+  const ui = tool._meta?.ui as { visibility?: unknown } | undefined;
+  const result = McpUiToolMetaSchema.shape.visibility.safeParse(ui?.visibility);
   if (!result.success) return true; // default: visible to model
-  const visibility = result.data.visibility;
+  const visibility = result.data;
   if (!visibility) return true; // default: visible to model
   return visibility.includes("model");
 }
@@ -93,6 +96,10 @@ function Host({ serversPromise }: HostProps) {
   const [destroyingIds, setDestroyingIds] = useState<Set<number>>(new Set());
   const queryParams = useMemo(() => getQueryParams(), []);
 
+  const addToolCall = (info: ToolCallInfo) => {
+    setToolCalls((calls) => [...calls, { ...info, id: nextToolCallId++ }]);
+  };
+
   const requestClose = (id: number) => {
     setDestroyingIds((s) => new Set(s).add(id));
   };
@@ -120,11 +127,14 @@ function Host({ serversPromise }: HostProps) {
       ))}
       <CallToolPanel
         serversPromise={serversPromise}
-        addToolCall={(info) => setToolCalls([...toolCalls, { ...info, id: nextToolCallId++ }])}
+        addToolCall={addToolCall}
         initialServer={queryParams.server}
         initialTool={queryParams.tool}
         autoCall={queryParams.call}
       />
+      <Suspense>
+        <Entrypoints serversPromise={serversPromise} addToolCall={addToolCall} />
+      </Suspense>
     </>
   );
 }

@@ -302,6 +302,56 @@
       },
       "additionalProperties": {}
     },
+    "McpUiEntrypoint": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Kind of entrypoint. The specification defines `\"global\"`,\n`\"thread\"` and `\"file\"`. Hosts ignore the types that they do not support."
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": {}
+    },
+    "McpUiFileEntrypoint": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "file"
+        },
+        "extensions": {
+          "description": "File name extensions that the view handles, each with its\nleading dot (e.g. `\".csv\"`). Compared without regard to case.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mimeTypes": {
+          "description": "Media types that the view handles: exact (e.g. `\"text/csv\"`)\nor a whole type (e.g. `\"image/*\"`).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "McpUiGlobalEntrypoint": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "global"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
     "McpUiHostCapabilities": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5295,6 +5345,18 @@
       ],
       "description": "Color theme preference for the host environment."
     },
+    "McpUiThreadEntrypoint": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "thread"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
     "McpUiToolCancelledNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5395,6 +5457,21 @@
               }
             ],
             "description": "Tool visibility scope - who can access the tool."
+          }
+        },
+        "entrypoints": {
+          "description": "Ways for the user to open this tool's view from the host's own UI.\nOnly has an effect on a tool that declares a UI resource.\nTo ignore malformed entries as the specification requires, read it with the\nSDK's `getToolEntrypoints()`: `McpUiToolMetaSchema` rejects the whole object for one.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Kind of entrypoint. The specification defines `\"global\"`,\n`\"thread\"` and `\"file\"`. Hosts ignore the types that they do not support."
+              }
+            },
+            "required": ["type"],
+            "additionalProperties": {}
           }
         },
         "csp": {

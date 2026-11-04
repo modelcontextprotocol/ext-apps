@@ -80,7 +80,7 @@ To test local modifications, use this configuration (replace `~/code/ext-apps` w
 
 ### Server (`server.ts`)
 
-Exposes a single `get-budget-data` tool that returns:
+Exposes a single `get-budget-data` tool, which declares a `"thread"` entrypoint (`_meta.ui.entrypoints`) so that a host can let the user add the allocator to a conversation directly. It returns:
 
 - Category definitions with colors and default allocations
 - Historical data (~120 data points) - 24 months of allocation history per category
