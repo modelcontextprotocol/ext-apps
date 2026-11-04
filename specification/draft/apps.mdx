@@ -1171,6 +1171,8 @@ Host behavior:
 
 The `content` of `ui/message` and of `ui/update-model-context` is an array of MCP `ContentBlock`s, so a View can send an **embedded resource** (`type: "resource"`, an MCP `EmbeddedResource`, whose content is inline as `text` or `blob`) or a **resource link** (`type: "resource_link"`, an MCP `ResourceLink`, which names content by `uri` without carrying it). The rules in this section apply to both requests. They do not apply to `ui/download-file`, which has its own.
 
+> **Note (non-normative):** This section builds on [OpenAI's MCP extensions specification](https://github.com/openai/mcp-extensions/blob/15e0f4745e7c95865ee2195de5b79f4148b21418/docs/spec.md#supported-content), which lists resource links and embedded resources among the content blocks supported in `ui/update-model-context` and `ui/message`, and declares them with the same `resource` and `resourceLink` capability keys. What this section adds is what a Host does with a link's `uri`, and with a block type that it has not declared.
+
 A View's HTML is a resource of its MCP server, so a Host MUST give these blocks no more trust than it gives the same block in a tool result from that server. This holds for `ui/message` too: whatever its `role`, the View wrote the content and the user did not.
 
 ```typescript
@@ -1233,8 +1235,6 @@ Resource links (`resource_link`):
 * View SHOULD only send links that its own MCP server can serve through `resources/read`.
 
 For the reasoning, see "Resource blocks sent by a View" under [Other risks](#other-risks).
-
-> **Note (non-normative):** [OpenAI's MCP extensions specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md) lists resource links and embedded resources among the content blocks that its hosts accept in `ui/update-model-context` and `ui/message`, and its capability example for `ui/update-model-context` declares them with the same `resource` and `resourceLink` keys.
 
 `ui/request-display-mode` - Request host to change display mode
 
