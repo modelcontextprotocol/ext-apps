@@ -34,7 +34,10 @@ export async function startStreamableHTTPServer(
 ): Promise<void> {
   const port = parseInt(process.env.PORT ?? "3001", 10);
 
-  const app = createMcpExpressApp({ host: "0.0.0.0" });
+  // Raise the JSON body limit (express default: 100kb): the viewer submits
+  // whole-document base64 through submit_current_pdf / submit_save_data and
+  // page screenshots through submit_page_data.
+  const app = createMcpExpressApp({ host: "0.0.0.0", jsonLimit: "64mb" });
   app.use(cors());
 
   app.all("/mcp", async (req: Request, res: Response) => {

@@ -343,6 +343,43 @@ function waitForViewerState(
   });
 }
 
+/** What the viewer submits for a get_current_pdf request. */
+interface CurrentPdfPayload {
+  data: string; // base64 PDF bytes
+  fileName: string;
+  hasEdits: boolean;
+}
+
+const pendingCurrentPdfRequests = new Map<
+  string,
+  (v: CurrentPdfPayload | Error) => void
+>();
+
+/**
+ * Wait for the viewer to build the current PDF bytes and submit them.
+ * Same timeout/abort semantics as waitForSaveData.
+ */
+function waitForCurrentPdf(
+  requestId: string,
+  signal?: AbortSignal,
+): Promise<CurrentPdfPayload> {
+  return new Promise<CurrentPdfPayload>((resolve, reject) => {
+    const settle = (v: CurrentPdfPayload | Error) => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      pendingCurrentPdfRequests.delete(requestId);
+      v instanceof Error ? reject(v) : resolve(v);
+    };
+    const onAbort = () => settle(new Error("interact request cancelled"));
+    const timer = setTimeout(
+      () => settle(new Error("Timeout waiting for PDF bytes from viewer")),
+      GET_PAGES_TIMEOUT_MS,
+    );
+    signal?.addEventListener("abort", onAbort);
+    pendingCurrentPdfRequests.set(requestId, settle);
+  });
+}
+
 interface QueueEntry {
   commands: PdfCommand[];
   /** Timestamp of the most recent enqueue or dequeue */
@@ -1491,6 +1528,7 @@ Returns a viewUUID in structuredContent. Pass it to \`interact\`:
 - navigate, search, find, search_navigate, zoom
 - get_text, get_screenshot, get_viewer_state (extract content / read selection & current page)
 - save_as (write annotated PDF to disk)
+- get_current_pdf (return the current PDF, edits applied, as an embedded resource)
 
 Accepts local files (use list_pdfs), client MCP root directories, or any HTTPS URL.
 Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before display.`,
@@ -1778,6 +1816,7 @@ URL: ${normalized}`,
           "get_screenshot",
           "get_viewer_state",
           "save_as",
+          "get_current_pdf",
         ])
         .describe("Action to perform"),
       page: z
@@ -1847,7 +1886,11 @@ URL: ${normalized}`,
     type InteractCommand = z.infer<typeof InteractCommandSchema>;
     type ContentPart =
       | { type: "text"; text: string }
-      | { type: "image"; data: string; mimeType: string };
+      | { type: "image"; data: string; mimeType: string }
+      | {
+          type: "resource";
+          resource: { uri: string; mimeType: string; blob: string };
+        };
 
     /**
      * Resolve an image annotation: fetch imageUrl → imageData if needed,
@@ -2398,6 +2441,42 @@ URL: ${normalized}`,
             );
           }
         }
+        case "get_current_pdf": {
+          const requestId = randomUUID();
+          enqueueCommand(uuid, { type: "get_current_pdf", requestId });
+          let payload: CurrentPdfPayload;
+          try {
+            await ensureViewerIsPolling(uuid);
+            payload = await waitForCurrentPdf(requestId, signal);
+          } catch (err) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `get_current_pdf failed: ${err instanceof Error ? err.message : String(err)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          const byteLength = Buffer.from(payload.data, "base64").length;
+          return {
+            content: [
+              {
+                type: "text",
+                text: `${payload.fileName} (application/pdf, ${byteLength} bytes${payload.hasEdits ? ", includes in-viewer edits" : ""})`,
+              },
+              {
+                type: "resource",
+                resource: {
+                  uri: `file:///${encodeURIComponent(payload.fileName)}`,
+                  mimeType: "application/pdf",
+                  blob: payload.data,
+                },
+              },
+            ],
+          };
+        }
         case "get_viewer_state": {
           const requestId = randomUUID();
           enqueueCommand(uuid, { type: "get_viewer_state", requestId });
@@ -2479,7 +2558,9 @@ Example — add a signature image and a stamp, then screenshot to verify:
 
 **FORMS** — fill_form: fill fields with \`fields\` array of {name, value}.
 
-**SAVE** — save_as: write the annotated PDF (annotations + form values) to a file. Pass \`path\` (absolute path or file://) for a new location, or omit \`path\` to overwrite the original. Set \`overwrite: true\` to replace an existing file (always required when omitting \`path\`).`,
+**SAVE** — save_as: write the annotated PDF (annotations + form values) to a file. Pass \`path\` (absolute path or file://) for a new location, or omit \`path\` to overwrite the original. Set \`overwrite: true\` to replace an existing file (always required when omitting \`path\`).
+
+**EXPORT** — get_current_pdf: return the current document (annotations + form values applied) as an embedded PDF resource. No file is written. The result embeds the whole document as base64, so prefer a single call once editing is done.`,
         inputSchema: z.object({
           viewUUID: z
             .string()
@@ -2503,6 +2584,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
               "get_screenshot",
               "get_viewer_state",
               "save_as",
+              "get_current_pdf",
             ])
             .optional()
             .describe(
@@ -2684,10 +2766,23 @@ Example — add a signature image and a stamp, then screenshot to verify:
           if (result.content.length === 1) {
             allContent.push(result.content[0]);
           } else {
-            const texts = result.content
-              .map((c) => (c.type === "text" ? c.text : null))
-              .filter((t) => t != null);
-            allContent.push({ type: "text", text: texts.join("\n") });
+            const resourcePart = result.content.find(
+              (c) => c.type === "resource",
+            );
+            if (resourcePart && commandList.length === 1) {
+              // Single command: no 1:1 slot contract — keep the summary
+              // text and the embedded resource (get_current_pdf) as-is.
+              allContent.push(...(result.content as ContentPart[]));
+            } else if (resourcePart) {
+              // Batch: preserve the embedded resource as the slot's value —
+              // the accompanying text block is only a summary.
+              allContent.push(resourcePart as ContentPart);
+            } else {
+              const texts = result.content
+                .map((c) => (c.type === "text" ? c.text : null))
+                .filter((t) => t != null);
+              allContent.push({ type: "text", text: texts.join("\n") });
+            }
           }
         }
 
@@ -2780,6 +2875,63 @@ Example — add a signature image and a stamp, then screenshot to verify:
           settle(new Error(error || "Viewer returned no data"));
         } else {
           settle(data);
+        }
+        return { content: [{ type: "text", text: "Submitted" }] };
+      },
+    );
+
+    // Tool: submit_current_pdf (app-only) - Viewer submits current PDF bytes
+    registerAppTool(
+      server,
+      "submit_current_pdf",
+      {
+        title: "Submit Current PDF",
+        description:
+          "Submit current PDF bytes for a get_current_pdf request (used by viewer). The model should NOT call this tool directly.",
+        inputSchema: z.object({
+          requestId: z
+            .string()
+            .describe("The request ID from the get_current_pdf command"),
+          data: z.string().optional().describe("Base64-encoded PDF bytes"),
+          fileName: z
+            .string()
+            .optional()
+            .describe("Suggested file name for the document"),
+          hasEdits: z
+            .boolean()
+            .optional()
+            .describe("Whether the bytes include in-viewer edits"),
+          error: z
+            .string()
+            .optional()
+            .describe("Error message if the viewer failed to build bytes"),
+        }),
+        _meta: { ui: { visibility: ["app"] } },
+      },
+      async ({
+        requestId,
+        data,
+        fileName,
+        hasEdits,
+        error,
+      }): Promise<CallToolResult> => {
+        const settle = pendingCurrentPdfRequests.get(requestId);
+        if (!settle) {
+          return {
+            content: [
+              { type: "text", text: `No pending request for ${requestId}` },
+            ],
+            isError: true,
+          };
+        }
+        if (error || !data) {
+          settle(new Error(error || "Viewer returned no data"));
+        } else {
+          settle({
+            data,
+            fileName: fileName || "document.pdf",
+            hasEdits: hasEdits ?? false,
+          });
         }
         return { content: [{ type: "text", text: "Submitted" }] };
       },
