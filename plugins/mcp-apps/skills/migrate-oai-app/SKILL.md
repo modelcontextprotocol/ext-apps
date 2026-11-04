@@ -108,6 +108,7 @@ These OpenAI features don't have MCP equivalents yet:
 |----------------|-------------------|
 | `_meta["openai/toolInvocation/invoking"]` / `_meta["openai/toolInvocation/invoked"]` | Progress indicators not yet available |
 | `_meta["openai/widgetDescription"]` | Use `app.updateModelContext()` for dynamic context |
+| `_meta["openai/ui"].entrypoints` (OpenAI MCP extensions) | `"thread"`, `"file"` and deep links not yet available; only `{ "type": "global" }` maps, to `_meta.ui.entrypoints` (draft spec) |
 
 **Client-side:**
 | OpenAI Feature | Status/Workaround |

@@ -37,6 +37,44 @@ registerAppTool(
 > [!NOTE]
 > For full examples that implement this pattern, see: [`examples/system-monitor-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/system-monitor-server) and [`examples/pdf-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/pdf-server).
 
+## Letting users open an App directly
+
+> [!NOTE]
+> `entrypoints` is part of the [draft specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx). Hosts that don't support it ignore it, and the tool keeps working as an ordinary tool.
+
+By default a View only appears when the agent calls its tool. Add a `"global"` entry to {@link types!McpUiToolMeta.entrypoints `Tool._meta.ui.entrypoints`} to tell the host that the View is a useful starting point by itself, so that the host can offer it in its own UI (in a list of apps, for instance). When the user picks it, the host calls the tool with `{}` as arguments, or asks the agent to, and renders the View as for any other tool call.
+
+<!-- prettier-ignore -->
+```ts source="../src/server/index.examples.ts#registerAppTool_globalEntrypoint"
+registerAppTool(
+  server,
+  "show-cart",
+  {
+    title: "Shopping Cart",
+    description: "Display the user's shopping cart",
+    // Opened with `{}`: no required arguments, and nothing changes
+    annotations: { readOnlyHint: true },
+    _meta: {
+      ui: {
+        resourceUri: "ui://shop/cart.html",
+        entrypoints: [{ type: "global" }],
+      },
+    },
+  },
+  async () => {
+    const cart = await getCart();
+    return { content: [{ type: "text", text: JSON.stringify(cart) }] };
+  },
+);
+```
+
+Such a tool has to work with no arguments: give it no required inputs, return a result that the View can render from, and don't change anything when called with `{}` (opening a View is not a request to act). The tool's `title` (or `name`) and `icons` are what the host shows, so choose them for people as well as for the model. The tool remains an ordinary tool that the agent can call too, and its result may reach the model.
+
+Hosts can read the field with {@link app-bridge!getToolEntrypoints `getToolEntrypoints`}, which skips malformed entries.
+
+> [!NOTE]
+> For full examples that implement this pattern, see: [`examples/system-monitor-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/system-monitor-server) (server) and [`examples/basic-host/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) (host).
+
 ## Polling for live data
 
 For real-time dashboards or monitoring views, use an app-only tool (with `visibility: ["app"]`) that the App polls at regular intervals.
