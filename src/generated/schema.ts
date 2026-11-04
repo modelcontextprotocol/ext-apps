@@ -288,55 +288,114 @@ export const McpUiResourceCspSchema = z.object({
  * @description Sandbox permissions requested by the UI resource.
  *
  * Servers declare which browser capabilities their UI needs.
+ * Keys are Permission Policy feature names.
+ *
  * Hosts MAY honor these by setting appropriate iframe `allow` attributes.
+ * Hosts SHOULD recognize the named keys, MAY honor other feature names, and
+ * MUST NOT apply keys that are not valid Permission Policy feature names.
  * Apps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.
  */
-export const McpUiResourcePermissionsSchema = z.object({
-  /**
-   * @description Request camera access.
-   *
-   * Maps to Permission Policy `camera` feature.
-   */
-  camera: z
-    .object({})
-    .optional()
-    .describe(
-      "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
-    ),
-  /**
-   * @description Request microphone access.
-   *
-   * Maps to Permission Policy `microphone` feature.
-   */
-  microphone: z
-    .object({})
-    .optional()
-    .describe(
-      "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
-    ),
-  /**
-   * @description Request geolocation access.
-   *
-   * Maps to Permission Policy `geolocation` feature.
-   */
-  geolocation: z
-    .object({})
-    .optional()
-    .describe(
-      "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
-    ),
-  /**
-   * @description Request clipboard write access.
-   *
-   * Maps to Permission Policy `clipboard-write` feature.
-   */
-  clipboardWrite: z
-    .object({})
-    .optional()
-    .describe(
-      "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
-    ),
-});
+export const McpUiResourcePermissionsSchema = z
+  .object({
+    /**
+     * @description Request camera access.
+     *
+     * Maps to Permission Policy `camera` feature.
+     */
+    camera: z
+      .object({})
+      .optional()
+      .describe(
+        "Request camera access.\n\nMaps to Permission Policy `camera` feature.",
+      ),
+    /**
+     * @description Request microphone access.
+     *
+     * Maps to Permission Policy `microphone` feature.
+     */
+    microphone: z
+      .object({})
+      .optional()
+      .describe(
+        "Request microphone access.\n\nMaps to Permission Policy `microphone` feature.",
+      ),
+    /**
+     * @description Request geolocation access.
+     *
+     * Maps to Permission Policy `geolocation` feature.
+     */
+    geolocation: z
+      .object({})
+      .optional()
+      .describe(
+        "Request geolocation access.\n\nMaps to Permission Policy `geolocation` feature.",
+      ),
+    /**
+     * @description Request clipboard write access.
+     *
+     * Maps to Permission Policy `clipboard-write` feature.
+     */
+    "clipboard-write": z
+      .object({})
+      .optional()
+      .describe(
+        "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+      ),
+    /**
+     * @description Legacy alias for `clipboard-write`.
+     *
+     * @deprecated Use `"clipboard-write"` instead.
+     */
+    clipboardWrite: z
+      .object({})
+      .optional()
+      .describe("Legacy alias for `clipboard-write`."),
+    /**
+     * @description Request Fullscreen API access.
+     *
+     * Maps to Permission Policy `fullscreen` feature.
+     */
+    fullscreen: z
+      .object({})
+      .optional()
+      .describe(
+        "Request Fullscreen API access.\n\nMaps to Permission Policy `fullscreen` feature.",
+      ),
+    /**
+     * @description Request Picture-in-Picture API access.
+     *
+     * Maps to Permission Policy `picture-in-picture` feature.
+     */
+    "picture-in-picture": z
+      .object({})
+      .optional()
+      .describe(
+        "Request Picture-in-Picture API access.\n\nMaps to Permission Policy `picture-in-picture` feature.",
+      ),
+    /**
+     * @description Request media autoplay with sound.
+     *
+     * Maps to Permission Policy `autoplay` feature.
+     */
+    autoplay: z
+      .object({})
+      .optional()
+      .describe(
+        "Request media autoplay with sound.\n\nMaps to Permission Policy `autoplay` feature.",
+      ),
+    /**
+     * @description Request Encrypted Media Extensions access for DRM-protected media playback.
+     *
+     * Maps to Permission Policy `encrypted-media` feature.
+     */
+    "encrypted-media": z
+      .object({})
+      .optional()
+      .describe(
+        "Request Encrypted Media Extensions access for DRM-protected media playback.\n\nMaps to Permission Policy `encrypted-media` feature.",
+      ),
+  })
+  .passthrough();
 
 /**
  * @description Notification of UI size changes (View -> Host).
@@ -543,9 +602,9 @@ export const McpUiHostCapabilitiesSchema = z.object({
   /** @description Sandbox configuration applied by the host. */
   sandbox: z
     .object({
-      /** @description Permissions granted by the host (camera, microphone, geolocation). */
+      /** @description Permission Policy features granted by the host. */
       permissions: McpUiResourcePermissionsSchema.optional().describe(
-        "Permissions granted by the host (camera, microphone, geolocation).",
+        "Permission Policy features granted by the host.",
       ),
       /** @description CSP domains approved by the host. */
       csp: McpUiResourceCspSchema.optional().describe(

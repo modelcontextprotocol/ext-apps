@@ -171,13 +171,26 @@ export function isToolVisibilityAppOnly(tool: Partial<Tool>): boolean {
 }
 
 /**
+ * Permission Policy feature names for the {@link McpUiResourcePermissions `McpUiResourcePermissions`}
+ * keys that are not spelled as their feature name. Every other key is its own feature name.
+ */
+const PERMISSION_POLICY_FEATURE_ALIASES: Record<string, string> = {
+  clipboardWrite: "clipboard-write",
+};
+
+/** Bare Permission Policy feature tokens: lowercase letters, digits and hyphens. */
+const PERMISSION_POLICY_FEATURE_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
+
+/**
  * Build iframe `allow` attribute string from permissions.
  *
- * Maps McpUiResourcePermissions to the Permission Policy allow attribute
- * format used by iframes (e.g., "microphone; clipboard-write").
+ * Emits each requested key as its Permission Policy feature name in the
+ * allow attribute format used by iframes (e.g., "microphone; clipboard-write").
+ * Keys that are not valid feature names are dropped, so the result can be
+ * assigned to the attribute as is.
  *
  * @param permissions - Permissions requested by the UI resource
- * @returns Space-separated permission directives, or empty string if none
+ * @returns Semicolon-separated permission directives, or empty string if none
  *
  * @example
  * ```typescript
@@ -192,10 +205,19 @@ export function buildAllowAttribute(
   if (!permissions) return "";
 
   const allowList: string[] = [];
-  if (permissions.camera) allowList.push("camera");
-  if (permissions.microphone) allowList.push("microphone");
-  if (permissions.geolocation) allowList.push("geolocation");
-  if (permissions.clipboardWrite) allowList.push("clipboard-write");
+
+  for (const [key, value] of Object.entries(permissions)) {
+    if (!value) continue;
+
+    const feature = PERMISSION_POLICY_FEATURE_ALIASES[key] ?? key;
+
+    if (
+      PERMISSION_POLICY_FEATURE_NAME_PATTERN.test(feature) &&
+      !allowList.includes(feature)
+    ) {
+      allowList.push(feature);
+    }
+  }
 
   return allowList.join("; ");
 }

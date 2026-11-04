@@ -3109,6 +3109,63 @@ describe("buildAllowAttribute", () => {
         "clipboard-write",
       );
     });
+
+    it("when only clipboard-write is set", () => {
+      expect(buildAllowAttribute({ "clipboard-write": {} })).toBe(
+        "clipboard-write",
+      );
+    });
+
+    it("when clipboard-write is requested under both its key and its alias, emits it once", () => {
+      expect(
+        buildAllowAttribute({ "clipboard-write": {}, clipboardWrite: {} }),
+      ).toBe("clipboard-write");
+    });
+
+    it("when only fullscreen is set", () => {
+      expect(buildAllowAttribute({ fullscreen: {} })).toBe("fullscreen");
+    });
+
+    it("when only picture-in-picture is set", () => {
+      expect(buildAllowAttribute({ "picture-in-picture": {} })).toBe(
+        "picture-in-picture",
+      );
+    });
+
+    it("when only autoplay is set", () => {
+      expect(buildAllowAttribute({ autoplay: {} })).toBe("autoplay");
+    });
+
+    it("when only encrypted-media is set", () => {
+      expect(buildAllowAttribute({ "encrypted-media": {} })).toBe(
+        "encrypted-media",
+      );
+    });
+
+    it("when the key is a feature without a named property, passes it through verbatim", () => {
+      expect(buildAllowAttribute({ "xr-spatial-tracking": {} })).toBe(
+        "xr-spatial-tracking",
+      );
+    });
+  });
+
+  describe("drops entries that cannot be emitted", () => {
+    it("when the value is undefined", () => {
+      expect(buildAllowAttribute({ camera: undefined, fullscreen: {} })).toBe(
+        "fullscreen",
+      );
+    });
+
+    it("when the key is not a bare Permission Policy feature name", () => {
+      expect(
+        buildAllowAttribute({
+          "camera 'self'": {},
+          Fullscreen: {},
+          "camera;": {},
+          toString: {},
+        }),
+      ).toBe("");
+    });
   });
 
   describe("returns multiple directives joined with '; '", () => {
@@ -3124,9 +3181,16 @@ describe("buildAllowAttribute", () => {
           camera: {},
           microphone: {},
           geolocation: {},
+          "clipboard-write": {},
           clipboardWrite: {},
+          fullscreen: {},
+          "picture-in-picture": {},
+          autoplay: {},
+          "encrypted-media": {},
         }),
-      ).toBe("camera; microphone; geolocation; clipboard-write");
+      ).toBe(
+        "camera; microphone; geolocation; clipboard-write; fullscreen; picture-in-picture; autoplay; encrypted-media",
+      );
     });
   });
 });

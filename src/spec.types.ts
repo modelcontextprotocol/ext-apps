@@ -512,7 +512,7 @@ export interface McpUiHostCapabilities {
   logging?: {};
   /** @description Sandbox configuration applied by the host. */
   sandbox?: {
-    /** @description Permissions granted by the host (camera, microphone, geolocation). */
+    /** @description Permission Policy features granted by the host. */
     permissions?: McpUiResourcePermissions;
     /** @description CSP domains approved by the host. */
     csp?: McpUiResourceCsp;
@@ -658,7 +658,11 @@ export interface McpUiResourceCsp {
  * @description Sandbox permissions requested by the UI resource.
  *
  * Servers declare which browser capabilities their UI needs.
+ * Keys are Permission Policy feature names.
+ *
  * Hosts MAY honor these by setting appropriate iframe `allow` attributes.
+ * Hosts SHOULD recognize the named keys, MAY honor other feature names, and
+ * MUST NOT apply keys that are not valid Permission Policy feature names.
  * Apps SHOULD NOT assume permissions are granted; use JS feature detection as fallback.
  */
 export interface McpUiResourcePermissions {
@@ -685,7 +689,45 @@ export interface McpUiResourcePermissions {
    *
    * Maps to Permission Policy `clipboard-write` feature.
    */
+  "clipboard-write"?: {};
+  /**
+   * @description Legacy alias for `clipboard-write`.
+   *
+   * @deprecated Use `"clipboard-write"` instead.
+   */
   clipboardWrite?: {};
+  /**
+   * @description Request Fullscreen API access.
+   *
+   * Maps to Permission Policy `fullscreen` feature.
+   */
+  fullscreen?: {};
+  /**
+   * @description Request Picture-in-Picture API access.
+   *
+   * Maps to Permission Policy `picture-in-picture` feature.
+   */
+  "picture-in-picture"?: {};
+  /**
+   * @description Request media autoplay with sound.
+   *
+   * Maps to Permission Policy `autoplay` feature.
+   */
+  autoplay?: {};
+  /**
+   * @description Request Encrypted Media Extensions access for DRM-protected media playback.
+   *
+   * Maps to Permission Policy `encrypted-media` feature.
+   */
+  "encrypted-media"?: {};
+  /**
+   * Any other Permission Policy feature, keyed by its feature name.
+   *
+   * Typed `unknown` because the schema generator turns only that form into a
+   * passthrough object, so parsing keeps keys not declared above instead of
+   * stripping them.
+   */
+  [feature: string]: unknown;
 }
 
 /**

@@ -366,7 +366,7 @@
           "type": "object",
           "properties": {
             "permissions": {
-              "description": "Permissions granted by the host (camera, microphone, geolocation).",
+              "description": "Permission Policy features granted by the host.",
               "type": "object",
               "properties": {
                 "camera": {
@@ -387,14 +387,44 @@
                   "properties": {},
                   "additionalProperties": false
                 },
-                "clipboardWrite": {
+                "clipboard-write": {
                   "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "clipboardWrite": {
+                  "description": "Legacy alias for `clipboard-write`.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "fullscreen": {
+                  "description": "Request Fullscreen API access.\n\nMaps to Permission Policy `fullscreen` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "picture-in-picture": {
+                  "description": "Request Picture-in-Picture API access.\n\nMaps to Permission Policy `picture-in-picture` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "autoplay": {
+                  "description": "Request media autoplay with sound.\n\nMaps to Permission Policy `autoplay` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "encrypted-media": {
+                  "description": "Request Encrypted Media Extensions access for DRM-protected media playback.\n\nMaps to Permission Policy `encrypted-media` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {}
             },
             "csp": {
               "description": "CSP domains approved by the host.",
@@ -2777,7 +2807,7 @@
               "type": "object",
               "properties": {
                 "permissions": {
-                  "description": "Permissions granted by the host (camera, microphone, geolocation).",
+                  "description": "Permission Policy features granted by the host.",
                   "type": "object",
                   "properties": {
                     "camera": {
@@ -2798,14 +2828,44 @@
                       "properties": {},
                       "additionalProperties": false
                     },
-                    "clipboardWrite": {
+                    "clipboard-write": {
                       "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "clipboardWrite": {
+                      "description": "Legacy alias for `clipboard-write`.",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "fullscreen": {
+                      "description": "Request Fullscreen API access.\n\nMaps to Permission Policy `fullscreen` feature.",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "picture-in-picture": {
+                      "description": "Request Picture-in-Picture API access.\n\nMaps to Permission Policy `picture-in-picture` feature.",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "autoplay": {
+                      "description": "Request media autoplay with sound.\n\nMaps to Permission Policy `autoplay` feature.",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "encrypted-media": {
+                      "description": "Request Encrypted Media Extensions access for DRM-protected media playback.\n\nMaps to Permission Policy `encrypted-media` feature.",
                       "type": "object",
                       "properties": {},
                       "additionalProperties": false
                     }
                   },
-                  "additionalProperties": false
+                  "additionalProperties": {}
                 },
                 "csp": {
                   "description": "CSP domains approved by the host.",
@@ -4315,14 +4375,44 @@
               "properties": {},
               "additionalProperties": false
             },
-            "clipboardWrite": {
+            "clipboard-write": {
               "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "clipboardWrite": {
+              "description": "Legacy alias for `clipboard-write`.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "fullscreen": {
+              "description": "Request Fullscreen API access.\n\nMaps to Permission Policy `fullscreen` feature.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "picture-in-picture": {
+              "description": "Request Picture-in-Picture API access.\n\nMaps to Permission Policy `picture-in-picture` feature.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "autoplay": {
+              "description": "Request media autoplay with sound.\n\nMaps to Permission Policy `autoplay` feature.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "encrypted-media": {
+              "description": "Request Encrypted Media Extensions access for DRM-protected media playback.\n\nMaps to Permission Policy `encrypted-media` feature.",
               "type": "object",
               "properties": {},
               "additionalProperties": false
             }
           },
-          "additionalProperties": false
+          "additionalProperties": {}
         },
         "domain": {
           "description": "Dedicated origin for view sandbox.\n\nUseful when views need stable, dedicated origins for OAuth callbacks, CORS policies, or API key allowlists.\n\n**Host-dependent:** The format and validation rules for this field are determined by each host. Servers MUST consult host-specific documentation for the expected domain format. Common patterns include:\n- Hash-based subdomains (e.g., `{hash}.claudemcpcontent.com`)\n- URL-derived subdomains (e.g., `www-example-com.oaiusercontent.com`)\n\nIf omitted, host uses default sandbox origin (typically per-conversation).",
@@ -4357,14 +4447,44 @@
           "properties": {},
           "additionalProperties": false
         },
-        "clipboardWrite": {
+        "clipboard-write": {
           "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "clipboardWrite": {
+          "description": "Legacy alias for `clipboard-write`.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "fullscreen": {
+          "description": "Request Fullscreen API access.\n\nMaps to Permission Policy `fullscreen` feature.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "picture-in-picture": {
+          "description": "Request Picture-in-Picture API access.\n\nMaps to Permission Policy `picture-in-picture` feature.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "autoplay": {
+          "description": "Request media autoplay with sound.\n\nMaps to Permission Policy `autoplay` feature.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "encrypted-media": {
+          "description": "Request Encrypted Media Extensions access for DRM-protected media playback.\n\nMaps to Permission Policy `encrypted-media` feature.",
           "type": "object",
           "properties": {},
           "additionalProperties": false
         }
       },
-      "additionalProperties": false
+      "additionalProperties": {}
     },
     "McpUiResourceTeardownRequest": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4484,14 +4604,44 @@
                   "properties": {},
                   "additionalProperties": false
                 },
-                "clipboardWrite": {
+                "clipboard-write": {
                   "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "clipboardWrite": {
+                  "description": "Legacy alias for `clipboard-write`.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "fullscreen": {
+                  "description": "Request Fullscreen API access.\n\nMaps to Permission Policy `fullscreen` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "picture-in-picture": {
+                  "description": "Request Picture-in-Picture API access.\n\nMaps to Permission Policy `picture-in-picture` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "autoplay": {
+                  "description": "Request media autoplay with sound.\n\nMaps to Permission Policy `autoplay` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "encrypted-media": {
+                  "description": "Request Encrypted Media Extensions access for DRM-protected media playback.\n\nMaps to Permission Policy `encrypted-media` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": {}
             }
           },
           "required": ["html"],
