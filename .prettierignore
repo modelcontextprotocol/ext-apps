@@ -7,3 +7,13 @@ examples/quickstart/**/*.ts
 **/.build/**
 **/.claude/**
 SKILL.md
+
+# Swift package manager build artifacts
+sdk/swift/.build/
+examples/basic-host-swift/.build/
+examples/basic-host-swift/build/
+examples/basic-host-kotlin/.gradle/
+examples/basic-host-kotlin/build/
+
+# Swift build artifacts
+swift/.build/

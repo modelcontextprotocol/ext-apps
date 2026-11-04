@@ -1,0 +1,17 @@
+
+# Swift build artifacts
+swift/.build/
+examples/basic-host-swift/.build/
+examples/basic-host-swift/build/
+
+# Kotlin build artifacts
+examples/basic-host-kotlin/build/
+examples/basic-host-kotlin/.gradle/
+kotlin/.gradle/
+kotlin/build/
+
+# Kotlin build artifacts
+kotlin/.gradle/
+kotlin/build/
+examples/basic-host-kotlin/.gradle/
+examples/basic-host-kotlin/build/
