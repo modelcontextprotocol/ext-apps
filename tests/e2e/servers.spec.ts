@@ -315,3 +315,35 @@ test.describe(`Integration Test Server - Interactions`, () => {
     expect(logs.some((log) => log.includes("Open link request"))).toBe(true);
   });
 });
+
+// Entrypoint test for system-monitor-server, whose tool declares a "global" entrypoint
+// Only run if system-monitor-server is included (either no filter or EXAMPLE=system-monitor-server)
+const systemMonitorServer = SERVERS.find((s) => s.key === "system-monitor");
+
+test.describe("Global entrypoints", () => {
+  test.skip(
+    () => !systemMonitorServer,
+    "Skipped: system-monitor-server not in EXAMPLE filter",
+  );
+
+  test("user opens a tool's View directly, with no arguments", async ({
+    page,
+  }) => {
+    await page.goto("/?theme=hide");
+    // The host lists the tool by its title, next to the name of its server
+    const entrypoint = page.getByRole("button", { name: /Get System Info/ });
+    await expect(entrypoint).toContainText("System Monitor Server");
+    await entrypoint.click();
+    await waitForAppLoad(page);
+
+    await expect(page.locator('[class*="appHeader"]')).toContainText(
+      "System Monitor Server:get-system-info",
+    );
+    await expect(
+      page.locator('[class*="collapsiblePanel"]', { hasText: "Tool Input" }),
+    ).toContainText("{}");
+    await expect(
+      getAppFrame(page).getByText("System Monitor", { exact: true }),
+    ).toBeVisible();
+  });
+});
