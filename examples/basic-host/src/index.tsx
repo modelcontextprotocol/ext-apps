@@ -1,5 +1,5 @@
-import { getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Tool } from "@modelcontextprotocol/client";
+import { getToolEntrypoints, getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { getDisplayName, type Tool } from "@modelcontextprotocol/client";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
@@ -9,13 +9,34 @@ import styles from "./index.module.css";
 /**
  * Check if a tool is visible to the model (not app-only).
  * Tools with `visibility: ["app"]` should not be shown in tool lists.
+ * Parses `visibility` alone: a malformed sibling field must not make an app-only tool visible.
  */
 function isToolVisibleToModel(tool: { _meta?: Record<string, unknown> }): boolean {
-  const result = McpUiToolMetaSchema.safeParse(tool._meta?.ui);
+  const ui = tool._meta?.ui as { visibility?: unknown } | undefined;
+  const result = McpUiToolMetaSchema.shape.visibility.safeParse(ui?.visibility);
   if (!result.success) return true; // default: visible to model
-  const visibility = result.data.visibility;
+  const visibility = result.data;
   if (!visibility) return true; // default: visible to model
   return visibility.includes("model");
+}
+
+/**
+ * Check if the user can open a tool's View directly, with no arguments:
+ * its server declares a `"global"` entrypoint (`_meta.ui.entrypoints`).
+ *
+ * This host makes the call itself, so it offers such a tool whatever its
+ * `visibility`. A tool whose input schema has required properties cannot
+ * accept `{}`, whatever it declares, and is left out.
+ */
+function isGlobalEntrypoint(tool: Tool): boolean {
+  if (!getToolEntrypoints(tool).some((entrypoint) => entrypoint.type === "global")) {
+    return false;
+  }
+  if (tool.inputSchema.required?.length) {
+    log.warn(`Ignoring the "global" entrypoint of ${tool.name}: its input schema has required properties`);
+    return false;
+  }
+  return true;
 }
 
 /** Compare tools: UI-enabled first, then alphabetically by name. */
@@ -93,6 +114,10 @@ function Host({ serversPromise }: HostProps) {
   const [destroyingIds, setDestroyingIds] = useState<Set<number>>(new Set());
   const queryParams = useMemo(() => getQueryParams(), []);
 
+  const addToolCall = (info: ToolCallInfo) => {
+    setToolCalls((calls) => [...calls, { ...info, id: nextToolCallId++ }]);
+  };
+
   const requestClose = (id: number) => {
     setDestroyingIds((s) => new Set(s).add(id));
   };
@@ -120,11 +145,14 @@ function Host({ serversPromise }: HostProps) {
       ))}
       <CallToolPanel
         serversPromise={serversPromise}
-        addToolCall={(info) => setToolCalls([...toolCalls, { ...info, id: nextToolCallId++ }])}
+        addToolCall={addToolCall}
         initialServer={queryParams.server}
         initialTool={queryParams.tool}
         autoCall={queryParams.call}
       />
+      <Suspense>
+        <GlobalEntrypoints serversPromise={serversPromise} addToolCall={addToolCall} />
+      </Suspense>
     </>
   );
 }
@@ -245,6 +273,43 @@ function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool
           Call Tool
         </button>
       </form>
+    </div>
+  );
+}
+
+
+// GlobalEntrypoints lists the tools that the user can open directly, across
+// all servers. It renders nothing when no server declares one.
+interface GlobalEntrypointsProps {
+  serversPromise: Promise<ServerInfo[]>;
+  addToolCall: (info: ToolCallInfo) => void;
+}
+function GlobalEntrypoints({ serversPromise, addToolCall }: GlobalEntrypointsProps) {
+  const servers = use(serversPromise);
+  const entrypoints = useMemo(
+    () => servers.flatMap((server) =>
+      Array.from(server.tools.values())
+        .filter(isGlobalEntrypoint)
+        .map((tool) => ({ server, tool }))),
+    [servers],
+  );
+
+  if (entrypoints.length === 0) return null;
+
+  return (
+    <div className={styles.entrypoints}>
+      <span>Apps</span>
+      {entrypoints.map(({ server, tool }, i) => (
+        <button
+          key={i}
+          title={tool.description}
+          // Opening an entrypoint is a tool call with no arguments, made on the user's click
+          onClick={() => addToolCall(callTool(server, tool.name, {}))}
+        >
+          {getDisplayName(tool)}
+          <span className={styles.entrypointServer}>{server.name}</span>
+        </button>
+      ))}
     </div>
   );
 }

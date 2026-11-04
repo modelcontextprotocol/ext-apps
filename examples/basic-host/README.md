@@ -24,6 +24,8 @@ By default, the host application will try to connect to an MCP server at `http:/
 SERVERS='["http://localhost:1234/mcp", "http://localhost:5678/mcp"]' npm run start
 ```
 
+Tools that declare a `"global"` entrypoint (`_meta.ui.entrypoints`, draft specification) are also listed under **Apps**, below the form. Clicking one calls the tool with `{}` and renders its View, as a user would open an app from a host's own UI.
+
 ## Architecture
 
 This example uses a double-iframe sandbox pattern for secure UI isolation:

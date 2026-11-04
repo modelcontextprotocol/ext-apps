@@ -98,6 +98,40 @@
   }
 }
 
+/* Tools that the user can open directly (`_meta.ui.entrypoints`) */
+.entrypoints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: 480px;
+  margin: 1rem auto 0;
+  font-weight: 600;
+
+  button {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: none;
+    font-size: inherit;
+    color: var(--color-text);
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--color-bg-secondary);
+    }
+  }
+
+  .entrypointServer {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+}
+
 .toolCallInfoPanel {
   display: flex;
   flex-direction: column;
