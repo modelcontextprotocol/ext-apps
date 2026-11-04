@@ -117,7 +117,7 @@ titleEl.onclick = () => app.openLink(sourceUrl);
 
 ### 5. View Persistence
 
-Page position is saved per-view using `viewUUID` and localStorage.
+Page position is saved per-view. When the host advertises the `viewState` capability, the viewer saves it with `app.setViewState()` and reads it back from `app.getHostContext()?.viewState`; on other hosts it falls back to localStorage, keyed by the server's `viewUUID`.
 
 ### 6. Dark Mode / Theming
 
@@ -309,7 +309,7 @@ src/
 | Model context                 | `app.updateModelContext()`                                     |
 | Display modes                 | `app.requestDisplayMode()`                                     |
 | External links                | `app.openLink()`                                               |
-| View persistence              | `viewUUID` + localStorage                                      |
+| View persistence              | `app.setViewState()`, or `viewUUID` + localStorage             |
 | Theming                       | `applyDocumentTheme()` + CSS `light-dark()`                    |
 | Annotations                   | DOM overlays synced with proper PDF annotation dicts           |
 | Annotation import             | Load existing PDF annotations via PDF.js `getAnnotations()`    |

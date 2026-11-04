@@ -2,11 +2,23 @@
  * @file App that demonstrates a few features using MCP Apps SDK + React.
  */
 import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
-import { useApp } from "@modelcontextprotocol/ext-apps/react";
+import { useApp, useViewState } from "@modelcontextprotocol/ext-apps/react";
 import type { CallToolResult } from "@modelcontextprotocol/client";
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import styles from "./mcp-app.module.css";
+
+
+// What the user typed into the fields below and has not sent yet. The host
+// saves it (if it supports that), so that it comes back after a reload.
+type Draft = { version: 1; messageText: string; logText: string; linkUrl: string };
+
+const INITIAL_DRAFT: Draft = {
+  version: 1,
+  messageText: "This is message text.",
+  logText: "This is log text.",
+  linkUrl: "https://modelcontextprotocol.io/",
+};
 
 
 function extractTime(callToolResult: CallToolResult): string {
@@ -70,9 +82,12 @@ interface GetTimeAppInnerProps {
 }
 function GetTimeAppInner({ app, toolResult, hostContext }: GetTimeAppInnerProps) {
   const [serverTime, setServerTime] = useState("Loading...");
-  const [messageText, setMessageText] = useState("This is message text.");
-  const [logText, setLogText] = useState("This is log text.");
-  const [linkUrl, setLinkUrl] = useState("https://modelcontextprotocol.io/");
+  // Like `useState`, but starts from the state that the host saved for this
+  // View, and saves each change (debounced) with `app.setViewState()`.
+  const [saved, setDraft] = useViewState<Draft>(app, INITIAL_DRAFT);
+  // The saved state may come from an older version of this View.
+  const draft = saved.version === 1 ? saved : INITIAL_DRAFT;
+  const { messageText, logText, linkUrl } = draft;
 
   useEffect(() => {
     if (toolResult) {
@@ -137,17 +152,17 @@ function GetTimeAppInner({ app, toolResult, hostContext }: GetTimeAppInnerProps)
       </div>
 
       <div className={styles.action}>
-        <textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} />
+        <textarea value={messageText} onChange={(e) => setDraft({ ...draft, messageText: e.target.value })} />
         <button onClick={handleSendMessage}>Send Message</button>
       </div>
 
       <div className={styles.action}>
-        <input type="text" value={logText} onChange={(e) => setLogText(e.target.value)} />
+        <input type="text" value={logText} onChange={(e) => setDraft({ ...draft, logText: e.target.value })} />
         <button onClick={handleSendLog}>Send Log</button>
       </div>
 
       <div className={styles.action}>
-        <input type="url" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
+        <input type="url" value={linkUrl} onChange={(e) => setDraft({ ...draft, linkUrl: e.target.value })} />
         <button onClick={handleOpenLink}>Open Link</button>
       </div>
     </main>
