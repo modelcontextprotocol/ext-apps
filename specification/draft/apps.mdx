@@ -620,6 +620,11 @@ interface HostContext {
     bottom: number;
     left: number;
   };
+  /**
+   * State last saved for this View instance, or null if nothing is saved.
+   * Sent only in the ui/initialize result. See View State Persistence.
+   */
+  viewState?: Record<string, unknown> | null;
 }
 ```
 
@@ -721,6 +726,11 @@ interface HostCapabilities {
    * the model's context for future turns.
    */
   updateModelContext?: SupportedContentBlockModalities;
+  /** Host supports saving View state via ui/set-view-state. */
+  viewState?: {
+    /** Largest state accepted: its length in bytes as UTF-8 JSON with no whitespace between tokens. */
+    maxBytes: number;
+  };
   /** Host supports receiving content messages (ui/message) from the view. */
   message?: SupportedContentBlockModalities;
   /**
@@ -1236,6 +1246,47 @@ Host behavior:
 - If multiple updates are received before the next user message, Host SHOULD only send the last update to the model
 - MAY display context updates to the user
 
+`ui/set-view-state` - Save the View's state for the next time it is rendered
+
+```typescript
+// Request
+{
+  jsonrpc: "2.0",
+  id: 4,
+  method: "ui/set-view-state",
+  params: {
+    state: Record<string, unknown> | null  // Replaces any saved state; null clears it
+  }
+}
+
+// Success Response
+{
+  jsonrpc: "2.0",
+  id: 4,
+  result: {}  // Empty result on success
+}
+
+// Error Response (if denied or failed)
+{
+  jsonrpc: "2.0",
+  id: 4,
+  error: {
+    code: -32602 | -32603,  // Invalid params: this state cannot or will not be stored | Internal error: it cannot be stored now
+    message: "View state too large" | "Storage unavailable"
+  }
+}
+```
+
+The View MAY send this request to save state that it wants back the next time it is rendered, for example after a page reload or when the conversation is reopened. The View MUST NOT send it unless the Host advertised `hostCapabilities.viewState`. Each request replaces the saved state as a whole: there is no merge, and no key parameter. The result is empty, and the View MUST ignore result fields that it does not know. See [View State Persistence](#view-state-persistence).
+
+Host behavior:
+- MUST answer with success only after that state, or a newer one from the same View, has been stored so that it survives both a reload of the View and a reload of the Host
+- MUST apply requests from one View in the order received
+- MAY coalesce requests that arrive while a write is in progress: it then stores only the newest and answers each of them with the outcome of that one write
+- MUST answer with an error, and leave the saved state as it was, when it cannot or will not store the new state whole, for example when it is larger than `maxBytes`
+- SHOULD use `-32602` (Invalid params) for a state that it cannot or will not store as given, for example one that is larger than `maxBytes`, is neither an object nor `null`, or is refused by an automated scan, and `-32603` (Internal error) when it cannot store the state now, so that the View can tell "never" from "try again later"
+- MUST NOT add the saved state to the model's context, sampling requests included, or send it to the MCP server, so that a View can keep what the user has not chosen to share, such as an unsent draft
+
 #### Requests (Host → App)
 
 When Apps declare the `tools` capability, the Host can send standard MCP tool requests to the App:
@@ -1470,6 +1521,8 @@ The View MAY send this notification to request that the host tear it down. This 
 
 Host MAY send this notification when any context field changes (e.g., theme toggle, display mode change, device orientation change, window/panel resize). This notification contains partial updates - the View SHOULD merge received fields with its current context state.
 
+The Host MUST NOT send `viewState` in this notification (see [View State Persistence](#view-state-persistence)).
+
 #### Reserved Messages (Sandbox Proxy)
 
 These messages are reserved for web-based hosts that implement the recommended double-iframe sandbox architecture:
@@ -1592,6 +1645,10 @@ sequenceDiagram
       UI ->> H: ui/update-model-context
       H ->> H: Store model context (overwrite existing)
       H -->> UI: ui/update-model-context response
+    else View state
+      UI ->> H: ui/set-view-state
+      H ->> H: Store view state (overwrite existing)
+      H -->> UI: ui/set-view-state response
     else Log
       UI ->> H: notifications/message
       H ->> H: Record log for debugging/telemetry
@@ -1735,6 +1792,38 @@ await client.callTool("get_weather", { location: "New York" });
 This pattern enables interactive, self-updating views.
 
 Note: Tools with `visibility: ["app"]` are hidden from the agent but remain callable by apps via `tools/call`. This enables UI-only interactions (refresh buttons, form submissions) without exposing implementation details to the model. See the Visibility section under Resource Discovery for details.
+
+### View State Persistence
+
+A View loses what it holds in memory when its iframe is destroyed: on page reload, when a conversation is reopened, or when the Host unmounts it, for example to save memory. The Host re-sends the tool input and tool result, but not what the user did afterwards (a selected tab, a half-filled form, a map's position). `ui/set-view-state` lets the View give that state to the Host, and `hostContext.viewState` hands it back.
+
+**Scope:**
+
+- View state belongs to one View instance: the View that the Host renders for one tool call, whoever initiated that call (the agent, the user or the Host), however often it renders it. This section does not define View instances for Views created in any other way (for example a View that is not tied to a tool call).
+- The Host MUST derive the storage key itself, from at least the user, the user's connection to the MCP server as the Host records it (not only the server's URL), and the View instance. The key stays the same each time the Host renders that View instance. The View cannot name or influence it.
+- The Host MUST NOT hand a View state that was saved by another View instance, another server or another user.
+- Where the state is kept is the Host's choice. A Host MAY let it follow the user to another device.
+- These rules govern only the state saved with `ui/set-view-state`. A wider scope (per conversation, per device, per account) would be a separate capability with its own rules.
+
+**Handing state back:**
+
+- A Host that advertises `hostCapabilities.viewState` in a `ui/initialize` result MUST include `hostContext.viewState` in that same result. `null` means that nothing is saved: nothing was ever saved, the last save cleared it, or the Host evicted it.
+- A Host that cannot read the saved state for this render, or has not read it by the time it answers `ui/initialize`, MUST NOT advertise `hostCapabilities.viewState` in that result, so that the View cannot overwrite state that it has not seen.
+- A Host that does not advertise `hostCapabilities.viewState` MUST NOT send `hostContext.viewState`.
+- The Host MUST NOT send `viewState` in `ui/notifications/host-context-changed`: it does not echo saves.
+- After a successful save, an SDK that exposes host context to the View SHOULD set `viewState` in its own copy of the host context to the state it sent.
+- Two open copies of one View instance (for example in two tabs) do not see each other's saves, and the last successful save wins.
+- The View applies saved state on top of the tool input and tool result, which the Host still re-sends. Saved state may have been written by an older version of the View, so Views SHOULD version it.
+
+**Limits and lifetime:**
+
+- `maxBytes` SHOULD be at least 65536. Hosts MAY refuse other values that they cannot store, such as deeply nested ones.
+- Views SHOULD save as changes happen, debounced, because a View can be destroyed before `ui/resource-teardown` can reach it, for example when the Host's own page is reloaded, closed or crashes. A View MAY also save while handling `ui/resource-teardown`, and SHOULD then wait for the save's response before it answers; the Host SHOULD answer that save before it tears the View down.
+- Saved state SHOULD NOT outlive its View instance: Hosts SHOULD delete it with the conversation that holds the tool call. Hosts SHOULD also delete it when the user removes the server, and with the user's account. Hosts MAY evict it earlier.
+
+A View that wants the model or the MCP server to know something sends it itself, for example with `ui/update-model-context`, a tool call, or the result of a tool that it provides.
+
+Note: View state is the counterpart of the UI-only part of the OpenAI Apps SDK's [widget state](https://developers.openai.com/apps-sdk/build/state-management) (`window.openai.widgetState` and `setWidgetState()`). There, one snapshot can carry both `privateContent`, which only the UI sees, and `modelContent`, which the model sees. In MCP Apps these are two requests: `ui/set-view-state` for the former and [`ui/update-model-context`](#uiupdate-model-context) for the latter. The Host does not hand model context back to the View, so a View that needs it after a reload also keeps a copy in its view state.
 
 ### App-Provided Tools
 
@@ -2362,7 +2451,7 @@ This specification defines the Minimum Viable Product (MVP) for MCP Apps.
 **Other Advanced Features (see Future Considerations):**
 
 - Support multiple UI resources in a tool response
-- State persistence and restoration
+- State persistence and restoration beyond a single View instance (see [View State Persistence](#view-state-persistence))
 - Custom sandbox policies per resource
 - View-to-View communication
 - Screenshot/preview generation APIs
@@ -2658,6 +2747,15 @@ App tools MUST be tied to the app's lifecycle:
 - Tools automatically disappear when app iframe is torn down
 - Hosts MUST NOT persist app tool registrations across sessions
 - Calling a tool from a closed app MUST return an error
+
+#### 6. View State
+
+`ui/set-view-state` stores data written by untrusted View code and hands it back in a later session.
+
+- Hosts MUST treat saved state as opaque: store it, hand it back to that View instance, and never interpret or render it. Automated policy or content scanning is the one exception: when such a scan objects, a Host MAY refuse the save with an error (`-32602`), or evict what it has already stored, so that the next render gets `null`.
+- A View instance created for a new tool call starts with `null`, so saved state gives that View no identifier that carries from one conversation to another.
+- Hosts SHOULD limit write rate and total storage per user, and refuse a write with an error rather than drop it silently.
+- Views SHOULD NOT save credentials or access tokens. Hosts SHOULD protect saved state as they protect conversation content.
 
 ### Other risks
 
