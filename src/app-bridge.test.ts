@@ -243,6 +243,24 @@ describe("App <-> AppBridge integration", () => {
       });
     });
 
+    it("preserves an error result for a retained view without cancelling it", async () => {
+      const receivedResults: unknown[] = [];
+      const receivedCancellations: unknown[] = [];
+      app.ontoolresult = (params) => receivedResults.push(params);
+      app.ontoolcancelled = (params) => receivedCancellations.push(params);
+      await app.connect(appTransport);
+      await bridge.sendToolInput({ arguments: { account: "missing" } });
+      const result = {
+        isError: true,
+        content: [{ type: "text" as const, text: "Account unavailable" }],
+        structuredContent: { code: "account_unavailable" },
+        _meta: { retryAfter: 30 },
+      };
+      await bridge.sendToolResult(result);
+      expect(receivedResults).toEqual([result]);
+      expect(receivedCancellations).toEqual([]);
+    });
+
     it("sendToolCancelled triggers app.ontoolcancelled", async () => {
       const receivedCancellations: unknown[] = [];
       app.ontoolcancelled = (params) => {
