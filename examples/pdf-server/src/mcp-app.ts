@@ -3552,9 +3552,12 @@ async function renderPage() {
   }
 }
 
-// Where the current page is kept: with the host when it saves view state
-// (`ui/set-view-state`, handed back as `hostContext.viewState`), otherwise in
-// localStorage under the server's viewUUID.
+// The current page is kept in two places:
+// - with the host, when it saves view state (`ui/set-view-state`, handed back
+//   as `hostContext.viewState`): preferred when restoring;
+// - in localStorage under the server's viewUUID, always: the only store on
+//   hosts that cannot save view state, and the fallback when the host has
+//   nothing saved (for example a page saved before it gained the capability).
 const hostSavesViewState = () => !!app.getHostCapabilities()?.viewState;
 let hostSaveTimer: ReturnType<typeof setTimeout> | null = null;
 /** Page of the latest host save, which `hostContext.viewState` only reflects
@@ -3577,7 +3580,6 @@ function saveCurrentPage() {
     pageSentToHost = currentPage;
     if (hostSaveTimer) clearTimeout(hostSaveTimer);
     hostSaveTimer = setTimeout(flushPageToHost, 300);
-    return;
   }
   log.info("saveCurrentPage: key=", viewUUID, "page=", currentPage);
   if (viewUUID) {
@@ -3594,10 +3596,11 @@ function loadSavedPage(): number | null {
   if (hostSavesViewState()) {
     const saved = app.getHostContext()?.viewState;
     const page = pageSentToHost ?? (saved?.version === 1 ? saved.page : null);
-    log.info("loadSavedPage: from host, page=", page);
-    return typeof page === "number" && Number.isInteger(page) && page >= 1
-      ? page
-      : null;
+    if (typeof page === "number" && Number.isInteger(page) && page >= 1) {
+      log.info("loadSavedPage: from host, page=", page);
+      return page;
+    }
+    // Nothing usable from the host: fall back to localStorage
   }
   log.info("loadSavedPage: key=", viewUUID);
   if (!viewUUID) return null;

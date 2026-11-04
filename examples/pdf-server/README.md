@@ -117,7 +117,7 @@ titleEl.onclick = () => app.openLink(sourceUrl);
 
 ### 5. View Persistence
 
-Page position is saved per-view. When the host advertises the `viewState` capability, the viewer saves it with `app.setViewState()` and reads it back from `app.getHostContext()?.viewState`; on other hosts it falls back to localStorage, keyed by the server's `viewUUID`.
+Page position is saved per-view. When the host advertises the `viewState` capability, the viewer saves it with `app.setViewState()` and reads it back from `app.getHostContext()?.viewState`. It also keeps it in localStorage, keyed by the server's `viewUUID`: that is the only store on other hosts, and the fallback when the host has nothing saved.
 
 ### 6. Dark Mode / Theming
 

@@ -6,8 +6,10 @@
  *
  * - With the host (`ui/set-view-state`), when the host advertises the
  *   `viewState` capability, as basic-host does. The page then comes back in
- *   `hostContext.viewState` after a reload of the host page.
- * - In localStorage, keyed by the server's viewUUID, on other hosts. The
+ *   `hostContext.viewState` after a reload of the host page. This is the
+ *   store that the viewer prefers.
+ * - In localStorage, keyed by the server's viewUUID, always: the only store on
+ *   other hosts, and the fallback when the host has nothing saved. The
  *   restore then happens when the host re-sends `ui/notifications/tool-result`.
  *   Regression test for the restore being discarded: the old code
  *   bounds-checked the saved page against structuredContent.pageCount, a field
@@ -102,6 +104,10 @@ test.describe("PDF Server - saved page restore (view state)", () => {
     await expect
       .poll(() => hostViewStates(page))
       .toEqual([{ version: 1, page: 3 }]);
+    // It keeps the localStorage copy as well
+    const { viewUUID } = (await readDisplayPdfResult(page))
+      .structuredContent as { viewUUID: string };
+    expect(await appLocalStorageItem(page, viewUUID)).toBe("3");
 
     await page.reload();
     await waitForAppLoad(page);
@@ -234,4 +240,79 @@ test.describe("PDF Server - saved page restore (localStorage fallback)", () => {
       timeout: 60000,
     });
   });
+});
+
+/**
+ * Puts a page (or nothing) into each of the two stores, for the one tool call
+ * that basic-host is showing. The host's key is derived as in
+ * examples/basic-host/src/storage.ts.
+ */
+async function setStores(
+  page: Page,
+  viewUUID: string,
+  stores: { host: number | null; local: number | null },
+) {
+  await page.evaluate((hostPage) => {
+    const [call] = JSON.parse(localStorage.getItem("basic-host:tool-calls")!);
+    const key = `basic-host:view-state:${call.id}:${call.serverUrl}`;
+    if (hostPage === null) localStorage.removeItem(key);
+    else
+      localStorage.setItem(key, JSON.stringify({ version: 1, page: hostPage }));
+  }, stores.host);
+  await getSandboxFrame(page)
+    .childFrames()[0]
+    .evaluate(
+      ([key, localPage]) => {
+        if (localPage === null) localStorage.removeItem(key as string);
+        else localStorage.setItem(key as string, String(localPage));
+      },
+      [viewUUID, stores.local] as const,
+    );
+}
+
+// Every combination of: host saves view state or not, a page saved with the
+// host or not, a page in localStorage or not. The host's state wins when the
+// host offers it; localStorage is the fallback; else the initial page.
+const COMBINATIONS: Array<{
+  capability: boolean;
+  host: number | null;
+  local: number | null;
+  expected: number;
+}> = [
+  { capability: true, host: 3, local: 2, expected: 3 },
+  { capability: true, host: 3, local: null, expected: 3 },
+  { capability: true, host: null, local: 2, expected: 2 },
+  { capability: true, host: null, local: null, expected: 1 },
+  { capability: false, host: 3, local: 2, expected: 2 },
+  { capability: false, host: 3, local: null, expected: 1 },
+  { capability: false, host: null, local: 2, expected: 2 },
+  { capability: false, host: null, local: null, expected: 1 },
+];
+
+test.describe("PDF Server - which saved page wins after a reload", () => {
+  for (const { capability, host, local, expected } of COMBINATIONS) {
+    const name =
+      `host ${capability ? "saves" : "does not save"} view state, ` +
+      `host has ${host ?? "nothing"}, localStorage has ${local ?? "nothing"} ` +
+      `-> page ${expected}`;
+    test(name, async ({ page }) => {
+      test.setTimeout(180_000);
+      if (!capability) await page.addInitScript(stripViewStateCapability);
+      await loadPdfServer(page);
+      await waitForPdfCanvas(page);
+      await expect(getAppFrame(page).locator("#page-input")).toHaveValue("1");
+      const { viewUUID } = (await readDisplayPdfResult(page))
+        .structuredContent as { viewUUID: string };
+
+      await setStores(page, viewUUID, { host, local });
+      await page.reload();
+      await waitForAppLoad(page);
+      await waitForPdfCanvas(page);
+
+      await expect(getAppFrame(page).locator("#page-input")).toHaveValue(
+        String(expected),
+        { timeout: 60000 },
+      );
+    });
+  }
 });
