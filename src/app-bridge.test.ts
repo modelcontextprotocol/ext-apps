@@ -648,7 +648,7 @@ describe("App <-> AppBridge integration", () => {
       expect(app.getHostContext()?.viewState).toBeNull();
     });
 
-    it("handles saves one at a time, in the order received", async () => {
+    it("handles one save at a time, and only the newest of those that arrive meanwhile", async () => {
       const log: string[] = [];
       let releaseFirst!: () => void;
       const firstHeld = new Promise<void>((resolve) => {
@@ -662,14 +662,51 @@ describe("App <-> AppBridge integration", () => {
       };
 
       await app.connect(appTransport);
-      const first = app.setViewState({ n: 1 });
-      const second = app.setViewState({ n: 2 });
+      const saves = [1, 2, 3].map((n) => app.setViewState({ n }));
       await flush();
-      // The second save waits for the first, however slow the host's store is
+      // The later saves wait for the first, however slow the host's store is
       expect(log).toEqual(["start 1"]);
       releaseFirst();
-      await Promise.all([first, second]);
-      expect(log).toEqual(["start 1", "end 1", "start 2", "end 2"]);
+      await Promise.all(saves);
+      // The second was superseded before the store was free
+      expect(log).toEqual(["start 1", "end 1", "start 3", "end 3"]);
+      expect(app.getHostContext()?.viewState).toEqual({ n: 3 });
+
+      // The next save is not held up by what came before
+      await app.setViewState({ n: 4 });
+      expect(log.slice(-2)).toEqual(["start 4", "end 4"]);
+    });
+
+    it("answers coalesced saves with the outcome of the one write", async () => {
+      let releaseFirst!: () => void;
+      const firstHeld = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      bridge.onsetviewstate = async ({ state }) => {
+        if (state?.n === 1) await firstHeld;
+        if (state?.n === 3) throw new Error("Storage unavailable");
+        return {};
+      };
+
+      await app.connect(appTransport);
+      const outcomes = Promise.allSettled(
+        [1, 2, 3].map((n) => app.setViewState({ n })),
+      );
+      await flush();
+      releaseFirst();
+
+      const [first, second, third] = await outcomes;
+      expect(first).toEqual({ status: "fulfilled", value: {} });
+      expect(second).toMatchObject({
+        status: "rejected",
+        reason: { message: "Storage unavailable" },
+      });
+      expect(third).toMatchObject({
+        status: "rejected",
+        reason: { message: "Storage unavailable" },
+      });
+      // What the host holds is the first state
+      expect(app.getHostContext()?.viewState).toEqual({ n: 1 });
     });
 
     it("a refused save does not hold up the next one", async () => {

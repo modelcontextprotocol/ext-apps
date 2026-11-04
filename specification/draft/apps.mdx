@@ -1819,7 +1819,7 @@ A View loses what it holds in memory when its iframe is destroyed: on page reloa
 
 - `maxBytes` SHOULD be at least 65536. Hosts MAY refuse other values that they cannot store, such as deeply nested ones.
 - Views SHOULD save as changes happen, debounced, because a View can be destroyed before `ui/resource-teardown` can reach it, for example when the Host's own page is reloaded, closed or crashes. A View MAY also save while handling `ui/resource-teardown`, and SHOULD then wait for the save's response before it answers; the Host SHOULD answer that save before it tears the View down.
-- Saved state SHOULD NOT outlive its View instance: Hosts SHOULD delete it with the conversation that holds the tool call. Hosts SHOULD also delete it when the user removes the server, and with the user's account. Hosts MAY evict it earlier.
+- Saved state SHOULD NOT outlive its View instance: Hosts SHOULD delete it with the conversation that holds the tool call, or, for a tool call that is in no conversation, when the Host discards that call. Hosts SHOULD also delete it when the user removes the server, and with the user's account. Hosts MAY evict it earlier.
 
 A View that wants the model or the MCP server to know something sends it itself, for example with `ui/update-model-context`, a tool call, or the result of a tool that it provides.
 

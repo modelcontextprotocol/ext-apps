@@ -1226,7 +1226,9 @@ export class AppBridge extends Protocol<BaseContext> {
    * never sends `viewState`. The bridge keeps the state of the last successful
    * save and hands it back if the view initializes again.
    *
-   * Requests are handled one at a time, in the order received.
+   * The handler is called for one save at a time, in the order received. Saves
+   * that arrive while one is in progress are coalesced: only the newest of them
+   * is passed to the handler, and they all get its outcome.
    *
    * @example
    * ```ts source="./app-bridge.examples.ts#AppBridge_onsetviewstate_store"
@@ -1253,8 +1255,39 @@ export class AppBridge extends Protocol<BaseContext> {
     params: McpUiSetViewStateRequest["params"],
     extra: RequestHandlerExtra,
   ) => Promise<McpUiSetViewStateResult>;
-  /** Settles when the `ui/set-view-state` requests received so far are handled. */
-  private _viewStateSaves: Promise<unknown> = Promise.resolve();
+  /** The save that the handler is working on, if any. */
+  private _viewStateWrite?: Promise<McpUiSetViewStateResult>;
+  /** The newest save that arrived during that one; it runs next. */
+  private _viewStateWaiting?: {
+    params: McpUiSetViewStateRequest["params"];
+    extra: RequestHandlerExtra;
+    write: Promise<McpUiSetViewStateResult>;
+  };
+
+  /** Calls the handler for one save, and keeps the state if it succeeds. */
+  private _writeViewState(
+    params: McpUiSetViewStateRequest["params"],
+    extra: RequestHandlerExtra,
+  ): Promise<McpUiSetViewStateResult> {
+    const write = (async () => {
+      if (!this._onsetviewstate)
+        throw new Error("No onsetviewstate handler set");
+      const result = await this._onsetviewstate(params, extra);
+      // Not echoed to the view, but kept for the next `ui/initialize` on
+      // this bridge (for example when the view's document is reloaded).
+      this._hostContext = { ...this._hostContext, viewState: params.state };
+      return result;
+    })();
+    this._viewStateWrite = write;
+    const settled = () => {
+      // With a save waiting, this stays set until that save starts.
+      if (this._viewStateWrite === write && !this._viewStateWaiting) {
+        this._viewStateWrite = undefined;
+      }
+    };
+    write.then(settled, settled);
+    return write;
+  }
   get onsetviewstate() {
     return this._onsetviewstate;
   }
@@ -1278,18 +1311,28 @@ export class AppBridge extends Protocol<BaseContext> {
         params: McpUiSetViewStateRequestSchema.shape.params,
         result: McpUiSetViewStateResultSchema,
       },
-      async (params, extra) => {
-        const handler = this._onsetviewstate;
-        if (!handler) throw new Error("No onsetviewstate handler set");
+      (params, extra) => {
         // One save at a time, in the order received: the host's store may be
-        // asynchronous, and a later save must not be overtaken by an earlier one.
-        const save = this._viewStateSaves.then(() => handler(params, extra));
-        this._viewStateSaves = save.catch(() => {});
-        const result = await save;
-        // Not echoed to the view, but kept for the next `ui/initialize` on
-        // this bridge (for example when the view's document is reloaded).
-        this._hostContext = { ...this._hostContext, viewState: params.state };
-        return result;
+        // slow, and a later save must not be overtaken by an earlier one.
+        if (!this._viewStateWrite) return this._writeViewState(params, extra);
+        // A save is in progress. Only the newest of those that arrive
+        // meanwhile is stored, and they all get the outcome of that one.
+        const waiting = this._viewStateWaiting;
+        if (waiting) {
+          waiting.params = params;
+          waiting.extra = extra;
+          return waiting.write;
+        }
+        const next = { params, extra } as NonNullable<
+          typeof this._viewStateWaiting
+        >;
+        const ignore = () => {};
+        next.write = this._viewStateWrite.then(ignore, ignore).then(() => {
+          this._viewStateWaiting = undefined;
+          return this._writeViewState(next.params, next.extra);
+        });
+        this._viewStateWaiting = next;
+        return next.write;
       },
     );
   }
