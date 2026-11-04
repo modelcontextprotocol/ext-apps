@@ -1,0 +1,46 @@
+.resourceLink {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-bg-secondary);
+  font-size: 0.875rem;
+}
+
+.resourceLinkHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  button {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+}
+
+.resourceLinkName {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.resourceLinkUri {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resourceLinkOutcome {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
+}

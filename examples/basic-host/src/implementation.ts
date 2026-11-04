@@ -288,8 +288,10 @@ export function newAppBridge(
     openLinks: {},
     serverTools: serverCapabilities?.tools,
     serverResources: serverCapabilities?.resources,
-    // Declare support for model context updates
-    updateModelContext: { text: {} },
+    // Declare the content blocks shown in the Messages and Model Context
+    // panels. For `resource` and `resourceLink`, see resource-blocks.tsx.
+    message: { text: {}, resource: {}, resourceLink: {} },
+    updateModelContext: { text: {}, resource: {}, resourceLink: {} },
   }, {
     // Pass initial host context with theme, display mode, and style variables
     hostContext: {

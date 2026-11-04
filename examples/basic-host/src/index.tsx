@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
 import styles from "./index.module.css";
+import { formatContentBlock, ResourceLinks } from "./resource-blocks";
 
 /**
  * Check if a tool is visible to the model (not app-only).
@@ -480,22 +481,6 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
       });
   }, [isDestroying, onTeardownComplete]);
 
-  // Format content blocks - handle text, images, resources, etc.
-  const formatContentBlock = (c: { type: string; [key: string]: unknown }) => {
-    switch (c.type) {
-      case "text":
-        return (c as { type: "text"; text: string }).text;
-      case "image":
-        return `<image: ${(c as { mimeType?: string }).mimeType ?? "unknown"}>`;
-      case "audio":
-        return `<audio: ${(c as { mimeType?: string }).mimeType ?? "unknown"}>`;
-      case "resource":
-        return `<resource: ${(c as { resource?: { uri?: string } }).resource?.uri ?? "unknown"}>`;
-      default:
-        return `<${c.type}>`;
-    }
-  };
-
   // Format context for display
   const contextText = modelContext?.content?.map(formatContentBlock).join("\n") ?? "";
   const contextJson = modelContext?.structuredContent
@@ -525,8 +510,14 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
           badge={`${messages.length} message${messages.length > 1 ? "s" : ""}`}
         />
       )}
+      {displayMode === "inline" && (
+        <ResourceLinks content={messages.flatMap((m) => m.content)} serverInfo={toolCallInfo.serverInfo} />
+      )}
       {modelContext && (
         <CollapsiblePanel icon="📋" label="Model Context" content={fullContext} />
+      )}
+      {displayMode === "inline" && (
+        <ResourceLinks content={modelContext?.content ?? []} serverInfo={toolCallInfo.serverInfo} />
       )}
     </div>
   );
