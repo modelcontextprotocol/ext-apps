@@ -61,3 +61,4 @@ npm run dev
 2. The view fetches the resource via `resources/read`
 3. The server fetches the video from CDN and returns it as a base64 blob
 4. The view decodes the blob and plays it in a `<video>` element
+5. The view tells the model which video is playing with `ui/update-model-context`. If the host declares `updateModelContext.resourceLink`, it adds a `resource_link` to the video's `videos://` URI, which the host can read from this server if the user or the model asks

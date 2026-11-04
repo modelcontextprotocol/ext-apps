@@ -5,7 +5,10 @@
  * The video is served as a base64 blob and converted to a data URI for playback.
  */
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/client";
+import type {
+  CallToolResult,
+  ContentBlock,
+} from "@modelcontextprotocol/client";
 import "./global.css";
 import "./mcp-app.css";
 
@@ -113,6 +116,29 @@ async function fetchAndPlayVideo(uri: string, label: string) {
   const objectUrl = URL.createObjectURL(new Blob([binary], { type: mimeType }));
 
   showPlayer(objectUrl, label);
+  tellModelWhatIsPlaying(uri, mimeType);
+}
+
+/**
+ * Tell the model which video is on screen. Where the host accepts resource
+ * links in model context, add one for the video: its URI is one that this
+ * app's own server serves through `resources/read`, and the video itself is
+ * far too large to embed.
+ */
+function tellModelWhatIsPlaying(uri: string, mimeType: string) {
+  const caps = app.getHostCapabilities()?.updateModelContext;
+  if (!caps) return;
+
+  const content: ContentBlock[] = [
+    { type: "text", text: `The user is watching the video ${uri}` },
+  ];
+  if (caps.resourceLink) {
+    const name = uri.replace("videos://", "video-");
+    content.push({ type: "resource_link", uri, name, mimeType });
+  }
+  app.updateModelContext({ content }).catch((err: unknown) => {
+    console.warn("Failed to update model context:", err);
+  });
 }
 
 async function discoverVideos() {
