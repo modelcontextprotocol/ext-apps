@@ -126,9 +126,24 @@
     }
   }
 
-  .entrypointServer {
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .entrypointServer,
+  .entrypointNote {
     font-size: 0.75rem;
+    font-weight: normal;
     color: var(--color-text-secondary);
+  }
+
+  .entrypointChoice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.5rem;
   }
 }
 

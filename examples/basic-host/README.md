@@ -24,7 +24,10 @@ By default, the host application will try to connect to an MCP server at `http:/
 SERVERS='["http://localhost:1234/mcp", "http://localhost:5678/mcp"]' npm run start
 ```
 
-Tools that declare a `"global"` entrypoint (`_meta.ui.entrypoints`, draft specification) are also listed under **Apps**, below the form. Clicking one calls the tool with `{}` and renders its View, as a user would open an app from a host's own UI.
+Tools that declare an entrypoint (`_meta.ui.entrypoints`, draft specification) are also offered below the form, as a user would open an app from a host's own UI ([`src/entrypoints.tsx`](src/entrypoints.tsx)):
+
+- **Apps** lists `"global"` entrypoints, and **In this conversation** lists `"thread"` ones. Clicking one calls the tool with `{}` and renders its View. This host has a single conversation, the page, so both open in the same place.
+- **Open file…** offers the tools whose `"file"` entrypoint matches the file that you pick, and sends the file to the one that you choose, as a file argument of the File Uploads extension (a working draft). This host only sends files inline, up to the size that the server advertises, and keeps the bytes out of the View's tool input.
 
 ## Architecture
 
