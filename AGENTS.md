@@ -65,7 +65,7 @@ rm -fR  package-lock.json node_modules && \
 - `src/server/index.ts` - Helpers for MCP servers to register tools/resources with UI metadata
 - `src/types.ts` - Protocol types re-exported from `spec.types.ts` and Zod schemas from `generated/schema.ts` (auto-generated during build)
 - `src/message-transport.ts` - `PostMessageTransport` for iframe communication
-- `src/react/` - React hooks: `useApp`, `useHostStyles`, `useAutoResize`, `useDocumentTheme`
+- `src/react/` - React hooks: `useApp`, `useHostStyles`, `useAutoResize`, `useDocumentTheme`, `useViewState`
 
 ### Protocol Flow
 
