@@ -316,6 +316,44 @@ describe("registerAppTool schema forms", () => {
   });
 });
 
+describe("registerAppTool icons", () => {
+  it("lists the tool's icons in tools/list", async () => {
+    const icons = [
+      {
+        src: "https://example.com/weather-light.svg",
+        mimeType: "image/svg+xml",
+        sizes: ["any"],
+        theme: "light" as const,
+      },
+      {
+        src: "https://example.com/weather-dark.svg",
+        mimeType: "image/svg+xml",
+        sizes: ["any"],
+        theme: "dark" as const,
+      },
+    ];
+    const server = new RealMcpServer({ name: "test", version: "0.0.0" });
+    registerAppTool(
+      server,
+      "weather",
+      {
+        description: "Get weather forecast",
+        icons,
+        _meta: { ui: { resourceUri: "ui://weather/view.html" } },
+      },
+      async () => ({ content: [{ type: "text", text: "sunny" }] }),
+    );
+    const client = new Client({ name: "client", version: "0.0.0" });
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const { tools } = await client.listTools();
+    expect(tools[0].icons).toEqual(icons);
+  });
+});
+
 describe("registerAppResource", () => {
   it("should register a resource with default MIME type", () => {
     let capturedName: string | undefined;
