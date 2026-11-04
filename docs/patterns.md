@@ -474,6 +474,64 @@ await app.updateModelContext({
 > [!NOTE]
 > For full examples that implement this pattern, see: [`examples/map-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/map-server) and [`examples/transcript-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/transcript-server).
 
+## Attaching resources to messages and model context
+
+Besides text and images, {@link app!App.sendMessage `sendMessage`} and {@link app!App.updateModelContext `updateModelContext`} accept the two MCP resource blocks:
+
+- An **embedded resource** (`type: "resource"`) carries its content inline, with a MIME type. Use it for a file-like payload that the app already holds, such as an export or a selection.
+- A **resource link** (`type: "resource_link"`) carries only a `uri`. Use it for content that is large, or that the model may never need. The host does not fetch a link when it arrives: it reads it with `resources/read` on your app's own MCP server, and only if the user or the model asks. So link only to URIs that your server serves.
+
+A host that has not declared a block type rejects the whole request, so check {@link app!App.getHostCapabilities `getHostCapabilities`} first and fall back to text:
+
+<!-- prettier-ignore -->
+```ts source="../src/app.examples.ts#App_sendMessage_withEmbeddedResource"
+// A host that has not declared `resource` rejects the whole message,
+// so check first and fall back to plain text.
+const canEmbed = app.getHostCapabilities()?.message?.resource !== undefined;
+
+await app.sendMessage({
+  role: "user",
+  content: [
+    { type: "text", text: "What stands out in this export?" },
+    canEmbed
+      ? {
+          type: "resource",
+          resource: {
+            uri: "reports://q3/export.csv",
+            mimeType: "text/csv",
+            text: csv,
+          },
+        }
+      : { type: "text", text: csv },
+  ],
+});
+```
+
+<!-- prettier-ignore -->
+```ts source="../src/app.examples.ts#App_updateModelContext_withResourceLink"
+const content: ContentBlock[] = [
+  { type: "text", text: `User is watching "${video.title}"` },
+];
+
+// A link carries no content: the host reads it with resources/read on this
+// app's own server, and only if the user or the model asks for it.
+if (app.getHostCapabilities()?.updateModelContext?.resourceLink) {
+  content.push({
+    type: "resource_link",
+    uri: video.uri, // e.g. "videos://bunny-1mb"
+    name: video.title,
+    mimeType: "video/mp4",
+  });
+}
+
+await app.updateModelContext({ content });
+```
+
+Hosts treat these blocks like a tool result from your server, not like something the user typed. In particular, the `uri` of an embedded resource is a label that your app chose, and hosts do not show it as the origin of the content.
+
+> [!NOTE]
+> For a full example that sends a resource link, see: [`examples/video-resource-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/video-resource-server). For the host side, see [`examples/basic-host/src/resource-blocks.tsx`](https://github.com/modelcontextprotocol/ext-apps/blob/main/examples/basic-host/src/resource-blocks.tsx).
+
 ## Sending large follow-up messages
 
 When you need to send more data than fits in a message, use {@link app!App.updateModelContext `updateModelContext`} to set the context first, then {@link app!App.sendMessage `sendMessage`} with a brief prompt to trigger a response:
