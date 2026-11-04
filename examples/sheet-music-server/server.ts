@@ -54,6 +54,20 @@ const AbcFileSchema = z
   });
 
 /**
+ * Removes HTML markup from an abcjs warning. Tags are removed until none is
+ * left, since removing one can join the text around it into another, and then
+ * any stray angle bracket goes too.
+ */
+function stripMarkup(text: string): string {
+  let previous: string;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== previous);
+  return text.replace(/[<>]/g, "");
+}
+
+/**
  * Parses ABC notation with abcjs, and returns an error message if it is invalid.
  */
 function validateAbcNotation(abcNotation: string): string | undefined {
@@ -61,8 +75,7 @@ function validateAbcNotation(abcNotation: string): string | undefined {
 
   // abcjs reports errors as warnings
   if (warnings && warnings.length > 0) {
-    // Strip HTML markup from warning messages
-    const messages = warnings.map((w) => w.replace(/<[^>]*>/g, ""));
+    const messages = warnings.map(stripMarkup);
     return `Invalid ABC notation:\n${messages.join("\n")}`;
   }
   return undefined;
