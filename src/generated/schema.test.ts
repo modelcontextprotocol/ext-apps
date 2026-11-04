@@ -127,6 +127,18 @@ export type McpUiEntrypointSchemaInferredType = z.infer<
   typeof generated.McpUiEntrypointSchema
 >;
 
+export type McpUiGlobalEntrypointSchemaInferredType = z.infer<
+  typeof generated.McpUiGlobalEntrypointSchema
+>;
+
+export type McpUiThreadEntrypointSchemaInferredType = z.infer<
+  typeof generated.McpUiThreadEntrypointSchema
+>;
+
+export type McpUiFileEntrypointSchemaInferredType = z.infer<
+  typeof generated.McpUiFileEntrypointSchema
+>;
+
 export type McpUiToolMetaSchemaInferredType = z.infer<
   typeof generated.McpUiToolMetaSchema
 >;
@@ -309,6 +321,24 @@ expectType<McpUiToolVisibilitySchemaInferredType>(
 );
 expectType<spec.McpUiEntrypoint>({} as McpUiEntrypointSchemaInferredType);
 expectType<McpUiEntrypointSchemaInferredType>({} as spec.McpUiEntrypoint);
+expectType<spec.McpUiGlobalEntrypoint>(
+  {} as McpUiGlobalEntrypointSchemaInferredType,
+);
+expectType<McpUiGlobalEntrypointSchemaInferredType>(
+  {} as spec.McpUiGlobalEntrypoint,
+);
+expectType<spec.McpUiThreadEntrypoint>(
+  {} as McpUiThreadEntrypointSchemaInferredType,
+);
+expectType<McpUiThreadEntrypointSchemaInferredType>(
+  {} as spec.McpUiThreadEntrypoint,
+);
+expectType<spec.McpUiFileEntrypoint>(
+  {} as McpUiFileEntrypointSchemaInferredType,
+);
+expectType<McpUiFileEntrypointSchemaInferredType>(
+  {} as spec.McpUiFileEntrypoint,
+);
 expectType<spec.McpUiToolMeta>({} as McpUiToolMetaSchemaInferredType);
 expectType<McpUiToolMetaSchemaInferredType>({} as spec.McpUiToolMeta);
 expectType<spec.McpUiClientCapabilities>(

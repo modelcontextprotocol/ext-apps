@@ -768,8 +768,8 @@ export type McpUiToolVisibility = "model" | "app";
  */
 export interface McpUiEntrypoint {
   /**
-   * @description Kind of entrypoint. The specification defines `"global"`.
-   * Hosts ignore the types that they do not support.
+   * @description Kind of entrypoint. The specification defines `"global"`,
+   * `"thread"` and `"file"`. Hosts ignore the types that they do not support.
    */
   type: string;
   /**
@@ -777,6 +777,41 @@ export interface McpUiEntrypoint {
    * Note: The generated schema uses passthrough() to allow additional properties.
    */
   [key: string]: unknown;
+}
+
+/**
+ * @description The user can open the view as a starting point, e.g. from a list of apps.
+ * The host calls the tool with `{}`.
+ */
+export interface McpUiGlobalEntrypoint {
+  type: "global";
+}
+
+/**
+ * @description The user can open the view inside a conversation, to which it then belongs.
+ * The host calls the tool with `{}`.
+ */
+export interface McpUiThreadEntrypoint {
+  type: "thread";
+}
+
+/**
+ * @description The view handles files that the user opens in the host.
+ * The host calls the tool with the file as its one `x-mcp-file` argument.
+ * A file matches if either list has an item that matches it.
+ */
+export interface McpUiFileEntrypoint {
+  type: "file";
+  /**
+   * @description File name extensions that the view handles, each with its
+   * leading dot (e.g. `".csv"`). Compared without regard to case.
+   */
+  extensions?: string[];
+  /**
+   * @description Media types that the view handles: exact (e.g. `"text/csv"`)
+   * or a whole type (e.g. `"image/*"`).
+   */
+  mimeTypes?: string[];
 }
 
 /**

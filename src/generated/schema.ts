@@ -721,16 +721,61 @@ export const McpUiToolVisibilitySchema = z
 export const McpUiEntrypointSchema = z
   .object({
     /**
-     * @description Kind of entrypoint. The specification defines `"global"`.
-     * Hosts ignore the types that they do not support.
+     * @description Kind of entrypoint. The specification defines `"global"`,
+     * `"thread"` and `"file"`. Hosts ignore the types that they do not support.
      */
     type: z
       .string()
       .describe(
-        'Kind of entrypoint. The specification defines `"global"`.\nHosts ignore the types that they do not support.',
+        'Kind of entrypoint. The specification defines `"global"`,\n`"thread"` and `"file"`. Hosts ignore the types that they do not support.',
       ),
   })
   .passthrough();
+
+/**
+ * @description The user can open the view as a starting point, e.g. from a list of apps.
+ * The host calls the tool with `{}`.
+ */
+export const McpUiGlobalEntrypointSchema = z.object({
+  type: z.literal("global"),
+});
+
+/**
+ * @description The user can open the view inside a conversation, to which it then belongs.
+ * The host calls the tool with `{}`.
+ */
+export const McpUiThreadEntrypointSchema = z.object({
+  type: z.literal("thread"),
+});
+
+/**
+ * @description The view handles files that the user opens in the host.
+ * The host calls the tool with the file as its one `x-mcp-file` argument.
+ * A file matches if either list has an item that matches it.
+ */
+export const McpUiFileEntrypointSchema = z.object({
+  type: z.literal("file"),
+  /**
+   * @description File name extensions that the view handles, each with its
+   * leading dot (e.g. `".csv"`). Compared without regard to case.
+   */
+  extensions: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'File name extensions that the view handles, each with its\nleading dot (e.g. `".csv"`). Compared without regard to case.',
+    ),
+  /**
+   * @description Media types that the view handles: exact (e.g. `"text/csv"`)
+   * or a whole type (e.g. `"image/*"`).
+   */
+  mimeTypes: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Media types that the view handles: exact (e.g. `"text/csv"`)\nor a whole type (e.g. `"image/*"`).',
+    ),
+});
 
 /**
  * @description UI-related metadata for tools.

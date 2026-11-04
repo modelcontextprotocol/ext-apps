@@ -7,7 +7,11 @@
  * @module
  */
 
-import { Client, type Transport } from "@modelcontextprotocol/client";
+import {
+  Client,
+  type Tool,
+  type Transport,
+} from "@modelcontextprotocol/client";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
@@ -15,7 +19,9 @@ import type {
 import {
   AppBridge,
   PostMessageTransport,
+  fileMatchesEntrypoint,
   getToolEntrypoints,
+  getToolFileArgument,
 } from "./app-bridge.js";
 import type { McpUiDisplayMode } from "./types.js";
 
@@ -38,6 +44,48 @@ async function getToolEntrypoints_listGlobal(client: Client) {
     arguments: {},
   });
   //#endregion getToolEntrypoints_listGlobal
+}
+
+/**
+ * Example: Finding the tools that can open a file.
+ */
+async function fileMatchesEntrypoint_findHandlers(client: Client) {
+  //#region fileMatchesEntrypoint_findHandlers
+  const file = { name: "tune.abc", mimeType: "text/vnd.abc" };
+  const { tools } = await client.listTools();
+
+  // Let the user choose among these, next to the host's own viewer
+  const handlers = tools.filter(
+    (tool) =>
+      getToolFileArgument(tool) !== undefined &&
+      getToolEntrypoints(tool).some((entrypoint) =>
+        fileMatchesEntrypoint(file, entrypoint),
+      ),
+  );
+  //#endregion fileMatchesEntrypoint_findHandlers
+}
+
+/**
+ * Example: Opening a file with a tool that declares a "file" entrypoint.
+ */
+async function getToolFileArgument_openFile(
+  client: Client,
+  tool: Tool,
+  // A `FileInput` of the File Uploads extension, built from the user's file
+  fileInput: Record<string, unknown>,
+) {
+  //#region getToolFileArgument_openFile
+  const argument = getToolFileArgument(tool);
+  if (argument === undefined) {
+    throw new Error(`${tool.name} cannot be opened with a file alone`);
+  }
+
+  // The file is the only argument
+  const result = await client.callTool({
+    name: tool.name,
+    arguments: { [argument]: fileInput },
+  });
+  //#endregion getToolFileArgument_openFile
 }
 
 /**

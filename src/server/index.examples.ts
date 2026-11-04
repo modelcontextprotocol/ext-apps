@@ -28,6 +28,7 @@ declare function updateCartItem(
   itemId: string,
   quantity: number,
 ): Promise<{ items: unknown[]; total: number }>;
+declare function parseCsv(file: { size: number; data?: string }): string[][];
 
 /**
  * Example: Module overview showing basic registration of tools and resources.
@@ -161,6 +162,57 @@ function registerAppTool_globalEntrypoint(server: McpServer) {
     },
   );
   //#endregion registerAppTool_globalEntrypoint
+}
+
+/**
+ * Example: File entrypoint - the tool's view opens files that the user picks.
+ */
+function registerAppTool_fileEntrypoint(server: McpServer) {
+  //#region registerAppTool_fileEntrypoint
+  registerAppTool(
+    server,
+    "open-spreadsheet",
+    {
+      title: "Spreadsheet",
+      description: "Show a spreadsheet file",
+      inputSchema: z.object({
+        // The one file argument, marked for the File Uploads extension.
+        // The host binds it to the file that the user opened.
+        file: z
+          .object({
+            id: z.string(),
+            name: z.string().optional(),
+            mimeType: z.string(),
+            size: z.number(),
+            digest: z.object({
+              algorithm: z.literal("sha-256"),
+              value: z.string(),
+            }),
+            data: z.string().optional(),
+          })
+          .meta({ "x-mcp-file": { accept: [".csv", "text/csv"] } }),
+      }),
+      annotations: { readOnlyHint: true },
+      _meta: {
+        ui: {
+          resourceUri: "ui://sheets/viewer.html",
+          entrypoints: [
+            { type: "file", extensions: [".csv"], mimeTypes: ["text/csv"] },
+          ],
+        },
+      },
+    },
+    async ({ file }) => {
+      // Checks the size and digest, then decodes the bytes
+      const rows = parseCsv(file);
+      // The view renders from the result: its tool input may lack the bytes
+      return {
+        content: [{ type: "text", text: `Opened ${file.name}` }],
+        structuredContent: { rows },
+      };
+    },
+  );
+  //#endregion registerAppTool_fileEntrypoint
 }
 
 /**
