@@ -112,7 +112,6 @@ These OpenAI features don't have MCP equivalents yet:
 **Client-side:**
 | OpenAI Feature | Status/Workaround |
 |----------------|-------------------|
-| `window.openai.widgetState` / `setWidgetState()` | Use `localStorage` or server-side state |
 | `window.openai.uploadFile()` / `getFileDownloadUrl()` | File operations not yet available |
 | `window.openai.requestModal()` / `requestClose()` | Modal management not yet available |
 | `window.openai.view` | Not yet available |
@@ -136,6 +135,7 @@ Slow down and carefully follow each item in this checklist:
     |---------|-----------|
     | `window.openai.toolInput` | Old global → `params.arguments` in `ontoolinput` handler |
     | `window.openai.toolOutput` | Old global → `params.structuredContent` in `ontoolresult` |
+    | `window.openai.widgetState` or `setWidgetState` | Old state API → `app.getHostContext()?.viewState` / `app.setViewState(state)` for UI-only state (`privateContent`), which the host never shows to the model; `app.updateModelContext()` for `modelContent`. `setViewState` needs host support: check `app.getHostCapabilities()?.viewState`, otherwise use `localStorage` or server-side state |
     | `window.openai` | Old global API → `App` instance methods |
 
 - [ ] For each origin from your CSP investigation, show where it appears in the `registerAppResource()` CSP config. **Every** origin from the CSP investigation (universal, dev-only, prod-only) must be included in the CSP config—MCP Apps HTML runs in a sandboxed iframe **with no same-origin server**. If an origin was not included in the CSP config, add it now.

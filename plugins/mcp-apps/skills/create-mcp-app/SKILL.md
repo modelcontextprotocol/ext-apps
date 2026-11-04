@@ -95,7 +95,7 @@ See `/tmp/mcp-ext-apps/docs/patterns.md` for detailed recipes:
 - **Host context** — theme, styling, fonts, safe area insets
 - **Fullscreen mode** — `requestDisplayMode`, display mode changes
 - **Model context** — `updateModelContext`, `sendMessage`, keeping model informed
-- **View state** — `viewUUID`, localStorage, state recovery
+- **View state** — `setViewState`, `useViewState`, state recovery, `viewUUID` + localStorage fallback
 - **Visibility-based pause** — IntersectionObserver, pausing animations/WebGL
 - **Streaming input** — `ontoolinputpartial`, progressive rendering
 
