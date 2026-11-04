@@ -349,6 +349,15 @@ interface McpUiToolMeta {
    * - "app": Tool callable by the app from this server only
    */
   visibility?: Array<"model" | "app">;
+  /** Ways for the user to open this tool's View from the Host's own UI. See Entrypoints below. */
+  entrypoints?: McpUiEntrypoint[];
+}
+
+interface McpUiEntrypoint {
+  /** Kind of entrypoint. This specification defines "global". */
+  type: string;
+  /** The definition of a type can add fields. */
+  [key: string]: unknown;
 }
 
 interface Tool {
@@ -419,6 +428,59 @@ Example (app-only tool, hidden from model):
 - **tools/list behavior:** Host MUST NOT include tools in the agent's tool list when their visibility does not include `"model"` (e.g., `visibility: ["app"]`)
 - **tools/call behavior:** Host MUST reject `tools/call` requests from apps for tools that don't include `"app"` in visibility
 - Cross-server tool calls are always blocked for app-only tools
+
+#### Entrypoints:
+
+A View is normally created when the agent calls its tool. With `entrypoints`, a Server marks a tool whose View the user can also open directly from the Host's own UI, such as a list of apps.
+
+Example (tool that the user can open directly):
+
+```json
+{
+  "name": "open_inbox",
+  "title": "Inbox",
+  "description": "Show the user's inbox",
+  "inputSchema": { "type": "object" },
+  "annotations": { "readOnlyHint": true },
+  "_meta": {
+    "ui": {
+      "resourceUri": "ui://mail-server/inbox",
+      "entrypoints": [{ "type": "global" }]
+    }
+  }
+}
+```
+
+- `entrypoints` is a list of objects, each with a `type`. It has an effect only on a tool that declares a UI resource
+- `"global"`: The View is a useful starting point, with no earlier tool call or message from the agent. This specification defines no other fields for it, and declaring it twice is the same as declaring it once
+- A `type` without a `/` is reserved for this specification. A Host that defines its own SHOULD prefix it with a reversed domain name that it owns (e.g., `com.example/custom`)
+- Host reads the entries one by one. It MUST ignore an entry whose `type` it does not support or that is malformed (not an object with a string `type`), and MUST NOT reject the other entries or the tool because of it
+
+**Server behavior** (for a tool that declares `"global"`):
+
+- The tool MUST accept empty arguments (`{}`), so its `inputSchema` has no required properties
+- On success, a call with `{}` MUST return a result from which the View can render
+- A call with `{}` SHOULD NOT change anything: opening a View is not a request to act. If every call of the tool is read-only, the Server SHOULD say so with `annotations.readOnlyHint: true`
+- Server MUST NOT assume that the result stays out of the model's context
+- The tool remains an ordinary tool. The agent can still call it, with or without arguments, as `visibility` allows
+
+**Host behavior:**
+
+- Host MAY list `"global"` entrypoints anywhere in its own UI, and MAY leave any of them out, for instance a tool whose `inputSchema` has required properties. It SHOULD label each with the tool's display name (`title`, then `annotations.title`, then `name`), and MAY show the tool's `icons` and `description`
+- Host MUST NOT open as an entrypoint a tool that its Server has not declared as one, with a type that Host supports: without the declaration, nothing says that the tool accepts `{}`
+- Host MUST NOT offer or open an entrypoint of a tool that it would not otherwise allow to be called for that user
+- To open an entrypoint, Host calls the tool with `{}` as arguments, or asks the agent to make that call, and renders the View as for any other tool call (see Lifecycle)
+- Host MUST NOT open an entrypoint except on a user action in Host's own UI; building or previewing the list does not count, and a View or Server cannot trigger it. Following a link in content that Host displays, or one passed to `ui/open-link`, is not such an action. Host MAY still prefetch the UI resource (see Behavior), and a View's own `tools/call` of the tool is governed by Visibility
+- A page reload or a restored session is not a user action: Host MAY show the result that it kept instead of calling the tool again, but only to the same user, and only while that user can still call the Server's tools. Whether opening an entrypoint again makes a new call or returns to a View that Host still shows is up to Host
+- A Host that opens entrypoints through the agent cannot open a tool whose `visibility` lacks `"model"`, so a Server that wants its entrypoint offered by every Host SHOULD keep `"model"`
+- The title, description and icons are chosen by the Server and appear in Host's own UI, where they can imitate the Host or another Server. Host SHOULD show which Server each entrypoint comes from, and SHOULD treat a new or changed entrypoint as it treats a new tool. Core MCP's precautions for `icons` apply
+- This section changes nothing in how a Host enables tools or handles consent for tool calls. Whether the user action also counts as consent is for the Host to decide
+
+**View behavior:**
+
+- View SHOULD render from the tool result that Host sends it (`ui/notifications/tool-result`), without calling the tool again
+
+_Note (non-normative):_ the shape of this field follows the entrypoints of OpenAI's [MCP extensions](https://github.com/openai/mcp-extensions/blob/15e0f4745e7c95865ee2195de5b79f4148b21418/docs/spec.md#mcp-app-entrypoints), which declares the same list of typed objects under `_meta["openai/ui"].entrypoints`. That document defines three types, `"global"`, `"thread"` and `"file"`, and deep links into a global entrypoint. This specification defines only `"global"`. A Server can declare both keys.
 
 #### Benefits:
 
