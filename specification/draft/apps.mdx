@@ -734,6 +734,8 @@ interface HostCapabilities {
 }
 ```
 
+The `resource` and `resourceLink` keys of `message` and `updateModelContext` commit the Host to the rules in [Resource blocks in messages and model context](#resource-blocks-in-messages-and-model-context).
+
 ### Container Dimensions
 
 The `HostContext` provides sizing information via `containerDimensions`:
@@ -1140,10 +1142,7 @@ Host behavior:
   method: "ui/message",
   params: {
     role: "user",
-    content: {
-      type: "text",
-      text: string
-    }
+    content: ContentBlock[]
   }
 }
 
@@ -1167,6 +1166,75 @@ Host behavior:
 Host behavior:
 * Host SHOULD add the message to the conversation context, preserving the specified role.
 * Host MAY request user consent.
+
+##### Resource blocks in messages and model context
+
+The `content` of `ui/message` and of `ui/update-model-context` is an array of MCP `ContentBlock`s, so a View can send an **embedded resource** (`type: "resource"`, an MCP `EmbeddedResource`, whose content is inline as `text` or `blob`) or a **resource link** (`type: "resource_link"`, an MCP `ResourceLink`, which names content by `uri` without carrying it). The rules in this section apply to both requests. They do not apply to `ui/download-file`, which has its own.
+
+A View's HTML is a resource of its MCP server, so a Host MUST give these blocks no more trust than it gives the same block in a tool result from that server. This holds for `ui/message` too: whatever its `role`, the View wrote the content and the user did not.
+
+```typescript
+// A context update with one block of each type
+{
+  jsonrpc: "2.0",
+  id: 3,
+  method: "ui/update-model-context",
+  params: {
+    content: [
+      { type: "text", text: "The Q3 export is open." },
+      {
+        type: "resource",
+        resource: {
+          uri: "reports://q3/export.csv",   // A label chosen by the View
+          mimeType: "text/csv",
+          text: "region,total\nnorth,1200\n" // Text content (or `blob` for base64 binary)
+        }
+      },
+      {
+        type: "resource_link",
+        uri: "reports://q3/summary.pdf",    // Read with resources/read on the View's server, on request
+        name: "Q3 summary",
+        mimeType: "application/pdf"
+      }
+    ]
+  }
+}
+
+// Error Response (the Host has not declared one of the block types)
+{
+  jsonrpc: "2.0",
+  id: 3,
+  error: {
+    code: -32602,  // Invalid params
+    message: "Unsupported content block type: resource_link"
+  }
+}
+```
+
+Declaring support:
+* A Host declares the block types that it accepts, separately for each request, with the `resource` and `resourceLink` keys of `hostCapabilities.message` and `hostCapabilities.updateModelContext`.
+* Host MUST NOT declare a key unless it follows the rules below for that block type.
+* View SHOULD NOT send a `resource` or `resource_link` block in a request for which the Host has not declared the matching key. It can send the content as a `text` block instead, or leave it out.
+
+Blocks that the Host has not declared:
+* Host MUST reject a request that contains a `resource` or `resource_link` block for which it has not declared the matching key. It MUST answer with a JSON-RPC error and SHOULD use `-32602` (Invalid params).
+* Host MUST NOT act on the rest of a request that it rejects: no message is added to the conversation, and the model context that the View set earlier stays as it was.
+* Host MUST NOT drop such a block and report success. Neither result can say that only part of the content was accepted, and a context update overwrites the previous one, so the View would take a truncated message or context for a complete one.
+
+Embedded resources (`resource`):
+* The content travels with the request. Where a Host passes the message or the context on to the model, it SHOULD pass the embedded `text` or `blob` on with it, as it would for an embedded resource in a tool result.
+* `resource.uri` is a label chosen by the View. Host MUST NOT retrieve it, and MUST NOT present it to the user as the place that the content was obtained from.
+* Host MAY reject a request, as above, whose embedded content is larger than it accepts or has a MIME type that it does not accept.
+
+Resource links (`resource_link`):
+* A link is passed on as a reference. Host MUST NOT retrieve the `uri`, or make any other request derived from the block (a preview, an entry of `icons`, a title lookup), on its own initiative: not when it receives the block, displays it, stores it or passes it on to the model.
+* Host MAY retrieve the linked content once the user or the model asks for it. It MUST then do so only with `resources/read` on the MCP server that provided the View, under the same policy and consent as any other `resources/read` on that server. Host MUST NOT resolve the `uri` through another MCP server, or with its own network or file access, whatever the URI scheme.
+* If that `resources/read` fails, Host MUST NOT fall back on another way of retrieving the `uri`. (A server need not list a linked resource in `resources/list`, and a link can go stale.)
+* View SHOULD only send links that its own MCP server can serve through `resources/read`.
+
+For the reasoning, see "Resource blocks sent by a View" under [Other risks](#other-risks).
+
+> **Note (non-normative):** [OpenAI's MCP extensions specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md) lists resource links and embedded resources among the content blocks that its hosts accept in `ui/update-model-context` and `ui/message`, and its capability example for `ui/update-model-context` declares them with the same `resource` and `resourceLink` keys.
 
 `ui/request-display-mode` - Request host to change display mode
 
@@ -1227,6 +1295,7 @@ See the Display Modes section for detailed behavior requirements.
 
 The View MAY send this request to update the Host's model context. This context will be used in future turns. Each request overwrites the previous context sent by the View.
 This event serves a different use case from `notifications/message` (logging) and `ui/message` (which also trigger follow-ups).
+For `resource` and `resource_link` blocks in `content`, see [Resource blocks in messages and model context](#resource-blocks-in-messages-and-model-context).
 
 Host behavior:
 - SHOULD provide the context to the model in future turns
@@ -2661,6 +2730,12 @@ App tools MUST be tied to the app's lifecycle:
 
 ### Other risks
 
+- **Resource blocks sent by a View:** In `ui/message` and `ui/update-model-context`, View code picks every `uri` at runtime, and can encode data in it. Three things follow, and the rules in [Resource blocks in messages and model context](#resource-blocks-in-messages-and-model-context) answer them:
+  - *Retrieval by the Host.* A Host that fetched a `uri` on receipt (for the content, a preview or an icon) would make a request that the View's CSP forbids the View to make, from the Host's network position and possibly with the Host's credentials: an exfiltration channel and a request forgery vector. So a Host retrieves nothing on its own initiative.
+  - *Which server a `uri` belongs to.* A `uri` means something only to the server that issued it. Resolved through another connected server, or by the Host itself (`file:`, `https:`), it would let one server's View name content that only another server, or the user's machine, can reach, and have it handed to the model. So a link is only ever read with `resources/read` on the View's own server, which already supplies the View's code and its tool results: the link reaches nothing that this server could not put in front of the model itself.
+  - *Provenance.* The `uri` of an embedded resource is a label next to content that the View supplied. Shown as the source of that content, it would let a View pass its own text off as coming from a place the user trusts. Hosts should attribute these blocks to the View's server, as they would a tool result, including in `ui/message`, whose `role` is `"user"`.
+
+  What remains is what a `text` block already allows: a View can put a URL in front of the model, and a model that has a fetch tool may follow it. Hosts should treat a `uri` that reaches the model this way like any other URL in untrusted content.
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
 - **Resource consumption:** Malicious View can consume CPU/memory. Hosts should implement resource limits.
 
