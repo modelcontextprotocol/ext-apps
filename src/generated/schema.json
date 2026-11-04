@@ -392,6 +392,12 @@
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false
+                },
+                "tools": {
+                  "description": "Request WebMCP tools access.\n\nMaps to Permission Policy `tools` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false
@@ -2803,6 +2809,12 @@
                       "type": "object",
                       "properties": {},
                       "additionalProperties": false
+                    },
+                    "tools": {
+                      "description": "Request WebMCP tools access.\n\nMaps to Permission Policy `tools` feature.",
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
                     }
                   },
                   "additionalProperties": false
@@ -4320,6 +4332,12 @@
               "type": "object",
               "properties": {},
               "additionalProperties": false
+            },
+            "tools": {
+              "description": "Request WebMCP tools access.\n\nMaps to Permission Policy `tools` feature.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -4359,6 +4377,12 @@
         },
         "clipboardWrite": {
           "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "tools": {
+          "description": "Request WebMCP tools access.\n\nMaps to Permission Policy `tools` feature.",
           "type": "object",
           "properties": {},
           "additionalProperties": false
@@ -4486,6 +4510,12 @@
                 },
                 "clipboardWrite": {
                   "description": "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "tools": {
+                  "description": "Request WebMCP tools access.\n\nMaps to Permission Policy `tools` feature.",
                   "type": "object",
                   "properties": {},
                   "additionalProperties": false

@@ -686,6 +686,12 @@ export interface McpUiResourcePermissions {
    * Maps to Permission Policy `clipboard-write` feature.
    */
   clipboardWrite?: {};
+  /**
+   * @description Request WebMCP tools access.
+   *
+   * Maps to Permission Policy `tools` feature.
+   */
+  tools?: {};
 }
 
 /**
