@@ -514,8 +514,21 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
     ? `${styles.appIframePanel} ${styles.fullscreen}`
     : styles.appIframePanel;
 
+  // Host-owned way out of fullscreen: the app may have been started there by
+  // its preferred display mode, before the user has seen it.
+  const exitFullscreen = () => {
+    appBridgeRef.current?.sendHostContextChange({ displayMode: "inline" });
+    setDisplayMode("inline");
+  };
+
   return (
     <div className={panelClassName}>
+      {displayMode === "fullscreen" && (
+        <div className={styles.fullscreenBar}>
+          <span>{toolCallInfo.serverInfo.name}:{toolCallInfo.tool.name}</span>
+          <button onClick={exitFullscreen}>Exit fullscreen</button>
+        </div>
+      )}
       <iframe ref={iframeRef} />
       {messages.length > 0 && (
         <CollapsiblePanel

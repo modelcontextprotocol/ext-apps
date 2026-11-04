@@ -171,6 +171,16 @@
     display: flex;
     flex-direction: column;
 
+    /* Host controls stay visible above the app: its name and a way out */
+    .fullscreenBar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      font-family: monospace;
+    }
+
     /* Hide collapsible panels in fullscreen */
     .collapsiblePanel {
       display: none;
