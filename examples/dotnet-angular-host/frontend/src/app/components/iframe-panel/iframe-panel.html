@@ -1,0 +1,17 @@
+<div [class]="panelClass()">
+  <iframe #iframeEl></iframe>
+
+  @if (displayMode() !== 'fullscreen') {
+    @if (messages().length > 0) {
+      <app-collapsible-panel
+        icon="💬"
+        label="Messages"
+        [content]="messagesText()"
+        [badge]="messagesBadge()"
+      />
+    }
+    @if (modelContext()) {
+      <app-collapsible-panel icon="📋" label="Model Context" [content]="contextText()" />
+    }
+  }
+</div>
