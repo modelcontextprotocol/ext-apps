@@ -3552,7 +3552,35 @@ async function renderPage() {
   }
 }
 
+// The current page is kept in two places:
+// - with the host, when it saves view state (`ui/set-view-state`, handed back
+//   as `hostContext.viewState`): preferred when restoring;
+// - in localStorage under the server's viewUUID, always: the only store on
+//   hosts that cannot save view state, and the fallback when the host has
+//   nothing saved (for example a page saved before it gained the capability).
+const hostSavesViewState = () => !!app.getHostCapabilities()?.viewState;
+let hostSaveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Page of the latest host save, which `hostContext.viewState` only reflects
+ *  once the (debounced) save has been answered. */
+let pageSentToHost: number | null = null;
+
+/** Sends the host the page that is waiting for its debounce, if any. */
+async function flushPageToHost(): Promise<void> {
+  const page = pageSentToHost;
+  if (!hostSaveTimer || page === null) return;
+  clearTimeout(hostSaveTimer);
+  hostSaveTimer = null;
+  await app
+    .setViewState({ version: 1, page })
+    .catch((err) => log.error("saveCurrentPage: host save failed", err));
+}
+
 function saveCurrentPage() {
+  if (hostSavesViewState()) {
+    pageSentToHost = currentPage;
+    if (hostSaveTimer) clearTimeout(hostSaveTimer);
+    hostSaveTimer = setTimeout(flushPageToHost, 300);
+  }
   log.info("saveCurrentPage: key=", viewUUID, "page=", currentPage);
   if (viewUUID) {
     try {
@@ -3565,6 +3593,15 @@ function saveCurrentPage() {
 }
 
 function loadSavedPage(): number | null {
+  if (hostSavesViewState()) {
+    const saved = app.getHostContext()?.viewState;
+    const page = pageSentToHost ?? (saved?.version === 1 ? saved.page : null);
+    if (typeof page === "number" && Number.isInteger(page) && page >= 1) {
+      log.info("loadSavedPage: from host, page=", page);
+      return page;
+    }
+    // Nothing usable from the host: fall back to localStorage
+  }
   log.info("loadSavedPage: key=", viewUUID);
   if (!viewUUID) return null;
   try {
@@ -5172,6 +5209,9 @@ function handleHostContextChanged(ctx: McpUiHostContext) {
 
 app.onteardown = async () => {
   log.info("App is being torn down");
+  // A page change may still be waiting for its debounce: send it, and wait
+  // for the host's answer before answering the teardown.
+  await flushPageToHost();
   stopPolling();
   // Bump loadGeneration so startPreloading's gen check fails and the
   // loop exits on its next iteration (reuses the reload-abort mechanism).

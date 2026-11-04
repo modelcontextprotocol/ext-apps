@@ -477,6 +477,18 @@
           },
           "additionalProperties": false
         },
+        "viewState": {
+          "description": "Host supports saving View state via ui/set-view-state.",
+          "type": "object",
+          "properties": {
+            "maxBytes": {
+              "type": "number",
+              "description": "Largest state accepted: its length in bytes as UTF-8 JSON with no whitespace between tokens."
+            }
+          },
+          "required": ["maxBytes"],
+          "additionalProperties": false
+        },
         "message": {
           "description": "Host supports receiving content messages (ui/message) from the view.",
           "type": "object",
@@ -1284,6 +1296,23 @@
               },
               "required": ["top", "right", "bottom", "left"],
               "additionalProperties": false
+            },
+            "viewState": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "description": "State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result."
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result."
             }
           },
           "additionalProperties": {},
@@ -2067,6 +2096,23 @@
           },
           "required": ["top", "right", "bottom", "left"],
           "additionalProperties": false
+        },
+        "viewState": {
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "description": "State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result."
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result."
         }
       },
       "additionalProperties": {},
@@ -2888,6 +2934,18 @@
               },
               "additionalProperties": false
             },
+            "viewState": {
+              "description": "Host supports saving View state via ui/set-view-state.",
+              "type": "object",
+              "properties": {
+                "maxBytes": {
+                  "type": "number",
+                  "description": "Largest state accepted: its length in bytes as UTF-8 JSON with no whitespace between tokens."
+                }
+              },
+              "required": ["maxBytes"],
+              "additionalProperties": false
+            },
             "message": {
               "description": "Host supports receiving content messages (ui/message) from the view.",
               "type": "object",
@@ -3688,6 +3746,23 @@
               },
               "required": ["top", "right", "bottom", "left"],
               "additionalProperties": false
+            },
+            "viewState": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "description": "State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result."
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result."
             }
           },
           "additionalProperties": {},
@@ -4500,6 +4575,50 @@
       },
       "required": ["method", "params"],
       "additionalProperties": false
+    },
+    "McpUiSetViewStateRequest": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/set-view-state"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "description": "State to save; replaces any saved state, and `null` clears it."
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "State to save; replaces any saved state, and `null` clears it."
+            }
+          },
+          "required": ["state"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiSetViewStateResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
     },
     "McpUiSizeChangedNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",

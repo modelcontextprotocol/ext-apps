@@ -431,6 +431,43 @@ export const McpUiHostStylesSchema = z.object({
 });
 
 /**
+ * @description Request to save the View's state for when it is rendered again (View -> Host).
+ *
+ * Each request replaces the saved state as a whole. The Host picks the storage key and answers
+ * with an empty result once the state is stored. The saved state comes back in
+ * {@link McpUiHostContext `McpUiHostContext.viewState`}; the Host gives it to neither the model
+ * nor the MCP server.
+ *
+ * @see {@link app!App.setViewState `App.setViewState`} for the method that sends this request
+ * @see {@link app-bridge!AppBridge.onsetviewstate `AppBridge.onsetviewstate`} for the host handler
+ */
+export const McpUiSetViewStateRequestSchema = z.object({
+  method: z.literal("ui/set-view-state"),
+  params: z.object({
+    /** @description State to save; replaces any saved state, and `null` clears it. */
+    state: z
+      .record(
+        z.string(),
+        z
+          .unknown()
+          .describe(
+            "State to save; replaces any saved state, and `null` clears it.",
+          ),
+      )
+      .nullable()
+      .describe(
+        "State to save; replaces any saved state, and `null` clears it.",
+      ),
+  }),
+});
+
+/**
+ * @description Result from saving the View's state.
+ * @see {@link McpUiSetViewStateRequest `McpUiSetViewStateRequest`}
+ */
+export const McpUiSetViewStateResultSchema = z.record(z.string(), z.unknown());
+
+/**
  * @description Request for graceful shutdown of the View (Host -> View).
  * @see {@link app-bridge!AppBridge.teardownResource `AppBridge.teardownResource`} for the host method that sends this
  */
@@ -559,6 +596,18 @@ export const McpUiHostCapabilitiesSchema = z.object({
     McpUiSupportedContentBlockModalitiesSchema.optional().describe(
       "Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns.",
     ),
+  /** @description Host supports saving View state via ui/set-view-state. */
+  viewState: z
+    .object({
+      /** @description Largest state accepted: its length in bytes as UTF-8 JSON with no whitespace between tokens. */
+      maxBytes: z
+        .number()
+        .describe(
+          "Largest state accepted: its length in bytes as UTF-8 JSON with no whitespace between tokens.",
+        ),
+    })
+    .optional()
+    .describe("Host supports saving View state via ui/set-view-state."),
   /** @description Host supports receiving content messages (ui/message) from the view. */
   message: McpUiSupportedContentBlockModalitiesSchema.optional().describe(
     "Host supports receiving content messages (ui/message) from the view.",
@@ -964,6 +1013,21 @@ export const McpUiHostContextSchema = z
       })
       .optional()
       .describe("Mobile safe area boundaries in pixels."),
+    /** @description State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result. */
+    viewState: z
+      .record(
+        z.string(),
+        z
+          .unknown()
+          .describe(
+            "State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result.",
+          ),
+      )
+      .optional()
+      .nullable()
+      .describe(
+        "State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result.",
+      ),
   })
   .passthrough();
 

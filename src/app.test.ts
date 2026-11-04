@@ -12,6 +12,9 @@ import {
   McpUiInitializeRequestSchema,
   McpUiInitializeResultSchema,
   McpUiInitializedNotificationSchema,
+  McpUiSetViewStateRequestSchema,
+  type McpUiHostCapabilities,
+  type McpUiHostContext,
 } from "./types.js";
 
 type ConnectedPair = {
@@ -27,6 +30,10 @@ async function connectPair(
     { tools: { listChanged: true } },
     { autoResize: false },
   ),
+  host: {
+    capabilities?: McpUiHostCapabilities;
+    context?: McpUiHostContext;
+  } = {},
 ): Promise<ConnectedPair> {
   const server = new Server(
     { name: "inner-mcp-server", version: "0.0.0" },
@@ -57,9 +64,13 @@ async function connectPair(
       expect(params.protocolVersion).toBe(LATEST_PROTOCOL_VERSION);
       return {
         protocolVersion: LATEST_PROTOCOL_VERSION,
-        hostCapabilities: { openLinks: {} },
+        hostCapabilities: { openLinks: {}, ...host.capabilities },
         hostInfo: { name: "apps-host", version: "2.0.0" },
-        hostContext: { theme: "dark" as const, locale: "en-US" },
+        hostContext: {
+          theme: "dark" as const,
+          locale: "en-US",
+          ...host.context,
+        },
       };
     },
   );
@@ -377,5 +388,189 @@ describe("App base MCP SDK v2 Protocol migration", () => {
       z.object({}),
     );
     expect(handledBy).toBe(2);
+  });
+});
+
+describe("App.setViewState", () => {
+  type State = Record<string, unknown> | null;
+
+  /** A host that advertises the viewState capability and records what it is asked to store. */
+  async function connectSavingHost(
+    viewState: State,
+    host: {
+      /** Throws to refuse a save, before it is stored. */
+      refuse?: (state: State) => void;
+      /** Delays the answer to a save that is already stored. */
+      holdAnswer?: (state: State) => Promise<void> | undefined;
+      /** What the host answers; `{}` if left out. */
+      answer?: Record<string, unknown>;
+    } = {},
+  ) {
+    const pair = await connectPair(undefined, {
+      capabilities: { viewState: { maxBytes: 65536 } },
+      context: { viewState },
+    });
+    connected.push(pair);
+    const stored: State[] = [];
+    pair.server.setRequestHandler(
+      "ui/set-view-state",
+      {
+        params: McpUiSetViewStateRequestSchema.shape.params,
+        result: z.record(z.string(), z.unknown()),
+      },
+      async ({ state }) => {
+        host.refuse?.(state);
+        stored.push(state);
+        await host.holdAnswer?.(state);
+        return host.answer ?? {};
+      },
+    );
+    const heard: McpUiHostContext[] = [];
+    pair.app.addEventListener("hostcontextchanged", (changed) => {
+      heard.push(changed);
+    });
+    return { ...pair, stored, heard };
+  }
+
+  it("reads the capability and the state handed back at ui/initialize", async () => {
+    const { app } = await connectSavingHost({ tab: "a" });
+    expect(app.getHostCapabilities()?.viewState).toEqual({ maxBytes: 65536 });
+    expect(app.getHostContext()?.viewState).toEqual({ tab: "a" });
+  });
+
+  it("keeps null (nothing saved) apart from absent (no support)", async () => {
+    const nothingSaved = await connectSavingHost(null);
+    expect(nothingSaved.app.getHostContext()?.viewState).toBeNull();
+    const noSupport = await connectPair();
+    connected.push(noSupport);
+    expect(noSupport.app.getHostContext()?.viewState).toBeUndefined();
+    expect(noSupport.app.getHostCapabilities()?.viewState).toBeUndefined();
+  });
+
+  it("a successful save sets the copy and calls no listener", async () => {
+    const { app, stored, heard } = await connectSavingHost(null);
+    const result = await app.setViewState({ tab: "b" });
+    expect(result).toEqual({});
+    expect(stored).toEqual([{ tab: "b" }]);
+    expect(app.getHostContext()?.viewState).toEqual({ tab: "b" });
+    expect(app.getHostContext()?.theme).toBe("dark");
+    expect(heard).toEqual([]);
+  });
+
+  it("takes a result with a field it does not know as a success", async () => {
+    const { app } = await connectSavingHost(null, {
+      answer: { someLaterField: 1 },
+    });
+    await app.setViewState({ tab: "b" });
+    expect(app.getHostContext()?.viewState).toEqual({ tab: "b" });
+  });
+
+  it("saving null clears the copy", async () => {
+    const { app } = await connectSavingHost({ tab: "a" });
+    await app.setViewState(null);
+    expect(app.getHostContext()?.viewState).toBeNull();
+  });
+
+  it("a failed save leaves the copy and calls no listener", async () => {
+    const { app, heard } = await connectSavingHost(
+      { tab: "a" },
+      {
+        refuse: () => {
+          throw new Error("Storage unavailable");
+        },
+      },
+    );
+    await expect(app.setViewState({ tab: "b" })).rejects.toThrow(
+      /Storage unavailable/,
+    );
+    expect(app.getHostContext()?.viewState).toEqual({ tab: "a" });
+    expect(heard).toEqual([]);
+  });
+
+  it("keeps the copy when another host context field changes", async () => {
+    const { app, server, heard } = await connectSavingHost({ tab: "a" });
+    await app.setViewState({ tab: "b" });
+    await server.notification({
+      method: "ui/notifications/host-context-changed",
+      params: { theme: "light" },
+    });
+    // Let the in-memory transport deliver the notification.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(app.getHostContext()?.theme).toBe("light");
+    expect(app.getHostContext()?.viewState).toEqual({ tab: "b" });
+    expect(heard).toEqual([{ theme: "light" }]);
+  });
+
+  it("ends at the newest save when answers arrive out of order", async () => {
+    let releaseFirst!: () => void;
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const { app, stored } = await connectSavingHost(null, {
+      holdAnswer: (state) => (state?.n === 1 ? firstHeld : undefined),
+    });
+    const first = app.setViewState({ n: 1 });
+    await app.setViewState({ n: 2 });
+    releaseFirst();
+    await first;
+    expect(stored).toEqual([{ n: 1 }, { n: 2 }]);
+    expect(app.getHostContext()?.viewState).toEqual({ n: 2 });
+  });
+
+  it("keeps the older save when the newer one fails and the older succeeds late", async () => {
+    let releaseFirst!: () => void;
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const { app } = await connectSavingHost(null, {
+      refuse: (state) => {
+        if (state?.n === 2) throw new Error("Storage unavailable");
+      },
+      holdAnswer: (state) => (state?.n === 1 ? firstHeld : undefined),
+    });
+    const first = app.setViewState({ n: 1 });
+    await expect(app.setViewState({ n: 2 })).rejects.toThrow();
+    releaseFirst();
+    await first;
+    // What the host holds is the first state: the second was never stored
+    expect(app.getHostContext()?.viewState).toEqual({ n: 1 });
+  });
+
+  it("the copy does not follow later changes to the caller's object", async () => {
+    const { app } = await connectSavingHost(null);
+    const state = { tab: "b" };
+    await app.setViewState(state);
+    state.tab = "c";
+    expect(app.getHostContext()?.viewState).toEqual({ tab: "b" });
+  });
+
+  it("sends, and keeps as the copy, what JSON keeps of the state", async () => {
+    const { app, stored } = await connectSavingHost(null);
+    await app.setViewState({ at: new Date(0), skipped: () => {} });
+    const kept = { at: "1970-01-01T00:00:00.000Z" };
+    expect(stored).toEqual([kept]);
+    expect(app.getHostContext()?.viewState).toEqual(kept);
+  });
+
+  it("sends nothing to a host that does not advertise the capability", async () => {
+    const pair = await connectPair();
+    connected.push(pair);
+    let asked = false;
+    pair.server.setRequestHandler(
+      "ui/set-view-state",
+      {
+        params: McpUiSetViewStateRequestSchema.shape.params,
+        result: z.record(z.string(), z.unknown()),
+      },
+      async () => {
+        asked = true;
+        return {};
+      },
+    );
+    await expect(pair.app.setViewState({ tab: "b" })).rejects.toThrow(
+      /does not support saving view state/,
+    );
+    expect(asked).toBe(false);
+    expect(pair.app.getHostContext()?.viewState).toBeUndefined();
   });
 });

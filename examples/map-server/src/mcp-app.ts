@@ -101,10 +101,29 @@ let persistViewTimer: ReturnType<typeof setTimeout> | null = null;
 // Track whether tool input has been received (to know if we should restore persisted state)
 let hasReceivedToolInput = false;
 
+// Set when the camera was restored from state the host saved for this view.
+// That state arrives with the handshake, before the tool input, and wins over it.
+let restoredFromHost = false;
+
+// Set once the initial view (from tool input, restored, or the default) is in place
+let initialViewShown = false;
+
+// Set when a camera change came too early to be saved with the host (see persistViewState)
+let saveWaitsForInitialView = false;
+
+// localStorage key from the tool result; only used when the host cannot save view state
 let viewUUID: string | undefined = undefined;
 
 /**
- * Persisted camera state for localStorage
+ * Whether the host saves view state for us (`ui/set-view-state`). If not, the
+ * camera is kept in localStorage instead, under the server-provided viewUUID.
+ */
+function hostSavesViewState(): boolean {
+  return !!app.getHostCapabilities()?.viewState;
+}
+
+/**
+ * Persisted camera state
  */
 interface PersistedCameraState {
   longitude: number; // degrees
@@ -137,28 +156,44 @@ function getCameraState(cesiumViewer: any): PersistedCameraState | null {
 }
 
 /**
- * Save current view state to localStorage (debounced)
+ * Save current view state (debounced)
  */
 function schedulePersistViewState(cesiumViewer: any): void {
   if (persistViewTimer) {
     clearTimeout(persistViewTimer);
   }
   persistViewTimer = setTimeout(() => {
-    persistViewState(cesiumViewer);
+    persistViewTimer = null;
+    void persistViewState(cesiumViewer);
   }, 500); // 500ms debounce
 }
 
 /**
- * Persist current view state to localStorage
+ * Persist current view state: with the host if it can save it, else in localStorage
  */
-function persistViewState(cesiumViewer: any): void {
+function persistViewState(cesiumViewer: any): Promise<void> | void {
+  const state = getCameraState(cesiumViewer);
+  if (!state) return;
+
+  if (hostSavesViewState()) {
+    // Don't save the placeholder view shown while waiting for the tool input:
+    // restored on the next render, it would take precedence over that input.
+    // hideLoading() saves once the initial view is in place.
+    if (!initialViewShown) {
+      saveWaitsForInitialView = true;
+      return;
+    }
+    // Versioned: a later build of this view may read what this one wrote.
+    return app.setViewState({ version: 1, ...state }).then(
+      () => log.info("Persisted view state with host:", state),
+      (e) => log.warn("Failed to persist view state:", e),
+    );
+  }
+
   if (!viewUUID) {
     log.info("No storage key available, skipping view persistence");
     return;
   }
-
-  const state = getCameraState(cesiumViewer);
-  if (!state) return;
 
   try {
     const value = JSON.stringify(state);
@@ -170,19 +205,28 @@ function persistViewState(cesiumViewer: any): void {
 }
 
 /**
- * Load persisted view state from localStorage
+ * Load persisted view state: from the host if it saves it, else from localStorage
  */
 function loadPersistedViewState(): PersistedCameraState | null {
-  if (!viewUUID) return null;
-
   try {
-    const stored = localStorage.getItem(viewUUID);
-    if (!stored) {
-      console.info("No persisted view state found");
-      return null;
+    let state: PersistedCameraState;
+    if (hostSavesViewState()) {
+      const saved = app.getHostContext()?.viewState;
+      if (saved?.version !== 1) {
+        log.info("No usable view state from host:", saved);
+        return null;
+      }
+      state = saved as unknown as PersistedCameraState;
+    } else {
+      if (!viewUUID) return null;
+      const stored = localStorage.getItem(viewUUID);
+      if (!stored) {
+        console.info("No persisted view state found");
+        return null;
+      }
+      state = JSON.parse(stored) as PersistedCameraState;
     }
 
-    const state = JSON.parse(stored) as PersistedCameraState;
     // Basic validation
     if (
       typeof state.longitude !== "number" ||
@@ -680,6 +724,11 @@ function waitForTilesLoaded(cesiumViewer: any): Promise<void> {
  * Hide the loading indicator
  */
 function hideLoading(): void {
+  initialViewShown = true;
+  if (saveWaitsForInitialView && viewer) {
+    saveWaitsForInitialView = false;
+    schedulePersistViewState(viewer);
+  }
   const loadingEl = document.getElementById("loading");
   if (loadingEl) {
     loadingEl.style.display = "none";
@@ -804,6 +853,13 @@ function handleDisplayModeChange(
 app.onteardown = async () => {
   log.info("App is being torn down");
   if (viewer) {
+    // Send a camera change that is still waiting for its debounce, and wait
+    // for the host's answer before answering the teardown.
+    if (persistViewTimer) {
+      clearTimeout(persistViewTimer);
+      persistViewTimer = null;
+      await persistViewState(viewer);
+    }
     viewer.destroy();
     viewer = null;
   }
@@ -862,7 +918,11 @@ app.ontoolinput = async (params) => {
       };
     }
 
-    if (bbox) {
+    if (bbox && restoredFromHost) {
+      // The host re-sends the tool input each time it renders this view;
+      // the camera the user left it on takes precedence.
+      log.info("Ignoring tool input bbox, view was restored from host state");
+    } else if (bbox) {
       // Mark that we received explicit tool input (overrides persisted state)
       hasReceivedToolInput = true;
       log.info("Positioning camera to bbox:", bbox);
@@ -1044,7 +1104,8 @@ app.ontoolresult = async (result) => {
 
   // Now that we have viewUUID, try to restore persisted view
   // This overrides the tool input position if a saved state exists
-  if (viewer && viewUUID) {
+  // (State saved by the host was already applied after connect.)
+  if (viewer && viewUUID && !hostSavesViewState()) {
     const restored = restorePersistedView(viewer);
     if (restored) {
       log.info("Restored persisted view from tool result handler");
@@ -1067,6 +1128,14 @@ async function initialize() {
     // Connect to host (must happen before we can receive notifications)
     await app.connect();
     log.info("Connected to host");
+
+    // State saved by the host comes with the handshake: apply it right away,
+    // before any tool input arrives.
+    if (hostSavesViewState() && restorePersistedView(viewer)) {
+      restoredFromHost = true;
+      log.info("Restored view from host state, waiting for tiles...");
+      void waitForTilesLoaded(viewer).then(hideLoading);
+    }
 
     // Get initial display mode from host context
     const context = app.getHostContext();
@@ -1100,7 +1169,8 @@ async function initialize() {
       if (
         loadingEl &&
         loadingEl.style.display !== "none" &&
-        !hasReceivedToolInput
+        !hasReceivedToolInput &&
+        !restoredFromHost
       ) {
         // No explicit tool input - try to restore persisted view
         const restored = restorePersistedView(viewer!);

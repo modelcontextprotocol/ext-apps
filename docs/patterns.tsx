@@ -20,7 +20,7 @@ import type {
 } from "@modelcontextprotocol/server";
 import type { McpUiHostContext } from "../src/types.js";
 import { useEffect, useState } from "react";
-import { useApp } from "../src/react/index.js";
+import { useApp, useViewState } from "../src/react/index.js";
 import { registerAppTool } from "../src/server/index.js";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import { z } from "zod";
@@ -371,7 +371,72 @@ function persistViewStateServer(url: string, title: string, pageCount: number) {
 }
 
 /**
- * Example: Persisting view state (client-side)
+ * Example: Persisting view state with the host (vanilla JS)
+ */
+async function persistViewStateWithHost(
+  app: App,
+  showPage: (page: number) => void,
+) {
+  //#region persistViewState
+  await app.connect();
+
+  // Restore: the host hands back what this view last saved, or null
+  const saved = app.getHostContext()?.viewState;
+  if (saved?.version === 1 && typeof saved.currentPage === "number") {
+    showPage(saved.currentPage);
+  }
+
+  // Save as the user changes things, debounced. Each save replaces the last.
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  function saveState(state: { currentPage: number }) {
+    if (!app.getHostCapabilities()?.viewState) return; // see the fallback below
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      app.setViewState({ version: 1, ...state }).catch((err) => {
+        console.error("Failed to save view state:", err);
+      });
+    }, 500);
+  }
+
+  // e.g., saveState({ currentPage: 5 });
+  //#endregion persistViewState
+  void saveState;
+}
+
+/**
+ * Example: Persisting view state with the host (React)
+ */
+function PersistViewStateReact() {
+  //#region persistViewStateReact
+  type ViewerState = { version: 1; currentPage: number };
+  const INITIAL_STATE: ViewerState = { version: 1, currentPage: 1 };
+
+  function PdfViewer() {
+    const { app } = useApp({
+      appInfo: { name: "PDF Viewer", version: "1.0.0" },
+      capabilities: {},
+    });
+
+    // Like useState, but restored from the host and saved back (debounced)
+    const [saved, setState] = useViewState<ViewerState>(app, INITIAL_STATE);
+    // The saved state may come from an older version of this View
+    const state = saved.version === 1 ? saved : INITIAL_STATE;
+
+    return (
+      <button
+        onClick={() =>
+          setState({ ...state, currentPage: state.currentPage + 1 })
+        }
+      >
+        Page {state.currentPage}
+      </button>
+    );
+  }
+  //#endregion persistViewStateReact
+}
+
+/**
+ * Example: Persisting view state in localStorage (fallback, client-side)
  */
 function persistViewState(app: App) {
   //#region persistData
