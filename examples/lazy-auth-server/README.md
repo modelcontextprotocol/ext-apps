@@ -16,8 +16,16 @@ The embedded OAuth authorization server is a deliberately minimal mock (HS256 JW
 
 ## Getting Started
 
+The examples are npm workspaces that share the SDK built at the repository root, so install from there first:
+
 ```bash
+# from the repository root
 npm install
+```
+
+Then run this example from its directory:
+
+```bash
 npm start
 # → MCP endpoint at http://localhost:3097/mcp
 ```
