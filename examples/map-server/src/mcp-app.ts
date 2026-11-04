@@ -696,13 +696,7 @@ let currentDisplayMode: "inline" | "fullscreen" | "pip" = "inline";
 // autoResize: false - we manually send size since map fills its container
 const app = new App(
   { name: "CesiumJS Globe", version: "1.0.0" },
-  {
-    tools: { listChanged: true },
-    // A map is most useful on a large surface: ask to start in fullscreen.
-    // This is a hint; the actual mode comes from the host context below.
-    availableDisplayModes: ["inline", "fullscreen"],
-    preferredDisplayMode: "fullscreen",
-  },
+  { tools: { listChanged: true } },
   { autoResize: false },
 );
 
