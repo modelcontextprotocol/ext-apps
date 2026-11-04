@@ -242,6 +242,30 @@ export interface McpUiAppResourceConfig extends ResourceMetadata {
  * );
  * ```
  *
+ * @example Tool whose view the user can open directly from the host's own UI
+ * ```ts source="./index.examples.ts#registerAppTool_globalEntrypoint"
+ * registerAppTool(
+ *   server,
+ *   "show-cart",
+ *   {
+ *     title: "Shopping Cart",
+ *     description: "Display the user's shopping cart",
+ *     // Opened with `{}`: no required arguments, and nothing changes
+ *     annotations: { readOnlyHint: true },
+ *     _meta: {
+ *       ui: {
+ *         resourceUri: "ui://shop/cart.html",
+ *         entrypoints: [{ type: "global" }],
+ *       },
+ *     },
+ *   },
+ *   async () => {
+ *     const cart = await getCart();
+ *     return { content: [{ type: "text", text: JSON.stringify(cart) }] };
+ *   },
+ * );
+ * ```
+ *
  * @see {@link registerAppResource `registerAppResource`} to register the HTML resource referenced by the tool
  */
 export function registerAppTool<

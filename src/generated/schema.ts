@@ -716,6 +716,23 @@ export const McpUiToolVisibilitySchema = z
   .describe("Tool visibility scope - who can access the tool.");
 
 /**
+ * @description One way for the user to open a tool's view from the host's own UI.
+ */
+export const McpUiEntrypointSchema = z
+  .object({
+    /**
+     * @description Kind of entrypoint. The specification defines `"global"`.
+     * Hosts ignore the types that they do not support.
+     */
+    type: z
+      .string()
+      .describe(
+        'Kind of entrypoint. The specification defines `"global"`.\nHosts ignore the types that they do not support.',
+      ),
+  })
+  .passthrough();
+
+/**
  * @description UI-related metadata for tools.
  */
 export const McpUiToolMetaSchema = z.object({
@@ -738,6 +755,18 @@ export const McpUiToolMetaSchema = z.object({
     .optional()
     .describe(
       'Who can access this tool. Default: ["model", "app"]\n- "model": Tool visible to and callable by the agent\n- "app": Tool callable by the app from this server only',
+    ),
+  /**
+   * @description Ways for the user to open this tool's view from the host's own UI.
+   * Only has an effect on a tool that declares a UI resource.
+   * To ignore malformed entries as the specification requires, read it with the
+   * SDK's `getToolEntrypoints()`: `McpUiToolMetaSchema` rejects the whole object for one.
+   */
+  entrypoints: z
+    .array(McpUiEntrypointSchema)
+    .optional()
+    .describe(
+      "Ways for the user to open this tool's view from the host's own UI.\nOnly has an effect on a tool that declares a UI resource.\nTo ignore malformed entries as the specification requires, read it with the\nSDK's `getToolEntrypoints()`: `McpUiToolMetaSchema` rejects the whole object for one.",
     ),
   /**
    * `csp` belongs on the UI **resource** (see {@link McpUiResourceMeta}),

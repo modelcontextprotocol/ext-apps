@@ -136,6 +136,34 @@ function registerAppTool_appOnlyVisibility(server: McpServer) {
 }
 
 /**
+ * Example: Global entrypoint - the user can open the tool's view directly.
+ */
+function registerAppTool_globalEntrypoint(server: McpServer) {
+  //#region registerAppTool_globalEntrypoint
+  registerAppTool(
+    server,
+    "show-cart",
+    {
+      title: "Shopping Cart",
+      description: "Display the user's shopping cart",
+      // Opened with `{}`: no required arguments, and nothing changes
+      annotations: { readOnlyHint: true },
+      _meta: {
+        ui: {
+          resourceUri: "ui://shop/cart.html",
+          entrypoints: [{ type: "global" }],
+        },
+      },
+    },
+    async () => {
+      const cart = await getCart();
+      return { content: [{ type: "text", text: JSON.stringify(cart) }] };
+    },
+  );
+  //#endregion registerAppTool_globalEntrypoint
+}
+
+/**
  * Example: Basic usage of registerAppResource.
  */
 function registerAppResource_basicUsage(server: McpServer) {

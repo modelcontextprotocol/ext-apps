@@ -302,6 +302,18 @@
       },
       "additionalProperties": {}
     },
+    "McpUiEntrypoint": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Kind of entrypoint. The specification defines `\"global\"`.\nHosts ignore the types that they do not support."
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": {}
+    },
     "McpUiHostCapabilities": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5395,6 +5407,21 @@
               }
             ],
             "description": "Tool visibility scope - who can access the tool."
+          }
+        },
+        "entrypoints": {
+          "description": "Ways for the user to open this tool's view from the host's own UI.\nOnly has an effect on a tool that declares a UI resource.\nTo ignore malformed entries as the specification requires, read it with the\nSDK's `getToolEntrypoints()`: `McpUiToolMetaSchema` rejects the whole object for one.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Kind of entrypoint. The specification defines `\"global\"`.\nHosts ignore the types that they do not support."
+              }
+            },
+            "required": ["type"],
+            "additionalProperties": {}
           }
         },
         "csp": {

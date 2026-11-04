@@ -12,8 +12,33 @@ import type {
   CreateMessageRequest,
   CreateMessageResult,
 } from "@modelcontextprotocol/server";
-import { AppBridge, PostMessageTransport } from "./app-bridge.js";
+import {
+  AppBridge,
+  PostMessageTransport,
+  getToolEntrypoints,
+} from "./app-bridge.js";
 import type { McpUiDisplayMode } from "./types.js";
+
+/**
+ * Example: Listing the tools that the user can open directly.
+ */
+async function getToolEntrypoints_listGlobal(client: Client) {
+  //#region getToolEntrypoints_listGlobal
+  const { tools } = await client.listTools();
+
+  // Offer these in the host's own UI, e.g. in a list of apps
+  const launchable = tools.filter((tool) =>
+    getToolEntrypoints(tool).some((entrypoint) => entrypoint.type === "global"),
+  );
+
+  // When the user picks one, open it with no arguments
+  // and render its view as for any other tool call
+  const result = await client.callTool({
+    name: launchable[0].name,
+    arguments: {},
+  });
+  //#endregion getToolEntrypoints_listGlobal
+}
 
 /**
  * Example: Basic usage of the AppBridge class with PostMessageTransport.

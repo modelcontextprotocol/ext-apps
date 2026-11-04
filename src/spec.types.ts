@@ -764,6 +764,22 @@ export interface McpUiRequestDisplayModeResult {
 export type McpUiToolVisibility = "model" | "app";
 
 /**
+ * @description One way for the user to open a tool's view from the host's own UI.
+ */
+export interface McpUiEntrypoint {
+  /**
+   * @description Kind of entrypoint. The specification defines `"global"`.
+   * Hosts ignore the types that they do not support.
+   */
+  type: string;
+  /**
+   * The definition of a type can add fields.
+   * Note: The generated schema uses passthrough() to allow additional properties.
+   */
+  [key: string]: unknown;
+}
+
+/**
  * @description UI-related metadata for tools.
  */
 export interface McpUiToolMeta {
@@ -782,6 +798,13 @@ export interface McpUiToolMeta {
    * - "app": Tool callable by the app from this server only
    */
   visibility?: McpUiToolVisibility[];
+  /**
+   * @description Ways for the user to open this tool's view from the host's own UI.
+   * Only has an effect on a tool that declares a UI resource.
+   * To ignore malformed entries as the specification requires, read it with the
+   * SDK's `getToolEntrypoints()`: `McpUiToolMetaSchema` rejects the whole object for one.
+   */
+  entrypoints?: McpUiEntrypoint[];
   /**
    * `csp` belongs on the UI **resource** (see {@link McpUiResourceMeta}),
    * not the tool. Hosts read it from the `resources/read` content item

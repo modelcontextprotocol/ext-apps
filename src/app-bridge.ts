@@ -92,6 +92,8 @@ import {
   McpUiRequestDisplayModeResultSchema,
   McpUiResourcePermissions,
   McpUiToolMeta,
+  McpUiEntrypoint,
+  McpUiEntrypointSchema,
 } from "./types.js";
 export * from "./types.js";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./constants.js";
@@ -140,6 +142,51 @@ export function getToolUiResourceUri(tool: Partial<Tool>): string | undefined {
     throw new Error(`Invalid UI resource URI: ${JSON.stringify(uri)}`);
   }
   return undefined;
+}
+
+/**
+ * Read the entrypoints that a tool declares in `_meta.ui.entrypoints`.
+ *
+ * Skips malformed entries (anything but an object with a string `type`) and
+ * keeps the rest, whereas `McpUiToolMetaSchema` rejects the whole `_meta.ui`
+ * object for one malformed entry. Returns an empty list for a tool without a
+ * valid UI resource. The caller still has to leave out the types that it does
+ * not support. Repeated types are kept: what a repeat means depends on the type.
+ *
+ * @param tool - A tool object with optional `_meta` property
+ * @returns The well-formed entrypoints, in the order in which the tool declares them
+ *
+ * @example List the tools that the user can open directly
+ * ```ts source="./app-bridge.examples.ts#getToolEntrypoints_listGlobal"
+ * const { tools } = await client.listTools();
+ *
+ * // Offer these in the host's own UI, e.g. in a list of apps
+ * const launchable = tools.filter((tool) =>
+ *   getToolEntrypoints(tool).some((entrypoint) => entrypoint.type === "global"),
+ * );
+ *
+ * // When the user picks one, open it with no arguments
+ * // and render its view as for any other tool call
+ * const result = await client.callTool({
+ *   name: launchable[0].name,
+ *   arguments: {},
+ * });
+ * ```
+ */
+export function getToolEntrypoints(tool: Partial<Tool>): McpUiEntrypoint[] {
+  try {
+    if (getToolUiResourceUri(tool) === undefined) return [];
+  } catch {
+    return [];
+  }
+  const declared = (tool._meta?.ui as { entrypoints?: unknown } | undefined)
+    ?.entrypoints;
+  if (!Array.isArray(declared)) return [];
+
+  return declared.flatMap((item) => {
+    const parsed = McpUiEntrypointSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 /**
