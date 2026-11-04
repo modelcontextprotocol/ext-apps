@@ -555,6 +555,27 @@ async function App_updateModelContext_reportError(app: App) {
 }
 
 /**
+ * Example: Restore saved state, then save as the user changes things.
+ */
+async function App_setViewState_restoreAndSave(
+  app: App,
+  showTab: (tab: string) => void,
+) {
+  //#region App_setViewState_restoreAndSave
+  // After connect(): what the host stored for this View, or null
+  const saved = app.getHostContext()?.viewState;
+  if (saved?.version === 1) {
+    showTab(String(saved.tab));
+  }
+
+  // Later, as the user changes things (debounce this)
+  if (app.getHostCapabilities()?.viewState) {
+    await app.setViewState({ version: 1, tab: "details" });
+  }
+  //#endregion App_setViewState_restoreAndSave
+}
+
+/**
  * Example: Open documentation link.
  */
 async function App_openLink_documentation(app: App) {

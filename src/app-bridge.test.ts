@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
+import {
+  Client,
+  InMemoryTransport,
+  ProtocolError,
+  ProtocolErrorCode,
+} from "@modelcontextprotocol/client";
 import { Server, type ServerCapabilities } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
@@ -11,6 +16,7 @@ import {
   getToolUiResourceUri,
   isToolVisibilityModelOnly,
   isToolVisibilityAppOnly,
+  McpUiInitializeResultSchema,
   McpUiOpenLinkResultSchema,
   type McpUiHostCapabilities,
 } from "./app-bridge.js";
@@ -48,6 +54,7 @@ const testHostCapabilities: McpUiHostCapabilities = {
   openLinks: {},
   serverTools: {},
   logging: {},
+  viewState: { maxBytes: 65536 },
 };
 
 describe("App <-> AppBridge integration", () => {
@@ -63,6 +70,8 @@ describe("App <-> AppBridge integration", () => {
       createMockClient() as Client,
       testHostInfo,
       testHostCapabilities,
+      // A host that advertises the viewState capability hands back the saved state.
+      { hostContext: { viewState: null } },
     );
   });
 
@@ -575,6 +584,187 @@ describe("App <-> AppBridge integration", () => {
           content: [{ type: "text", text: "Test" }],
         }),
       ).rejects.toThrow("Context update failed");
+    });
+
+    it("app.setViewState triggers bridge.onsetviewstate and returns an empty result", async () => {
+      const received: unknown[] = [];
+      bridge.onsetviewstate = async (params) => {
+        received.push(params);
+        return {};
+      };
+
+      await app.connect(appTransport);
+      expect(await app.setViewState({ tab: "details" })).toEqual({});
+      expect(await app.setViewState(null)).toEqual({});
+
+      expect(received).toEqual([
+        { state: { tab: "details" } },
+        { state: null },
+      ]);
+      expect(app.getHostContext()?.viewState).toBeNull();
+    });
+
+    it("app.setViewState rejects with -32603 when the handler throws a plain error", async () => {
+      bridge.onsetviewstate = async () => {
+        throw new Error("Storage unavailable");
+      };
+
+      await app.connect(appTransport);
+      await expect(app.setViewState({ tab: "details" })).rejects.toMatchObject({
+        code: -32603,
+        message: "Storage unavailable",
+      });
+      expect(app.getHostContext()?.viewState).toBeNull();
+    });
+
+    it("app.setViewState rejects with -32602 when the handler throws it as a ProtocolError", async () => {
+      bridge.onsetviewstate = async () => {
+        throw new ProtocolError(
+          ProtocolErrorCode.InvalidParams,
+          "View state too large",
+        );
+      };
+
+      await app.connect(appTransport);
+      await expect(app.setViewState({ tab: "details" })).rejects.toMatchObject({
+        code: -32602,
+        message: "View state too large",
+      });
+      expect(app.getHostContext()?.viewState).toBeNull();
+    });
+
+    it("a state that is neither an object nor null gets -32602 before the handler runs", async () => {
+      let called = false;
+      bridge.onsetviewstate = async () => {
+        called = true;
+        return {};
+      };
+
+      await app.connect(appTransport);
+      await expect(app.setViewState("details" as never)).rejects.toMatchObject({
+        code: -32602,
+      });
+      expect(called).toBe(false);
+      expect(app.getHostContext()?.viewState).toBeNull();
+    });
+
+    it("handles saves one at a time, in the order received", async () => {
+      const log: string[] = [];
+      let releaseFirst!: () => void;
+      const firstHeld = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      bridge.onsetviewstate = async ({ state }) => {
+        log.push(`start ${state?.n}`);
+        if (state?.n === 1) await firstHeld;
+        log.push(`end ${state?.n}`);
+        return {};
+      };
+
+      await app.connect(appTransport);
+      const first = app.setViewState({ n: 1 });
+      const second = app.setViewState({ n: 2 });
+      await flush();
+      // The second save waits for the first, however slow the host's store is
+      expect(log).toEqual(["start 1"]);
+      releaseFirst();
+      await Promise.all([first, second]);
+      expect(log).toEqual(["start 1", "end 1", "start 2", "end 2"]);
+    });
+
+    it("a refused save does not hold up the next one", async () => {
+      bridge.onsetviewstate = async ({ state }) => {
+        if (state?.n === 1) throw new Error("Storage unavailable");
+        return {};
+      };
+
+      await app.connect(appTransport);
+      const first = app.setViewState({ n: 1 });
+      const second = app.setViewState({ n: 2 });
+      await expect(first).rejects.toThrow("Storage unavailable");
+      expect(await second).toEqual({});
+      expect(app.getHostContext()?.viewState).toEqual({ n: 2 });
+    });
+
+    it("hands the last saved state back when the view initializes again", async () => {
+      bridge.onsetviewstate = async ({ state }) => {
+        if (state?.refuse) throw new Error("Storage unavailable");
+        return {};
+      };
+      const initializeAgain = () =>
+        app.request(
+          {
+            method: "ui/initialize",
+            params: {
+              appCapabilities: {},
+              appInfo: testAppInfo,
+              protocolVersion: LATEST_PROTOCOL_VERSION,
+            },
+          },
+          McpUiInitializeResultSchema,
+        );
+
+      await app.connect(appTransport);
+      await app.setViewState({ tab: "details" });
+      await expect(app.setViewState({ refuse: true })).rejects.toThrow();
+
+      // As when the view's document is reloaded inside the same iframe
+      expect((await initializeAgain()).hostContext.viewState).toEqual({
+        tab: "details",
+      });
+    });
+
+    it("setHostContext never sends viewState, and does not lose it", async () => {
+      bridge.onsetviewstate = async () => ({});
+      const heard: unknown[] = [];
+      app.addEventListener("hostcontextchanged", (changed) => {
+        heard.push(changed);
+      });
+
+      await app.connect(appTransport);
+      await app.setViewState({ tab: "details" });
+      bridge.setHostContext({ theme: "dark" });
+      bridge.setHostContext({ theme: "dark", viewState: { tab: "other" } });
+      await flush();
+
+      expect(heard).toEqual([{ theme: "dark" }]);
+      expect(app.getHostContext()?.viewState).toEqual({ tab: "details" });
+      const again = await app.request(
+        {
+          method: "ui/initialize",
+          params: {
+            appCapabilities: {},
+            appInfo: testAppInfo,
+            protocolVersion: LATEST_PROTOCOL_VERSION,
+          },
+        },
+        McpUiInitializeResultSchema,
+      );
+      expect(again.hostContext.viewState).toEqual({ tab: "details" });
+    });
+
+    it("setHostContext does not send viewState on a bridge that was given none", async () => {
+      const [viewSide, hostSide] = InMemoryTransport.createLinkedPair();
+      const plainBridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        { openLinks: {} },
+        { hostContext: { theme: "light" } },
+      );
+      const heard: unknown[] = [];
+      app.addEventListener("hostcontextchanged", (changed) => {
+        heard.push(changed);
+      });
+      await plainBridge.connect(hostSide);
+      await app.connect(viewSide);
+
+      plainBridge.setHostContext({ theme: "dark", viewState: { tab: "x" } });
+      await flush();
+
+      expect(heard).toEqual([{ theme: "dark" }]);
+      expect(app.getHostContext()?.viewState).toBeUndefined();
+      await viewSide.close();
+      await hostSide.close();
     });
 
     it("app.requestTeardown allows host to initiate teardown flow", async () => {

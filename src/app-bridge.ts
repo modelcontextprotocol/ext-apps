@@ -58,6 +58,10 @@ import {
   McpUiAppCapabilities,
   McpUiUpdateModelContextRequest,
   McpUiUpdateModelContextRequestSchema,
+  McpUiSetViewStateRequest,
+  McpUiSetViewStateRequestSchema,
+  McpUiSetViewStateResult,
+  McpUiSetViewStateResultSchema,
   McpUiHostCapabilities,
   McpUiHostContext,
   McpUiHostContextChangedNotification,
@@ -1201,6 +1205,96 @@ export class AppBridge extends Protocol<BaseContext> {
   }
 
   /**
+   * Register a handler for view state saves from the view.
+   *
+   * The view sends `ui/set-view-state` requests to save state that it wants
+   * back the next time it is rendered. Each request replaces the saved state as
+   * a whole, and `null` clears it. The host picks the storage key, and resolves
+   * only once the state is stored so that it survives both a reload of the view
+   * and a reload of the host.
+   *
+   * Throw to refuse a save: a `ProtocolError` with
+   * `ProtocolErrorCode.InvalidParams` (`-32602`) for a state that cannot or
+   * will not be stored as given. An error with no integer `code` of its own
+   * reaches the view as `-32603`, which says that the state cannot be stored
+   * now.
+   *
+   * Read the saved state before constructing the bridge: advertise
+   * `viewState` in the host capabilities and pass the state (or `null`) as
+   * `viewState` in the initial host context, or do neither if the read failed.
+   * Saves are not echoed to the view: {@link setHostContext `setHostContext`}
+   * never sends `viewState`. The bridge keeps the state of the last successful
+   * save and hands it back if the view initializes again.
+   *
+   * Requests are handled one at a time, in the order received.
+   *
+   * @example
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onsetviewstate_store"
+   * bridge.onsetviewstate = async ({ state }) => {
+   *   if (new TextEncoder().encode(JSON.stringify(state)).length > maxBytes) {
+   *     // -32602: this state will never be stored as it is
+   *     throw new ProtocolError(
+   *       ProtocolErrorCode.InvalidParams,
+   *       "View state too large",
+   *     );
+   *   }
+   *   // The host derives the key (user, server, View instance), never the View.
+   *   // A plain Error from put() reaches the View as -32603: try again later
+   *   await savedStateStore.put(viewInstanceKey, state);
+   *   return {};
+   * };
+   * ```
+   *
+   * @see {@link McpUiSetViewStateRequest `McpUiSetViewStateRequest`} for the request type
+   * @see {@link McpUiSetViewStateResult `McpUiSetViewStateResult`} for the result type
+   * @see {@link app!App.setViewState `App.setViewState`} - the View method that sends these requests
+   */
+  private _onsetviewstate?: (
+    params: McpUiSetViewStateRequest["params"],
+    extra: RequestHandlerExtra,
+  ) => Promise<McpUiSetViewStateResult>;
+  /** Settles when the `ui/set-view-state` requests received so far are handled. */
+  private _viewStateSaves: Promise<unknown> = Promise.resolve();
+  get onsetviewstate() {
+    return this._onsetviewstate;
+  }
+  set onsetviewstate(
+    callback:
+      | ((
+          params: McpUiSetViewStateRequest["params"],
+          extra: RequestHandlerExtra,
+        ) => Promise<McpUiSetViewStateResult>)
+      | undefined,
+  ) {
+    this.warnIfRequestHandlerReplaced(
+      "onsetviewstate",
+      this._onsetviewstate,
+      callback,
+    );
+    this._onsetviewstate = callback;
+    this.replaceRequestHandler(
+      "ui/set-view-state",
+      {
+        params: McpUiSetViewStateRequestSchema.shape.params,
+        result: McpUiSetViewStateResultSchema,
+      },
+      async (params, extra) => {
+        const handler = this._onsetviewstate;
+        if (!handler) throw new Error("No onsetviewstate handler set");
+        // One save at a time, in the order received: the host's store may be
+        // asynchronous, and a later save must not be overtaken by an earlier one.
+        const save = this._viewStateSaves.then(() => handler(params, extra));
+        this._viewStateSaves = save.catch(() => {});
+        const result = await save;
+        // Not echoed to the view, but kept for the next `ui/initialize` on
+        // this bridge (for example when the view's document is reloaded).
+        this._hostContext = { ...this._hostContext, viewState: params.state };
+        return result;
+      },
+    );
+  }
+
+  /**
    * Register a handler for tool call requests from the view.
    *
    * The view sends `tools/call` requests to execute MCP server tools. This
@@ -1686,6 +1780,9 @@ export class AppBridge extends Protocol<BaseContext> {
   setHostContext(hostContext: McpUiHostContext) {
     const changes: McpUiHostContext = {};
     let hasChanges = false;
+    // Saved view state is sent only in the `ui/initialize` result, and the
+    // bridge's copy follows the view's saves, not the caller's context.
+    hostContext = { ...hostContext, viewState: this._hostContext.viewState };
     for (const key of Object.keys(hostContext) as Array<
       keyof McpUiHostContext
     >) {
