@@ -116,13 +116,15 @@ C C G G | A A G2 | F F E E | D D C2 |
 
 ### Server (`server.ts`)
 
-Exposes a single `play-sheet-music` tool that accepts:
+Exposes a `play-sheet-music` tool that accepts:
 
 - `abcNotation`: ABC notation string to render
 
 The tool validates the ABC notation server-side using the abcjs parser and returns any parse errors. The actual rendering happens client-side when the UI receives the tool input.
 
+A second tool, `play-sheet-music-file`, declares a `"file"` entrypoint (`_meta.ui.entrypoints`) for `.abc` files, so that a host can show a file that the user opens with this View. It takes the file as its one `x-mcp-file` argument, as the [File Uploads extension](https://github.com/modelcontextprotocol/experimental-ext-file-uploads/pull/1) (a working draft) defines it, inline only. It checks the size and digest, validates the notation, and returns it in `structuredContent`, from which the UI renders.
+
 ### App (`src/mcp-app.ts`)
 
-- Receives ABC notation via `ontoolinput` handler
+- Receives ABC notation via `ontoolinput` handler, or via `ontoolresult` for a file
 - Uses abcjs for audio playback controls and sheet music rendering (in `renderAbc()`)
