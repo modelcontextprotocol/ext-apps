@@ -1,11 +1,13 @@
 # Load Node.js environment for GUI apps (GitHub Desktop, etc.)
-# that don't inherit shell PATH
+# that don't inherit shell PATH. Each line prepends, so later lines win:
+# version managers go last so a stale system Node (e.g. from the nodejs.org
+# installer in /usr/local/bin) can't shadow the version they select.
+[ -d "/usr/local/bin" ] && export PATH="/usr/local/bin:$PATH"  # homebrew (macOS Intel)
+[ -d "/opt/homebrew/bin" ] && export PATH="/opt/homebrew/bin:$PATH"  # homebrew (macOS ARM)
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # nvm
 [ -s "$HOME/.fnm/fnm" ] && eval "$(~/.fnm/fnm env)"  # fnm
 [ -s "$HOME/.volta/bin/volta" ] && export PATH="$HOME/.volta/bin:$PATH"  # volta
-[ -d "/opt/homebrew/bin" ] && export PATH="/opt/homebrew/bin:$PATH"  # homebrew (macOS ARM)
-[ -d "/usr/local/bin" ] && export PATH="/usr/local/bin:$PATH"  # homebrew (macOS Intel)
 
 # Verify no private registry URLs in package-lock.json
 if grep -E '"resolved": "https?://' package-lock.json | grep -v registry.npmjs.org > /dev/null; then
