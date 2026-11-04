@@ -7,7 +7,11 @@
  * @module
  */
 
-import type { SamplingMessage, Tool } from "@modelcontextprotocol/client";
+import type {
+  ContentBlock,
+  SamplingMessage,
+  Tool,
+} from "@modelcontextprotocol/client";
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/server";
 import {
   App,
@@ -491,6 +495,61 @@ ${fullTranscript}`;
     content: [{ type: "text", text: "Summarize the key points" }],
   });
   //#endregion App_sendMessage_withLargeContext
+}
+
+/**
+ * Example: Attach an embedded resource when the host accepts them.
+ */
+async function App_sendMessage_withEmbeddedResource(app: App, csv: string) {
+  //#region App_sendMessage_withEmbeddedResource
+  // A host that has not declared `resource` rejects the whole message,
+  // so check first and fall back to plain text.
+  const canEmbed = app.getHostCapabilities()?.message?.resource !== undefined;
+
+  await app.sendMessage({
+    role: "user",
+    content: [
+      { type: "text", text: "What stands out in this export?" },
+      canEmbed
+        ? {
+            type: "resource",
+            resource: {
+              uri: "reports://q3/export.csv",
+              mimeType: "text/csv",
+              text: csv,
+            },
+          }
+        : { type: "text", text: csv },
+    ],
+  });
+  //#endregion App_sendMessage_withEmbeddedResource
+}
+
+/**
+ * Example: Point the model at a resource on the app's server.
+ */
+async function App_updateModelContext_withResourceLink(
+  app: App,
+  video: { uri: string; title: string },
+) {
+  //#region App_updateModelContext_withResourceLink
+  const content: ContentBlock[] = [
+    { type: "text", text: `User is watching "${video.title}"` },
+  ];
+
+  // A link carries no content: the host reads it with resources/read on this
+  // app's own server, and only if the user or the model asks for it.
+  if (app.getHostCapabilities()?.updateModelContext?.resourceLink) {
+    content.push({
+      type: "resource_link",
+      uri: video.uri, // e.g. "videos://bunny-1mb"
+      name: video.title,
+      mimeType: "video/mp4",
+    });
+  }
+
+  await app.updateModelContext({ content });
+  //#endregion App_updateModelContext_withResourceLink
 }
 
 /**

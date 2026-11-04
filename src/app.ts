@@ -1766,10 +1766,19 @@ export class App extends Protocol<BaseContext> {
    * Enables the app to add messages to the conversation thread. Useful for
    * user-initiated messages or app-to-conversation communication.
    *
+   * Besides text, `content` can carry an embedded resource (`type: "resource"`,
+   * content inline) or a resource link (`type: "resource_link"`, a `uri` that
+   * the app's own MCP server can serve through `resources/read`). Send them
+   * only if the host declares `resource` / `resourceLink` under
+   * {@link getHostCapabilities `getHostCapabilities`}`()?.message`: a host that
+   * has not declared a block type rejects the whole request, and nothing is
+   * added to the conversation.
+   *
    * @param params - Message role and content
    * @param options - Request options (timeout, etc.)
    * @returns Result with optional `isError` flag indicating host rejection
    *
+   * @throws {Error} If the host rejects the request (e.g., a content block type it has not declared)
    * @throws {Error} If the request times out or the connection is lost
    *
    * @example Send a text message from user interaction
@@ -1805,6 +1814,30 @@ export class App extends Protocol<BaseContext> {
    * await app.sendMessage({
    *   role: "user",
    *   content: [{ type: "text", text: "Summarize the key points" }],
+   * });
+   * ```
+   *
+   * @example Attach an embedded resource when the host accepts them
+   * ```ts source="./app.examples.ts#App_sendMessage_withEmbeddedResource"
+   * // A host that has not declared `resource` rejects the whole message,
+   * // so check first and fall back to plain text.
+   * const canEmbed = app.getHostCapabilities()?.message?.resource !== undefined;
+   *
+   * await app.sendMessage({
+   *   role: "user",
+   *   content: [
+   *     { type: "text", text: "What stands out in this export?" },
+   *     canEmbed
+   *       ? {
+   *           type: "resource",
+   *           resource: {
+   *             uri: "reports://q3/export.csv",
+   *             mimeType: "text/csv",
+   *             text: csv,
+   *           },
+   *         }
+   *       : { type: "text", text: csv },
+   *   ],
    * });
    * ```
    *
@@ -1858,6 +1891,13 @@ export class App extends Protocol<BaseContext> {
    * next user message — either from the actual user or via `sendMessage`. Only
    * the last update is sent; each call overwrites any previous context.
    *
+   * As with {@link sendMessage `sendMessage`}, send `resource` and
+   * `resource_link` blocks only if the host declares `resource` /
+   * `resourceLink` under
+   * {@link getHostCapabilities `getHostCapabilities`}`()?.updateModelContext`.
+   * A host that has not declared a block type rejects the whole update and
+   * keeps the previous context.
+   *
    * @param params - Context content and/or structured content
    * @param options - Request options (timeout, etc.)
    *
@@ -1897,6 +1937,26 @@ export class App extends Protocol<BaseContext> {
    *     ],
    *   });
    * }
+   * ```
+   *
+   * @example Point the model at a resource on the app's server
+   * ```ts source="./app.examples.ts#App_updateModelContext_withResourceLink"
+   * const content: ContentBlock[] = [
+   *   { type: "text", text: `User is watching "${video.title}"` },
+   * ];
+   *
+   * // A link carries no content: the host reads it with resources/read on this
+   * // app's own server, and only if the user or the model asks for it.
+   * if (app.getHostCapabilities()?.updateModelContext?.resourceLink) {
+   *   content.push({
+   *     type: "resource_link",
+   *     uri: video.uri, // e.g. "videos://bunny-1mb"
+   *     name: video.title,
+   *     mimeType: "video/mp4",
+   *   });
+   * }
+   *
+   * await app.updateModelContext({ content });
    * ```
    *
    * @returns Promise that resolves when the context update is acknowledged

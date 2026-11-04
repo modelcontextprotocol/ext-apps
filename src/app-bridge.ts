@@ -1,5 +1,7 @@
 import {
   Protocol,
+  ProtocolError,
+  ProtocolErrorCode,
   type BaseContext,
   type Client,
   type ProtocolOptions,
@@ -793,6 +795,14 @@ export class AppBridge extends Protocol<BaseContext> {
    * return conversation content or follow-up results to prevent information
    * leakage.
    *
+   * A request that carries a `resource` or `resource_link` block is rejected
+   * with a JSON-RPC error (`-32602`) before it reaches the handler, unless the
+   * host capabilities passed to the constructor declare `message.resource` or
+   * `message.resourceLink` respectively. Declare them only if the handler
+   * follows the specification's rules for these blocks: a link's `uri` is
+   * never retrieved on the host's own initiative, and only ever through
+   * `resources/read` on the View's own MCP server.
+   *
    * @param callback - Handler that receives message params and returns a result
    *   - `params.role` - Message role (currently only "user" is supported)
    *   - `params.content` - Message content blocks (text, image, etc.)
@@ -810,6 +820,28 @@ export class AppBridge extends Protocol<BaseContext> {
    *     return { isError: true };
    *   }
    * };
+   * ```
+   *
+   * @example Accept resource blocks, and read a link only when asked
+   * ```ts source="./app-bridge.examples.ts#AppBridge_onmessage_resourceBlocks"
+   * const bridge = new AppBridge(
+   *   client,
+   *   { name: "MyHost", version: "1.0.0" },
+   *   // Without these keys, the bridge rejects such blocks before onmessage runs
+   *   { message: { text: {}, resource: {}, resourceLink: {} } },
+   * );
+   *
+   * bridge.onmessage = async ({ role, content }) => {
+   *   // An embedded resource carries its content; a link stays a reference.
+   *   // Nothing is fetched here, and no `uri` is shown as a verified source.
+   *   await chatManager.addMessage({ role, content, source: "app" });
+   *   return {};
+   * };
+   *
+   * // Later, if the user or the model asks for a link's content: read it from
+   * // the MCP server that provided the View, and nowhere else.
+   * const readLink = (link: { uri: string }) =>
+   *   client.readResource({ uri: link.uri });
    * ```
    *
    * @see {@link McpUiMessageRequest `McpUiMessageRequest`} for the request type
@@ -840,9 +872,37 @@ export class AppBridge extends Protocol<BaseContext> {
       },
       async (params, extra) => {
         if (!this._onmessage) throw new Error("No onmessage handler set");
+        this.assertResourceBlocksDeclared("message", params.content);
         return this._onmessage(params, extra);
       },
     );
+  }
+
+  /**
+   * Reject `resource` and `resource_link` content blocks that the host has not
+   * declared for this request, before the host's handler sees them.
+   *
+   * @throws {ProtocolError} `-32602` naming the first undeclared block type
+   */
+  private assertResourceBlocksDeclared(
+    capability: "message" | "updateModelContext",
+    content: { type: string }[] | undefined,
+  ): void {
+    const declared = this._hostCapabilities[capability];
+    for (const { type } of content ?? []) {
+      const key =
+        type === "resource"
+          ? "resource"
+          : type === "resource_link"
+            ? "resourceLink"
+            : undefined;
+      if (key && !declared?.[key]) {
+        throw new ProtocolError(
+          ProtocolErrorCode.InvalidParams,
+          `Unsupported content block type: ${type} (the host has not declared hostCapabilities.${capability}.${key})`,
+        );
+      }
+    }
   }
 
   /**
@@ -1151,6 +1211,11 @@ export class AppBridge extends Protocol<BaseContext> {
    * next user message (including `ui/message`), and will only send the last
    * update received.
    *
+   * As for {@link onmessage `onmessage`}, a request that carries a `resource`
+   * or `resource_link` block is rejected with a JSON-RPC error (`-32602`)
+   * before it reaches the handler, unless the host capabilities declare
+   * `updateModelContext.resource` or `updateModelContext.resourceLink`.
+   *
    * @example
    * ```ts source="./app-bridge.examples.ts#AppBridge_onupdatemodelcontext_storeContext"
    * bridge.onupdatemodelcontext = async (
@@ -1195,6 +1260,7 @@ export class AppBridge extends Protocol<BaseContext> {
       async (params, extra) => {
         if (!this._onupdatemodelcontext)
           throw new Error("No onupdatemodelcontext handler set");
+        this.assertResourceBlocksDeclared("updateModelContext", params.content);
         return this._onupdatemodelcontext(params, extra);
       },
     );

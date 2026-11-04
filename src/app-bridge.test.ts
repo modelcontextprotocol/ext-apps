@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
+import {
+  Client,
+  InMemoryTransport,
+  ProtocolError,
+  type ContentBlock,
+} from "@modelcontextprotocol/client";
 import { Server, type ServerCapabilities } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
@@ -2412,6 +2417,166 @@ describe("App <-> AppBridge integration", () => {
 
       expect(receivedNotifications).toHaveLength(1);
     });
+  });
+});
+
+describe("resource and resource_link blocks from the View", () => {
+  const embedded: ContentBlock = {
+    type: "resource",
+    resource: {
+      uri: "reports://q3/export.csv",
+      mimeType: "text/csv",
+      text: "region,total\nnorth,1200\n",
+    },
+  };
+  const link: ContentBlock = {
+    type: "resource_link",
+    uri: "reports://q3/summary.pdf",
+    name: "Q3 summary",
+    mimeType: "application/pdf",
+  };
+  const text: ContentBlock = { type: "text", text: "The Q3 export is open." };
+
+  let app: App;
+  let bridge: AppBridge;
+  let appTransport: InMemoryTransport;
+  let bridgeTransport: InMemoryTransport;
+  let messages: ContentBlock[][];
+  let contexts: (ContentBlock[] | undefined)[];
+
+  /** Connect an App to a bridge that declares `capabilities`, recording what its handlers receive. */
+  async function connect(capabilities: McpUiHostCapabilities) {
+    [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+    bridge = new AppBridge(null, testHostInfo, capabilities);
+    messages = [];
+    contexts = [];
+    bridge.onmessage = async ({ content }) => {
+      messages.push(content);
+      return {};
+    };
+    bridge.onupdatemodelcontext = async ({ content }) => {
+      contexts.push(content);
+      return {};
+    };
+    app = new App(testAppInfo, {}, { autoResize: false });
+    await bridge.connect(bridgeTransport);
+    await app.connect(appTransport);
+  }
+
+  /** Await a rejection and return it, failing if the promise resolves. */
+  async function rejection(promise: Promise<unknown>): Promise<unknown> {
+    return promise.then(
+      () => {
+        throw new Error("expected the request to be rejected");
+      },
+      (error: unknown) => error,
+    );
+  }
+
+  afterEach(async () => {
+    await appTransport.close();
+    await bridgeTransport.close();
+  });
+
+  it("delivers both block types unchanged when the host declares them", async () => {
+    await connect({
+      message: { text: {}, resource: {}, resourceLink: {} },
+      updateModelContext: { text: {}, resource: {}, resourceLink: {} },
+    });
+
+    await app.sendMessage({ role: "user", content: [text, embedded, link] });
+    await app.updateModelContext({ content: [text, embedded, link] });
+
+    expect(messages).toEqual([[text, embedded, link]]);
+    expect(contexts).toEqual([[text, embedded, link]]);
+  });
+
+  for (const [name, block] of [
+    ["resource", embedded],
+    ["resource_link", link],
+  ] as const) {
+    it(`rejects an undeclared ${name} block in ui/message with -32602 and delivers nothing`, async () => {
+      await connect({ message: { text: {} } });
+
+      const error = await rejection(
+        app.sendMessage({ role: "user", content: [text, block] }),
+      );
+
+      expect(error).toBeInstanceOf(ProtocolError);
+      expect((error as ProtocolError).code).toBe(-32602);
+      expect((error as ProtocolError).message).toContain(name);
+      // The whole request is refused: the text block is not delivered alone.
+      expect(messages).toEqual([]);
+    });
+
+    it(`rejects an undeclared ${name} block in ui/update-model-context and keeps the earlier context`, async () => {
+      await connect({ updateModelContext: { text: {} } });
+      await app.updateModelContext({ content: [text] });
+
+      const error = await rejection(
+        app.updateModelContext({ content: [text, block] }),
+      );
+
+      expect(error).toBeInstanceOf(ProtocolError);
+      expect((error as ProtocolError).code).toBe(-32602);
+      // The handler never saw the second update, so the first one stands.
+      expect(contexts).toEqual([[text]]);
+    });
+  }
+
+  it("rejects resource blocks when the host declares no modalities at all", async () => {
+    await connect({});
+
+    await expect(
+      app.sendMessage({ role: "user", content: [link] }),
+    ).rejects.toThrow(ProtocolError);
+    await expect(
+      app.updateModelContext({ content: [embedded] }),
+    ).rejects.toThrow(ProtocolError);
+    expect(messages).toEqual([]);
+    expect(contexts).toEqual([]);
+  });
+
+  it("treats the two block types separately", async () => {
+    await connect({ message: { text: {}, resource: {} } });
+
+    await app.sendMessage({ role: "user", content: [embedded] });
+    await expect(
+      app.sendMessage({ role: "user", content: [embedded, link] }),
+    ).rejects.toThrow(ProtocolError);
+
+    expect(messages).toEqual([[embedded]]);
+  });
+
+  it("treats the two requests separately", async () => {
+    await connect({
+      message: { text: {}, resourceLink: {} },
+      updateModelContext: { text: {} },
+    });
+
+    await app.sendMessage({ role: "user", content: [link] });
+    await expect(app.updateModelContext({ content: [link] })).rejects.toThrow(
+      ProtocolError,
+    );
+
+    expect(messages).toEqual([[link]]);
+    expect(contexts).toEqual([]);
+  });
+
+  it("leaves other block types and structuredContent to the host's handler", async () => {
+    await connect({});
+    const image: ContentBlock = {
+      type: "image",
+      data: "aGVsbG8=",
+      mimeType: "image/png",
+    };
+
+    await app.sendMessage({ role: "user", content: [text, image] });
+    await app.updateModelContext({ structuredContent: { page: 3 } });
+    await app.updateModelContext({ content: [text, image] });
+
+    expect(messages).toEqual([[text, image]]);
+    expect(contexts).toEqual([undefined, [text, image]]);
   });
 });
 

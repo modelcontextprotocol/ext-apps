@@ -141,6 +141,33 @@ function AppBridge_onmessage_logMessage(bridge: AppBridge) {
   //#endregion AppBridge_onmessage_logMessage
 }
 
+/**
+ * Example: Accept resource blocks in messages, and read a link only when asked.
+ */
+function AppBridge_onmessage_resourceBlocks(client: Client) {
+  //#region AppBridge_onmessage_resourceBlocks
+  const bridge = new AppBridge(
+    client,
+    { name: "MyHost", version: "1.0.0" },
+    // Without these keys, the bridge rejects such blocks before onmessage runs
+    { message: { text: {}, resource: {}, resourceLink: {} } },
+  );
+
+  bridge.onmessage = async ({ role, content }) => {
+    // An embedded resource carries its content; a link stays a reference.
+    // Nothing is fetched here, and no `uri` is shown as a verified source.
+    await chatManager.addMessage({ role, content, source: "app" });
+    return {};
+  };
+
+  // Later, if the user or the model asks for a link's content: read it from
+  // the MCP server that provided the View, and nowhere else.
+  const readLink = (link: { uri: string }) =>
+    client.readResource({ uri: link.uri });
+  //#endregion AppBridge_onmessage_resourceBlocks
+  return { bridge, readLink };
+}
+
 // Stub for example code - represents a hypothetical chat manager
 declare const chatManager: {
   addMessage(message: {
