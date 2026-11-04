@@ -560,6 +560,12 @@ interface McpUiAppCapabilities {
    * @example ["inline", "fullscreen"]
    */
   availableDisplayModes?: Array<"inline" | "fullscreen" | "pip">;
+  /**
+   * Display mode in which the app prefers to be first shown. A hint: the host MAY ignore it.
+   * See Display Modes section for details.
+   * @example "fullscreen"
+   */
+  preferredDisplayMode?: "inline" | "fullscreen" | "pip";
 }
 ```
 
@@ -835,6 +841,30 @@ Views declare which display modes they support in the `ui/initialize` request vi
 
 Hosts declare which display modes they support in `HostContext.availableDisplayModes`. Views should check this before requesting a mode change.
 
+#### Preferred Display Mode
+
+A View can name the display mode in which it prefers to be first shown, in `appCapabilities.preferredDisplayMode`. This suits Views that are mainly useful on a large surface, such as an editor, a dashboard or a map.
+
+```typescript
+// Example: View supports inline and fullscreen, and prefers to start in fullscreen
+{
+  method: "ui/initialize",
+  params: {
+    appCapabilities: {
+      availableDisplayModes: ["inline", "fullscreen"],
+      preferredDisplayMode: "fullscreen"
+    },
+    // ...
+  }
+}
+```
+
+The preference is a hint. The Host chooses how it first shows the View and how much weight it gives to the preference, for example when several Views prefer `fullscreen` at once. The View sends the preference before it has seen `HostContext.availableDisplayModes`, so checking that the mode is available falls to the Host.
+
+A Host that applies the preference should do so before it first shows the View, so that the user does not see the View move. It tells the View either in the `hostContext.displayMode` of its `ui/initialize` result, or in a `ui/notifications/host-context-changed` sent after `ui/notifications/initialized`. A Host that has already shown the View, for example inline while the tool runs, may instead move it once, no later than when it sends the first `ui/notifications/tool-result`. After that, a Host should not use the preference to move the View without a user action: to change mode later, Views use `ui/request-display-mode`.
+
+Note: OpenAI's [MCP extensions](https://github.com/openai/mcp-extensions/blob/15e0f4745e7c95865ee2195de5b79f4148b21418/docs/spec.md#display-modes) define a field of the same name, `_meta["openai/ui"].preferredDisplayMode`, on the UI resource content item rather than in `ui/initialize`. This specification does not define that key.
+
 #### Requesting Changes
 
 Views request display mode changes via `ui/request-display-mode`. See the Requests section for message format.
@@ -849,12 +879,19 @@ Hosts notify views of display mode changes via `ui/notifications/host-context-ch
 - View MUST declare all display modes it supports in `appCapabilities.availableDisplayModes` during initialization.
 - View MUST check if the requested mode is in `availableDisplayModes` from host context before requesting a mode change.
 - View MUST handle the response mode differing from the requested mode.
+- View that sets `appCapabilities.preferredDisplayMode` MUST also list that mode in `appCapabilities.availableDisplayModes`.
+- View MUST handle being shown in a display mode other than `appCapabilities.preferredDisplayMode`.
 
 **Host behavior:**
 - Host MUST NOT switch the View to a display mode that does not appear in its `appCapabilities.availableDisplayModes`, if set.
 - Host MUST return the resulting mode (whether updated or not) in the response to `ui/request-display-mode`.
 - If the requested mode is not available, Host SHOULD return the current display mode in the response.
 - Host MAY decline display mode requests from Views that did not declare said modes in their capabilities.
+- Host MAY ignore `appCapabilities.preferredDisplayMode`, for example in favor of a choice the user has made, or by declining to start a View in `fullscreen` or `pip` without a user action.
+- Host MUST NOT refuse `ui/initialize` because it does not offer the preferred mode (one of the display modes defined above), or because `appCapabilities.availableDisplayModes`, if set, lacks it; it ignores the preference instead.
+- Host that applies `appCapabilities.preferredDisplayMode` SHOULD do so before it first shows the View. A Host that has already shown the View MAY instead apply it once, no later than when it sends the first `ui/notifications/tool-result`, unless the user has changed the View's display mode in the meantime.
+- After that, Host SHOULD NOT use the preference to change the View's display mode without a user action. A repeated `ui/initialize` from a View that is already shown does not renew the preference.
+- Host that applies `appCapabilities.preferredDisplayMode` SHOULD report the resulting mode in `hostContext.displayMode`.
 
 ### Theming
 
@@ -2663,6 +2700,7 @@ App tools MUST be tied to the app's lifecycle:
 
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
 - **Resource consumption:** Malicious View can consume CPU/memory. Hosts should implement resource limits.
+- **Preferred display mode:** A View that starts in `fullscreen` or `pip` gets a large or floating surface before the user has seen it in the conversation, which can help it imitate Host UI. A Host that starts a View in `fullscreen` or `pip` should keep its own controls visible, naming the app and offering a way out.
 
 ## Reservations in MCP
 
