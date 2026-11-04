@@ -13,7 +13,7 @@ import type {
   CreateMessageResult,
 } from "@modelcontextprotocol/server";
 import { AppBridge, PostMessageTransport } from "./app-bridge.js";
-import type { McpUiDisplayMode } from "./types.js";
+import type { McpUiDisplayMode, McpUiHostContext } from "./types.js";
 
 /**
  * Example: Basic usage of the AppBridge class with PostMessageTransport.
@@ -93,6 +93,34 @@ function AppBridge_getAppCapabilities_checkAfterInit(bridge: AppBridge) {
     }
   };
   //#endregion AppBridge_getAppCapabilities_checkAfterInit
+}
+
+/**
+ * Example: Apply the View's preferred display mode.
+ */
+function AppBridge_getAppCapabilities_preferredDisplayMode(
+  bridge: AppBridge,
+  hostContext: McpUiHostContext,
+) {
+  //#region AppBridge_getAppCapabilities_preferredDisplayMode
+  let applied = false;
+  bridge.addEventListener("initialized", () => {
+    // The preference is for how the View is first shown: apply it once.
+    if (applied) return;
+    applied = true;
+
+    const caps = bridge.getAppCapabilities();
+    const preferred = caps?.preferredDisplayMode;
+    // A hint: only for a mode that both the View and the host support.
+    if (
+      preferred &&
+      caps.availableDisplayModes?.includes(preferred) &&
+      hostContext.availableDisplayModes?.includes(preferred)
+    ) {
+      bridge.setHostContext({ ...hostContext, displayMode: preferred });
+    }
+  });
+  //#endregion AppBridge_getAppCapabilities_preferredDisplayMode
 }
 
 /**

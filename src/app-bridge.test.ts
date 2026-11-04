@@ -163,6 +163,75 @@ describe("App <-> AppBridge integration", () => {
       expect(appCaps).toEqual(appCapabilities);
     });
 
+    it("Bridge receives the app's preferred display mode", async () => {
+      const appCapabilities = {
+        availableDisplayModes: ["inline" as const, "fullscreen" as const],
+        preferredDisplayMode: "fullscreen" as const,
+      };
+      app = new App(testAppInfo, appCapabilities, { autoResize: false });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+
+      expect(bridge.getAppCapabilities()).toEqual(appCapabilities);
+    });
+
+    it("App learns from host context that its preferred display mode was applied", async () => {
+      app = new App(
+        testAppInfo,
+        {
+          availableDisplayModes: ["inline", "fullscreen"],
+          preferredDisplayMode: "fullscreen",
+        },
+        { autoResize: false },
+      );
+      const hostContext: ReturnType<App["getHostContext"]> = {
+        theme: "dark",
+        displayMode: "inline",
+        availableDisplayModes: ["inline", "fullscreen"],
+      };
+      bridge = new AppBridge(
+        createMockClient() as Client,
+        testHostInfo,
+        testHostCapabilities,
+        { hostContext },
+      );
+      bridge.addEventListener("initialized", () => {
+        const caps = bridge.getAppCapabilities();
+        const preferred = caps?.preferredDisplayMode;
+        if (
+          preferred &&
+          caps?.availableDisplayModes?.includes(preferred) &&
+          hostContext.availableDisplayModes?.includes(preferred)
+        ) {
+          bridge.setHostContext({ ...hostContext, displayMode: preferred });
+        }
+      });
+
+      await bridge.connect(bridgeTransport);
+      await app.connect(appTransport);
+      await flush();
+
+      expect(app.getHostContext()).toEqual({
+        ...hostContext,
+        displayMode: "fullscreen",
+      });
+    });
+
+    it("Bridge refuses ui/initialize when the preferred display mode is not a known mode", async () => {
+      app = new App(
+        testAppInfo,
+        { preferredDisplayMode: "not-a-mode" as never },
+        { autoResize: false },
+      );
+
+      await bridge.connect(bridgeTransport);
+      await expect(app.connect(appTransport)).rejects.toMatchObject({
+        code: -32602,
+      });
+      expect(bridge.getAppCapabilities()).toBeUndefined();
+    });
+
     it("App receives initial hostContext after connect", async () => {
       // Need fresh transports for new bridge
       const [newAppTransport, newBridgeTransport] =

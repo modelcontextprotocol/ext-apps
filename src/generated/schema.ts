@@ -614,6 +614,14 @@ export const McpUiAppCapabilitiesSchema = z.object({
     .array(McpUiDisplayModeSchema)
     .optional()
     .describe("Display modes the app supports."),
+  /**
+   * @description Display mode in which the app prefers to be first shown.
+   *
+   * A hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.
+   */
+  preferredDisplayMode: McpUiDisplayModeSchema.optional().describe(
+    "Display mode in which the app prefers to be first shown.\n\nA hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.",
+  ),
 });
 
 /**
