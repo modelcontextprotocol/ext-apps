@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-system-monitor",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "type": "module",
   "description": "System monitor MCP App Server with real-time stats",
   "repository": {
@@ -9,6 +9,9 @@
     "directory": "examples/system-monitor-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"

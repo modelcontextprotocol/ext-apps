@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-sheet-music",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "type": "module",
   "description": "MCP App Server for rendering and playing sheet music from ABC notation",
   "repository": {
@@ -9,6 +9,9 @@
     "directory": "examples/sheet-music-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"

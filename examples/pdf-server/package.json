@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-pdf",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "type": "module",
   "description": "MCP server for loading and extracting text from PDF files with chunked pagination and interactive viewer",
   "repository": {
@@ -9,6 +9,9 @@
     "directory": "examples/pdf-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"
@@ -25,7 +28,7 @@
     "build:mcpb": "npm run build && node build-mcpb.mjs"
   },
   "dependencies": {
-    "@cantoo/pdf-lib": "^2.6.5",
+    "@cantoo/pdf-lib": "2.6.5",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/express": "2.0.0",
     "@modelcontextprotocol/ext-apps": "^2.0.0",
@@ -33,7 +36,7 @@
     "@modelcontextprotocol/server": "2.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "pdfjs-dist": "^5.0.0",
+    "pdfjs-dist": "5.4.530",
     "zod": "^4.2.0"
   },
   "devDependencies": {

@@ -97,7 +97,7 @@ it will guide you through the rest.
 > MCP Apps is an extension to the
 > [core MCP specification](https://modelcontextprotocol.io/specification). Host
 > support varies — see the
-> [clients page](https://modelcontextprotocol.io/clients) for the full list.
+> [clients page](https://modelcontextprotocol.io/extensions/client-matrix) for the full list.
 
 ## Why MCP Apps?
 

@@ -17,6 +17,32 @@ const CESIUM_VERSION = "1.123";
 const CESIUM_BASE_URL = `https://cesium.com/downloads/cesiumjs/releases/${CESIUM_VERSION}/Build/Cesium`;
 
 const MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION = 768; // Max width/height for screenshots in pixels for updateModelContext
+const DEFAULT_SCREENSHOT_MAX_DIMENSION = 1024; // Default max width/height for the get-screenshot tool
+
+/**
+ * Capture the globe canvas as a base64 PNG, scaled down so neither side
+ * exceeds maxDimension (image token cost scales with dimensions).
+ */
+function captureScreenshotBase64(
+  sourceCanvas: HTMLCanvasElement,
+  maxDimension: number,
+): { data: string; width: number; height: number } | null {
+  const scale = Math.min(
+    1,
+    maxDimension / Math.max(sourceCanvas.width, sourceCanvas.height),
+  );
+  const targetWidth = Math.round(sourceCanvas.width * scale);
+  const targetHeight = Math.round(sourceCanvas.height * scale);
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = targetWidth;
+  tempCanvas.height = targetHeight;
+  const ctx = tempCanvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
+  const base64Data = tempCanvas.toDataURL("image/png").split(",")[1];
+  if (!base64Data) return null;
+  return { data: base64Data, width: targetWidth, height: targetHeight };
+}
 
 /**
  * Dynamically load CesiumJS from CDN
@@ -300,33 +326,19 @@ function scheduleLocationUpdate(cesiumViewer: any): void {
     if (app.getHostCapabilities()?.updateModelContext?.image) {
       try {
         // Scale down to reduce token usage (tokens depend on dimensions)
-        const sourceCanvas = cesiumViewer.canvas;
-        const scale = Math.min(
-          1,
-          MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION /
-            Math.max(sourceCanvas.width, sourceCanvas.height),
+        const shot = captureScreenshotBase64(
+          cesiumViewer.canvas,
+          MAX_MODEL_CONTEXT_UPDATE_IMAGE_DIMENSION,
         );
-        const targetWidth = Math.round(sourceCanvas.width * scale);
-        const targetHeight = Math.round(sourceCanvas.height * scale);
-
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = targetWidth;
-        tempCanvas.height = targetHeight;
-        const ctx = tempCanvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(sourceCanvas, 0, 0, targetWidth, targetHeight);
-          const dataUrl = tempCanvas.toDataURL("image/png");
-          const base64Data = dataUrl.split(",")[1];
-          if (base64Data) {
-            content.push({
-              type: "image",
-              data: base64Data,
-              mimeType: "image/png",
-            });
-            log.info(
-              `Added screenshot to model context (${targetWidth}x${targetHeight})`,
-            );
-          }
+        if (shot) {
+          content.push({
+            type: "image",
+            data: shot.data,
+            mimeType: "image/png",
+          });
+          log.info(
+            `Added screenshot to model context (${shot.width}x${shot.height})`,
+          );
         }
       } catch (err) {
         log.warn("Failed to capture screenshot:", err);
@@ -973,6 +985,54 @@ app.registerTool(
         },
       ],
       structuredContent: viewData,
+    };
+  },
+);
+
+app.registerTool(
+  "get-screenshot",
+  {
+    title: "Get Screenshot",
+    description:
+      "Capture the current globe view as a PNG image for visual analysis",
+    inputSchema: z.object({
+      maxDimension: z
+        .number()
+        .int()
+        .min(64)
+        .max(2048)
+        .optional()
+        .describe(
+          "Max width/height in pixels (default 1024). Larger images show more detail but cost more tokens.",
+        ),
+    }),
+  },
+  async (args) => {
+    if (!viewer) {
+      return {
+        content: [
+          { type: "text" as const, text: "Error: Viewer not initialized" },
+        ],
+        isError: true,
+      };
+    }
+
+    const shot = captureScreenshotBase64(
+      viewer.canvas,
+      args.maxDimension ?? DEFAULT_SCREENSHOT_MAX_DIMENSION,
+    );
+    if (!shot) {
+      return {
+        content: [
+          { type: "text" as const, text: "Error: screenshot capture failed" },
+        ],
+        isError: true,
+      };
+    }
+    return {
+      content: [
+        { type: "image" as const, data: shot.data, mimeType: "image/png" },
+      ],
     };
   },
 );

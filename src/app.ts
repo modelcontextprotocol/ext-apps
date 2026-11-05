@@ -41,6 +41,19 @@ export { EventDispatcher } from "./events.js";
 
 import { PostMessageTransport } from "./message-transport.js";
 import {
+  callToolResultText,
+  getWebMcpConsumer,
+  getWebMcpModelContext,
+  isPlainObject,
+  ownWebMcpTools,
+  parseWebMcpResult,
+  toMcpTool,
+  webMcpErrorMessage,
+  webMcpExecuteInput,
+  type WebMcpConsumer,
+  type WebMcpModelContext,
+} from "./webmcp.js";
+import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
   McpUiUpdateModelContextRequest,
@@ -165,6 +178,28 @@ export type AppOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
    * @default false
    */
   allowUnsafeEval?: boolean;
+  /**
+   * Bridge tools between the Apps SDK and
+   * [WebMCP](https://webmachinelearning.github.io/webmcp/), in both
+   * directions:
+   *
+   * - tools registered with {@link App.registerTool `registerTool`} are
+   *   mirrored into `document.modelContext` when the document provides one,
+   *   so WebMCP-enabled hosts discover them without speaking the Apps
+   *   `tools/list` channel (the `tools/list` / `tools/call` wire path is
+   *   unaffected either way);
+   * - tools the page registered on `document.modelContext` are served over
+   *   the Apps `tools/list` / `tools/call` channel, so WebMCP-authored Views
+   *   work on MCP Apps hosts that do not provide WebMCP themselves. Tools
+   *   registered with {@link App.registerTool `registerTool`} win on name
+   *   collisions, and tools the {@link App `App`} itself mirrored into
+   *   WebMCP are never echoed back.
+   *
+   * Pass `false` to disable the bridge.
+   *
+   * @default true
+   */
+  webMcpBridge?: boolean;
 };
 
 type RequestHandlerExtra = BaseContext;
@@ -308,6 +343,9 @@ export class App extends Protocol<BaseContext> {
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
   private _registeredTools: { [name: string]: RegisteredAppTool } = {};
+  private readonly _webMcpMirrors = new Map<string, AbortController>();
+  private _webMcpCallCount = 0;
+  private _webMcpWatched?: { consumer: WebMcpConsumer; listener: () => void };
   private _initializedSent = false;
   private readonly _registeredEvents = new Set<keyof AppEventMap>();
   private readonly _events = new EventDispatcher<AppEventMap>();
@@ -606,6 +644,7 @@ export class App extends Protocol<BaseContext> {
       if (app._initializedSent && app._appCapabilities.tools?.listChanged) {
         void app.sendToolListChanged();
       }
+      app.syncWebMcpMirror(name);
     };
     // Arity is fixed at registration time even if inputSchema is later
     // update()d, since cb's signature can't change.
@@ -693,10 +732,17 @@ export class App extends Protocol<BaseContext> {
 
     this.oncalltool = async (params, extra) => {
       const tool = this._registeredTools[params.name];
-      if (!tool) {
-        throw new Error(`Tool ${params.name} not found`);
+      if (tool) {
+        return tool.handler(params.arguments, extra);
       }
-      return tool.handler(params.arguments, extra);
+      const bridged = await this.callWebMcpBridgedTool(
+        params,
+        extra.mcpReq.signal,
+      );
+      if (bridged) {
+        return bridged;
+      }
+      throw new Error(`Tool ${params.name} not found`);
     };
     this.onlisttools = async (_params, _extra) => {
       const tools: Tool[] = await Promise.all(
@@ -731,8 +777,223 @@ export class App extends Protocol<BaseContext> {
             return result;
           }),
       );
+      tools.push(...(await this.listWebMcpBridgedTools()));
       return { tools };
     };
+  }
+
+  /**
+   * The page's own WebMCP (`document.modelContext`) tools as MCP `Tool`s,
+   * ready to serve over `tools/list`. Tools registered with
+   * {@link App.registerTool `registerTool`} shadow same-named entries — which
+   * also keeps the mirrors this App itself registered into WebMCP from being
+   * echoed back.
+   */
+  private async listWebMcpBridgedTools(): Promise<Tool[]> {
+    if (this.options?.webMcpBridge === false) return [];
+    const consumer = getWebMcpConsumer();
+    if (!consumer) return [];
+    try {
+      return (await ownWebMcpTools(consumer)).flatMap((descriptor) => {
+        const tool = toMcpTool(descriptor);
+        return tool && !this._registeredTools[tool.name]
+          ? [tool as unknown as Tool]
+          : [];
+      });
+    } catch {
+      return []; // A broken model context must not take down tools/list.
+    }
+  }
+
+  /**
+   * Execute a `tools/call` against the page's own WebMCP tools, or
+   * `undefined` when the tool is not served that way (so the caller reports
+   * "not found"). A failing execution is a `CallToolResult` with
+   * `isError: true`, not a thrown error.
+   */
+  private async callWebMcpBridgedTool(
+    params: CallToolRequest["params"],
+    signal?: AbortSignal,
+  ): Promise<CallToolResult | undefined> {
+    if (this.options?.webMcpBridge === false) return undefined;
+    if (this._registeredTools[params.name]) return undefined;
+    const consumer = getWebMcpConsumer();
+    if (!consumer) return undefined;
+
+    let frameTools, found;
+    try {
+      frameTools = await ownWebMcpTools(consumer);
+      // Names map through toMcpTool unchanged, so match on the raw name and
+      // convert only the match (validating it serves as a listed tool).
+      found = frameTools.find((descriptor) => {
+        try {
+          return descriptor.name === params.name;
+        } catch {
+          return false;
+        }
+      });
+      if (!found || !toMcpTool(found)) return undefined;
+    } catch {
+      return undefined;
+    }
+
+    try {
+      const value = parseWebMcpResult(
+        await consumer.executeTool(
+          found,
+          webMcpExecuteInput(frameTools, params.arguments ?? {}),
+          { signal },
+        ),
+      );
+      return {
+        content: [],
+        structuredContent: (isPlainObject(value)
+          ? value
+          : { result: value }) as CallToolResult["structuredContent"],
+      };
+    } catch (error) {
+      return {
+        content: [{ type: "text", text: webMcpErrorMessage(error) }],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * Bring the `document.modelContext` (WebMCP) mirror of the tool registered
+   * under `name` in line with its current state: (re-)registered while
+   * present and enabled, unregistered otherwise. A no-op when the document
+   * provides no model context — the tool is still served over `tools/list` —
+   * or when {@link AppOptions.webMcpBridge `webMcpBridge`} is `false`.
+   */
+  private syncWebMcpMirror(name: string): void {
+    this._webMcpMirrors.get(name)?.abort();
+    this._webMcpMirrors.delete(name);
+
+    if (this.options?.webMcpBridge === false) return;
+    const tool = this._registeredTools[name];
+    if (!tool?.enabled) return;
+    const modelContext = getWebMcpModelContext();
+    if (!modelContext) return;
+
+    const controller = new AbortController();
+    this._webMcpMirrors.set(name, controller);
+    void this.mirrorToWebMcp(name, tool, modelContext, controller.signal);
+  }
+
+  private async mirrorToWebMcp(
+    name: string,
+    tool: RegisteredAppTool,
+    modelContext: WebMcpModelContext,
+    signal: AbortSignal,
+  ): Promise<void> {
+    try {
+      const inputSchema = tool.inputSchema
+        ? await standardSchemaToJsonSchema(tool.inputSchema, "input")
+        : undefined;
+      if (signal.aborted) return;
+      await modelContext.registerTool(
+        {
+          name,
+          title: tool.title,
+          description: tool.description || tool.title || name,
+          inputSchema,
+          annotations:
+            tool.annotations?.readOnlyHint === undefined
+              ? undefined
+              : { readOnlyHint: tool.annotations.readOnlyHint },
+          execute: async (input, options) => {
+            const result = await tool.handler(
+              input,
+              this.buildWebMcpContext(options.signal),
+            );
+            if (result.isError) throw new Error(callToolResultText(result));
+            return result.structuredContent ?? { content: result.content };
+          },
+        },
+        { signal },
+      );
+    } catch (error) {
+      // A failed registration (invalid name, unserializable schema,
+      // duplicate, permissions policy…) means the tool is not visible through
+      // WebMCP; it is still served over tools/list.
+      if (!signal.aborted) {
+        console.warn(
+          `[MCP Apps] Tool "${name}" could not be mirrored into document.modelContext:`,
+          error,
+        );
+      }
+    }
+  }
+
+  /**
+   * Handler context for a tool call that arrived through WebMCP rather than a
+   * `tools/call` request: same shape as the wire path, with a synthetic
+   * request id and `send`/`notify` going out over this App's own transport.
+   */
+  private buildWebMcpContext(signal: AbortSignal): RequestHandlerExtra {
+    return {
+      mcpReq: {
+        id: `webmcp-${++this._webMcpCallCount}`,
+        method: "tools/call",
+        signal,
+        requestState: () => undefined,
+        send: ((...args: [never, ...never[]]) =>
+          (this.request as (...a: unknown[]) => unknown)(
+            ...args,
+          )) as RequestHandlerExtra["mcpReq"]["send"],
+        notify: (notification) => this.notification(notification),
+      },
+    };
+  }
+
+  /**
+   * Relay WebMCP `toolchange` events as `notifications/tools/list_changed`,
+   * so a host learns when the page's own WebMCP tools come and go.
+   */
+  private watchWebMcpToolChanges(): void {
+    if (this.options?.webMcpBridge === false) return;
+    const consumer = getWebMcpConsumer();
+    if (!consumer || consumer === this._webMcpWatched?.consumer) return;
+    const listener = () => {
+      if (
+        this.transport &&
+        this._initializedSent &&
+        this._appCapabilities.tools?.listChanged
+      ) {
+        void this.sendToolListChanged();
+      }
+    };
+    this.unwatchWebMcpToolChanges();
+    try {
+      consumer.addEventListener("toolchange", listener);
+      this._webMcpWatched = { consumer, listener };
+    } catch {
+      this._webMcpWatched = undefined;
+    }
+  }
+
+  private unwatchWebMcpToolChanges(): void {
+    try {
+      this._webMcpWatched?.consumer.removeEventListener(
+        "toolchange",
+        this._webMcpWatched.listener,
+      );
+    } catch {
+      // The model context is the page's to break; nothing to clean up then.
+    }
+    this._webMcpWatched = undefined;
+  }
+
+  protected override _onclose(): void {
+    // Unwatch before aborting the mirrors: unregistering them fires
+    // `toolchange`, which must not try to notify over the closed transport.
+    this.unwatchWebMcpToolChanges();
+    for (const controller of this._webMcpMirrors.values()) {
+      controller.abort();
+    }
+    this._webMcpMirrors.clear();
+    super._onclose();
   }
 
   async sendToolListChanged(
@@ -2013,6 +2274,29 @@ export class App extends Protocol<BaseContext> {
     }
     this._initializedSent = false;
 
+    // WebMCP interop: when the page carries WebMCP tools in a readable model
+    // context, they are served over tools/list / tools/call, which requires
+    // declaring the `tools` capability before the handshake. Views that
+    // answer tools/* themselves (oncalltool/onlisttools assigned directly)
+    // are left alone.
+    if (
+      this.options?.webMcpBridge !== false &&
+      (this._toolHandlersInitialized || !(this.oncalltool || this.onlisttools))
+    ) {
+      const consumer = getWebMcpConsumer();
+      const pageTools = consumer
+        ? await ownWebMcpTools(consumer).catch(
+            () => [] as Awaited<ReturnType<typeof ownWebMcpTools>>,
+          )
+        : [];
+      if (pageTools.some((descriptor) => toMcpTool(descriptor))) {
+        if (!this._appCapabilities.tools) {
+          this.registerAppCapabilities({ tools: { listChanged: true } });
+        }
+        this.ensureToolHandlersInitialized();
+      }
+    }
+
     try {
       // Protocol.connect only wires the transport — no MCP handshake. The
       // ui/initialize request below is the sole negotiation on this channel,
@@ -2044,6 +2328,13 @@ export class App extends Protocol<BaseContext> {
         method: "ui/notifications/initialized",
       });
       this._initializedSent = true;
+      this.watchWebMcpToolChanges();
+      // Mirrors are independent of the transport but are torn down on close:
+      // re-establish them on (re)connect, which also picks up a model context
+      // that appeared after registration.
+      for (const name of Object.keys(this._registeredTools)) {
+        this.syncWebMcpMirror(name);
+      }
 
       if (this.options?.autoResize) {
         this.setupSizeChangedNotifications();

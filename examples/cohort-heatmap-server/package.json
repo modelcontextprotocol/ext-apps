@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-cohort-heatmap",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "type": "module",
   "description": "Cohort heatmap MCP App Server for retention analysis",
   "repository": {
@@ -9,6 +9,9 @@
     "directory": "examples/cohort-heatmap-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"
