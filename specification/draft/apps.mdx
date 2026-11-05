@@ -2788,6 +2788,8 @@ App tools MUST be tied to the app's lifecycle:
 
 Dynamic View Content payloads are data, not code: they are interpreted by a renderer that is itself sandboxed, CSP-constrained, and reviewable under this specification's existing model. Declarative formats narrow the attack surface relative to arbitrary HTML precisely because the executable component (the renderer) is static and predeclared.
 
+When the renderer is server-provided, the trust model is that of any MCP App: the host relies on the iframe sandbox and CSP rather than on owning the renderer code. Hosts that require first-party rendering of a payload format (e.g., to control all script execution and event handling) SHOULD render that format natively by advertising it in `mimeTypes`, rather than forwarding it to a server-provided renderer.
+
 **View behavior:**
 
 - Renderers MUST treat payloads as untrusted input (no `eval` or direct `innerHTML` of payload-derived strings)
