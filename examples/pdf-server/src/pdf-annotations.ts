@@ -679,11 +679,13 @@ export async function addAnnotationDicts(
         // Use a non-standard /Name so viewers like Preview.app don't
         // substitute their own built-in stamp graphic
         dict.set(PDFName.of("Name"), PDFName.of("#custom"));
-        dict.set(PDFName.of("Contents"), PDFHexString.fromText(def.label));
+        // Legacy persisted defs can lack label (pre-schema-validation data).
+        const stampLabel = String(def.label ?? "STAMP");
+        dict.set(PDFName.of("Contents"), PDFHexString.fromText(stampLabel));
 
         // Create a simple appearance stream so the stamp text is visible
         const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-        const actualTextWidth = font.widthOfTextAtSize(def.label, fontSize);
+        const actualTextWidth = font.widthOfTextAtSize(stampLabel, fontSize);
         const apRectW = actualTextWidth + padX * 2;
         const apRectH = fontSize + padY * 2;
 
@@ -711,7 +713,7 @@ export async function addAnnotationDicts(
           `BT`,
           `/F1 ${fontSize} Tf`,
           `${padX} ${textBaselineY} Td`,
-          `(${def.label.replace(/[()\\]/g, "\\$&")}) Tj`,
+          `(${stampLabel.replace(/[()\\]/g, "\\$&")}) Tj`,
           `ET`,
         ].join("\n");
 

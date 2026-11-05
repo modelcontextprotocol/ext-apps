@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-debug",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "type": "module",
   "description": "Debug MCP App Server for testing all SDK capabilities",
   "repository": {
@@ -9,6 +9,9 @@
     "directory": "examples/debug-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
   "bin": {

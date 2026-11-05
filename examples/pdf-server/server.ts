@@ -13,6 +13,7 @@
 import { randomUUID } from "crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   registerAppResource,
   registerAppTool,
@@ -145,10 +146,13 @@ export function isWritablePath(resolved: string): boolean {
   });
 }
 
-// Works both from source (server.ts) and compiled (dist/server.js)
-const DIST_DIR = import.meta.filename.endsWith(".ts")
-  ? path.join(import.meta.dirname, "dist")
-  : import.meta.dirname;
+// Works both from source (server.ts) and compiled (dist/server.js). Derived
+// from import.meta.url rather than import.meta.filename/dirname, which are
+// undefined on Node older than 20.11.
+const SERVER_FILE = fileURLToPath(import.meta.url);
+const DIST_DIR = SERVER_FILE.endsWith(".ts")
+  ? path.join(path.dirname(SERVER_FILE), "dist")
+  : path.dirname(SERVER_FILE);
 
 // =============================================================================
 // Command Queue (shared across stateless server instances)
@@ -191,6 +195,11 @@ const PageInterval = z.object({
 // poll queue. Defined once in src/commands.ts; both sides import it.
 // (`import type` → no pdf-lib bundled into the server.)
 import type { PdfCommand } from "./src/commands.js";
+import {
+  AnnotationDefSchema,
+  AnnotationUpdateSchema,
+  formatAnnotationIssues,
+} from "./src/annotation-schemas.js";
 export type { PdfCommand };
 
 // =============================================================================
@@ -1259,6 +1268,17 @@ export interface CreateServerOptions {
    * in a floating bubble). Toggled by the `--debug` CLI flag.
    */
   debug?: boolean;
+
+  /**
+   * Register the view's actions as separate app tools (navigate, search,
+   * add_annotations, ...) instead of the default single `interact` app
+   * tool. Hosts that ask the user to approve each app tool separately
+   * show one approval card per tool, so the single-tool default keeps
+   * that to one; pass the `--split-app-tools` CLI flag to get the
+   * per-action tools back. The choice is injected into the served view
+   * HTML, where src/mcp-app.ts reads it before connecting.
+   */
+  splitAppTools?: boolean;
 }
 
 // Module-level singletons so they survive across createServer() calls — in
@@ -1266,10 +1286,12 @@ export interface CreateServerOptions {
 // per-instance caches are discarded immediately.
 const sharedPdfCache = createPdfCache();
 let cachedAppHtml: string | undefined;
+let cachedSplitAppHtml: string | undefined;
 
 export function createServer(options: CreateServerOptions = {}): McpServer {
   const { enableInteract = false, useClientRoots = false } = options;
   const debug = options.debug ?? false;
+  const splitAppTools = options.splitAppTools ?? false;
   const disableInteract = !enableInteract;
   const server = new McpServer({ name: "PDF Server", version: "2.0.0" });
 
@@ -2026,6 +2048,24 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
+          // Enforce the per-type contract (e.g. a stamp REQUIRES `label`;
+          // without this a stamp sent with `content` instead rendered as
+          // the literal text "undefined").
+          for (let i = 0; i < annotations.length; i++) {
+            const parsed = AnnotationDefSchema.safeParse(annotations[i]);
+            if (!parsed.success) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `add_annotations: ${formatAnnotationIssues(i, (annotations[i] as { type?: unknown }).type, parsed.error)}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            annotations[i] = parsed.data;
+          }
           // Resolve image annotations: fetch imageUrl → imageData, auto-detect dimensions.
           // Rejection (path not allowed, not https, fetch failed) surfaces as
           // a tool error so the model sees it — don't silently skip.
@@ -2048,9 +2088,9 @@ URL: ${normalized}`,
           }
           enqueueCommand(uuid, {
             type: "add_annotations",
-            // resolveImageAnnotation populates optional x/y/width/height;
-            // input is validated as Record<string,any>[] so this cast is
-            // the wire-protocol promise, not a compiler guarantee.
+            // Schema-validated above; the residual gap this cast bridges
+            // is the image variant's optional x/y/width/height, which
+            // resolveImageAnnotation has just filled in.
             annotations: annotations as Extract<
               PdfCommand,
               { type: "add_annotations" }
@@ -2069,6 +2109,21 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
+          for (let i = 0; i < annotations.length; i++) {
+            const parsed = AnnotationUpdateSchema.safeParse(annotations[i]);
+            if (!parsed.success) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `update_annotations: ${formatAnnotationIssues(i, (annotations[i] as { type?: unknown }).type, parsed.error)}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            annotations[i] = parsed.data;
+          }
           enqueueCommand(uuid, {
             type: "update_annotations",
             annotations: annotations as Extract<
@@ -2392,11 +2447,11 @@ IMPORTANT: viewUUID must be the exact UUID returned by display_pdf (e.g. "a1b2c3
 - For highlights/underlines, each rect's y is the TOP of the highlighted region.
 
 Annotation types:
-• highlight: rects:[{x,y,width,height}], color?, content? • underline: rects:[{x,y,w,h}], color?
-• strikethrough: rects:[{x,y,w,h}], color? • note: x, y, content, color?
+• highlight: rects:[{x,y,width,height}], color?, content? • underline: rects:[{x,y,width,height}], color?
+• strikethrough: rects:[{x,y,width,height}], color? • note: x, y, content, color?
 • rectangle: x, y, width, height, color?, fillColor?, rotation? • circle: x, y, width, height, color?, fillColor?
 • line: x1, y1, x2, y2, color? • freetext: x, y, content, fontSize?, color?
-• stamp: x, y, label (any text, e.g. APPROVED, DRAFT, CONFIDENTIAL), color?, rotation?
+• stamp: x, y, label (REQUIRED — the stamp's text, e.g. APPROVED, DRAFT, CONFIDENTIAL), color?, rotation?
 • image: imageUrl (required), x?, y?, width?, height?, mimeType?, rotation?, aspect? — places an image (signature, logo, etc.) on the page. Pass a local file path or HTTPS URL (NO data: URIs, NO base64). Width/height auto-detected if omitted. Users can also drag & drop images directly onto the viewer.
 
 TIP: For text annotations, prefer highlight_text (auto-finds text) over manual rects.
@@ -2419,7 +2474,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
 
 **TEXT/SCREENSHOTS**:
 • get_text: extract text from pages. Optional \`page\` for single page, or \`intervals\` for ranges [{start?,end?}]. Max 20 pages.
-• get_screenshot: capture a single page as PNG image. Requires \`page\`.
+• get_screenshot: capture a single page as a JPEG image. Requires \`page\`.
 • get_viewer_state: snapshot of the live viewer — JSON {currentPage, pageCount, zoom, displayMode, selectedAnnotationIds, selection:{text,contextBefore,contextAfter,boundingRect}|null}. Use this to read what the user has selected or which page they're on.
 
 **FORMS** — fill_form: fill fields with \`fields\` array of {name, value}.
@@ -2913,12 +2968,35 @@ Example — add a signature image and a stamp, then screenshot to verify:
         path.join(DIST_DIR, "mcp-app.html"),
         "utf-8",
       ));
+      // The view decides its app-tool surface (single `interact` vs one
+      // tool per action) at load time, before connect(), so the choice
+      // rides in the served HTML rather than in a tool result. The
+      // injected variant is cached like the base HTML — the bundle is
+      // several MB and stateless HTTP mode reads it per request.
+      let servedHtml = html;
+      if (splitAppTools) {
+        if (cachedSplitAppHtml === undefined) {
+          const injected = html.replace(
+            /<head(\s[^>]*)?>/i,
+            (headTag) =>
+              `${headTag}\n    <script>globalThis.PDF_APP_CONFIG = { splitAppTools: true };</script>`,
+          );
+          if (injected === html) {
+            console.error(
+              "[pdf-server] --split-app-tools: no <head> tag found in the view HTML; " +
+                "falling back to the single interact app tool",
+            );
+          }
+          cachedSplitAppHtml = injected;
+        }
+        servedHtml = cachedSplitAppHtml;
+      }
       return {
         contents: [
           {
             uri: RESOURCE_URI,
             mimeType: RESOURCE_MIME_TYPE,
-            text: html,
+            text: servedHtml,
             _meta: {
               ui: {
                 permissions: { clipboardWrite: {} },

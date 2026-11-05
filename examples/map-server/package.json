@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-map",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "type": "module",
   "description": "MCP App Server example with CesiumJS 3D globe and geocoding",
   "repository": {
@@ -9,6 +9,9 @@
     "directory": "examples/map-server"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "files": [
     "dist"

@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-basic-react",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "type": "module",
   "description": "Basic MCP App Server example using React",
   "repository": {
@@ -9,6 +9,9 @@
     "directory": "examples/basic-server-react"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
   "bin": {

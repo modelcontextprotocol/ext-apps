@@ -164,7 +164,8 @@ try {
       JSON.stringify({
         compilerOptions: {
           jsx: "react-jsx",
-          lib: ["ES2020", "DOM"],
+          // @modelcontextprotocol/client 2.1+ typings reference ErrorOptions.
+          lib: ["ES2020", "ES2022.Error", "DOM"],
           module: "ESNext",
           moduleResolution: "bundler",
           noEmit: true,
