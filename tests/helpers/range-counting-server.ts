@@ -127,6 +127,56 @@ async function buildWithNativeAnnotPdf(): Promise<Uint8Array> {
   return doc.save();
 }
 
+/**
+ * One-page PDF with a native /Stamp annotation and an appearance stream.
+ * PDF.js imports it as an editable "imported" overlay, which lets the Revert
+ * regression drag it through the real viewer.
+ */
+export async function buildAnnotationRevertPdf(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage([612, 792]);
+  page.drawText("Native annotation revert fixture", {
+    x: 72,
+    y: 720,
+    size: 16,
+    font,
+  });
+
+  const appearance = doc.context.flateStream(
+    [
+      "0.8 0 0 RG",
+      "3 w",
+      "2 2 116 36 re S",
+      "0.8 0 0 rg",
+      "BT /F1 20 Tf 12 12 Td (NATIVE) Tj ET",
+    ].join("\n"),
+    {
+      Type: "XObject",
+      Subtype: "Form",
+      BBox: [0, 0, 120, 40],
+      Resources: {
+        Font: { F1: font.ref },
+      },
+    },
+  );
+  const appearanceRef = doc.context.register(appearance);
+  const annotationRef = doc.context.register(
+    doc.context.obj({
+      Type: "Annot",
+      Subtype: "Stamp",
+      Rect: [180, 500, 300, 540],
+      F: 4,
+      C: [0.8, 0, 0],
+      Name: "Draft",
+      Contents: PDFString.of("NATIVE"),
+      AP: { N: appearanceRef },
+    }),
+  );
+  page.node.set(PDFName.of("Annots"), doc.context.obj([annotationRef]));
+  return doc.save();
+}
+
 async function buildFormsPdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const form = doc.getForm();
@@ -150,6 +200,7 @@ export async function startRangeServer(): Promise<RangeServer> {
     "/noforms.pdf": await buildNoFormsPdf(),
     "/forms.pdf": await buildFormsPdf(),
     "/with-native-annot.pdf": await buildWithNativeAnnotPdf(),
+    "/annotation-revert.pdf": await buildAnnotationRevertPdf(),
   };
   const fileSizes = Object.fromEntries(
     Object.entries(files).map(([k, v]) => [k, v.length]),

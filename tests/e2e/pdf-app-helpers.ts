@@ -22,8 +22,11 @@ export function getAppFrame(page: Page) {
   return page.frameLocator("iframe").first().frameLocator("iframe").first();
 }
 
-/** Load the PDF server and call display_pdf with the default PDF. */
-export async function loadPdfServer(page: Page) {
+/** Load the PDF server and call display_pdf with optional tool input. */
+export async function loadPdfServer(
+  page: Page,
+  toolInput?: Record<string, unknown>,
+) {
   // The reload loop below can legitimately take longer than the default
   // test timeout right after the examples server (re)builds.
   test.setTimeout(240_000);
@@ -40,6 +43,9 @@ export async function loadPdfServer(page: Page) {
     );
   }).toPass({ timeout: 90000, intervals: [2000] });
   await page.locator("select").first().selectOption({ label: "PDF Server" });
+  if (toolInput) {
+    await page.locator("textarea").fill(JSON.stringify(toolInput));
+  }
   await page.click('button:has-text("Call Tool")');
   await waitForAppLoad(page);
 }

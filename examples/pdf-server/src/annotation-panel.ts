@@ -10,7 +10,11 @@
 
 import type * as pdfjsLib from "pdfjs-dist";
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
-import type { PdfAnnotationDef } from "./pdf-annotations.js";
+import {
+  annotationDefsEqual,
+  cloneAnnotationDef,
+  type PdfAnnotationDef,
+} from "./pdf-annotations.js";
 import {
   type TrackedAnnotation,
   annotationMap,
@@ -308,6 +312,14 @@ function sidebarItemCount(): number {
   );
 }
 
+/** Native edits are UI-only, so they are absent from the persisted diff. */
+function hasNativeAnnotationChanges(): boolean {
+  return deps.state().pdfBaselineAnnotations.some((baseline) => {
+    const current = annotationMap.get(baseline.id);
+    return !current || !annotationDefsEqual(baseline, current.def);
+  });
+}
+
 export function updateAnnotationsBadge(): void {
   const count = sidebarItemCount();
   if (count > 0 && !panelState.open) {
@@ -431,8 +443,7 @@ export function renderAnnotationPanel(): void {
   if (!panelState.open) return;
 
   annotationsPanelCountEl.textContent = String(sidebarItemCount());
-  annotationsPanelResetBtn.disabled = !deps.state().isDirty;
-  annotationsPanelClearAllBtn.disabled = sidebarItemCount() === 0;
+  refreshAnnotationPanelState();
 
   // Group annotations by page, sorted by Y position within each page
   const byPage = new Map<number, TrackedAnnotation[]>();
@@ -719,7 +730,10 @@ function createRemovedAnnotationCard(def: PdfAnnotationDef): HTMLElement {
   revertBtn.innerHTML = REVERT_SVG;
   revertBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    annotationMap.set(def.id, { def: { ...def }, elements: [] });
+    annotationMap.set(def.id, {
+      def: cloneAnnotationDef(def),
+      elements: [],
+    });
     updateAnnotationsBadge();
     renderAnnotationPanel();
     deps.renderPage();
@@ -939,7 +953,10 @@ function resetToBaseline(): void {
   clearAnnotationMap();
   const { pdfDocument, pdfBaselineAnnotations } = deps.state();
   for (const def of pdfBaselineAnnotations) {
-    annotationMap.set(def.id, { def: { ...def }, elements: [] });
+    annotationMap.set(def.id, {
+      def: cloneAnnotationDef(def),
+      elements: [],
+    });
   }
 
   if (pdfDocument) {
@@ -965,6 +982,18 @@ function resetToBaseline(): void {
   deps.persistAnnotations(); // diff is now empty → setDirty(false)
   deps.renderPage();
   renderAnnotationPanel();
+}
+
+/**
+ * Refresh actions backed by state that may change outside panel rendering.
+ * Native annotation moves are UI-only, so they are absent from the persisted
+ * diff; compare current geometry with the PDF baseline instead.
+ */
+export function refreshAnnotationPanelState(): void {
+  if (!panelState.open) return;
+  annotationsPanelResetBtn.disabled =
+    !deps.state().isDirty && !hasNativeAnnotationChanges();
+  annotationsPanelClearAllBtn.disabled = sidebarItemCount() === 0;
 }
 
 /**

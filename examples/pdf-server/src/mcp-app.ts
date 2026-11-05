@@ -41,6 +41,7 @@ import {
   deserializeDiff,
   mergeAnnotations,
   computeDiff,
+  cloneAnnotationDef,
   isDiffEmpty,
   buildAnnotatedPdfBytes,
   parseAnnotationRef,
@@ -70,6 +71,7 @@ import {
   annotationsPanelEl,
   annotationsPanelListEl,
   renderAnnotationPanel,
+  refreshAnnotationPanelState,
   updateAnnotationsBadge,
   setAnnotationPanelOpen,
   applyFloatingPanelPosition,
@@ -814,6 +816,7 @@ function setDirty(dirty: boolean): void {
   isDirty = dirty;
   updateTitleDisplay();
   updateSaveBtn();
+  refreshAnnotationPanelState();
 }
 
 function updateSaveBtn(): void {
@@ -1249,10 +1252,10 @@ function applyEdit(entry: EditEntry, reverse: boolean): void {
         annotationMap.set(entry.id, { def: { ...state }, elements: [] });
       }
     }
-    renderAnnotationsForPage(currentPage);
-    renderAnnotationPanel();
   }
   persistAnnotations();
+  renderAnnotationsForPage(currentPage);
+  renderAnnotationPanel();
 }
 
 // =============================================================================
@@ -2718,10 +2721,15 @@ function scanPageBaselineAnnotations(
       };
       const def = importPdfjsAnnotation(ann, pageNum, i);
       if (def) {
-        pdfBaselineAnnotations.push(def);
+        // Baseline definitions are immutable input to Revert/diff. Give the
+        // editable map its own nested geometry before drags mutate it.
+        pdfBaselineAnnotations.push(cloneAnnotationDef(def));
         imported++;
         if (!annotationMap.has(def.id) && !restoredRemovedIds.has(def.id)) {
-          annotationMap.set(def.id, { def, elements: [] });
+          annotationMap.set(def.id, {
+            def: cloneAnnotationDef(def),
+            elements: [],
+          });
         }
       } else if (ann.annotationType !== 20) {
         // Widget (type 20) is expected to be skipped; anything else we
@@ -2810,7 +2818,10 @@ function restoreAnnotations(): void {
     const merged = mergeAnnotations(pdfBaselineAnnotations, diff);
     for (const def of merged) {
       if (!annotationMap.has(def.id)) {
-        annotationMap.set(def.id, { def, elements: [] });
+        annotationMap.set(def.id, {
+          def: cloneAnnotationDef(def),
+          elements: [],
+        });
       }
     }
     for (const id of diff.removed) {
