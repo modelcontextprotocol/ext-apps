@@ -58,6 +58,7 @@ import type { z } from "zod/v4";
 // Re-exports for convenience
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
 export type { ResourceMetadata, ToolCallback };
+export * from "../ui-content.js";
 
 /**
  * A plain `{ field: z.string() }` record accepted by the deprecated raw-shape
