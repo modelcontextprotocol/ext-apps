@@ -81,6 +81,7 @@ import {
   getAnnotationPreview,
   getAnnotationColor,
 } from "./annotation-panel.js";
+import { resolveToolName } from "./tool-names.js";
 import "./global.css";
 import "./mcp-app.css";
 
@@ -710,6 +711,16 @@ const app = new App(
   {},
   { autoResize: false },
 );
+
+/**
+ * Name to use for `app.callServerTool` when calling one of this server's own
+ * tools. Hosts that aggregate servers may qualify tool names (for example
+ * `pdf-server-save_pdf`); the prefix is recovered from the name the host
+ * invoked `display_pdf` under. See tool-names.ts and ext-apps issue #753.
+ */
+function toolName(baseName: string): string {
+  return resolveToolName(baseName, app.getHostContext()?.toolInfo?.tool?.name);
+}
 
 // UI State functions
 function showLoading(text: string) {
@@ -2583,7 +2594,7 @@ async function handleGetViewerState(requestId: string): Promise<void> {
   };
 
   await app.callServerTool({
-    name: "submit_viewer_state",
+    name: toolName("submit_viewer_state"),
     arguments: { requestId, state: JSON.stringify(state, null, 2) },
   });
 }
@@ -2670,7 +2681,7 @@ async function handleGetPages(cmd: {
   // Submit results back to server
   try {
     await app.callServerTool({
-      name: "submit_page_data",
+      name: toolName("submit_page_data"),
       arguments: { requestId: cmd.requestId, pages: results },
     });
     log.info(
@@ -3190,7 +3201,7 @@ async function savePdf(): Promise<void> {
     const base64 = uint8ArrayToBase64(pdfBytes);
 
     const result = await app.callServerTool({
-      name: "save_pdf",
+      name: toolName("save_pdf"),
       arguments: { url: pdfUrl, data: base64 },
     });
 
@@ -4347,7 +4358,7 @@ async function fetchChunk(
   const request = (async (): Promise<RangeResult> => {
     try {
       const result = await app.callServerTool({
-        name: "read_pdf_bytes",
+        name: toolName("read_pdf_bytes"),
         arguments: { url, offset: begin, byteCount: end - begin },
       });
 
@@ -4963,7 +4974,7 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
           log.error("get_pages failed — submitting empty result:", err);
           await app
             .callServerTool({
-              name: "submit_page_data",
+              name: toolName("submit_page_data"),
               arguments: { requestId: cmd.requestId, pages: [] },
             })
             .catch(() => {});
@@ -4976,7 +4987,7 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
           const pdfBytes = await getAnnotatedPdfBytes();
           const base64 = uint8ArrayToBase64(pdfBytes);
           await app.callServerTool({
-            name: "submit_save_data",
+            name: toolName("submit_save_data"),
             arguments: { requestId: cmd.requestId, data: base64 },
           });
           log.info(`save_as: submitted ${pdfBytes.length} bytes`);
@@ -4984,7 +4995,7 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
           log.error("save_as: failed to build bytes — submitting error:", err);
           await app
             .callServerTool({
-              name: "submit_save_data",
+              name: toolName("submit_save_data"),
               arguments: {
                 requestId: cmd.requestId,
                 error: err instanceof Error ? err.message : String(err),
@@ -5001,7 +5012,7 @@ async function processCommands(commands: PdfCommand[]): Promise<void> {
           log.error("get_viewer_state failed — submitting error:", err);
           await app
             .callServerTool({
-              name: "submit_viewer_state",
+              name: toolName("submit_viewer_state"),
               arguments: {
                 requestId: cmd.requestId,
                 error: err instanceof Error ? err.message : String(err),
@@ -5075,7 +5086,7 @@ async function pollLoop(): Promise<void> {
   while (polling && viewUUID) {
     try {
       const result = await app.callServerTool({
-        name: "poll_pdf_commands",
+        name: toolName("poll_pdf_commands"),
         arguments: { viewUUID },
       });
       if (result.isError) {
