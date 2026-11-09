@@ -41,3 +41,9 @@ Host (port 8080)
 - Messages flow through the outer iframe which validates and relays them bidirectionally
 
 This architecture ensures that even if tool UI code is malicious, it cannot access the host application's DOM, cookies, or JavaScript context.
+
+### App-rendered form elicitation
+
+The host advertises form elicitation and the nested MCP Apps elicitation capability. Each request owns a dialog and bridge, validates the App result, and falls back to a native form on rendering failures. Decline and dismissal complete the elicitation without reopening it. The requesting server remains visible outside the sandboxed content.
+
+Run `EXAMPLE=integration-server npm start` from the repository root and select `schedule-delivery`. The `renderer` argument accepts `app`, `missing` to exercise native fallback, or `native`. The App fixture also includes an invalid answer button to demonstrate schema validation and fallback. These are testing controls, not additional protocol actions.

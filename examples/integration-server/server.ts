@@ -2,9 +2,15 @@ import {
   registerAppResource,
   registerAppTool,
   RESOURCE_MIME_TYPE,
+  withElicitationUi,
+  supportsAppElicitation,
+  EXTENSION_ID,
 } from "@modelcontextprotocol/ext-apps/server";
 import {
   McpServer,
+  inputRequired,
+  CLIENT_CAPABILITIES_META_KEY,
+  type ClientCapabilities,
   type CallToolResult,
   type ReadResourceResult,
 } from "@modelcontextprotocol/server";
@@ -30,6 +36,75 @@ export function createServer(): McpServer {
     name: "Integration Test Server",
     version: "1.0.0",
   });
+
+  const appsCapabilities = {
+    extensions: { [EXTENSION_ID]: { elicitation: {} } },
+  };
+  server.server.registerCapabilities(appsCapabilities);
+  const elicitationUri = "ui://delivery/choose-window.html";
+  registerAppResource(
+    server,
+    "delivery-window",
+    elicitationUri,
+    {},
+    async () => ({
+      contents: [
+        {
+          uri: elicitationUri,
+          mimeType: RESOURCE_MIME_TYPE,
+          text: await fs.readFile(
+            path.join(DIST_DIR, "elicitation-app.html"),
+            "utf8",
+          ),
+        },
+      ],
+    }),
+  );
+  server.registerTool(
+    "schedule-delivery",
+    {
+      description: "Choose a delivery window using an App or native form",
+      inputSchema: z.object({
+        renderer: z.enum(["app", "missing", "native"]).default("app"),
+      }),
+    },
+    async ({ renderer }, ctx) => {
+      const answer = ctx.mcpReq.inputResponses?.["delivery-window"];
+      if (answer)
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(answer) }],
+        };
+      const capabilities =
+        ((ctx.mcpReq.envelope as Record<string, unknown> | undefined)?.[
+          CLIENT_CAPABILITIES_META_KEY
+        ] as ClientCapabilities | undefined) ??
+        server.server.getClientCapabilities();
+      const params = {
+        mode: "form" as const,
+        message: "Choose a delivery window",
+        requestedSchema: {
+          type: "object" as const,
+          properties: {
+            window: { type: "string" as const, enum: ["morning", "afternoon"] },
+          },
+          required: ["window"],
+        },
+      };
+      const request =
+        renderer !== "native" &&
+        supportsAppElicitation(capabilities, appsCapabilities)
+          ? withElicitationUi(
+              params,
+              renderer === "missing"
+                ? "ui://delivery/missing.html"
+                : elicitationUri,
+            )
+          : params;
+      return inputRequired({
+        inputRequests: { "delivery-window": inputRequired.elicit(request) },
+      });
+    },
+  );
 
   registerAppTool(
     server,

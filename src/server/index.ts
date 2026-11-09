@@ -35,12 +35,10 @@ import {
   McpUiResourceCsp,
   McpUiResourceMeta,
   McpUiToolMeta,
-  McpUiClientCapabilities,
 } from "../spec.types.js";
 import { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "../constants.js";
 import type {
   CallToolResult,
-  ClientCapabilities,
   InputRequiredResult,
   McpServer,
   ReadResourceResult,
@@ -453,60 +451,12 @@ export function registerAppResource(
   );
 }
 
-/**
- * Extension identifier for MCP Apps capability negotiation.
- *
- * Used as the key in `extensions` to advertise MCP Apps support.
- */
-export const EXTENSION_ID = "io.modelcontextprotocol/ui";
-
-/**
- * Get MCP Apps capability settings from client capabilities.
- *
- * This helper retrieves the capability object from the `extensions` field
- * where MCP Apps advertises its support.
- *
- * @param clientCapabilities - The client capabilities from the initialize response
- * @returns The MCP Apps capability settings, or `undefined` if not supported
- *
- * @example Check for MCP Apps support in server initialization
- * ```ts source="./index.examples.ts#getUiCapability_checkSupport"
- * server.server.oninitialized = () => {
- *   const clientCapabilities = server.server.getClientCapabilities();
- *   const uiCap = getUiCapability(clientCapabilities);
- *
- *   if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
- *     // App-enhanced tool
- *     registerAppTool(
- *       server,
- *       "weather",
- *       {
- *         description: "Get weather information with interactive dashboard",
- *         _meta: { ui: { resourceUri: "ui://weather/dashboard" } },
- *       },
- *       weatherHandler,
- *     );
- *   } else {
- *     // Text-only fallback
- *     server.registerTool(
- *       "weather",
- *       {
- *         description: "Get weather information",
- *       },
- *       textWeatherHandler,
- *     );
- *   }
- * };
- * ```
- */
-export function getUiCapability(
-  clientCapabilities: ClientCapabilities | null | undefined,
-): McpUiClientCapabilities | undefined {
-  if (!clientCapabilities) {
-    return undefined;
-  }
-
-  return clientCapabilities.extensions?.[EXTENSION_ID] as
-    | McpUiClientCapabilities
-    | undefined;
-}
+export {
+  EXTENSION_ID,
+  getUiCapability,
+  getUiServerCapability,
+  supportsAppElicitation,
+  withElicitationUi,
+  getElicitationUiResourceUri,
+  validateUiResourceUri,
+} from "../elicitation.js";

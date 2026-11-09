@@ -99,7 +99,7 @@ try {
       // server must be neither installed (it is an optional peer) nor bundled.
       mustNotInstall: true,
       entry:
-        'import { App } from "@modelcontextprotocol/ext-apps"; import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge"; import { useApp } from "@modelcontextprotocol/ext-apps/react"; console.log(App, AppBridge, useApp);',
+        'import { App } from "@modelcontextprotocol/ext-apps"; import { AppBridge, supportsAppElicitation, getUiServerCapability, getElicitationUiResourceUri } from "@modelcontextprotocol/ext-apps/app-bridge"; import { useApp } from "@modelcontextprotocol/ext-apps/react"; console.log(App, AppBridge, useApp, supportsAppElicitation, getUiServerCapability, getElicitationUiResourceUri);',
     },
     {
       // Server author: ext-apps + server. npm auto-installs client as a

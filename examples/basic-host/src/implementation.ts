@@ -1,3 +1,4 @@
+import { renderElicitation, ELICITATION_CLIENT_CAPABILITIES } from "./elicitation";
 import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest } from "@modelcontextprotocol/ext-apps/app-bridge";
 import {
   Client,
@@ -37,6 +38,8 @@ export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
 
   const name = client.getServerVersion()?.name ?? serverUrl.href;
 
+  const serverInfo: ServerInfo = { name, client, tools: new Map(), resources: new Map(), appHtmlCache: new Map() };
+  client.setRequestHandler("elicitation/create", (request, ctx) => renderElicitation(serverInfo, request.params, ctx.mcpReq.signal));
   const toolsList = await client.listTools();
   const tools = new Map(toolsList.tools.map((tool) => [tool.name, tool]));
   log.info("Server tools:", Array.from(tools.keys()));
@@ -46,13 +49,13 @@ export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
   const resources = new Map(resourcesList.resources.map((r) => [r.uri, r]));
   log.info("Server resources:", Array.from(resources.keys()));
 
-  return { name, client, tools, resources, appHtmlCache: new Map() };
+  return Object.assign(serverInfo, { tools, resources });
 }
 
 async function connectWithFallback(serverUrl: URL): Promise<Client> {
   // Try Streamable HTTP first (modern transport)
   try {
-    const client = new Client(IMPLEMENTATION);
+    const client = new Client(IMPLEMENTATION, { capabilities: ELICITATION_CLIENT_CAPABILITIES, versionNegotiation: { mode: "auto" } });
     await client.connect(new StreamableHTTPClientTransport(serverUrl));
     log.info("Connected via Streamable HTTP transport");
     return client;
@@ -62,7 +65,7 @@ async function connectWithFallback(serverUrl: URL): Promise<Client> {
 
   // Fall back to SSE (deprecated but needed for older servers)
   try {
-    const client = new Client(IMPLEMENTATION);
+    const client = new Client(IMPLEMENTATION, { capabilities: ELICITATION_CLIENT_CAPABILITIES });
     await client.connect(new SSEClientTransport(serverUrl));
     log.info("Connected via SSE transport");
     return client;
@@ -116,9 +119,9 @@ export function callTool(
 }
 
 
-async function getUiResource(serverInfo: ServerInfo, uri: string): Promise<UiResourceData> {
+export async function getUiResource(serverInfo: ServerInfo, uri: string, signal?: AbortSignal): Promise<UiResourceData> {
   log.info("Reading UI resource:", uri);
-  const resource = await serverInfo.client.readResource({ uri });
+  const resource = await serverInfo.client.readResource({ uri }, { signal });
 
   if (!resource) {
     throw new Error(`Resource not found: ${uri}`);
@@ -164,6 +167,7 @@ export function loadSandboxProxy(
   iframe: HTMLIFrameElement,
   csp?: McpUiResourceCsp,
   permissions?: McpUiResourcePermissions,
+  signal?: AbortSignal,
 ): Promise<boolean> {
   // Prevent reload
   if (iframe.src) return Promise.resolve(false);
@@ -179,11 +183,15 @@ export function loadSandboxProxy(
   const readyNotification: McpUiSandboxProxyReadyNotification["method"] =
     "ui/notifications/sandbox-proxy-ready";
 
-  const readyPromise = new Promise<boolean>((resolve) => {
+  signal?.throwIfAborted();
+  const readyPromise = new Promise<boolean>((resolve, reject) => {
+    const abort = () => { window.removeEventListener("message", listener); reject(signal?.reason); };
+    signal?.addEventListener("abort", abort, { once: true });
     const listener = ({ source, data }: MessageEvent) => {
       if (source === iframe.contentWindow && data?.method === readyNotification) {
         log.info("Sandbox proxy loaded")
         window.removeEventListener("message", listener);
+        signal?.removeEventListener("abort", abort);
         resolve(true);
       }
     };
