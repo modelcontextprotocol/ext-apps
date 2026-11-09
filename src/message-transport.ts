@@ -41,6 +41,12 @@ import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types.js";
  * @see {@link app!App.connect `App.connect`} for View usage
  * @see {@link app-bridge!AppBridge.connect `AppBridge.connect`} for Host usage
  */
+/** Optional, explicitly enabled diagnostics for postMessage transports. */
+export interface PostMessageTransportOptions {
+  /** Debug logging is disabled unless a logger is supplied. */
+  logger?: Pick<Console, "debug">;
+}
+
 export class PostMessageTransport implements Transport {
   private messageListener: (
     this: Window,
@@ -53,6 +59,7 @@ export class PostMessageTransport implements Transport {
    * @param eventTarget - Target window to send messages to (default: `window.parent`)
    * @param eventSource - Source window for message validation. For views, pass
    *   `window.parent`. For hosts, pass `iframe.contentWindow`.
+   * @param options - Optional diagnostics logger; no debug output by default.
    *
    * @example View connecting to parent
    * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_view"
@@ -71,20 +78,24 @@ export class PostMessageTransport implements Transport {
   constructor(
     private eventTarget: Window = window.parent,
     private eventSource: MessageEventSource,
+    private options: PostMessageTransportOptions = {},
   ) {
     this.messageListener = (event) => {
       if (eventSource && event.source !== this.eventSource) {
-        console.debug("Ignoring message from unknown source", event);
+        this.options.logger?.debug(
+          "Ignoring message from unknown source",
+          event,
+        );
         return;
       }
       const parsed = JSONRPCMessageSchema.safeParse(event.data);
       if (parsed.success) {
-        console.debug("Parsed message", parsed.data);
+        this.options.logger?.debug("Parsed message", parsed.data);
         this.onmessage?.(parsed.data);
       } else if (event.data?.jsonrpc !== "2.0") {
         // Not a JSON-RPC message at all (e.g. internal frames injected by
         // the host environment). Ignore silently so the transport stays alive.
-        console.debug(
+        this.options.logger?.debug(
           "Ignoring non-JSON-RPC message",
           parsed.error.message,
           event,
@@ -125,7 +136,7 @@ export class PostMessageTransport implements Transport {
     // Skip debug log for high-frequency streaming notifications — these
     // can fire dozens of times per second and flood the console.
     if ((message as { method?: string }).method !== TOOL_INPUT_PARTIAL_METHOD) {
-      console.debug("Sending message", message);
+      this.options.logger?.debug("Sending message", message);
     }
     this.eventTarget.postMessage(message, "*");
   }
