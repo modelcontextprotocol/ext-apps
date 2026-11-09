@@ -512,7 +512,7 @@ describe("app-rendered elicitation negotiation", () => {
         },
         serverCapabilities,
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("reads the server setting from the existing MCP Apps extension", () => {

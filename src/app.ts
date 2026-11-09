@@ -1114,6 +1114,7 @@ export class App extends Protocol<BaseContext> {
    * Register this handler before {@link connect `connect`}; doing so advertises
    * the app's `elicitation` capability during `ui/initialize`.
    */
+  private _autoElicitationCapability = false;
   private _onelicitation?: (
     params: ElicitRequest["params"],
     extra: RequestHandlerExtra,
@@ -1129,28 +1130,40 @@ export class App extends Protocol<BaseContext> {
         ) => ElicitResult | Promise<ElicitResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced(
-      "onelicitation",
-      this._onelicitation,
-      callback,
-    );
-    this._onelicitation = callback;
-    if (callback && !this._appCapabilities.elicitation && !this.transport) {
-      this._appCapabilities.elicitation = {};
+    if (!callback) {
+      if (this._onelicitation) this.removeRequestHandler("elicitation/create");
+      this._onelicitation = undefined;
+      // Capabilities already advertised during initialization cannot be withdrawn.
+      if (this._autoElicitationCapability && !this.transport) {
+        const { elicitation: _elicitation, ...remaining } =
+          this._appCapabilities;
+        this._appCapabilities = remaining;
+        this._autoElicitationCapability = false;
+      }
+      return;
+    }
+    if (!this._appCapabilities.elicitation) {
+      this.registerAppCapabilities({ elicitation: {} });
+      this._autoElicitationCapability = true;
     }
     this.replaceRequestHandler(
       "elicitation/create",
       { params: ElicitRequestParamsSchema, result: ElicitResultSchema },
       (params, extra) => {
-        if (!this._onelicitation) {
+        if (!this._onelicitation)
           throw new Error("No onelicitation handler set");
-        }
         if (params.mode !== undefined && params.mode !== "form") {
           throw new Error("MCP Apps only support form-mode elicitations");
         }
         return this._onelicitation(params, extra);
       },
     );
+    this.warnIfRequestHandlerReplaced(
+      "onelicitation",
+      this._onelicitation,
+      callback,
+    );
+    this._onelicitation = callback;
   }
 
   /**

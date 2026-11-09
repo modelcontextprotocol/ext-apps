@@ -306,14 +306,14 @@ describe("App <-> AppBridge integration", () => {
       app.onelicitation = async () => ({ action: "cancel" });
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
-      expect(() =>
+      await expect(
         bridge.requestElicitation({
           mode: "url",
           message: "Open",
           elicitationId: "test",
           url: "https://example.com",
         }),
-      ).toThrow("form-mode");
+      ).rejects.toThrow("form-mode");
     });
 
     it("fails closed when the app did not advertise elicitation", async () => {
@@ -325,12 +325,12 @@ describe("App <-> AppBridge integration", () => {
       await bridge.connect(bridgeTransport);
       await app.connect(appTransport);
 
-      expect(() =>
+      await expect(
         bridge.requestElicitation({
           message: "Choose an option",
           requestedSchema: { type: "object", properties: {} },
         }),
-      ).toThrow("App does not support elicitation");
+      ).rejects.toThrow("App does not support elicitation");
     });
   });
 

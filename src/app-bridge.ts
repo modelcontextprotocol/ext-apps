@@ -1,3 +1,15 @@
+import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/client/validators/cf-worker";
+import type { jsonSchemaValidator } from "@modelcontextprotocol/client";
+import { validateUiResourceUri } from "./elicitation.js";
+export {
+  EXTENSION_ID,
+  getUiCapability,
+  getUiServerCapability,
+  supportsAppElicitation,
+  getElicitationUiResourceUri,
+  validateUiResourceUri,
+} from "./elicitation.js";
+
 import {
   Protocol,
   type BaseContext,
@@ -112,7 +124,7 @@ export { PostMessageTransport } from "./message-transport.js";
  *
  * @param tool - A tool object with optional `_meta` property
  * @returns The UI resource URI if valid, undefined if not present
- * @throws Error if resourceUri is present but invalid (does not start with "ui://")
+ * @throws Error if resourceUri is present but is not a canonical absolute ui:// URI
  *
  * @example
  * ```typescript
@@ -137,7 +149,12 @@ export function getToolUiResourceUri(tool: Partial<Tool>): string | undefined {
     uri = tool._meta?.[RESOURCE_URI_META_KEY];
   }
 
-  if (typeof uri === "string" && uri.startsWith("ui://")) {
+  if (typeof uri === "string") {
+    try {
+      validateUiResourceUri(uri);
+    } catch {
+      throw new Error(`Invalid UI resource URI: ${JSON.stringify(uri)}`);
+    }
     return uri;
   } else if (uri !== undefined) {
     throw new Error(`Invalid UI resource URI: ${JSON.stringify(uri)}`);
@@ -213,6 +230,8 @@ export function buildAllowAttribute(
  */
 export type HostOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
   hostContext?: McpUiHostContext;
+  /** JSON Schema provider for validating accepted elicitation content. Defaults to CfWorker. */
+  jsonSchemaValidator?: jsonSchemaValidator;
 };
 
 /**
@@ -310,6 +329,7 @@ export class AppBridge extends Protocol<BaseContext> {
   private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
   private _initializedReceived = false;
+  private readonly _elicitationValidator: jsonSchemaValidator;
   private readonly _registeredEvents = new Set<keyof AppBridgeEventMap>();
   private readonly _events = new EventDispatcher<AppBridgeEventMap>();
   private readonly _methods = new MethodRegistry();
@@ -537,6 +557,8 @@ export class AppBridge extends Protocol<BaseContext> {
     options?: HostOptions,
   ) {
     super(options);
+    this._elicitationValidator =
+      options?.jsonSchemaValidator ?? new CfWorkerJsonSchemaValidator();
     this._methods.replace("notifications/cancelled");
     this._methods.replace("notifications/progress");
 
@@ -639,12 +661,16 @@ export class AppBridge extends Protocol<BaseContext> {
    *
    * Hosts should call this only from the core MCP client's handler for the
    * originating `elicitation/create` request. The returned value is the
-   * standard MCP `ElicitResult`. Before returning an accepted result to the
-   * server, hosts must validate its content against `params.requestedSchema`.
-   * Invalid results should fall back to native form rendering; explicit
-   * `decline` and `cancel` results must be preserved.
+   * standard MCP `ElicitResult`. Accepted content is validated against the
+   * requested schema using the configured JSON Schema provider. Invalid results
+   * reject; hosts should use native form rendering if the operation is still
+   * pending. Explicit `decline` and `cancel` results preserve the action and omit content.
+   *
+   * The default timeout is ten minutes for human input. Hosts can override it
+   * per request and should pass the originating operation's abort signal.
+   * Cancellation of that operation must not open a fallback form.
    */
-  requestElicitation(
+  async requestElicitation(
     params: ElicitRequest["params"],
     options?: RequestOptions,
   ): Promise<ElicitResult> {
@@ -660,11 +686,26 @@ export class AppBridge extends Protocol<BaseContext> {
     if (params.mode !== undefined && params.mode !== "form") {
       throw new Error("MCP Apps only support form-mode elicitations");
     }
-    return this.request(
+    // Compile before sending so invalid schemas cannot leave an orphaned form.
+    const validate = this._elicitationValidator.getValidator(
+      params.requestedSchema,
+    );
+    const result = await this.request(
       { method: "elicitation/create", params },
       ElicitResultSchema,
-      options,
+      { ...options, timeout: options?.timeout ?? 10 * 60 * 1000 },
     );
+    if (result.action !== "accept") {
+      const { content: _content, ...withoutContent } = result;
+      return withoutContent;
+    }
+    const checked = validate(result.content);
+    if (!checked.valid) {
+      throw new Error(
+        `App elicitation content does not match requestedSchema: ${checked.errorMessage}`,
+      );
+    }
+    return result;
   }
 
   /**
