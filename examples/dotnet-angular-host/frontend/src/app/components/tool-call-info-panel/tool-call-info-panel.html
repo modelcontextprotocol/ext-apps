@@ -1,0 +1,30 @@
+<div
+  class="tool-call-info-panel"
+  [style.opacity]="isDestroying() ? '0.5' : null"
+  [style.pointer-events]="isDestroying() ? 'none' : null"
+>
+  <!-- Header: server:tool name + close button -->
+  <div class="app-header">
+    <span>
+      {{ toolCallInfo().serverInfo.name }}:<span class="tool-name">{{ toolCallInfo().tool.name }}</span>
+    </span>
+    @if (!isDestroying()) {
+      <button class="close-button" (click)="onCloseClick()" title="Close">×</button>
+    }
+  </div>
+
+  <!-- Tool Input -->
+  <app-collapsible-panel icon="📥" label="Tool Input" [content]="inputJson()" />
+
+  <!-- App iframe (if app tool) -->
+  @if (isApp()) {
+    <app-iframe-panel
+      [toolCallInfo]="$any(toolCallInfo())"
+      [isDestroying]="isDestroying()"
+      (teardownComplete)="onTeardownComplete()"
+    />
+  }
+
+  <!-- Tool Result -->
+  <app-tool-result-panel [toolCallInfo]="toolCallInfo()" />
+</div>
