@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-pdf",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "type": "module",
   "description": "MCP server for loading and extracting text from PDF files with chunked pagination and interactive viewer",
   "repository": {
@@ -31,7 +31,7 @@
     "@cantoo/pdf-lib": "2.6.5",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/express": "2.0.0",
-    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "@modelcontextprotocol/ext-apps": "^2.1.0",
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "cors": "^2.8.5",

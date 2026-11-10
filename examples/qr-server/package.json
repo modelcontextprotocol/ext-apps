@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-qr",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "start": "uv run server.py",
@@ -8,6 +8,6 @@
     "build": "echo 'No build step needed for Python server'"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^2.0.0"
+    "@modelcontextprotocol/ext-apps": "^2.1.0"
   }
 }
