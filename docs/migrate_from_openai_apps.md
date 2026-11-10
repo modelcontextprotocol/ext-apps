@@ -275,10 +275,34 @@ Client-side migration involves replacing the implicit `window.openai` global wit
 
 ### State Persistence
 
-| OpenAI                                | MCP Apps | Notes                                                                |
-| ------------------------------------- | -------- | -------------------------------------------------------------------- |
-| `window.openai.widgetState`           | —        | Not directly available in MCP                                        |
-| `window.openai.setWidgetState(state)` | —        | Use alternative mechanisms (`localStorage`, server-side state, etc.) |
+OpenAI's widget state is one snapshot that can carry UI-only state (`privateContent`), state for the model (`modelContent`) and file ids (`imageIds`). MCP Apps has a separate request for each purpose:
+
+| OpenAI                                                         | MCP Apps                                    | Notes                                                                                                                                                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `window.openai.widgetState`                                    | `app.getHostContext()?.viewState`           | Read it after `connect()`. `null` means nothing is saved                                                                                                                                               |
+| `window.openai.setWidgetState(state)`, or its `privateContent` | `await app.setViewState(state)`             | Kept by the host for this View instance and never shown to the model. Needs host support: check `app.getHostCapabilities()?.viewState`, and otherwise fall back to `localStorage` or server-side state |
+| `setWidgetState({ modelContent })`                             | `await app.updateModelContext({ content })` | The host does not hand model context back to the View: also keep a copy in the view state if you need it after a reload                                                                                |
+| `setWidgetState({ imageIds })`                                 | —                                           | Not yet implemented (see File Operations)                                                                                                                                                              |
+
+```typescript
+// Before (OpenAI)
+window.openai.setWidgetState({
+  modelContent: "Selected: M6 hex bolt",
+  privateContent: { tab: "details" },
+});
+const saved = window.openai.widgetState?.privateContent;
+
+// After (MCP Apps)
+if (app.getHostCapabilities()?.viewState) {
+  await app.setViewState({ version: 1, tab: "details" });
+}
+await app.updateModelContext({
+  content: [{ type: "text", text: "Selected: M6 hex bolt" }],
+});
+const saved = app.getHostContext()?.viewState; // after connect()
+```
+
+In React, {@link @modelcontextprotocol/ext-apps/react!useViewState `useViewState`} wraps the restore and the debounced save. See [Persisting view state](./patterns.md#persisting-view-state) for the full pattern and its fallback.
 
 ### File Operations (Not Yet in MCP Apps)
 
