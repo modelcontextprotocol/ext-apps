@@ -265,6 +265,9 @@ Client-side migration involves replacing the implicit `window.openai` global wit
 | -------------------------------------------------- | --------------------------------------------------------- | ----------------------------------- |
 | `await window.openai.requestDisplayMode({ mode })` | `await app.requestDisplayMode({ mode })`                  | Same API                            |
 | —                                                  | Check `app.getHostContext()?.availableDisplayModes` first | MCP lets you check what's available |
+| `_meta["openai/ui"].preferredDisplayMode`          | `preferredDisplayMode` in the `App` capabilities          | A hint; see below                   |
+
+`_meta["openai/ui"].preferredDisplayMode` comes from OpenAI's [MCP extensions](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#display-modes), where it is set on the UI resource. In MCP Apps the View declares the preference itself when it connects (`new App(appInfo, { availableDisplayModes, preferredDisplayMode })`), and the host may ignore it.
 
 ### Size Reporting
 
