@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-system-monitor",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "type": "module",
   "description": "System monitor MCP App Server with real-time stats",
   "repository": {
@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/express": "2.0.0",
-    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "@modelcontextprotocol/ext-apps": "^2.1.0",
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "chart.js": "^4.4.0",

@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-say",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "private": true,
   "description": "Streaming TTS MCP App Server with karaoke-style text highlighting",
   "repository": {
@@ -15,6 +15,6 @@
     "build": "echo 'No build step needed for Python server'"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^2.0.0"
+    "@modelcontextprotocol/ext-apps": "^2.1.0"
   }
 }
