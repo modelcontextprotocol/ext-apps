@@ -114,6 +114,10 @@ export {
   type McpUiRequestDisplayModeRequest,
   type McpUiRequestDisplayModeResult,
   type McpUiToolVisibility,
+  type McpUiEntrypoint,
+  type McpUiGlobalEntrypoint,
+  type McpUiThreadEntrypoint,
+  type McpUiFileEntrypoint,
   type McpUiToolMeta,
   type McpUiClientCapabilities,
 } from "./spec.types.js";
@@ -155,6 +159,10 @@ export {
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResultSchema,
   McpUiToolVisibilitySchema,
+  McpUiEntrypointSchema,
+  McpUiGlobalEntrypointSchema,
+  McpUiThreadEntrypointSchema,
+  McpUiFileEntrypointSchema,
   McpUiToolMetaSchema,
 } from "./generated/schema.js";
 

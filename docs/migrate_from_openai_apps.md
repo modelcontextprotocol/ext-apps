@@ -34,6 +34,13 @@ The server-side changes involve updating metadata structure and using helper fun
 | `_meta["openai/toolInvocation/invoked"]`       | —                                  | Not yet implemented                                         |
 | `_meta["openai/widgetAccessible"]` (`boolean`) | `_meta.ui.visibility` (`string[]`) | `true`/`false` → include/exclude `"app"` in array           |
 | `_meta["openai/visibility"]` (`string`)        | `_meta.ui.visibility` (`string[]`) | `"public"`/`"private"` → include/exclude `"model"` in array |
+| `_meta["openai/ui"].entrypoints`               | `_meta.ui.entrypoints`             | Draft; same three types, `"file"` differs (see below)       |
+
+`_meta["openai/ui"].entrypoints` comes from OpenAI's [MCP extensions](https://github.com/openai/mcp-extensions/blob/15e0f4745e7c95865ee2195de5b79f4148b21418/docs/spec.md#mcp-app-entrypoints). `_meta.ui.entrypoints` (draft specification) takes the same list of typed objects, and a server can declare both keys:
+
+- `{ "type": "global" }` and `{ "type": "thread" }` map as they are.
+- `{ "type": "file", "extensions": [...] }` keeps its `extensions` and can add `mimeTypes`, but the file reaches the tool differently. In MCP Apps the tool takes the file as its one `x-mcp-file` argument, as the [File Uploads extension](https://github.com/modelcontextprotocol/experimental-ext-file-uploads/pull/1) (a working draft) defines it, where OpenAI's tool receives `{ file: { name, resourceUri } }` with a URI that the host serves. Return the content that the View needs in the tool result.
+- Deep links into a global entrypoint have no MCP Apps equivalent yet.
 
 ### Resource Metadata
 

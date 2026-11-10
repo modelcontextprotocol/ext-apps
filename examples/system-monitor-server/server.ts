@@ -141,7 +141,10 @@ export function createServer(): McpServer {
         "Returns system information, including hostname, platform, CPU info, and memory.",
       inputSchema: z.object({}),
       outputSchema: SystemInfoSchema,
-      _meta: { ui: { resourceUri } },
+      annotations: { readOnlyHint: true },
+      // The tool takes no arguments and only reads, so the user can also
+      // open the monitor directly from the host's own UI.
+      _meta: { ui: { resourceUri, entrypoints: [{ type: "global" }] } },
     },
     (): CallToolResult => {
       const info = getSystemInfo();

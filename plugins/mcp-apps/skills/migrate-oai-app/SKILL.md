@@ -108,6 +108,7 @@ These OpenAI features don't have MCP equivalents yet:
 |----------------|-------------------|
 | `_meta["openai/toolInvocation/invoking"]` / `_meta["openai/toolInvocation/invoked"]` | Progress indicators not yet available |
 | `_meta["openai/widgetDescription"]` | Use `app.updateModelContext()` for dynamic context |
+| `_meta["openai/ui"].entrypoints` (OpenAI MCP extensions) | Maps to `_meta.ui.entrypoints` (draft spec): `"global"` and `"thread"` as they are; `"file"` takes the file as an `x-mcp-file` tool argument (File Uploads draft) instead of a host resource URI. Deep links not yet available |
 
 **Client-side:**
 | OpenAI Feature | Status/Workaround |
