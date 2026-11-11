@@ -67,7 +67,7 @@ then just ask:
 
 ```
 /plugin marketplace add modelcontextprotocol/ext-apps
-/plugin install mcp-apps@modelcontextprotocol-ext-apps
+/plugin install mcp-apps@mcp-apps
 ```
 
 **Other agents** — any AI coding agent that supports
