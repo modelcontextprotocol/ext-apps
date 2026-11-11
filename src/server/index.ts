@@ -37,7 +37,11 @@ import {
   McpUiToolMeta,
   McpUiClientCapabilities,
 } from "../spec.types.js";
-import { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "../constants.js";
+import {
+  RESOURCE_URI_META_KEY,
+  RESOURCE_MIME_TYPE,
+  UI_CLOSE_META_KEY,
+} from "../constants.js";
 import type {
   CallToolResult,
   ClientCapabilities,
@@ -56,7 +60,7 @@ import type {
 import type { z } from "zod/v4";
 
 // Re-exports for convenience
-export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
+export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE, UI_CLOSE_META_KEY };
 export type { ResourceMetadata, ToolCallback };
 
 /**

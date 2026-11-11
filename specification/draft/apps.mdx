@@ -340,9 +340,13 @@ Example:
 Tools are associated with UI resources through the `_meta.ui` field:
 
 ```typescript
+type McpUiToolPreload = "optional" | "disabled";
+
 interface McpUiToolMeta {
   /** URI of UI resource for rendering tool results */
   resourceUri?: string;
+  /** Whether the Host may preload the UI resource. Default: "optional" */
+  preload?: McpUiToolPreload;
   /**
    * Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
@@ -402,6 +406,22 @@ Example (app-only tool, hidden from model):
 }
 ```
 
+Example (defer loading the View until the tool result is available):
+
+```json
+{
+  "name": "search_orders",
+  "description": "Search for matching orders",
+  "inputSchema": { "type": "object" },
+  "_meta": {
+    "ui": {
+      "resourceUri": "ui://orders/search-results",
+      "preload": "disabled"
+    }
+  }
+}
+```
+
 #### Behavior:
 
 - If `ui.resourceUri` is present and host supports MCP Apps, host renders tool results using the specified UI resource
@@ -410,6 +430,43 @@ Example (app-only tool, hidden from model):
 - Host MUST use `resources/read` to fetch the referenced resource URI
 - Host MAY prefetch and cache UI resource content for performance optimization
 - Since UI resources are primarily discovered through tool metadata, Servers MAY omit UI-only resources from `resources/list` and `notifications/resources/list_changed`
+
+#### Preloading:
+
+Hosts that recognize the `preload` field apply the following behavior:
+
+- `preload` defaults to `"optional"` if omitted
+- `"optional"`: Host MAY fetch the UI resource and initialize or display its View before tool execution completes
+- `"disabled"`: Host MUST wait for the tool result before fetching the UI resource for that invocation or initializing or displaying its View
+- `"disabled"` does not require a Host to evict a UI resource that is already cached from another invocation
+- After receiving a result without `_meta["ui/close"]: true`, Host MAY load and display the View normally
+- Hosts that do not recognize `preload` MAY ignore it and preserve their existing behavior
+
+#### Result-driven View closure:
+
+A Server MAY indicate that the View declared for a tool is not needed for a particular invocation by setting `_meta["ui/close"]` on its `CallToolResult`:
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Found one matching order."
+    }
+  ],
+  "_meta": {
+    "ui/close": true
+  }
+}
+```
+
+Hosts that recognize the `ui/close` signal apply the following behavior:
+
+- The signal applies only to the invocation that produced the result
+- If its View has not been initialized or displayed, Host MUST suppress it
+- If its View has been initialized or displayed, Host MUST initiate graceful teardown using `ui/resource-teardown` and SHOULD wait for a response before unmounting it
+- The signal has no effect when it is omitted, set to `false`, or no View is associated with the invocation
+- Hosts that do not recognize `ui/close` MAY ignore it; Servers SHOULD provide meaningful non-UI content for those Hosts
 
 #### Visibility:
 

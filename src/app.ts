@@ -22,7 +22,11 @@ import {
   type Transport,
 } from "@modelcontextprotocol/client";
 import { EmptyResultSchema } from "@modelcontextprotocol/core";
-export { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY } from "./constants.js";
+export {
+  RESOURCE_MIME_TYPE,
+  RESOURCE_URI_META_KEY,
+  UI_CLOSE_META_KEY,
+} from "./constants.js";
 import { EventDispatcher, MethodRegistry } from "./events.js";
 import {
   toModernArgs,
