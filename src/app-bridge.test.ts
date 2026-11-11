@@ -2593,6 +2593,337 @@ describe("AppBridge outer v2 Client proxy", () => {
   });
 });
 
+describe("shared outer Client notification forwarding", () => {
+  const kinds = ["tools", "resources", "prompts"] as const;
+  type Counts = Record<(typeof kinds)[number], number>;
+  const counts = (): Counts => ({ tools: 0, resources: 0, prompts: 0 });
+  const all = (value: number): Counts => ({
+    tools: value,
+    resources: value,
+    prompts: value,
+  });
+  type Peer = {
+    client: Client;
+    server: Server;
+    errors: string[];
+  };
+  type View = {
+    app: App;
+    bridge: AppBridge;
+    appTransport: InMemoryTransport;
+    bridgeTransport: InMemoryTransport;
+    received: Counts;
+  };
+  const peers: Peer[] = [];
+  const views: View[] = [];
+
+  async function createPeer(): Promise<Peer> {
+    const server = new Server(testHostInfo, {
+      capabilities: {
+        tools: { listChanged: true },
+        resources: { listChanged: true },
+        prompts: { listChanged: true },
+      },
+      supportedProtocolVersions: ["2025-11-25"],
+    });
+    server.setRequestHandler("tools/call", (request) => ({
+      content: [{ type: "text", text: `outer:${request.params.name}` }],
+    }));
+    const client = new Client(testHostInfo, {
+      capabilities: {},
+      versionNegotiation: { mode: "legacy" },
+      supportedProtocolVersions: ["2025-11-25"],
+    });
+    const errors: string[] = [];
+    client.onerror = (error) => errors.push(error.message);
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const peer = { client, server, errors };
+    peers.push(peer);
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    return peer;
+  }
+
+  function createView(peer: Peer): View {
+    const received = counts();
+    const app = new App(testAppInfo, {}, { autoResize: false });
+    for (const kind of kinds) {
+      app.setNotificationHandler(`notifications/${kind}/list_changed`, () => {
+        received[kind]++;
+      });
+    }
+    const bridge = new AppBridge(peer.client, testHostInfo, {
+      serverTools: { listChanged: true },
+      serverResources: { listChanged: true },
+    });
+    const [appTransport, bridgeTransport] =
+      InMemoryTransport.createLinkedPair();
+    const view = { app, bridge, appTransport, bridgeTransport, received };
+    views.push(view);
+    return view;
+  }
+
+  async function connectView(peer: Peer): Promise<View> {
+    const view = createView(peer);
+    await view.bridge.connect(view.bridgeTransport);
+    await view.app.connect(view.appTransport);
+    return view;
+  }
+
+  async function notify(peer: Peer): Promise<void> {
+    await peer.server.sendToolListChanged();
+    await peer.server.sendResourceListChanged();
+    await peer.server.sendPromptListChanged();
+    await flush();
+  }
+
+  afterEach(async () => {
+    for (const view of views.splice(0)) {
+      await view.app.close();
+      await view.bridge.close();
+    }
+    for (const peer of peers.splice(0)) {
+      await peer.client.close();
+      await peer.server.close();
+    }
+  });
+
+  it("forwards all three notifications to every ready view on one Client", async () => {
+    const peer = await createPeer();
+    const first = await connectView(peer);
+    await notify(peer);
+    expect(first.received).toEqual(all(1));
+
+    const second = await connectView(peer);
+    await notify(peer);
+    expect(first.received).toEqual(all(2));
+    expect(second.received).toEqual(all(1));
+    for (const view of [first, second]) {
+      expect(
+        await view.app.callServerTool({ name: "ordinary-tool", arguments: {} }),
+      ).toEqual({ content: [{ type: "text", text: "outer:ordinary-tool" }] });
+    }
+    expect(peer.errors).toEqual([]);
+  });
+
+  for (const closeIndex of [0, 1]) {
+    it(`keeps forwarding when the ${closeIndex === 0 ? "older" : "newer"} bridge closes`, async () => {
+      const peer = await createPeer();
+      const pair = [await connectView(peer), await connectView(peer)];
+      const closed = pair[closeIndex];
+      const remaining = pair[1 - closeIndex];
+      let closeCalls = 0;
+      closed.bridge.onclose = () => closeCalls++;
+      await closed.bridge.close();
+      await closed.bridge.close();
+      await notify(peer);
+      expect(closed.received).toEqual(all(0));
+      expect(remaining.received).toEqual(all(1));
+      expect(closeCalls).toBe(1);
+      expect(peer.errors).toEqual([]);
+
+      const [appTransport, bridgeTransport] =
+        InMemoryTransport.createLinkedPair();
+      await closed.bridge.connect(bridgeTransport);
+      await closed.app.connect(appTransport);
+      await notify(peer);
+      expect(closed.received).toEqual(all(1));
+      expect(remaining.received).toEqual(all(2));
+      expect(peer.errors).toEqual([]);
+    });
+  }
+
+  it("cleans up a view-side disconnect and preserves the bridge onclose callback", async () => {
+    const peer = await createPeer();
+    const first = await connectView(peer);
+    const second = await connectView(peer);
+    let closeCalls = 0;
+    second.bridge.onclose = () => closeCalls++;
+    await second.app.close();
+    await notify(peer);
+    expect(first.received).toEqual(all(1));
+    expect(second.received).toEqual(all(0));
+    expect(closeCalls).toBe(1);
+    expect(peer.errors).toEqual([]);
+  });
+
+  it("does not forward to a connected view until its Apps handshake completes", async () => {
+    const peer = await createPeer();
+    const ready = await connectView(peer);
+    const pending = createView(peer);
+    const forwarded: string[] = [];
+    const send = pending.bridgeTransport.send.bind(pending.bridgeTransport);
+    pending.bridgeTransport.send = async (message, options) => {
+      if (
+        "method" in message &&
+        kinds.some(
+          (kind) => message.method === `notifications/${kind}/list_changed`,
+        )
+      ) {
+        forwarded.push(message.method);
+      }
+      await send(message, options);
+    };
+    await pending.bridge.connect(pending.bridgeTransport);
+    await notify(peer);
+    expect(forwarded).toEqual([]);
+    expect(ready.received).toEqual(all(1));
+    expect(pending.received).toEqual(all(0));
+
+    await pending.app.connect(pending.appTransport);
+    await notify(peer);
+    expect(ready.received).toEqual(all(2));
+    expect(pending.received).toEqual(all(1));
+    expect(forwarded).toHaveLength(3);
+    expect(peer.errors).toEqual([]);
+  });
+
+  it("releases a failed transport start and reconnects without duplicate delivery", async () => {
+    const peer = await createPeer();
+    const ready = await connectView(peer);
+    const failed = createView(peer);
+    failed.bridgeTransport.start = async () => {
+      throw new Error("transport start failed");
+    };
+    let closeCalls = 0;
+    failed.bridge.onclose = () => closeCalls++;
+    await expect(failed.bridge.connect(failed.bridgeTransport)).rejects.toThrow(
+      "transport start failed",
+    );
+    await notify(peer);
+    expect(ready.received).toEqual(all(1));
+    expect(failed.received).toEqual(all(0));
+    expect(failed.bridge.transport).toBeUndefined();
+    expect(closeCalls).toBe(1);
+    expect(peer.errors).toEqual([]);
+
+    const [appTransport, bridgeTransport] =
+      InMemoryTransport.createLinkedPair();
+    await failed.bridge.connect(bridgeTransport);
+    await failed.app.connect(appTransport);
+    await notify(peer);
+    expect(ready.received).toEqual(all(2));
+    expect(failed.received).toEqual(all(1));
+    expect(peer.errors).toEqual([]);
+  });
+
+  it("cleans up an interrupted Apps handshake and supports a fresh handshake", async () => {
+    const peer = await createPeer();
+    const ready = await connectView(peer);
+    const interrupted = createView(peer);
+    const send = interrupted.bridgeTransport.send.bind(
+      interrupted.bridgeTransport,
+    );
+    interrupted.bridgeTransport.send = async (message, options) => {
+      if ("result" in message) {
+        // Simulate the view's transport disappearing before ui/initialize's
+        // response arrives. The real initialization handler has already run.
+        await interrupted.bridgeTransport.close();
+        return;
+      }
+      await send(message, options);
+    };
+    await interrupted.bridge.connect(interrupted.bridgeTransport);
+    await expect(
+      interrupted.app.connect(interrupted.appTransport),
+    ).rejects.toThrow();
+    await notify(peer);
+    expect(ready.received).toEqual(all(1));
+    expect(interrupted.received).toEqual(all(0));
+    expect(peer.errors).toEqual([]);
+
+    const [appTransport, bridgeTransport] =
+      InMemoryTransport.createLinkedPair();
+    await interrupted.bridge.connect(bridgeTransport);
+    await interrupted.app.connect(appTransport);
+    await notify(peer);
+    expect(ready.received).toEqual(all(2));
+    expect(interrupted.received).toEqual(all(1));
+    expect(peer.errors).toEqual([]);
+  });
+
+  it("keeps notifications on separate outer Clients isolated", async () => {
+    const firstPeer = await createPeer();
+    const secondPeer = await createPeer();
+    const first = await connectView(firstPeer);
+    const second = await connectView(firstPeer);
+    const other = await connectView(secondPeer);
+    await notify(firstPeer);
+    expect(first.received).toEqual(all(1));
+    expect(second.received).toEqual(all(1));
+    expect(other.received).toEqual(all(0));
+    await notify(secondPeer);
+    expect(first.received).toEqual(all(1));
+    expect(second.received).toEqual(all(1));
+    expect(other.received).toEqual(all(1));
+  });
+
+  it("keeps live views forwarding after the outer Client disconnects and reconnects", async () => {
+    const peer = await createPeer();
+    const first = await connectView(peer);
+    const second = await connectView(peer);
+    let closeCalls = 0;
+    peer.client.onclose = () => closeCalls++;
+    await peer.server.close();
+    expect(closeCalls).toBe(1);
+
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    await peer.server.connect(serverTransport);
+    await peer.client.connect(clientTransport);
+    await notify(peer);
+    expect(first.received).toEqual(all(1));
+    expect(second.received).toEqual(all(1));
+    expect(peer.errors).toEqual([]);
+  });
+
+  it("leaves later caller handlers in place across bridge joins, closes and reconnects", async () => {
+    const peer = await createPeer();
+    const before = counts();
+    const later = counts();
+    for (const kind of kinds) {
+      peer.client.setNotificationHandler(
+        `notifications/${kind}/list_changed`,
+        () => {
+          before[kind]++;
+        },
+      );
+    }
+    const first = await connectView(peer);
+    await notify(peer);
+    // Automatic forwarding has always owned these single-handler slots.
+    expect(before).toEqual(all(0));
+    expect(first.received).toEqual(all(1));
+    for (const kind of kinds) {
+      peer.client.setNotificationHandler(
+        `notifications/${kind}/list_changed`,
+        () => {
+          later[kind]++;
+        },
+      );
+    }
+    const second = await connectView(peer);
+    await notify(peer);
+    expect(later).toEqual(all(1));
+    expect(first.received).toEqual(all(1));
+    expect(second.received).toEqual(all(0));
+    await first.bridge.close();
+    await second.bridge.close();
+    await notify(peer);
+    expect(later).toEqual(all(2));
+
+    const [appTransport, bridgeTransport] =
+      InMemoryTransport.createLinkedPair();
+    await first.bridge.connect(bridgeTransport);
+    await first.app.connect(appTransport);
+    await notify(peer);
+    expect(later).toEqual(all(3));
+    expect(first.received).toEqual(all(1));
+    expect(peer.errors).toEqual([]);
+  });
+});
+
 describe("getToolUiResourceUri", () => {
   describe("new nested format (_meta.ui.resourceUri)", () => {
     it("extracts resourceUri from _meta.ui.resourceUri", () => {
