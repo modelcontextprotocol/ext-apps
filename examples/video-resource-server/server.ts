@@ -12,18 +12,20 @@ import {
 import {
   McpServer,
   ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
-// Works both from source (server.ts) and compiled (dist/server.js)
-const DIST_DIR = import.meta.filename.endsWith(".ts")
-  ? path.join(import.meta.dirname, "dist")
-  : import.meta.dirname;
+// Works both from source (server.ts) and compiled (dist/server.js). Derived
+// from import.meta.url rather than import.meta.filename/dirname, which are
+// undefined on Node older than 20.11.
+const SERVER_FILE = fileURLToPath(import.meta.url);
+const DIST_DIR = SERVER_FILE.endsWith(".ts")
+  ? path.join(path.dirname(SERVER_FILE), "dist")
+  : path.dirname(SERVER_FILE);
 const RESOURCE_URI = "ui://video-player/mcp-app.html";
 
 /**
@@ -135,14 +137,14 @@ Available videos:
 ${Object.entries(VIDEO_LIBRARY)
   .map(([id, v]) => `- ${id}: ${v.description}`)
   .join("\n")}`,
-      inputSchema: {
+      inputSchema: z.object({
         videoId: z
           .enum(Object.keys(VIDEO_LIBRARY) as [string, ...string[]])
           .default("bunny-1mb")
           .describe(
             `Video ID to play. Available: ${Object.keys(VIDEO_LIBRARY).join(", ")}`,
           ),
-      },
+      }),
       outputSchema: z.object({
         videoUri: z.string(),
         description: z.string(),

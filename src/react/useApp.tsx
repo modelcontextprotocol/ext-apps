@@ -1,18 +1,17 @@
 import { useEffect, useState } from "react";
-import { Implementation } from "@modelcontextprotocol/sdk/types.js";
-import { Client } from "@modelcontextprotocol/sdk/client";
+import type { Implementation } from "@modelcontextprotocol/client";
 import {
   App,
   AppOptions,
   McpUiAppCapabilities,
   PostMessageTransport,
-} from "../app";
-export * from "../app";
+} from "../app.js";
+export * from "../app.js";
 
 /**
  * Options for configuring the {@link useApp `useApp`} hook.
  *
- * The `autoResize` and `strict` options are forwarded to the underlying
+ * The `autoResize`, `strict` and `webMcpBridge` options are forwarded to the underlying
  * {@link App `App`} instance. For other {@link AppOptions `AppOptions`},
  * create the `App` manually instead of using this hook.
  *
@@ -21,7 +20,7 @@ export * from "../app";
  */
 export interface UseAppOptions extends Pick<
   AppOptions,
-  "autoResize" | "strict"
+  "autoResize" | "strict" | "webMcpBridge"
 > {
   /** App identification (name and version) */
   appInfo: Implementation;
@@ -131,6 +130,7 @@ export function useApp({
   onAppCreated,
   autoResize = true,
   strict,
+  webMcpBridge,
 }: UseAppOptions): AppState {
   const [app, setApp] = useState<App | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -146,7 +146,11 @@ export function useApp({
           window.parent,
           window.parent,
         );
-        appInstance = new App(appInfo, capabilities, { autoResize, strict });
+        appInstance = new App(appInfo, capabilities, {
+          autoResize,
+          strict,
+          webMcpBridge,
+        });
 
         // Register handlers BEFORE connecting
         onAppCreated?.(appInstance);

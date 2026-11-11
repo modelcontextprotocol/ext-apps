@@ -18,7 +18,7 @@ import type {
   RequestId,
   ResourceLink,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 /**
  * Current protocol version supported by this SDK.
@@ -163,8 +163,8 @@ export interface McpUiOpenLinkResult {
   /** @description True if the host failed to open the URL (e.g., due to security policy). */
   isError?: boolean;
   /**
-   * Index signature required for MCP SDK `Protocol` class compatibility.
-   * Note: The generated schema uses passthrough() to allow additional properties.
+   * Additional result properties are preserved for protocol extensibility.
+   * The generated schema uses passthrough() to allow them.
    */
   [key: string]: unknown;
 }
@@ -195,8 +195,8 @@ export interface McpUiDownloadFileResult {
   /** @description True if the download failed (e.g., user cancelled or host denied). */
   isError?: boolean;
   /**
-   * Index signature required for MCP SDK `Protocol` class compatibility.
-   * Note: The generated schema uses passthrough() to allow additional properties.
+   * Additional result properties are preserved for protocol extensibility.
+   * The generated schema uses passthrough() to allow them.
    */
   [key: string]: unknown;
 }
@@ -223,8 +223,8 @@ export interface McpUiMessageResult {
   /** @description True if the host rejected or failed to deliver the message. */
   isError?: boolean;
   /**
-   * Index signature required for MCP SDK `Protocol` class compatibility.
-   * Note: The generated schema uses passthrough() to allow additional properties.
+   * Additional result properties are preserved for protocol extensibility.
+   * The generated schema uses passthrough() to allow them.
    */
   [key: string]: unknown;
 }
@@ -454,7 +454,7 @@ export interface McpUiResourceTeardownRequest {
  */
 export interface McpUiResourceTeardownResult {
   /**
-   * Index signature required for MCP SDK `Protocol` class compatibility.
+   * Additional result properties are preserved for protocol extensibility.
    */
   [key: string]: unknown;
 }
@@ -577,8 +577,8 @@ export interface McpUiInitializeResult {
   /** @description Rich context about the host environment. */
   hostContext: McpUiHostContext;
   /**
-   * Index signature required for MCP SDK `Protocol` class compatibility.
-   * Note: The generated schema uses passthrough() to allow additional properties.
+   * Additional result properties are preserved for protocol extensibility.
+   * The generated schema uses passthrough() to allow them.
    */
   [key: string]: unknown;
 }
@@ -752,7 +752,7 @@ export interface McpUiRequestDisplayModeResult {
   /** @description The display mode that was actually set. May differ from requested if not supported. */
   mode: McpUiDisplayMode;
   /**
-   * Index signature required for MCP SDK `Protocol` class compatibility.
+   * Additional result properties are preserved for protocol extensibility.
    * Note: The generated schema uses passthrough() to allow additional properties.
    */
   [key: string]: unknown;

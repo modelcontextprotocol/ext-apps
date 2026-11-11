@@ -8,7 +8,7 @@ import {
   applyHostStyleVariables,
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/client";
 import { createEffect, createSignal, onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import styles from "./mcp-app.module.css";

@@ -2,7 +2,7 @@
  * Wiki Explorer - Force-directed graph visualization of Wikipedia link networks
  */
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/client";
 import { z } from "zod";
 import {
   forceCenter,

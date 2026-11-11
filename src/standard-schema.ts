@@ -4,36 +4,22 @@ import type {
   StandardTypedV1,
 } from "@standard-schema/spec";
 
-export type { StandardJSONSchemaV1, StandardSchemaV1, StandardTypedV1 };
-
-// TODO(sdk-v2): once @modelcontextprotocol/core v2 is stable, import
-// StandardSchemaWithJSON / standardSchemaToJsonSchema / validateStandardSchema
-// from there and delete this file. At that point decide whether to tighten
-// App.registerTool to StandardSchemaWithJSON (drops zod 3 from the peer range
-// and the lazy z.toJSONSchema fallback below).
+import type { StandardSchemaWithJSON } from "@modelcontextprotocol/client";
 
 /**
  * A schema that implements both Standard Schema (validation) and Standard JSON
  * Schema (serialization). Zod v4, ArkType, and Valibot (via
- * `@valibot/to-json-schema`) all satisfy this.
- *
- * Mirrors the type of the same name in `@modelcontextprotocol/core` v2 so that
- * bumping to that package later is a drop-in import swap.
+ * `@valibot/to-json-schema`) all satisfy this. Re-exported from the SDK so
+ * View authors can import it alongside {@link app!App `App`}.
  *
  * @see https://standardschema.dev/
- * @see https://github.com/modelcontextprotocol/typescript-sdk/pull/1689
  */
-export interface StandardSchemaWithJSON<Input = unknown, Output = Input> {
-  readonly "~standard": StandardSchemaV1.Props<Input, Output> &
-    StandardJSONSchemaV1.Props<Input, Output>;
-}
-
-export namespace StandardSchemaWithJSON {
-  export type InferInput<S extends StandardTypedV1> =
-    StandardTypedV1.InferInput<S>;
-  export type InferOutput<S extends StandardTypedV1> =
-    StandardTypedV1.InferOutput<S>;
-}
+export type {
+  StandardJSONSchemaV1,
+  StandardSchemaV1,
+  StandardSchemaWithJSON,
+  StandardTypedV1,
+};
 
 /** JSON-Schema target draft used for tool input/output schemas (matches core MCP). */
 const TARGET = { target: "draft-2020-12" } as const;
@@ -41,11 +27,8 @@ const TARGET = { target: "draft-2020-12" } as const;
 /**
  * Serialize a Standard Schema to JSON Schema for the given direction.
  *
- * Uses `~standard.jsonSchema` when present (zod v4, ArkType, Valibot, …).
- * Falls back to a lazy `zod/v4` import for zod v3.25.x — which implements
- * `~standard.validate` but not yet `~standard.jsonSchema` — so the existing
- * `^3.25.0 || ^4.0.0` peer range keeps working. Non-zod schemas without
- * `jsonSchema` throw.
+ * Requires `~standard.jsonSchema` (zod v4, ArkType, Valibot, …); schemas
+ * without it throw.
  */
 export async function standardSchemaToJsonSchema(
   schema: StandardSchemaV1,
@@ -56,11 +39,6 @@ export async function standardSchemaToJsonSchema(
   >;
   if (std.jsonSchema) {
     return std.jsonSchema[io](TARGET);
-  }
-  if (std.vendor === "zod") {
-    const { z } = await import("zod/v4");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bridging StandardSchemaV1 → zod's $ZodType for the v3.25 fallback
-    return z.toJSONSchema(schema as any, { io });
   }
   throw new Error(
     `Schema (vendor: ${std.vendor}) does not implement Standard JSON Schema (~standard.jsonSchema). ` +

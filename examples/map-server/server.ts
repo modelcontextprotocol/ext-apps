@@ -5,13 +5,14 @@
  * - geocode: Search for places using OpenStreetMap Nominatim
  * - show-map: Display an interactive 3D globe at a given location
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import {
   registerAppTool,
@@ -20,10 +21,13 @@ import {
 } from "@modelcontextprotocol/ext-apps/server";
 import { randomUUID } from "crypto";
 
-// Works both from source (server.ts) and compiled (dist/server.js)
-const DIST_DIR = import.meta.filename.endsWith(".ts")
-  ? path.join(import.meta.dirname, "dist")
-  : import.meta.dirname;
+// Works both from source (server.ts) and compiled (dist/server.js). Derived
+// from import.meta.url rather than import.meta.filename/dirname, which are
+// undefined on Node older than 20.11.
+const SERVER_FILE = fileURLToPath(import.meta.url);
+const DIST_DIR = SERVER_FILE.endsWith(".ts")
+  ? path.join(path.dirname(SERVER_FILE), "dist")
+  : path.dirname(SERVER_FILE);
 const resourceUri = "ui://cesium-map/mcp-app.html";
 
 // Nominatim API response type
@@ -148,7 +152,7 @@ export function createServer(): McpServer {
       title: "Show Map",
       description:
         "Display an interactive world map zoomed to a specific bounding box. Use the GeoCode tool to find the bounding box of a location. The widget is interactive and exposes tools for navigation (fly to locations) and querying the current view.",
-      inputSchema: {
+      inputSchema: z.object({
         west: z
           .number()
           .optional()
@@ -173,7 +177,7 @@ export function createServer(): McpServer {
           .string()
           .optional()
           .describe("Optional label to display on the map"),
-      },
+      }),
       _meta: { ui: { resourceUri } },
     },
     async ({ west, south, east, north, label }): Promise<CallToolResult> => ({
@@ -196,13 +200,13 @@ export function createServer(): McpServer {
       title: "Geocode",
       description:
         "Search for places using OpenStreetMap. Returns coordinates and bounding boxes for up to 5 matches.",
-      inputSchema: {
+      inputSchema: z.object({
         query: z
           .string()
           .describe(
             "Place name or address to search for (e.g., 'Paris', 'Golden Gate Bridge', '1600 Pennsylvania Ave')",
           ),
-      },
+      }),
     },
     async ({ query }): Promise<CallToolResult> => {
       try {

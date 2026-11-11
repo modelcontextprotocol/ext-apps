@@ -56,7 +56,7 @@ To test local modifications, use this configuration (replace `~/code/ext-apps` w
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - Chrome, Edge, or Safari (Web Speech API support)
 
 ### Installation

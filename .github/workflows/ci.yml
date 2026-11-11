@@ -114,8 +114,40 @@ jobs:
           grep -q "Ready" /tmp/mcpb-smoke.log
         working-directory: examples/pdf-server
 
-  e2e:
+      # import.meta.filename/dirname are undefined before Node 20.11; servers
+      # must still start on the oldest Node their package.json engines allows.
+      - uses: actions/setup-node@v6
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        with:
+          node-version: "20.0.0"
+
+      - name: Smoke-test pdf-server starts on the oldest supported Node
+        if: runner.os == 'Linux' && matrix.name == 'Linux x64'
+        run: |
+          node --version
+          node .mcpb-smoke/dist/index.js --stdio < /dev/null 2>&1 | tee /tmp/mcpb-smoke-node20.log
+          grep -q "Ready" /tmp/mcpb-smoke-node20.log
+        working-directory: examples/pdf-server
+
+  dependency-isolation:
+    name: Dependency isolation
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run test:dependency-isolation
+
+  e2e:
+    # Pinned: the Playwright version in package.json cannot install its
+    # browser on ubuntu-26.04, which ubuntu-latest now resolves to.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -132,8 +164,10 @@ jobs:
 
       - run: npm ci
 
+      # Headless runs without a channel use chromium-headless-shell, so the
+      # full Chromium build (about 165 MB) would only be downloaded, never run.
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps --only-shell chromium
 
       - name: Run E2E tests
         run: npx playwright test --reporter=list
@@ -165,9 +199,14 @@ jobs:
           curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
           sudo apt-get install -y nodejs
 
+      # The checkout lives on the Windows drive, which WSL reaches over 9P;
+      # writing node_modules there is what makes this job slow (npm ci alone
+      # took about 3 minutes). Copy the tree onto the distro's ext4 filesystem
+      # first, as Microsoft's WSL guidance recommends for anything I/O heavy.
       - name: Build and test in WSL
         shell: wsl-bash {0}
         run: |
+          cp -r "$(pwd)" ~/ext-apps && cd ~/ext-apps
           npm ci
           npm run build
           npm run examples:build

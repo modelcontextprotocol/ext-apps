@@ -3,20 +3,24 @@ import {
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-// Works both from source (server.ts) and compiled (dist/server.js)
-const DIST_DIR = import.meta.filename.endsWith(".ts")
-  ? path.join(import.meta.dirname, "dist")
-  : import.meta.dirname;
+// Works both from source (server.ts) and compiled (dist/server.js). Derived
+// from import.meta.url rather than import.meta.filename/dirname, which are
+// undefined on Node older than 20.11.
+const SERVER_FILE = fileURLToPath(import.meta.url);
+const DIST_DIR = SERVER_FILE.endsWith(".ts")
+  ? path.join(path.dirname(SERVER_FILE), "dist")
+  : path.dirname(SERVER_FILE);
 
 // Track call counter across requests (stateful for demo purposes)
 let callCounter = 0;

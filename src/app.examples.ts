@@ -7,11 +7,8 @@
  * @module
  */
 
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type {
-  McpServer,
-  ToolCallback,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { SamplingMessage, Tool } from "@modelcontextprotocol/client";
+import type { McpServer, ToolCallback } from "@modelcontextprotocol/server";
 import {
   App,
   PostMessageTransport,
@@ -369,7 +366,7 @@ async function App_createSamplingMessage_simple(app: App) {
  */
 async function App_createSamplingMessage_withTools(
   app: App,
-  messages: import("@modelcontextprotocol/sdk/types.js").SamplingMessage[],
+  messages: SamplingMessage[],
 ) {
   //#region App_createSamplingMessage_withTools
   if (!app.getHostCapabilities()?.sampling?.tools) return;

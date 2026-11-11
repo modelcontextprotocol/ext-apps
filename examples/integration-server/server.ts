@@ -3,18 +3,22 @@ import {
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
-// Works both from source (server.ts) and compiled (dist/server.js)
-const DIST_DIR = import.meta.filename.endsWith(".ts")
-  ? path.join(import.meta.dirname, "dist")
-  : import.meta.dirname;
+// Works both from source (server.ts) and compiled (dist/server.js). Derived
+// from import.meta.url rather than import.meta.filename/dirname, which are
+// undefined on Node older than 20.11.
+const SERVER_FILE = fileURLToPath(import.meta.url);
+const DIST_DIR = SERVER_FILE.endsWith(".ts")
+  ? path.join(path.dirname(SERVER_FILE), "dist")
+  : path.dirname(SERVER_FILE);
 const RESOURCE_URI = "ui://get-time/mcp-app.html";
 const SAMPLE_DOWNLOAD_URI = "resource:///sample-report.txt";
 
@@ -33,7 +37,7 @@ export function createServer(): McpServer {
     {
       title: "Get Time",
       description: "Returns the current server time.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       outputSchema: z.object({
         time: z.string(),
       }),
@@ -72,7 +76,7 @@ export function createServer(): McpServer {
   );
 
   // Sample downloadable resource — used to demo ResourceLink in ui/download-file
-  server.resource(
+  server.registerResource(
     SAMPLE_DOWNLOAD_URI,
     SAMPLE_DOWNLOAD_URI,
     {

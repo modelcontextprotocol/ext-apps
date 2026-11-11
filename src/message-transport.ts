@@ -1,13 +1,11 @@
-import {
+import { JSONRPCMessageSchema } from "@modelcontextprotocol/core";
+import type {
   JSONRPCMessage,
-  JSONRPCMessageSchema,
   MessageExtraInfo,
-} from "@modelcontextprotocol/sdk/types.js";
-import {
   Transport,
   TransportSendOptions,
-} from "@modelcontextprotocol/sdk/shared/transport.js";
-import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types";
+} from "@modelcontextprotocol/client";
+import { TOOL_INPUT_PARTIAL_METHOD } from "./spec.types.js";
 
 /**
  * JSON-RPC transport using `window.postMessage` for iframe↔parent communication.

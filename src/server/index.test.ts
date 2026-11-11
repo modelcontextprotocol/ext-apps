@@ -6,8 +6,14 @@ import {
   RESOURCE_MIME_TYPE,
   getUiCapability,
   EXTENSION_ID,
-} from "./index";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+} from "./index.js";
+import {
+  InMemoryTransport,
+  McpServer as RealMcpServer,
+  type McpServer,
+} from "@modelcontextprotocol/server";
+import { Client } from "@modelcontextprotocol/client";
+import { z } from "zod/v4";
 
 describe("registerAppTool", () => {
   it("should pass through config to server.registerTool", () => {
@@ -194,6 +200,119 @@ describe("registerAppTool", () => {
       );
       expect(meta[RESOURCE_URI_META_KEY]).toBe("ui://old/view.html");
     });
+  });
+});
+
+describe("registerAppTool schema forms", () => {
+  /** Registers tools on a fresh server, then connects a client to it. */
+  async function connect(register: (server: RealMcpServer) => void) {
+    const server = new RealMcpServer({ name: "test", version: "0.0.0" });
+    register(server);
+    const client = new Client({ name: "client", version: "0.0.0" });
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    return client;
+  }
+
+  it("accepts a z.object() input schema and validates arguments", async () => {
+    const client = await connect((server) =>
+      registerAppTool(
+        server,
+        "greet",
+        {
+          inputSchema: z.object({ name: z.string() }),
+          _meta: { ui: { resourceUri: "ui://greet/view.html" } },
+        },
+        async ({ name }) => ({
+          content: [{ type: "text", text: `hello ${name}` }],
+        }),
+      ),
+    );
+
+    const { tools } = await client.listTools();
+    expect(tools).toHaveLength(1);
+    expect(tools[0].inputSchema).toMatchObject({
+      type: "object",
+      properties: { name: { type: "string" } },
+    });
+    expect(tools[0]._meta).toMatchObject({
+      ui: { resourceUri: "ui://greet/view.html" },
+      [RESOURCE_URI_META_KEY]: "ui://greet/view.html",
+    });
+
+    const result = await client.callTool({
+      name: "greet",
+      arguments: { name: "world" },
+    });
+    expect(result.content).toEqual([{ type: "text", text: "hello world" }]);
+
+    const invalid = await client.callTool({
+      name: "greet",
+      arguments: { name: 42 },
+    });
+    expect(invalid.isError).toBe(true);
+  });
+
+  it("accepts a raw zod shape (deprecated form) and wraps it with z.object()", async () => {
+    const client = await connect((server) =>
+      registerAppTool(
+        server,
+        "greet",
+        {
+          inputSchema: { name: z.string() },
+          outputSchema: { greeting: z.string() },
+          _meta: { ui: { resourceUri: "ui://greet/view.html" } },
+        },
+        async ({ name }) => ({
+          content: [{ type: "text", text: `hello ${name}` }],
+          structuredContent: { greeting: `hello ${name}` },
+        }),
+      ),
+    );
+
+    const { tools } = await client.listTools();
+    expect(tools[0].inputSchema).toMatchObject({
+      type: "object",
+      properties: { name: { type: "string" } },
+    });
+    expect(tools[0].outputSchema).toMatchObject({
+      type: "object",
+      properties: { greeting: { type: "string" } },
+    });
+
+    const result = await client.callTool({
+      name: "greet",
+      arguments: { name: "world" },
+    });
+    expect(result.structuredContent).toEqual({ greeting: "hello world" });
+
+    const invalid = await client.callTool({
+      name: "greet",
+      arguments: { name: 42 },
+    });
+    expect(invalid.isError).toBe(true);
+  });
+
+  it("accepts the raw-shape form without an input schema", async () => {
+    const client = await connect((server) =>
+      registerAppTool(
+        server,
+        "ping",
+        {
+          outputSchema: { ok: z.boolean() },
+          _meta: { ui: { resourceUri: "ui://ping/view.html" } },
+        },
+        async () => ({
+          content: [{ type: "text", text: "pong" }],
+          structuredContent: { ok: true },
+        }),
+      ),
+    );
+
+    const result = await client.callTool({ name: "ping", arguments: {} });
+    expect(result.structuredContent).toEqual({ ok: true });
   });
 });
 

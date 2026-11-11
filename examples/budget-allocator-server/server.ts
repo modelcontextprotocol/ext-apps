@@ -4,23 +4,27 @@
  * Provides budget configuration, 24 months of historical allocation data,
  * and industry benchmarks by company stage.
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  CallToolResult,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpServer,
+  type CallToolResult,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import {
   RESOURCE_MIME_TYPE,
   registerAppResource,
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
-// Works both from source (server.ts) and compiled (dist/server.js)
-const DIST_DIR = import.meta.filename.endsWith(".ts")
-  ? path.join(import.meta.dirname, "dist")
-  : import.meta.dirname;
+// Works both from source (server.ts) and compiled (dist/server.js). Derived
+// from import.meta.url rather than import.meta.filename/dirname, which are
+// undefined on Node older than 20.11.
+const SERVER_FILE = fileURLToPath(import.meta.url);
+const DIST_DIR = SERVER_FILE.endsWith(".ts")
+  ? path.join(path.dirname(SERVER_FILE), "dist")
+  : path.dirname(SERVER_FILE);
 
 // ---------------------------------------------------------------------------
 // Schemas - types are derived from these using z.infer
@@ -270,7 +274,7 @@ export function createServer(): McpServer {
       title: "Get Budget Data",
       description:
         "Returns budget configuration with 24 months of historical allocations and industry benchmarks by company stage. The widget is interactive and exposes tools for reading/modifying allocations, adjusting budgets, and comparing against industry benchmarks.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       outputSchema: BudgetDataResponseSchema,
       _meta: { ui: { resourceUri } },
     },

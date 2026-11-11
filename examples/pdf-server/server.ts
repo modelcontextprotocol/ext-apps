@@ -13,18 +13,20 @@
 import { randomUUID } from "crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { fileURLToPath } from "node:url";
 import {
   registerAppResource,
   registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import {
-  RootsListChangedNotificationSchema,
+  McpServer,
   type CallToolResult,
+  type ElicitResult,
+  type PrimitiveSchemaDefinition,
   type ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+  type Server,
+} from "@modelcontextprotocol/server";
 // Stub DOMMatrix/ImageData/Path2D before pdfjs-dist loads — its legacy
 // build instantiates DOMMatrix at module scope and the @napi-rs/canvas
 // polyfill is unreliable under npx. See ./pdfjs-polyfill.ts for details.
@@ -62,10 +64,6 @@ class FetchStandardFontDataFactory {
     return new Uint8Array(await res.arrayBuffer());
   }
 }
-import type {
-  PrimitiveSchemaDefinition,
-  ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 // =============================================================================
@@ -148,10 +146,13 @@ export function isWritablePath(resolved: string): boolean {
   });
 }
 
-// Works both from source (server.ts) and compiled (dist/server.js)
-const DIST_DIR = import.meta.filename.endsWith(".ts")
-  ? path.join(import.meta.dirname, "dist")
-  : import.meta.dirname;
+// Works both from source (server.ts) and compiled (dist/server.js). Derived
+// from import.meta.url rather than import.meta.filename/dirname, which are
+// undefined on Node older than 20.11.
+const SERVER_FILE = fileURLToPath(import.meta.url);
+const DIST_DIR = SERVER_FILE.endsWith(".ts")
+  ? path.join(path.dirname(SERVER_FILE), "dist")
+  : path.dirname(SERVER_FILE);
 
 // =============================================================================
 // Command Queue (shared across stateless server instances)
@@ -194,6 +195,11 @@ const PageInterval = z.object({
 // poll queue. Defined once in src/commands.ts; both sides import it.
 // (`import type` → no pdf-lib bundled into the server.)
 import type { PdfCommand } from "./src/commands.js";
+import {
+  AnnotationDefSchema,
+  AnnotationUpdateSchema,
+  formatAnnotationIssues,
+} from "./src/annotation-schemas.js";
 export type { PdfCommand };
 
 // =============================================================================
@@ -1262,6 +1268,17 @@ export interface CreateServerOptions {
    * in a floating bubble). Toggled by the `--debug` CLI flag.
    */
   debug?: boolean;
+
+  /**
+   * Register the view's actions as separate app tools (navigate, search,
+   * add_annotations, ...) instead of the default single `interact` app
+   * tool. Hosts that ask the user to approve each app tool separately
+   * show one approval card per tool, so the single-tool default keeps
+   * that to one; pass the `--split-app-tools` CLI flag to get the
+   * per-action tools back. The choice is injected into the served view
+   * HTML, where src/mcp-app.ts reads it before connecting.
+   */
+  splitAppTools?: boolean;
 }
 
 // Module-level singletons so they survive across createServer() calls — in
@@ -1269,10 +1286,12 @@ export interface CreateServerOptions {
 // per-instance caches are discarded immediately.
 const sharedPdfCache = createPdfCache();
 let cachedAppHtml: string | undefined;
+let cachedSplitAppHtml: string | undefined;
 
 export function createServer(options: CreateServerOptions = {}): McpServer {
   const { enableInteract = false, useClientRoots = false } = options;
   const debug = options.debug ?? false;
+  const splitAppTools = options.splitAppTools ?? false;
   const disableInteract = !enableInteract;
   const server = new McpServer({ name: "PDF Server", version: "2.0.0" });
 
@@ -1282,7 +1301,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       refreshRoots(server.server);
     };
     server.server.setNotificationHandler(
-      RootsListChangedNotificationSchema,
+      "notifications/roots/list_changed",
       async () => {
         await refreshRoots(server.server);
       },
@@ -1292,10 +1311,12 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   const { readPdfRange } = sharedPdfCache;
 
   // Tool: list_pdfs - List available PDFs
-  server.tool(
+  server.registerTool(
     "list_pdfs",
-    "List available PDFs that can be displayed",
-    {},
+    {
+      description: "List available PDFs that can be displayed",
+      inputSchema: z.object({}),
+    },
     async (): Promise<CallToolResult> => {
       const seen = new Set<string>();
       const localFiles: string[] = [];
@@ -1377,7 +1398,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       title: "Read PDF Bytes",
       description:
         "Read a range of bytes from a PDF (max 512KB per request). The model should NOT call this tool directly.",
-      inputSchema: {
+      inputSchema: z.object({
         url: z.string().describe("PDF URL or local file path"),
         offset: z.number().min(0).default(0).describe("Byte offset"),
         byteCount: z
@@ -1386,7 +1407,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
           .max(MAX_CHUNK_BYTES)
           .default(MAX_CHUNK_BYTES)
           .describe("Bytes to read"),
-      },
+      }),
       outputSchema: z.object({
         url: z.string(),
         bytes: z.string().describe("Base64 encoded bytes"),
@@ -1473,7 +1494,7 @@ Returns a viewUUID in structuredContent. Pass it to \`interact\`:
 
 Accepts local files (use list_pdfs), client MCP root directories, or any HTTPS URL.
 Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before display.`,
-      inputSchema: {
+      inputSchema: z.object({
         url: z
           .string()
           .default(DEFAULT_PDF)
@@ -1489,7 +1510,7 @@ Set \`elicit_form_inputs\` to true to prompt the user to fill form fields before
                   "If true and the PDF has form fields, prompt the user to fill them before displaying",
                 ),
             }),
-      },
+      }),
       outputSchema: z.object({
         viewUUID: z
           .string()
@@ -2027,6 +2048,24 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
+          // Enforce the per-type contract (e.g. a stamp REQUIRES `label`;
+          // without this a stamp sent with `content` instead rendered as
+          // the literal text "undefined").
+          for (let i = 0; i < annotations.length; i++) {
+            const parsed = AnnotationDefSchema.safeParse(annotations[i]);
+            if (!parsed.success) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `add_annotations: ${formatAnnotationIssues(i, (annotations[i] as { type?: unknown }).type, parsed.error)}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            annotations[i] = parsed.data;
+          }
           // Resolve image annotations: fetch imageUrl → imageData, auto-detect dimensions.
           // Rejection (path not allowed, not https, fetch failed) surfaces as
           // a tool error so the model sees it — don't silently skip.
@@ -2049,9 +2088,9 @@ URL: ${normalized}`,
           }
           enqueueCommand(uuid, {
             type: "add_annotations",
-            // resolveImageAnnotation populates optional x/y/width/height;
-            // input is validated as Record<string,any>[] so this cast is
-            // the wire-protocol promise, not a compiler guarantee.
+            // Schema-validated above; the residual gap this cast bridges
+            // is the image variant's optional x/y/width/height, which
+            // resolveImageAnnotation has just filled in.
             annotations: annotations as Extract<
               PdfCommand,
               { type: "add_annotations" }
@@ -2070,6 +2109,21 @@ URL: ${normalized}`,
               ],
               isError: true,
             };
+          for (let i = 0; i < annotations.length; i++) {
+            const parsed = AnnotationUpdateSchema.safeParse(annotations[i]);
+            if (!parsed.success) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `update_annotations: ${formatAnnotationIssues(i, (annotations[i] as { type?: unknown }).type, parsed.error)}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            annotations[i] = parsed.data;
+          }
           enqueueCommand(uuid, {
             type: "update_annotations",
             annotations: annotations as Extract<
@@ -2393,11 +2447,11 @@ IMPORTANT: viewUUID must be the exact UUID returned by display_pdf (e.g. "a1b2c3
 - For highlights/underlines, each rect's y is the TOP of the highlighted region.
 
 Annotation types:
-• highlight: rects:[{x,y,width,height}], color?, content? • underline: rects:[{x,y,w,h}], color?
-• strikethrough: rects:[{x,y,w,h}], color? • note: x, y, content, color?
+• highlight: rects:[{x,y,width,height}], color?, content? • underline: rects:[{x,y,width,height}], color?
+• strikethrough: rects:[{x,y,width,height}], color? • note: x, y, content, color?
 • rectangle: x, y, width, height, color?, fillColor?, rotation? • circle: x, y, width, height, color?, fillColor?
 • line: x1, y1, x2, y2, color? • freetext: x, y, content, fontSize?, color?
-• stamp: x, y, label (any text, e.g. APPROVED, DRAFT, CONFIDENTIAL), color?, rotation?
+• stamp: x, y, label (REQUIRED — the stamp's text, e.g. APPROVED, DRAFT, CONFIDENTIAL), color?, rotation?
 • image: imageUrl (required), x?, y?, width?, height?, mimeType?, rotation?, aspect? — places an image (signature, logo, etc.) on the page. Pass a local file path or HTTPS URL (NO data: URIs, NO base64). Width/height auto-detected if omitted. Users can also drag & drop images directly onto the viewer.
 
 TIP: For text annotations, prefer highlight_text (auto-finds text) over manual rects.
@@ -2420,13 +2474,13 @@ Example — add a signature image and a stamp, then screenshot to verify:
 
 **TEXT/SCREENSHOTS**:
 • get_text: extract text from pages. Optional \`page\` for single page, or \`intervals\` for ranges [{start?,end?}]. Max 20 pages.
-• get_screenshot: capture a single page as PNG image. Requires \`page\`.
+• get_screenshot: capture a single page as a JPEG image. Requires \`page\`.
 • get_viewer_state: snapshot of the live viewer — JSON {currentPage, pageCount, zoom, displayMode, selectedAnnotationIds, selection:{text,contextBefore,contextAfter,boundingRect}|null}. Use this to read what the user has selected or which page they're on.
 
 **FORMS** — fill_form: fill fields with \`fields\` array of {name, value}.
 
 **SAVE** — save_as: write the annotated PDF (annotations + form values) to a file. Pass \`path\` (absolute path or file://) for a new location, or omit \`path\` to overwrite the original. Set \`overwrite: true\` to replace an existing file (always required when omitting \`path\`).`,
-        inputSchema: {
+        inputSchema: z.object({
           viewUUID: z
             .string()
             .describe(
@@ -2523,7 +2577,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
             .describe(
               "Array of commands to execute sequentially. More efficient than separate calls. Tip: end with get_pages+getScreenshots to verify changes.",
             ),
-        },
+        }),
       },
       async (
         {
@@ -2600,7 +2654,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
           const result = await processInteractCommand(
             uuid,
             commandList[i],
-            extra.signal,
+            extra.mcpReq.signal,
           );
           if (result.isError) {
             const errText = result.content
@@ -2657,7 +2711,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
         title: "Submit Page Data",
         description:
           "Submit rendered page data for a get_pages request (used by viewer). The model should NOT call this tool directly.",
-        inputSchema: {
+        inputSchema: z.object({
           requestId: z
             .string()
             .describe("The request ID from the get_pages command"),
@@ -2670,7 +2724,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
               }),
             )
             .describe("Page data entries"),
-        },
+        }),
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ requestId, pages }): Promise<CallToolResult> => {
@@ -2700,7 +2754,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
         title: "Submit Save Data",
         description:
           "Submit annotated PDF bytes for a save_as request (used by viewer). The model should NOT call this tool directly.",
-        inputSchema: {
+        inputSchema: z.object({
           requestId: z
             .string()
             .describe("The request ID from the save_as command"),
@@ -2709,7 +2763,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
             .string()
             .optional()
             .describe("Error message if the viewer failed to build bytes"),
-        },
+        }),
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ requestId, data, error }): Promise<CallToolResult> => {
@@ -2739,7 +2793,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
         title: "Submit Viewer State",
         description:
           "Submit a viewer-state snapshot for a get_viewer_state request (used by viewer). The model should NOT call this tool directly.",
-        inputSchema: {
+        inputSchema: z.object({
           requestId: z
             .string()
             .describe("The request ID from the get_viewer_state command"),
@@ -2751,7 +2805,7 @@ Example — add a signature image and a stamp, then screenshot to verify:
             .string()
             .optional()
             .describe("Error message if the viewer failed to read state"),
-        },
+        }),
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ requestId, state, error }): Promise<CallToolResult> => {
@@ -2781,9 +2835,9 @@ Example — add a signature image and a stamp, then screenshot to verify:
         title: "Poll PDF Commands",
         description:
           "Poll for pending commands for a PDF viewer. The model should NOT call this tool directly.",
-        inputSchema: {
+        inputSchema: z.object({
           viewUUID: z.string().describe("The viewUUID of the PDF viewer"),
-        },
+        }),
         _meta: { ui: { visibility: ["app"] } },
       },
       async ({ viewUUID: uuid }): Promise<CallToolResult> => {
@@ -2828,10 +2882,10 @@ Example — add a signature image and a stamp, then screenshot to verify:
       title: "Save PDF",
       description:
         "Save annotated PDF bytes back to a local file. The model should NOT call this tool directly — use interact with action: save_as instead.",
-      inputSchema: {
+      inputSchema: z.object({
         url: z.string().describe("Original PDF URL or local file path"),
         data: z.string().describe("Base64-encoded PDF bytes"),
-      },
+      }),
       outputSchema: z.object({
         filePath: z.string(),
         mtimeMs: z.number(),
@@ -2914,12 +2968,35 @@ Example — add a signature image and a stamp, then screenshot to verify:
         path.join(DIST_DIR, "mcp-app.html"),
         "utf-8",
       ));
+      // The view decides its app-tool surface (single `interact` vs one
+      // tool per action) at load time, before connect(), so the choice
+      // rides in the served HTML rather than in a tool result. The
+      // injected variant is cached like the base HTML — the bundle is
+      // several MB and stateless HTTP mode reads it per request.
+      let servedHtml = html;
+      if (splitAppTools) {
+        if (cachedSplitAppHtml === undefined) {
+          const injected = html.replace(
+            /<head(\s[^>]*)?>/i,
+            (headTag) =>
+              `${headTag}\n    <script>globalThis.PDF_APP_CONFIG = { splitAppTools: true };</script>`,
+          );
+          if (injected === html) {
+            console.error(
+              "[pdf-server] --split-app-tools: no <head> tag found in the view HTML; " +
+                "falling back to the single interact app tool",
+            );
+          }
+          cachedSplitAppHtml = injected;
+        }
+        servedHtml = cachedSplitAppHtml;
+      }
       return {
         contents: [
           {
             uri: RESOURCE_URI,
             mimeType: RESOURCE_MIME_TYPE,
-            text: html,
+            text: servedHtml,
             _meta: {
               ui: {
                 permissions: { clipboardWrite: {} },

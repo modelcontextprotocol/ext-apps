@@ -12,7 +12,7 @@
  *
  * ts-to-zod generates `import { z } from "zod"`. We rewrite this to
  * `import { z } from "zod/v4"` because the generated schemas compose with
- * schemas imported from `@modelcontextprotocol/sdk/types.js`, which the SDK
+ * schemas imported from `@modelcontextprotocol/core`, which the SDK
  * constructs via `zod/v4`. Mixing schemas from the v3 and v4 APIs at runtime
  * fails with errors like `keyValidator._parse is not a function` (v3 internals
  * calling into v4 objects, or vice versa). The `zod/v4` subpath is exported by
@@ -22,10 +22,12 @@
  *
  * **Problem**: ts-to-zod cannot resolve types imported from external packages.
  * When it encounters types like `ContentBlock`, `CallToolResult`, `Implementation`,
- * `RequestId`, and `Tool` from `@modelcontextprotocol/sdk`, it generates `z.any()`
- * as a placeholder.
+ * `RequestId`, and `Tool` (imported by spec.types.ts from
+ * `@modelcontextprotocol/client`), it generates `z.any()` as a placeholder.
  *
- * **Solution**: Import the schemas from MCP SDK and remove the z.any() placeholders.
+ * **Solution**: Import the corresponding Zod schemas from
+ * `@modelcontextprotocol/core` (the role-neutral package both client and
+ * server re-export) and remove the z.any() placeholders.
  *
  * ### 3. Index Signatures (`z.record().and()` → `z.object().passthrough()`)
  *
@@ -193,7 +195,7 @@ function postProcess(content: string): string {
     `import { z } from "zod/v4";
 import {
   ${mcpImports},
-} from "@modelcontextprotocol/sdk/types.js";`,
+} from "@modelcontextprotocol/core";`,
   );
 
   // 2. Remove z.any() placeholders for external types (now imported from MCP SDK)

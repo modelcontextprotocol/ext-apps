@@ -10,7 +10,7 @@ import {
   RequestIdSchema,
   ResourceLinkSchema,
   ToolSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/core";
 
 /**
  * @description Color theme preference for the host environment.

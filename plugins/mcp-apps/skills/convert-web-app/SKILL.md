@@ -115,19 +115,22 @@ Create a new MCP server with tool and resource registration. This wraps the exis
 ### Dependencies
 
 ```bash
-npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/sdk zod
+npm install @modelcontextprotocol/ext-apps @modelcontextprotocol/client@^2.0.0 @modelcontextprotocol/server@^2.0.0 zod@^4.2.0
 npm install -D tsx vite vite-plugin-singlefile
 ```
 
-Use `npm install` to add dependencies rather than manually writing version numbers. This lets npm resolve the latest compatible versions. Never specify version numbers from memory.
+Use `npm install` so the package manager resolves versions; ext-apps 2.x needs
+the split base MCP SDK packages at `^2.0.0` (`@modelcontextprotocol/core` comes
+in transitively). Do not add the legacy `@modelcontextprotocol/sdk` v1 package
+or substitute unpublished local packages.
 
 ### Server Code
 
 Create `server.ts`:
 
 ```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -140,7 +143,9 @@ const resourceUri = "ui://my-app/mcp-app.html";
 // Register the tool — inputSchema maps to the app's data sources
 registerAppTool(server, "show-app", {
   description: "Displays the app with the given parameters",
-  inputSchema: { query: z.string().describe("The search query") },
+  inputSchema: z.object({
+    query: z.string().describe("The search query"),
+  }),
   _meta: { ui: { resourceUri } },
 }, async (args) => {
   // Process args server-side if needed
@@ -151,19 +156,29 @@ registerAppTool(server, "show-app", {
 });
 
 // Register the HTML resource
-registerAppResource(server, {
-  uri: resourceUri,
-  name: "My App UI",
-  mimeType: RESOURCE_MIME_TYPE,
-  // Add CSP domains from Step 2 if needed:
-  // _meta: { ui: { connectDomains: ["api.example.com"], resourceDomains: ["cdn.example.com"] } },
-}, async () => {
-  const html = await fs.readFile(
-    path.resolve(import.meta.dirname, "dist", "mcp-app.html"),
-    "utf-8",
-  );
-  return { contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: html }] };
-});
+registerAppResource(
+  server,
+  "My App UI",
+  resourceUri,
+  {},
+  async () => {
+    const html = await fs.readFile(
+      path.resolve(import.meta.dirname, "dist", "mcp-app.html"),
+      "utf-8",
+    );
+    return {
+      contents: [
+        {
+          uri: resourceUri,
+          mimeType: RESOURCE_MIME_TYPE,
+          text: html,
+          // Add CSP domains from Step 2 if needed:
+          // _meta: { ui: { csp: { connectDomains: ["https://api.example.com"], resourceDomains: ["https://cdn.example.com"] } } },
+        },
+      ],
+    };
+  },
+);
 
 // Start the server
 const transport = new StdioServerTransport();
@@ -310,7 +325,10 @@ const data = await fetch("/api/data").then(r => r.json());
 // After (hybrid):
 async function fetchData(): Promise<any> {
   if (isMcpApp) {
-    const result = await app.callServerTool("fetch-data", {});
+    const result = await app.callServerTool({
+      name: "fetch-data",
+      arguments: {},
+    });
     return result.structuredContent;
   }
   return fetch("/api/data").then(r => r.json());
@@ -437,7 +455,8 @@ registerAppTool(server, "refresh-data", {
 });
 ```
 
-The UI calls these via `app.callServerTool("refresh-data", {})`.
+The UI calls these via
+`app.callServerTool({ name: "refresh-data", arguments: {} })`.
 
 ### Streaming Partial Input
 

@@ -98,6 +98,14 @@ Display the 3D globe zoomed to a bounding box.
 
 Defaults to London if no coordinates provided.
 
+### App tools
+
+The map view registers tools on the view itself (via `app.registerTool`), for hosts that list and call view tools directly:
+
+- `navigate-to` — fly the globe to a bounding box, with an optional label.
+- `get-current-view` — return the camera position and the visible bounding box (also as `structuredContent`).
+- `get-screenshot` — capture the current globe view as a PNG image in the tool result (optional `maxDimension`, default 1024px), so the model can see exactly what the user sees.
+
 ## Architecture
 
 ### Server (`server.ts`)

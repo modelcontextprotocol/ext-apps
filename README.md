@@ -11,7 +11,7 @@
     <br /><br />
     <a href="#why-mcp-apps">Why</a>
     ·
-    <a href="https://apps.extensions.modelcontextprotocol.io/api/documents/Quickstart.html">Quickstart</a>
+    <a href="https://apps.extensions.modelcontextprotocol.io/api/documents/quickstart.html">Quickstart</a>
     ·
     <a href="https://apps.extensions.modelcontextprotocol.io/api/">API Docs</a>
     ·
@@ -97,7 +97,7 @@ it will guide you through the rest.
 > MCP Apps is an extension to the
 > [core MCP specification](https://modelcontextprotocol.io/specification). Host
 > support varies — see the
-> [clients page](https://modelcontextprotocol.io/clients) for the full list.
+> [clients page](https://modelcontextprotocol.io/extensions/client-matrix) for the full list.
 
 ## Why MCP Apps?
 
@@ -122,12 +122,36 @@ resources:
 
 ## Getting Started
 
+Requires Node.js 20+. The base MCP SDK packages are `^2.0.0` peers of
+`ext-apps` (`@modelcontextprotocol/core` is a required peer that `client` already depends on, so npm installs it for you).
+
+For a View or host:
+
 ```bash
-npm install -S @modelcontextprotocol/ext-apps
+npm install -S @modelcontextprotocol/ext-apps \
+  @modelcontextprotocol/client@^2.0.0 \
+  zod@^4.2.0
 ```
 
+For an MCP server, add the server package (and, for HTTP transports, the Node
+and Express adapters):
+
+```bash
+npm install -S @modelcontextprotocol/ext-apps \
+  @modelcontextprotocol/client@^2.0.0 \
+  @modelcontextprotocol/server@^2.0.0 \
+  @modelcontextprotocol/node@^2.0.0 \
+  @modelcontextprotocol/express@^2.0.0 \
+  zod@^4.2.0
+```
+
+The wire protocol is unchanged between `ext-apps` 1.x and 2.x: a 2.x View works
+in a 1.x host and a 2.x host renders 1.x Views. See the
+[migration guide](https://apps.extensions.modelcontextprotocol.io/api/documents/migrate-to-v2.html)
+when upgrading from 1.x.
+
 **New here?** Start with the
-[Quickstart Guide](https://apps.extensions.modelcontextprotocol.io/api/documents/Quickstart.html)
+[Quickstart Guide](https://apps.extensions.modelcontextprotocol.io/api/documents/quickstart.html)
 to build your first MCP App.
 
 ## Using the SDK
@@ -248,7 +272,7 @@ point your client at a local build:
 
 ## Resources
 
-- [Quickstart Guide](https://apps.extensions.modelcontextprotocol.io/api/documents/Quickstart.html)
+- [Quickstart Guide](https://apps.extensions.modelcontextprotocol.io/api/documents/quickstart.html)
 - [API Documentation](https://apps.extensions.modelcontextprotocol.io/api/)
 - [Specification (2026-01-26)](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
   ([Draft](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx))

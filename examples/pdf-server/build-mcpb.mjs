@@ -43,6 +43,21 @@ writeFileSync(
   path.join(stage, "manifest.json"),
   JSON.stringify(manifest, null, 2),
 );
+// The bundle must ship the ext-apps build from this checkout, not whatever
+// the registry has: pack the repo root and point the staged manifest at it.
+const repoRoot = path.resolve(here, "..", "..");
+const packed = JSON.parse(
+  execSync(
+    "npm pack --json --ignore-scripts --pack-destination " +
+      JSON.stringify(stage),
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  ).replace(/^[^[]*/, ""),
+);
+pkg.dependencies["@modelcontextprotocol/ext-apps"] =
+  "file:./" + packed[0].filename;
 writeFileSync(path.join(stage, "package.json"), JSON.stringify(pkg, null, 2));
 
 const run = (cmd) => execSync(cmd, { cwd: stage, stdio: "inherit" });

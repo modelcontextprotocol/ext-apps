@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
-import { App } from "../app";
+import { App } from "../app.js";
 import {
   applyDocumentTheme,
   applyHostFonts,
   applyHostStyleVariables,
-} from "../styles";
-import { McpUiHostContext } from "../types";
+} from "../styles.js";
+import { McpUiHostContext } from "../types.js";
 
 /**
  * React hook that applies host style variables and theme as CSS custom properties.
