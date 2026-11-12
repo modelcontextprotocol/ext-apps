@@ -453,6 +453,48 @@ describe("display_pdf transport-error handling", () => {
   });
 });
 
+describe("read_pdf_bytes result content", () => {
+  let tmpDir: string;
+  let tmpFile: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf-read-bytes-"));
+    tmpFile = path.join(tmpDir, "test.pdf");
+    fs.writeFileSync(tmpFile, Buffer.from("%PDF-1.4\n%test\n"));
+    allowedLocalFiles.add(tmpFile);
+  });
+
+  afterEach(() => {
+    allowedLocalFiles.delete(tmpFile);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("mirrors structuredContent as JSON text for clients that only read content", async () => {
+    const server = createServer();
+    const client = new Client({ name: "t", version: "1" });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(st), client.connect(ct)]);
+
+    try {
+      const result = await client.callTool({
+        name: "read_pdf_bytes",
+        arguments: { url: tmpFile, offset: 0, byteCount: 8 },
+      });
+      expect(result.isError).toBeFalsy();
+
+      const content = result.content as { type: string; text: string }[];
+      expect(content).toHaveLength(1);
+      expect(content[0].type).toBe("text");
+      const parsed = JSON.parse(content[0].text);
+      expect(parsed).toEqual(result.structuredContent);
+      expect(Buffer.from(parsed.bytes, "base64").toString()).toBe("%PDF-1.4");
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+});
+
 describe("extractFormSchema field-tree handling", () => {
   async function schemaFor(bytes: Uint8Array) {
     const doc = await getDocument({ data: bytes }).promise;
