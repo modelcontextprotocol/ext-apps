@@ -1,5 +1,5 @@
 import { getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Tool } from "@modelcontextprotocol/client";
+import { getDisplayName, type Tool } from "@modelcontextprotocol/client";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
@@ -339,9 +339,9 @@ function ToolCallInfoPanel({ toolCallInfo, isDestroying, onRequestClose, onClose
       className={styles.toolCallInfoPanel}
       style={isDestroying ? { opacity: 0.5, pointerEvents: "none" } : undefined}
     >
-      {/* Row 1: Header with server:tool name and close button */}
+      {/* Row 1: Header with server name, tool display name, and close button */}
       <div className={styles.appHeader}>
-        <span>{toolCallInfo.serverInfo.name}:<span className={styles.toolName}>{toolCallInfo.tool.name}</span></span>
+        <span>{toolCallInfo.serverInfo.name}:<span className={styles.toolName}>{getDisplayName(toolCallInfo.tool)}</span></span>
         {onRequestClose && !isDestroying && (
           <button
             className={styles.closeButton}
