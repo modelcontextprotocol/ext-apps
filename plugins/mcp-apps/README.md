@@ -27,3 +27,10 @@ Invoke skills by asking Claude Code to:
 - "Migrate from OpenAI Apps SDK"
 - "Convert OpenAI App to MCP"
 - "Port from window.openai"
+
+### Add MCP Apps to a host
+
+- "Render MCP Apps in my chat app"
+- "Build an MCP Apps host"
+- "Write an AppFrame and a sandbox proxy page"
+- "Use AppBridge to embed MCP App views"

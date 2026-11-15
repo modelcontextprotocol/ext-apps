@@ -8,12 +8,13 @@ description: Use Agent Skills to build, migrate, and extend MCP Apps with AI cod
 
 [Agent Skills](https://agentskills.io/) are instruction sets that guide AI coding agents through tasks. When you invoke a skill, the agent takes the lead — it asks clarifying questions, makes decisions based on your codebase, and executes the work.
 
-This repository provides four skills:
+This repository provides five skills:
 
 - [**create-mcp-app**](https://github.com/modelcontextprotocol/ext-apps/blob/main/plugins/mcp-apps/skills/create-mcp-app/SKILL.md) — scaffolds a new MCP App with an interactive UI
 - [**migrate-oai-app**](https://github.com/modelcontextprotocol/ext-apps/blob/main/plugins/mcp-apps/skills/migrate-oai-app/SKILL.md) — migrates an existing OpenAI App to the MCP Apps SDK
 - [**add-app-to-server**](https://github.com/modelcontextprotocol/ext-apps/blob/main/plugins/mcp-apps/skills/add-app-to-server/SKILL.md) — adds interactive UI to an existing MCP server's tools
 - [**convert-web-app**](https://github.com/modelcontextprotocol/ext-apps/blob/main/plugins/mcp-apps/skills/convert-web-app/SKILL.md) — converts an existing web application into an MCP App
+- [**add-apps-to-host**](https://github.com/modelcontextprotocol/ext-apps/blob/main/plugins/mcp-apps/skills/add-apps-to-host/SKILL.md) — adds MCP Apps support to a chat client (host): the sandbox page, the AppFrame component and the backend endpoints they need
 
 ## Install the Skills
 
@@ -55,7 +56,7 @@ Then copy the skills from `plugins/mcp-apps/skills/` to your agent's skills dire
 
 ## Verify Installation
 
-Ask your agent "What skills do you have?" — you should see `create-mcp-app`, `migrate-oai-app`, `add-app-to-server`, and `convert-web-app` among the available skills.
+Ask your agent "What skills do you have?" — you should see `create-mcp-app`, `migrate-oai-app`, `add-app-to-server`, `convert-web-app`, and `add-apps-to-host` among the available skills.
 
 ## Invoke a Skill
 
@@ -65,6 +66,7 @@ Try invoking the skills by asking your agent:
 - "Migrate from OpenAI Apps SDK" — converts an existing OpenAI App to use the MCP Apps SDK
 - "Add UI to my MCP server" — adds interactive UI to an existing MCP server's tools
 - "Convert my web app to an MCP App" — converts an existing web application into an MCP App
+- "Render MCP Apps in my chat app" — builds the host side: sandbox page, AppFrame and backend endpoints
 
 The agent will guide you through the process, asking clarifying questions as needed.
 

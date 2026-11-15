@@ -101,3 +101,6 @@ The `plugins/mcp-apps/` directory contains a Claude Code plugin distributed via 
 
 - `plugins/mcp-apps/skills/create-mcp-app/SKILL.md` — for creating an MCP App
 - `plugins/mcp-apps/skills/migrate-oai-app/SKILL.md` — for migrating an app from the OpenAI Apps SDK to the MCP Apps SDK
+- `plugins/mcp-apps/skills/add-app-to-server/SKILL.md` — for adding interactive UI to an existing MCP server's tools
+- `plugins/mcp-apps/skills/convert-web-app/SKILL.md` — for turning an existing web app into a hybrid web + MCP App
+- `plugins/mcp-apps/skills/add-apps-to-host/SKILL.md` — for building the host side (sandbox page, AppFrame, backend endpoints) that renders MCP Apps in a chat client

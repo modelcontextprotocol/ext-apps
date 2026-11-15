@@ -1,0 +1,2008 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Visual walkthrough of what a chat host must build to render MCP Apps: the backend, the sandbox page, the AppFrame and AppBridge, and how the UI and the model stay in touch.">
+<title>Building an MCP Apps Host</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky mono "file tree" rail on the left; each build piece gets one big drawing on the right. */
+:root {
+  --paper: #f5f5f5; --paper-2: #ececec; --node: #ffffff;
+  --ink: #2d3142; --muted: #4f5d75; --soft: #7a8399;
+  --rule: rgba(45,49,66,0.12); --rule-solid: #bfc0c0;
+  --accent: #eb6c36; --accent-tint: rgba(235,108,54,0.08);
+  --link: #2e5aa8;
+  --wash-1: rgba(45,49,66,0.02); --wash-2: rgba(45,49,66,0.05); --wash-3: rgba(79,93,117,0.10);
+  --ring-1: rgba(45,49,66,0.30); --ring-2: rgba(45,49,66,0.55);
+  --serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #2d3142; --paper-2: #393e53; --node: #393e53;
+    --ink: #f5f5f5; --muted: #bfc0c0; --soft: #8e98ac;
+    --rule: rgba(245,245,245,0.12); --rule-solid: rgba(191,192,192,0.25);
+    --accent: #f08a59; --accent-tint: rgba(240,138,89,0.10);
+    --link: #6a95d8;
+    --wash-1: rgba(245,245,245,0.02); --wash-2: rgba(245,245,245,0.05); --wash-3: rgba(191,192,192,0.10);
+    --ring-1: rgba(245,245,245,0.30); --ring-2: rgba(245,245,245,0.55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #2d3142; --paper-2: #393e53; --node: #393e53;
+  --ink: #f5f5f5; --muted: #bfc0c0; --soft: #8e98ac;
+  --rule: rgba(245,245,245,0.12); --rule-solid: rgba(191,192,192,0.25);
+  --accent: #f08a59; --accent-tint: rgba(240,138,89,0.10);
+  --link: #6a95d8;
+  --wash-1: rgba(245,245,245,0.02); --wash-2: rgba(245,245,245,0.05); --wash-3: rgba(191,192,192,0.10);
+  --ring-1: rgba(245,245,245,0.30); --ring-2: rgba(245,245,245,0.55);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
+
+.shell {
+  display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 56px;
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+
+/* ---------- rail ---------- */
+.rail { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; height: 100vh; overflow-y: auto; padding-block: 48px 32px; display: flex; flex-direction: column; gap: 28px; font-family: var(--mono); font-size: 13px; }
+.rail h1 { font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1.05; margin: 0; text-wrap: balance; }
+.rail .kicker { color: var(--soft); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 10px; }
+.tree { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.tree .root { color: var(--soft); padding: 3px 0; }
+.tree a { display: flex; gap: 8px; padding: 4px 8px 4px 0; color: var(--muted); text-decoration: none; border-radius: 4px; }
+.tree a::before { content: "└"; color: var(--rule-solid); }
+.tree a:hover { color: var(--ink); }
+.tree a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tree a.on { color: var(--ink); font-weight: 600; }
+.tree a.on::before { color: var(--accent); }
+.meter { display: flex; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums; }
+.meter .bar { color: var(--accent); letter-spacing: 1px; white-space: nowrap; }
+.meter .pct { color: var(--ink); min-width: 4ch; }
+.hint { color: var(--soft); font-size: 11px; margin: 0; margin-top: auto; }
+.hint kbd { font-family: var(--mono); border: 1px solid var(--rule-solid); border-radius: 4px; padding: 0 5px; }
+
+/* ---------- content ---------- */
+main { padding-block: 48px 120px; min-width: 0; }
+section { padding-block: 56px; border-top: 1px solid var(--rule); scroll-margin-top: 16px; }
+section:first-of-type { border-top: 0; padding-top: 0; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--soft); margin: 0 0 12px; }
+h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(34px, 5vw, 48px); line-height: 1.05; margin: 0 0 16px; text-wrap: balance; }
+h3.sub { font-size: 17px; font-weight: 600; margin: 32px 0 8px; }
+.lede { font-size: 20px; line-height: 1.45; max-width: 34em; margin: 0 0 8px; }
+p { max-width: 38em; margin: 0 0 12px; }
+.say { font-family: var(--serif); font-style: italic; font-size: 22px; line-height: 1.35; color: var(--muted); max-width: 30em; margin: 20px 0 0; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--wash-2); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
+
+pre { margin: 20px 0 0; padding: 16px 20px; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 6px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink); max-width: 100%; }
+pre code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+pre .c { color: var(--soft); }
+pre .k { color: var(--accent); }
+
+.fig { margin: 32px 0 24px; overflow-x: auto; }
+.fig svg { display: block; width: 100%; min-width: 640px; height: auto; }
+figure { margin: 0; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 44em; margin-top: 8px; }
+
+.cards { display: grid; gap: 16px; margin-top: 24px; }
+.cards.two { grid-template-columns: 1.15fr 0.85fr; }
+.cards.two.even { grid-template-columns: 1fr 1fr; }
+.cards.three { grid-template-columns: 1.1fr 1fr 0.9fr; }
+.card { background: var(--node); border: 1px solid var(--rule); border-radius: 6px; padding: 20px; min-width: 0; }
+.card h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.card h3::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.card.hot h3::before { background: var(--accent); }
+.card.blue h3::before { background: var(--link); }
+.card p { font-size: 15px; margin: 0; color: var(--muted); }
+.card p + p { margin-top: 8px; }
+.card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.card li { display: grid; gap: 2px; }
+.card li span { color: var(--muted); }
+.card .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--soft); text-transform: uppercase; margin: 0 0 6px; }
+
+.steps { list-style: none; counter-reset: s; margin: 20px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-width: 40em; }
+.steps li { counter-increment: s; position: relative; padding-left: 36px; font-size: 16px; min-width: 0; }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: 3px; font-family: var(--mono); font-size: 12px; color: var(--soft); font-variant-numeric: tabular-nums; }
+
+.note { margin-top: 24px; padding: 16px 20px; border: 1px dashed var(--accent); border-radius: 6px; background: var(--accent-tint); max-width: 42em; font-size: 15px; }
+.note strong { font-weight: 600; }
+
+.tablewrap { overflow-x: auto; margin-top: 24px; }
+table { border-collapse: collapse; width: 100%; min-width: 600px; font-size: 15px; }
+th { text-align: left; font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--soft); padding: 0 16px 10px 0; border-bottom: 1px solid var(--rule-solid); }
+td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td:first-child { font-weight: 600; }
+td.why { color: var(--muted); }
+.pill { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 8px; border-radius: 4px; border: 1px solid var(--rule-solid); color: var(--muted); white-space: nowrap; }
+.pill.must { border-color: var(--accent); color: var(--accent); }
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule); font-family: var(--mono); font-size: 11px; color: var(--soft); }
+
+/* ---------- diagram primitives ---------- */
+svg text { font-family: var(--sans); }
+.d-bg { fill: var(--paper); }
+.d-mask { fill: var(--paper); }
+.n-step { fill: var(--node); stroke: var(--ink); stroke-width: 1; }
+.n-focal { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 1; }
+.n-bound { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4,4; }
+.n-ext { fill: var(--wash-1); stroke: var(--ring-1); stroke-width: 1; }
+.n-input { fill: var(--wash-3); stroke: var(--soft); stroke-width: 1; }
+.hair-b { fill: none; stroke: var(--soft); stroke-width: 1; }
+.zone { fill: var(--wash-1); stroke: var(--rule); stroke-width: 0.8; }
+.ring-1 { fill: var(--wash-1); stroke: var(--ring-1); stroke-width: 1; }
+.ring-2 { fill: var(--wash-1); stroke: var(--ring-2); stroke-width: 1; }
+.tagbox { fill: none; stroke: var(--ring-1); stroke-width: 0.8; }
+.t-name { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.t-big { fill: var(--ink); font-size: 16px; font-weight: 600; }
+.t-note { fill: var(--muted); font-size: 12px; }
+.t-sub { fill: var(--muted); font-size: 8px; font-family: var(--mono); }
+.t-lbl { fill: var(--soft); font-size: 8px; font-family: var(--mono); letter-spacing: 0.06em; }
+.t-eye { fill: var(--soft); font-size: 8px; font-family: var(--mono); letter-spacing: 0.14em; }
+.t-msg { fill: var(--muted); font-size: 12px; font-family: var(--mono); }
+.a { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+.a-accent { fill: none; stroke: var(--accent); stroke-width: 1.2; }
+.a-link { fill: none; stroke: var(--link); stroke-width: 1.2; }
+.dash { stroke-dasharray: 5,4; }
+.life { stroke: var(--ring-1); stroke-width: 1; stroke-dasharray: 3,3; }
+.hair { stroke: var(--rule); stroke-width: 0.8; }
+.m-muted { fill: var(--muted); } .m-accent { fill: var(--accent); } .m-link { fill: var(--link); }
+.m-open { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.m-open-accent { fill: none; stroke: var(--accent); stroke-width: 1.4; }
+.m-open-link { fill: none; stroke: var(--link); stroke-width: 1.4; }
+.defs-only { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ---------- playable sequence ---------- */
+.playable .msg { transition: opacity .35s ease; }
+.playable[data-at] .msg { opacity: .1; }
+.playable[data-at] .msg.done { opacity: .4; }
+.playable[data-at] .msg.now { opacity: 1; }
+.playable .msg.now line, .playable .msg.now path { stroke-width: 2; }
+.playable .dot { fill: var(--muted); }
+.playable .dot.link { fill: var(--link); }
+.playable .dot.accent { fill: var(--accent); }
+.act-tool { fill: var(--wash-2); stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3,2; }
+.t-tool { fill: var(--muted); font-size: 8px; font-family: var(--mono); }
+.act-bridge { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 1; }
+.t-bridge { fill: var(--accent); font-size: 8px; font-family: var(--mono); }
+.t-bridge-tag { fill: var(--accent); font-size: 9px; font-family: var(--mono); font-weight: 600; }
+.relay { fill: var(--paper); stroke: var(--muted); stroke-width: 1.2; }
+.n-store { fill: var(--wash-2); stroke: var(--muted); stroke-width: 1; }
+
+/* ---------- FAQ ---------- */
+.faq { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 40px; }
+.faq > div { min-width: 0; }
+.qa { margin: 0; }
+.qa dt { font-weight: 600; font-size: 16px; margin-top: 16px; }
+.qa dd { margin: 4px 0 0; font-size: 15px; color: var(--muted); }
+@media (max-width: 880px) { .faq { grid-template-columns: minmax(0, 1fr); } }
+.player { margin: -8px 0 8px; }
+.player-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pbtn { font-family: var(--mono); font-size: 13px; padding: 8px 14px; border: 1px solid var(--rule-solid); border-radius: 6px; background: var(--node); color: var(--ink); cursor: pointer; }
+.pbtn:hover { border-color: var(--muted); }
+.pbtn.primary { background: var(--accent); border-color: var(--accent); color: var(--paper); min-width: 104px; }
+.pbtn:disabled { opacity: .4; cursor: default; }
+.pbtn:focus-visible, .pdot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pdots { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pdot { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--rule); background: transparent; color: var(--soft); cursor: pointer; }
+.pdot.done { color: var(--muted); border-color: var(--rule-solid); }
+.pdot.on { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
+.pcap { margin-top: 20px; min-height: 120px; max-width: 40em; }
+.pcap .eyebrow { margin-bottom: 4px; }
+.pcap h4 { font-family: var(--serif); font-weight: 400; font-size: 28px; line-height: 1.15; margin: 0 0 6px; }
+.pcap p { font-size: 16px; color: var(--muted); margin: 0; }
+.phint { font-size: 14px; color: var(--soft); margin-top: 12px; }
+/* step-by-step narration for the main diagram */
+.flowwrap { position: relative; }
+.player.sticky { position: sticky; bottom: 0; z-index: 3; margin: 0; padding: 12px 0 14px; background: var(--paper); border-top: 1px solid var(--rule-solid); }
+.player.sticky .player-bar { row-gap: 8px; }
+.player.sticky .pdots { margin: 0 0 0 8px; }
+.player.sticky .pcap { margin-top: 12px; min-height: 0; max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 28px; align-items: start; }
+.player.sticky .pcap > :not(.pcode) { grid-column: 1; }
+.player.sticky .pcap h4 { font-size: 24px; }
+.player.sticky .pcap p { font-size: 15px; }
+.pcode { grid-column: 2; grid-row: 1 / span 4; margin: 0; padding: 10px 12px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--ink); background: var(--wash-2); border: 1px solid var(--rule); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 168px; overflow: auto; }
+.proute { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 6px !important; }
+.proute .lane { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--rule-solid); color: var(--ink); background: var(--node); }
+.proute .lane.to { border-color: var(--accent); }
+.proute .arr { color: var(--soft); font-family: var(--mono); }
+.pspeed { min-width: 48px; }
+.rowband { fill: var(--accent-tint); stroke: var(--accent); stroke-opacity: .25; stroke-width: 1; opacity: 0; transition: opacity .3s ease, y .3s ease; }
+.rowband.on { opacity: 1; }
+.route-div { stroke: var(--ink); stroke-width: 1.5; opacity: .55; }
+.route-pill { fill: var(--ink); }
+.t-route { fill: var(--paper); font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .06em; }
+.later { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 2,4; opacity: .7; }
+.t-later { fill: var(--accent); font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .06em; }
+.playable .hd { transition: opacity .3s ease; }
+.playable[data-at] .hd { opacity: .45; }
+.playable[data-at] .hd.from, .playable[data-at] .hd.to { opacity: 1; }
+.playable .hd.from > rect:first-child { stroke: var(--ink); stroke-width: 2; }
+.playable .hd.to > rect:first-child { stroke: var(--accent); stroke-width: 2; }
+@media (max-width: 880px) {
+  .player.sticky .pcap { grid-template-columns: minmax(0, 1fr); }
+  .pcode { grid-column: 1; grid-row: auto; max-height: 96px; }
+  .player.sticky .pcap h4 { font-size: 20px; }
+}
+
+@media (max-width: 880px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .rail { height: auto; z-index: 5; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; background: var(--paper); border-bottom: 1px solid var(--rule); }
+  .rail h1 { font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .rail > div:first-child { min-width: 0; }
+  .rail .kicker, .tree, .hint { display: none; }
+  .meter .bar { font-size: 9px; letter-spacing: 0; }
+  main { padding-top: 32px; }
+  section { scroll-margin-top: 64px; }
+  .cards.two, .cards.two.even, .cards.three { grid-template-columns: minmax(0, 1fr); }
+  body { font-size: 16px; }
+  .lede { font-size: 18px; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+
+<svg class="defs-only" aria-hidden="true">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse"><polygon class="m-muted" points="0 0, 10 4, 0 8"/></marker>
+    <marker id="arrow-accent" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse"><polygon class="m-accent" points="0 0, 10 4, 0 8"/></marker>
+    <marker id="arrow-link" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse"><polygon class="m-link" points="0 0, 10 4, 0 8"/></marker>
+    <marker id="arrow-open" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse"><polyline class="m-open" points="1 1, 10 5, 1 9"/></marker>
+    <marker id="arrow-open-link" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse"><polyline class="m-open-link" points="1 1, 10 5, 1 9"/></marker>
+    <marker id="arrow-open-accent" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse"><polyline class="m-open-accent" points="1 1, 10 5, 1 9"/></marker>
+  </defs>
+</svg>
+
+<div class="shell">
+  <aside class="rail">
+    <div>
+      <p class="kicker">Your chat app + MCP Apps</p>
+      <h1>Building an MCP Apps Host</h1>
+    </div>
+    <ul class="tree" id="toc">
+      <li class="root">my-chat-app/</li>
+      <li><a href="#pieces">The four pieces</a></li>
+      <li><a href="#halves">Two halves of an app</a></li>
+      <li><a href="#backend">1 · Backend</a></li>
+      <li><a href="#sandbox">2 · Sandbox origin</a></li>
+      <li><a href="#frame">3 · Showing the app</a></li>
+      <li><a href="#talk">4 · UI ↔ model</a></li>
+      <li><a href="#state">Where state lives</a></li>
+      <li><a href="#api">Every message</a></li>
+      <li><a href="#context">Host context</a></li>
+      <li><a href="#trust">Permissions + sign-in</a></li>
+      <li><a href="#patterns">Patterns to support</a></li>
+      <li><a href="#faq">Expert questions</a></li>
+      <li><a href="#order">Build order</a></li>
+      <li><a href="#check">Checklist + tests</a></li>
+    </ul>
+    <div class="meter" aria-label="Reading progress"><span class="bar" id="bar">░░░░░░░░░░░░░░░░</span><span class="pct" id="pct">0%</span></div>
+    <p class="hint">press <kbd>↑</kbd> / <kbd>↓</kbd> to scroll</p>
+  </aside>
+
+  <main>
+    <!-- ============ PIECES ============ -->
+    <section id="pieces">
+      <p class="eyebrow">You already have a chat app</p>
+      <h2>The four pieces you build</h2>
+      <p class="lede">You have a chat window, a backend and an AI model that can call tools. To show MCP Apps, you extend two things you already have and add two new ones. The SDK handles the hard protocol work.</p>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 368" role="img" aria-labelledby="pieces-title pieces-desc">
+          <title id="pieces-title">The four pieces of an MCP Apps host</title>
+          <desc id="pieces-desc">In the person's browser: your chat UI and AppFrame on your own origin, and the sandbox page on another origin. The chat UI renders an AppFrame, which talks to the sandbox page by postMessage and fetches the app's HTML from your backend. Your backend streams tokens and app-start events to the chat UI and talks MCP to the servers.</desc>
+          <rect class="d-bg" width="720" height="368"/>
+
+          <rect class="zone" x="16" y="16" width="688" height="168" rx="8"/>
+          <rect class="d-mask" x="28" y="20" width="60" height="12" rx="2"/>
+          <text class="t-eye" x="58" y="29" text-anchor="middle">BROWSER</text>
+          <rect x="32" y="40" width="432" height="128" rx="6" fill="none" stroke="var(--ring-1)" stroke-width="1" stroke-dasharray="3,3"/>
+          <rect class="d-mask" x="44" y="34" width="84" height="12" rx="2"/>
+          <text class="t-eye" x="86" y="43" text-anchor="middle">YOUR ORIGIN</text>
+          <rect x="504" y="40" width="192" height="128" rx="6" fill="none" stroke="var(--ring-1)" stroke-width="1" stroke-dasharray="3,3"/>
+          <rect class="d-mask" x="516" y="34" width="96" height="12" rx="2"/>
+          <text class="t-eye" x="564" y="43" text-anchor="middle">ANOTHER ORIGIN</text>
+
+          <rect class="zone" x="16" y="216" width="472" height="136" rx="8"/>
+          <rect class="d-mask" x="28" y="220" width="84" height="12" rx="2"/>
+          <text class="t-eye" x="70" y="229" text-anchor="middle">YOUR SERVER</text>
+
+          <line class="a" x1="208" y1="104" x2="286" y2="104" marker-end="url(#arrow)"/>
+          <line class="a" x1="448" y1="104" x2="518" y2="104" marker-end="url(#arrow)"/>
+          <line class="a" x1="368" y1="136" x2="368" y2="254" marker-end="url(#arrow)"/>
+          <path class="a" d="M288,288 H136 Q128,288 128,280 V138" marker-end="url(#arrow)"/>
+          <line class="a-link" x1="448" y1="288" x2="542" y2="288" marker-end="url(#arrow-link)"/>
+
+          <rect class="d-mask" x="223" y="84" width="48" height="12" rx="2"/>
+          <text class="t-lbl" x="247" y="93" text-anchor="middle">RENDERS</text>
+          <rect class="d-mask" x="452" y="84" width="64" height="12" rx="2"/>
+          <text class="t-lbl" x="484" y="93" text-anchor="middle">POSTMESSAGE</text>
+          <rect class="d-mask" x="376" y="190" width="112" height="12" rx="2"/>
+          <text class="t-lbl" x="380" y="199">FETCH HTML + CSP</text>
+          <rect class="d-mask" x="146" y="268" width="124" height="12" rx="2"/>
+          <text class="t-lbl" x="208" y="277" text-anchor="middle">TOKENS + APP-START</text>
+          <rect class="d-mask" x="479" y="268" width="32" height="12" rx="2"/>
+          <text class="t-lbl" x="495" y="277" text-anchor="middle">MCP</text>
+
+          <rect class="d-mask" x="48" y="72" width="160" height="64" rx="6"/>
+          <rect class="n-step" x="48" y="72" width="160" height="64" rx="6"/>
+          <rect class="tagbox" x="56" y="78" width="16" height="12" rx="2"/><text class="t-eye" x="64" y="87" text-anchor="middle">4</text>
+          <text class="t-name" x="128" y="106" text-anchor="middle">Chat UI + logic</text>
+          <text class="t-sub" x="128" y="122" text-anchor="middle">messages, model turns</text>
+
+          <rect class="d-mask" x="288" y="72" width="160" height="64" rx="6"/>
+          <rect class="n-focal" x="288" y="72" width="160" height="64" rx="6"/>
+          <rect class="tagbox" x="296" y="78" width="16" height="12" rx="2"/><text class="t-eye" x="304" y="87" text-anchor="middle">3</text>
+          <text class="t-name" x="368" y="106" text-anchor="middle">AppFrame</text>
+          <text class="t-sub" x="368" y="122" text-anchor="middle">one AppBridge per screen</text>
+
+          <rect class="d-mask" x="520" y="72" width="160" height="64" rx="6"/>
+          <rect class="n-bound" x="520" y="72" width="160" height="64" rx="6"/>
+          <rect class="tagbox" x="528" y="78" width="16" height="12" rx="2"/><text class="t-eye" x="536" y="87" text-anchor="middle">2</text>
+          <text class="t-name" x="600" y="106" text-anchor="middle">Sandbox page</text>
+          <text class="t-sub" x="600" y="122" text-anchor="middle">holds the app's UI</text>
+
+          <rect class="d-mask" x="288" y="256" width="160" height="64" rx="6"/>
+          <rect class="n-step" x="288" y="256" width="160" height="64" rx="6"/>
+          <rect class="tagbox" x="296" y="262" width="16" height="12" rx="2"/><text class="t-eye" x="304" y="271" text-anchor="middle">1</text>
+          <text class="t-name" x="368" y="290" text-anchor="middle">Backend</text>
+          <text class="t-sub" x="368" y="306" text-anchor="middle">MCP clients + proxy</text>
+
+          <rect class="d-mask" x="544" y="256" width="144" height="64" rx="6"/>
+          <rect class="n-ext" x="544" y="256" width="144" height="64" rx="6"/>
+          <text class="t-name" x="616" y="290" text-anchor="middle">MCP servers</text>
+          <text class="t-sub" x="616" y="306" text-anchor="middle">tools + ui:// screens</text>
+        </svg>
+        <figcaption>Orange pieces are new; white ones extend what you have. The small numbers match the sections below. The sandbox page runs in the person's browser like your chat does, but it is served from a different origin, so the browser keeps the two apart. The MCP servers are not yours; you only connect to them.</figcaption>
+      </figure></div>
+      <div class="cards two even">
+        <div class="card"><p class="tag">Piece 1 · extend</p><h3>Backend</h3><p>Connects to MCP servers, hides tools the AI shouldn't see, tells the browser "this tool has a screen", and forwards the app's requests.</p></div>
+        <div class="card hot"><p class="tag">Piece 2 · new</p><h3>Sandbox page</h3><p>One tiny HTML page on a separate domain. It holds the app in a sealed frame and passes notes through.</p></div>
+        <div class="card hot"><p class="tag">Piece 3 · new</p><h3>AppFrame</h3><p>A component in your chat bubble. It creates the iframe and an <code>AppBridge</code>, then runs the startup steps in order.</p></div>
+        <div class="card"><p class="tag">Piece 4 · extend</p><h3>Chat logic</h3><p>Lets the app write into the chat and tell the AI what it is showing.</p></div>
+      </div>
+    </section>
+
+    <!-- ============ HALVES ============ -->
+    <section id="halves">
+      <p class="eyebrow">Know your guest</p>
+      <h2>An MCP App has two halves</h2>
+      <p class="lede">The app's author writes both halves of an MCP App, usually in one project, but the halves run in different places. The server half runs on a server. The UI half is stored on that server and runs in the person's browser, inside your sandbox.</p>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 344" role="img" aria-labelledby="halves-title halves-desc">
+          <title id="halves-title">The two halves of an MCP App</title>
+          <desc id="halves-desc">Left, what the app's author writes: the server half (server.ts) and the UI half (mcp-app.html and its script). Right, where they run. server.ts runs on a server as the MCP App's server half, which also serves the bundled UI as a ui:// resource. Your host carries that HTML to the browser, where it runs inside your sandbox as the MCP App's UI.</desc>
+          <rect class="d-bg" width="720" height="344"/>
+
+          <!-- top brackets: write time vs run time -->
+          <path class="hair-b" d="M24,36 V30 H224 V36"/>
+          <text class="t-eye" x="124" y="20" text-anchor="middle">WHAT THE AUTHOR WRITES</text>
+          <path class="hair-b" d="M272,36 V30 H704 V36"/>
+          <text class="t-eye" x="488" y="20" text-anchor="middle">WHERE IT RUNS</text>
+
+          <rect class="zone" x="24" y="48" width="200" height="272" rx="8"/>
+          <rect class="d-mask" x="36" y="52" width="76" height="12" rx="2"/>
+          <text class="t-eye" x="74" y="61" text-anchor="middle">SOURCE CODE</text>
+          <rect class="zone" x="272" y="48" width="208" height="272" rx="8"/>
+          <rect class="d-mask" x="284" y="52" width="76" height="12" rx="2"/>
+          <text class="t-eye" x="322" y="61" text-anchor="middle">ON A SERVER</text>
+          <rect class="zone" x="512" y="48" width="192" height="272" rx="8"/>
+          <rect class="d-mask" x="524" y="52" width="92" height="12" rx="2"/>
+          <text class="t-eye" x="570" y="61" text-anchor="middle">IN THE BROWSER</text>
+
+          <!-- sandbox boundary around the UI -->
+          <rect x="520" y="208" width="176" height="88" rx="8" fill="none" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4,4" stroke-opacity=".6"/>
+          <rect class="d-mask" x="530" y="202" width="80" height="12" rx="2"/>
+          <text class="t-eye" x="570" y="211" text-anchor="middle">YOUR SANDBOX</text>
+
+          <line class="a" x1="200" y1="124" x2="286" y2="124" marker-end="url(#arrow)"/>
+          <line class="a" x1="200" y1="252" x2="286" y2="252" marker-end="url(#arrow)"/>
+          <line class="a" x1="376" y1="152" x2="376" y2="222" marker-end="url(#arrow)"/>
+          <line class="a-accent" x1="464" y1="252" x2="526" y2="252" marker-end="url(#arrow-accent)"/>
+          <rect class="d-mask" x="220" y="104" width="48" height="12" rx="2"/><text class="t-lbl" x="244" y="113" text-anchor="middle">RUNS AS</text>
+          <rect class="d-mask" x="220" y="232" width="48" height="12" rx="2"/><text class="t-lbl" x="244" y="241" text-anchor="middle">BUNDLED</text>
+          <rect class="d-mask" x="384" y="182" width="40" height="12" rx="2"/><text class="t-lbl" x="404" y="191" text-anchor="middle">SERVES</text>
+          <rect class="d-mask" x="468" y="232" width="48" height="12" rx="2"/><text class="t-lbl" x="492" y="241" text-anchor="middle">VIA HOST</text>
+
+          <text class="t-eye" x="48" y="88">SERVER HALF</text>
+          <rect class="n-step" x="48" y="96" width="152" height="56" rx="6"/>
+          <text class="t-name" x="124" y="122" text-anchor="middle">server.ts</text>
+          <text class="t-sub" x="124" y="138" text-anchor="middle">tool + ui:// resource</text>
+          <text class="t-eye" x="48" y="216">UI HALF</text>
+          <rect class="n-step" x="48" y="224" width="152" height="56" rx="6"/>
+          <text class="t-name" x="124" y="250" text-anchor="middle">mcp-app.html + .ts</text>
+          <text class="t-sub" x="124" y="266" text-anchor="middle">new App(...)</text>
+
+          <rect class="n-ext" x="288" y="96" width="176" height="56" rx="6"/>
+          <text class="t-name" x="376" y="122" text-anchor="middle">MCP App · server</text>
+          <text class="t-sub" x="376" y="138" text-anchor="middle">does the tool work</text>
+          <rect class="n-step" x="288" y="224" width="176" height="56" rx="6"/>
+          <text class="t-name" x="376" y="250" text-anchor="middle">ui:// resource</text>
+          <text class="t-sub" x="376" y="266" text-anchor="middle">the HTML, as text</text>
+
+          <text class="t-note" x="608" y="120" text-anchor="middle">The same HTML, now</text>
+          <text class="t-note" x="608" y="136" text-anchor="middle">running like a web page.</text>
+          <rect class="n-focal" x="528" y="224" width="160" height="56" rx="6"/>
+          <text class="t-name" x="608" y="250" text-anchor="middle">MCP App · UI</text>
+          <text class="t-sub" x="608" y="266" text-anchor="middle">draws, answers clicks</text>
+        </svg>
+        <figcaption>It works like any website: the HTML file lives on a server, but the page runs in your browser. File names come from <code>examples/basic-server-vanillajs</code>.</figcaption>
+      </figure></div>
+      <div class="cards two even">
+        <div class="card">
+          <p class="tag">Server half · server.ts</p>
+          <h3>A tool and a screen, tied by one URI</h3>
+          <pre><code>registerAppTool(server, "get-time", {
+  inputSchema: z.object({}),
+  _meta: { ui: { resourceUri: "ui://get-time/mcp-app.html" } },
+}, async () =&gt; ({
+  content: [{ type: "text", text: time }],
+  structuredContent: { time },
+}));
+
+registerAppResource(server, uri, uri,
+  { mimeType: RESOURCE_MIME_TYPE },
+  async () =&gt; ({ contents: [{ uri,
+    mimeType: RESOURCE_MIME_TYPE,
+    text: await readFile("dist/mcp-app.html") }] }));</code></pre>
+        </div>
+        <div class="card hot">
+          <p class="tag">UI half · src/mcp-app.ts</p>
+          <h3>Waits for your host, then draws</h3>
+          <pre><code>const app = new App({ name: "Get Time App", version: "1.0.0" });
+
+<span class="c">// register handlers before connect()</span>
+app.ontoolinput  = (p) =&gt; showLoading(p.arguments);
+app.ontoolresult = (r) =&gt; show(r.structuredContent);
+app.onhostcontextchanged = applyTheme;
+app.onteardown   = async () =&gt; { save(); return {}; };
+
+button.onclick = () =&gt;
+  app.callServerTool({ name: "get-time", arguments: {} });
+
+await app.connect();  <span class="c">// sends ui/initialize to your AppFrame</span></code></pre>
+        </div>
+      </div>
+      <div class="cards three">
+        <div class="card"><h3>Text and data</h3><p>A tool result has <code>content</code> (text the model reads) and <code>structuredContent</code> (data the UI draws). Pass the whole result to the app.</p></div>
+        <div class="card"><h3>Text first</h3><p>The server half calls <code>getUiCapability()</code> on your client's capabilities. If your host didn't advertise the extension, it may register a text-only tool instead.</p></div>
+        <div class="card"><h3>React too</h3><p>React apps use <code>useApp()</code>, <code>useHostStyles()</code> and <code>useAutoResize()</code> from <code>/react</code>. On the wire it's the same protocol.</p></div>
+      </div>
+      <p class="say">You build the host. The app's author builds both halves. You only meet the UI half, through postMessage.</p>
+    </section>
+
+    <!-- ============ BACKEND ============ -->
+    <section id="backend">
+      <p class="eyebrow">Piece 1</p>
+      <h2>Backend: notice the screen</h2>
+      <p class="lede">Your AI loop already calls tools. Now it checks one extra thing: does this tool come with a screen? If yes, it tells the browser.</p>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 232" role="img" aria-labelledby="backend-title backend-desc">
+          <title id="backend-title">What the backend does when the model calls a tool</title>
+          <desc id="backend-desc">When the model calls a tool, the backend checks for _meta.ui.resourceUri. If present it streams app-start to the browser, then app-result when the call finishes. If absent, the tool result is shown as plain text.</desc>
+          <rect class="d-bg" width="720" height="232"/>
+          <line class="a" x1="152" y1="76" x2="200" y2="76" marker-end="url(#arrow)"/>
+          <line class="a-accent" x1="328" y1="76" x2="376" y2="76" marker-end="url(#arrow-accent)"/>
+          <line class="a" x1="504" y1="76" x2="552" y2="76" marker-end="url(#arrow)"/>
+          <line class="a" x1="264" y1="104" x2="264" y2="168" marker-end="url(#arrow)"/>
+          <rect class="d-mask" x="340" y="56" width="24" height="12" rx="2"/><text class="t-lbl" x="352" y="65" text-anchor="middle">YES</text>
+          <rect class="d-mask" x="272" y="128" width="20" height="12" rx="2"/><text class="t-lbl" x="282" y="137" text-anchor="middle">NO</text>
+
+          <rect class="n-input" x="24" y="48" width="128" height="56" rx="6"/>
+          <text class="t-name" x="88" y="74" text-anchor="middle">Model calls a tool</text>
+          <text class="t-sub" x="88" y="90" text-anchor="middle">your AI loop</text>
+          <rect class="n-step" x="200" y="48" width="128" height="56" rx="6"/>
+          <text class="t-name" x="264" y="74" text-anchor="middle">Has a screen?</text>
+          <text class="t-sub" x="264" y="90" text-anchor="middle">_meta.ui.resourceUri</text>
+          <rect class="n-focal" x="376" y="48" width="128" height="56" rx="6"/>
+          <text class="t-name" x="440" y="74" text-anchor="middle">Send app-start</text>
+          <text class="t-sub" x="440" y="90" text-anchor="middle">tool, args, uri</text>
+          <rect class="n-step" x="552" y="48" width="144" height="56" rx="6"/>
+          <text class="t-name" x="624" y="74" text-anchor="middle">Send app-result</text>
+          <text class="t-sub" x="624" y="90" text-anchor="middle">when tools/call ends</text>
+          <rect class="n-ext" x="200" y="168" width="128" height="48" rx="6"/>
+          <text class="t-name" x="264" y="196" text-anchor="middle">Plain text, as today</text>
+        </svg>
+      </figure></div>
+
+      <h3 class="sub">Four jobs</h3>
+      <div class="cards two even">
+        <div class="card">
+          <p class="tag">Job 1 · connect</p>
+          <h3>Say you support apps</h3>
+          <p>When your MCP client connects, advertise the extension. Then list tools and resources once and keep them.</p>
+          <pre><code>capabilities: { extensions: {
+  "io.modelcontextprotocol/ui": {
+    mimeTypes: ["text/html;profile=mcp-app"]
+  } } }</code></pre>
+        </div>
+        <div class="card">
+          <p class="tag">Job 2 · filter</p>
+          <h3>Hide app-only tools from the AI</h3>
+          <p>If a tool's <code>_meta.ui.visibility</code> leaves out <code>"model"</code>, don't give it to the model. It is a button for the app, like "refresh".</p>
+          <p>Helpers: <code>isToolVisibilityAppOnly(tool)</code> and <code>getToolUiResourceUri(tool)</code> from <code>@modelcontextprotocol/ext-apps/app-bridge</code>.</p>
+        </div>
+        <div class="card hot">
+          <p class="tag">Job 3 · stream</p>
+          <h3>Tell the browser</h3>
+          <ul>
+            <li><code>app-start</code><span>toolCallId, server, toolName, args, resourceUri</span></li>
+            <li><code>app-args-partial</code><span>optional, while the model is still typing the arguments</span></li>
+            <li><code>app-result</code> or <code>app-cancelled</code><span>when the tool call finishes or fails</span></li>
+          </ul>
+        </div>
+        <div class="card blue">
+          <p class="tag">Job 4 · proxy</p>
+          <h3>Endpoints for the app</h3>
+          <ul>
+            <li><code>GET /api/apps/resource</code><span>reads the <code>ui://</code> resource, checks the MIME type, returns <code>{ html, csp, permissions }</code></span></li>
+            <li><code>POST /api/apps/tools/call</code><span>forwards, but refuses tools whose visibility leaves out <code>"app"</code></span></li>
+            <li><code>POST /api/apps/resources/read</code><span>forwards as is</span></li>
+          </ul>
+        </div>
+      </div>
+      <p class="say">Also save toolName, args, uri and result with the message, so the app can be redrawn when the chat is reopened.</p>
+    </section>
+
+    <!-- ============ SANDBOX ============ -->
+    <section id="sandbox">
+      <p class="eyebrow">Piece 2</p>
+      <h2>A separate home for strangers</h2>
+      <p class="lede">The app's HTML was written by someone else. If it ran on your domain, it could read your cookies and your chat. So it runs on a different domain, inside a glass room.</p>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 320" role="img" aria-labelledby="sandbox-title sandbox-desc">
+          <title id="sandbox-title">Your site, the sandbox origin and the app</title>
+          <desc id="sandbox-desc">Your chat site contains an iframe on a separate sandbox domain, which contains an inner iframe running the app's HTML under a CSP sent as an HTTP header.</desc>
+          <rect class="d-bg" width="720" height="320"/>
+          <rect class="ring-1" x="24" y="24" width="672" height="272" rx="8"/>
+          <rect class="d-mask" x="36" y="18" width="148" height="12" rx="2"/>
+          <text class="t-eye" x="44" y="27">YOURAPP.COM · YOUR CHAT</text>
+          <text class="t-note" x="672" y="50" text-anchor="end">Holds AppBridge, the chat and the login.</text>
+
+          <rect class="ring-2" x="56" y="64" width="608" height="200" rx="8"/>
+          <rect class="d-mask" x="68" y="58" width="196" height="12" rx="2"/>
+          <text class="t-eye" x="76" y="67">SANDBOX.YOURAPP-USERCONTENT.COM</text>
+          <text class="t-note" x="640" y="90" text-anchor="end">sandbox.html: checks origins, passes notes.</text>
+
+          <rect class="n-focal" x="88" y="104" width="544" height="128" rx="8"/>
+          <rect class="d-mask" x="100" y="98" width="176" height="12" rx="2"/>
+          <text class="t-eye" x="108" y="107">INNER IFRAME · THE APP'S HTML</text>
+          <text class="t-big" x="360" y="160" text-anchor="middle">The MCP App</text>
+          <text class="t-note" x="360" y="184" text-anchor="middle">Can only reach the domains listed in its ui.csp.</text>
+          <text class="t-sub" x="360" y="204" text-anchor="middle">CSP is an HTTP header from your sandbox server, so the app can't change it</text>
+        </svg>
+        <figcaption>For local work a second port counts as a second origin: the reference host uses 8080 for the chat and 8081 for the sandbox.</figcaption>
+      </figure></div>
+      <h3 class="sub">What sandbox.html does, about 130 lines</h3>
+      <ol class="steps">
+        <li>Refuses to run unless it is inside an iframe and the parent's origin is yours.</li>
+        <li>Creates the inner iframe with <code>sandbox="allow-scripts allow-same-origin allow-forms"</code>.</li>
+        <li>Tells the parent it is ready: <code>ui/notifications/sandbox-proxy-ready</code>.</li>
+        <li>When <code>ui/notifications/sandbox-resource-ready</code> arrives, writes the HTML into the inner iframe and sets its <code>allow</code> permissions.</li>
+        <li>Passes every other note both ways, always naming the exact target origin, never <code>*</code>.</li>
+      </ol>
+      <div class="cards two">
+        <div class="card hot"><h3>The sandbox server</h3><p>Serves <code>sandbox.html</code> with a <code>Content-Security-Policy</code> header built from the <code>?csp=</code> value. Check every domain in it so nobody can sneak in extra rules with <code>;</code> or quotes.</p></div>
+        <div class="card"><h3>Copy, don't invent</h3><p><code>examples/basic-host/src/sandbox.ts</code> and <code>serve.ts</code> already do all of this. Change the allowed origin to your domain.</p></div>
+      </div>
+    </section>
+
+    <!-- ============ FRAME ============ -->
+    <section id="frame">
+      <p class="eyebrow">Piece 3</p>
+      <h2>Showing the app, step by step</h2>
+      <p class="lede">Here is the whole trip, from you typing a question, through the model choosing a tool, to a working screen and the model's answer. Press Play to watch it one stage at a time.</p>
+      <div class="flowwrap">
+      <div class="fig"><figure>
+        <svg id="flow" class="playable" viewBox="0 0 936 1116" role="img" aria-labelledby="frame-title frame-desc">
+          <title id="frame-title">From your question to a working screen</title>
+          <desc id="frame-desc">Browser lanes on the left (chat UI, AppFrame, sandbox page, MCP App UI) and server lanes on the right (your backend, the model, the MCP App server). Your backend asks the model, which asks to call the tool. The backend calls the tool and streams app-start; the chat UI mounts an AppFrame, which fetches the HTML, loads the sandbox and hands over the HTML. The UI and AppFrame shake hands, the AppFrame sends tool-input and then tool-result. Finally the backend gives the model the text content of the result and the model's answer appears in the chat.</desc>
+          <rect class="d-bg" width="936" height="1116"/>
+
+          <rect class="zone" x="8" y="12" width="512" height="1020" rx="8"/>
+          <rect class="d-mask" x="16" y="18" width="96" height="12" rx="2"/>
+          <text class="t-eye" x="64" y="27" text-anchor="middle">IN THE BROWSER</text>
+          <rect class="zone" x="544" y="12" width="384" height="1020" rx="8"/>
+          <rect class="d-mask" x="552" y="18" width="72" height="12" rx="2"/>
+          <text class="t-eye" x="588" y="27" text-anchor="middle">ON SERVERS</text>
+
+          <line class="life" x1="72" y1="92" x2="72" y2="1016"/>
+          <line class="life" x1="200" y1="92" x2="200" y2="1016"/>
+          <line class="life" x1="328" y1="92" x2="328" y2="1016"/>
+          <line class="life" x1="456" y1="92" x2="456" y2="1016"/>
+          <line class="life" x1="608" y1="92" x2="608" y2="1016"/>
+          <line class="life" x1="736" y1="92" x2="736" y2="1016"/>
+          <line class="life" x1="864" y1="92" x2="864" y2="1016"/>
+
+          <!-- AppBridge lives inside the AppFrame: active from connect() on -->
+          <rect class="act-bridge" x="195" y="548" width="10" height="460" rx="2"/>
+          <rect class="act-tool" x="859" y="244" width="10" height="532" rx="2"/>
+          <text class="t-tool" x="853" y="512" text-anchor="end">tool running…</text>
+          <text class="t-tool" x="853" y="524" text-anchor="end">reply at step 19</text>
+          <rect class="d-mask" x="124" y="532" width="66" height="14" rx="2"/>
+          <text class="t-bridge-tag" x="186" y="542" text-anchor="end">AppBridge ▸</text>
+          <rect class="rowband" x="12" y="104" width="904" height="36" rx="4"/>
+          <!-- 1 Ask -->
+          <g class="msg" data-step="1" data-tone="link">
+            <line class="a-link" x1="72" y1="132" x2="608" y2="132" marker-end="url(#arrow-link)"/>
+            <rect class="d-mask" x="476" y="108" width="112" height="16" rx="2"/><text class="t-msg" x="532" y="120" text-anchor="middle">Paris weather?</text>
+          </g>
+          <g class="msg" data-step="1">
+            <line class="a" x1="608" y1="168" x2="736" y2="168" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="624" y="144" width="96" height="16" rx="2"/><text class="t-msg" x="672" y="156" text-anchor="middle">chat + tools</text>
+          </g>
+          <g class="msg" data-step="1">
+            <line class="a dash" x1="736" y1="204" x2="608" y2="204" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="620" y="180" width="104" height="16" rx="2"/><text class="t-msg" x="672" y="192" text-anchor="middle">call the tool</text>
+          </g>
+          <!-- 2 Screen? -->
+          <g class="msg" data-step="2">
+            <line class="a" x1="608" y1="240" x2="864" y2="240" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="756" y="216" width="88" height="16" rx="2"/><text class="t-msg" x="800" y="228" text-anchor="middle">tools/call</text>
+          </g>
+          <g class="msg" data-step="2" data-tone="link">
+            <line class="a-link dash" x1="608" y1="276" x2="72" y2="276" marker-end="url(#arrow-open-link)"/>
+            <rect class="d-mask" x="492" y="252" width="80" height="16" rx="2"/><text class="t-msg" x="532" y="264" text-anchor="middle">app-start</text>
+          </g>
+          <g class="msg" data-step="2">
+            <line class="a dash" x1="72" y1="312" x2="200" y2="312" marker-end="url(#arrow-open)"/>
+            <rect class="d-mask" x="108" y="288" width="56" height="16" rx="2"/><text class="t-msg" x="136" y="300" text-anchor="middle">mounts</text>
+          </g>
+          <!-- 3 Fetch -->
+          <g class="msg" data-step="3" data-tone="link">
+            <line class="a-link" x1="200" y1="348" x2="608" y2="348" marker-end="url(#arrow-link)"/>
+            <rect class="d-mask" x="480" y="324" width="104" height="16" rx="2"/><text class="t-msg" x="532" y="336" text-anchor="middle">GET html + csp</text>
+          </g>
+          <g class="msg" data-step="3">
+            <line class="a" x1="608" y1="384" x2="864" y2="384" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="744" y="360" width="112" height="16" rx="2"/><text class="t-msg" x="800" y="372" text-anchor="middle">resources/read</text>
+          </g>
+          <g class="msg" data-step="3">
+            <line class="a dash" x1="864" y1="420" x2="608" y2="420" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="760" y="396" width="80" height="16" rx="2"/><text class="t-msg" x="800" y="408" text-anchor="middle">ui:// html</text>
+          </g>
+          <g class="msg" data-step="3" data-tone="link">
+            <line class="a-link dash" x1="608" y1="456" x2="200" y2="456" marker-end="url(#arrow-link)"/>
+            <rect class="d-mask" x="496" y="432" width="72" height="16" rx="2"/><text class="t-msg" x="532" y="444" text-anchor="middle">html, csp</text>
+          </g>
+          <!-- 4 Sandbox -->
+          <g class="msg" data-step="4">
+            <line class="a" x1="200" y1="492" x2="328" y2="492" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="216" y="468" width="96" height="16" rx="2"/><text class="t-msg" x="264" y="480" text-anchor="middle">load sandbox</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a dash" x1="328" y1="528" x2="200" y2="528" marker-end="url(#arrow-open)"/>
+            <rect class="d-mask" x="220" y="504" width="88" height="16" rx="2"/><text class="t-msg" x="264" y="516" text-anchor="middle">proxy-ready</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a dash" x1="200" y1="564" x2="328" y2="564" marker-end="url(#arrow-open)"/>
+            <rect class="d-mask" x="216" y="540" width="96" height="16" rx="2"/><text class="t-msg" x="264" y="552" text-anchor="middle">here is html</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a" x1="328" y1="600" x2="456" y2="600" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="344" y="576" width="96" height="16" rx="2"/><text class="t-msg" x="392" y="588" text-anchor="middle">runs html</text>
+          </g>
+          <!-- 5 Hello -->
+          <g class="msg" data-step="5">
+            <line class="a" x1="456" y1="636" x2="200" y2="636" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="340" y="612" width="104" height="16" rx="2"/><text class="t-msg" x="392" y="624" text-anchor="middle">ui/initialize</text>
+            <circle class="relay" cx="328" cy="636" r="3.5"/>
+          </g>
+          <g class="msg" data-step="5">
+            <line class="a dash" x1="200" y1="672" x2="456" y2="672" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="344" y="648" width="96" height="16" rx="2"/><text class="t-msg" x="392" y="660" text-anchor="middle">host context</text>
+            <circle class="relay" cx="328" cy="672" r="3.5"/>
+          </g>
+          <g class="msg" data-step="5">
+            <line class="a dash" x1="456" y1="708" x2="200" y2="708" marker-end="url(#arrow-open)"/>
+            <rect class="d-mask" x="348" y="684" width="88" height="16" rx="2"/><text class="t-msg" x="392" y="696" text-anchor="middle">initialized</text>
+            <circle class="relay" cx="328" cy="708" r="3.5"/>
+          </g>
+          <!-- 6 Data -->
+          <g class="msg" data-step="6">
+            <line class="a dash" x1="200" y1="744" x2="456" y2="744" marker-end="url(#arrow-open)"/>
+            <rect class="d-mask" x="352" y="720" width="80" height="16" rx="2"/><text class="t-msg" x="392" y="732" text-anchor="middle">tool-input</text>
+            <circle class="relay" cx="328" cy="744" r="3.5"/>
+          </g>
+          <g class="msg" data-step="6">
+            <line class="a dash" x1="864" y1="780" x2="608" y2="780" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="756" y="756" width="88" height="16" rx="2"/><text class="t-msg" x="800" y="768" text-anchor="middle">tool result</text>
+          </g>
+          <g class="msg" data-step="6" data-tone="link">
+            <line class="a-link dash" x1="608" y1="816" x2="72" y2="816" marker-end="url(#arrow-open-link)"/>
+            <rect class="d-mask" x="488" y="792" width="88" height="16" rx="2"/><text class="t-msg" x="532" y="804" text-anchor="middle">app-result</text>
+          </g>
+          <g class="msg" data-step="6">
+            <line class="a dash" x1="72" y1="852" x2="200" y2="852" marker-end="url(#arrow-open)"/>
+            <rect class="d-mask" x="88" y="828" width="96" height="16" rx="2"/><text class="t-msg" x="136" y="840" text-anchor="middle">passes it on</text>
+          </g>
+          <g class="msg" data-step="6" data-tone="accent">
+            <line class="a-accent dash" x1="200" y1="888" x2="456" y2="888" marker-end="url(#arrow-open-accent)"/>
+            <rect class="d-mask" x="348" y="864" width="88" height="16" rx="2"/><text class="t-msg" x="392" y="876" text-anchor="middle">tool-result</text>
+            <circle class="relay" cx="328" cy="888" r="3.5"/>
+          </g>
+          <!-- 7 Reply -->
+          <g class="msg" data-step="7">
+            <line class="a" x1="608" y1="924" x2="736" y2="924" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="624" y="900" width="96" height="16" rx="2"/><text class="t-msg" x="672" y="912" text-anchor="middle">content only</text>
+          </g>
+          <g class="msg" data-step="7">
+            <line class="a dash" x1="736" y1="960" x2="608" y2="960" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="644" y="936" width="56" height="16" rx="2"/><text class="t-msg" x="672" y="948" text-anchor="middle">answer</text>
+          </g>
+          <g class="msg" data-step="7" data-tone="link">
+            <line class="a-link dash" x1="608" y1="996" x2="72" y2="996" marker-end="url(#arrow-open-link)"/>
+            <rect class="d-mask" x="484" y="972" width="96" height="16" rx="2"/><text class="t-msg" x="532" y="984" text-anchor="middle">answer text</text>
+          </g>
+
+          <rect class="d-mask" x="136" y="547" width="52" height="12" rx="2"/><text class="t-bridge" x="184" y="556" text-anchor="end">connect()</text>
+          <rect class="d-mask" x="53" y="560" width="135" height="12" rx="2"/><text class="t-bridge" x="184" y="569" text-anchor="end">sendSandboxResourceReady()</text>
+          <rect class="d-mask" x="72" y="630" width="116" height="12" rx="2"/><text class="t-bridge" x="184" y="639" text-anchor="end">receives ui/initialize</text>
+          <rect class="d-mask" x="106" y="666" width="82" height="12" rx="2"/><text class="t-bridge" x="184" y="675" text-anchor="end">replies for you</text>
+          <rect class="d-mask" x="87" y="702" width="101" height="12" rx="2"/><text class="t-bridge" x="184" y="711" text-anchor="end">oninitialized fires</text>
+          <rect class="d-mask" x="106" y="738" width="82" height="12" rx="2"/><text class="t-bridge" x="184" y="747" text-anchor="end">sendToolInput()</text>
+          <rect class="d-mask" x="102" y="882" width="86" height="12" rx="2"/><text class="t-bridge" x="184" y="891" text-anchor="end">sendToolResult()</text>
+          <g class="hd" data-x="72"><rect class="n-input" x="16" y="40" width="112" height="52" rx="6"/>
+          <rect class="tagbox" x="54" y="48" width="36" height="12" rx="2"/><text class="t-eye" x="72" y="57" text-anchor="middle">HOST</text>
+          <text class="t-name" x="72" y="80" text-anchor="middle">You · chat UI</text></g>
+          <g class="hd" data-x="200"><rect class="n-focal" x="144" y="40" width="112" height="52" rx="6"/>
+          <rect class="tagbox" x="182" y="48" width="36" height="12" rx="2"/><text class="t-eye" x="200" y="57" text-anchor="middle">HOST</text>
+          <text class="t-name" x="200" y="76" text-anchor="middle">AppFrame</text><text class="t-bridge" x="200" y="87" text-anchor="middle">holds an AppBridge</text></g>
+          <g class="hd" data-x="328"><rect class="n-step" x="272" y="40" width="112" height="52" rx="6"/>
+          <rect class="tagbox" x="310" y="48" width="36" height="12" rx="2"/><text class="t-eye" x="328" y="57" text-anchor="middle">HOST</text>
+          <text class="t-name" x="328" y="80" text-anchor="middle">Sandbox page</text></g>
+          <g class="hd" data-x="456"><rect class="n-step" x="400" y="40" width="112" height="52" rx="6"/>
+          <rect class="tagbox" x="438" y="48" width="36" height="12" rx="2"/><text class="t-eye" x="456" y="57" text-anchor="middle">VIEW</text>
+          <text class="t-name" x="456" y="80" text-anchor="middle">MCP App · UI</text></g>
+          <g class="hd" data-x="608"><rect class="n-step" x="552" y="40" width="112" height="52" rx="6"/>
+          <rect class="tagbox" x="590" y="48" width="36" height="12" rx="2"/><text class="t-eye" x="608" y="57" text-anchor="middle">HOST</text>
+          <text class="t-name" x="608" y="80" text-anchor="middle">Your backend</text></g>
+          <g class="hd" data-x="736"><rect class="n-ext" x="680" y="40" width="112" height="52" rx="6"/>
+          <rect class="tagbox" x="716" y="48" width="40" height="12" rx="2"/><text class="t-eye" x="736" y="57" text-anchor="middle">AGENT</text>
+          <text class="t-name" x="736" y="80" text-anchor="middle">Model · LLM</text></g>
+          <g class="hd" data-x="864"><rect class="n-ext" x="808" y="40" width="112" height="52" rx="6"/>
+          <rect class="tagbox" x="840" y="48" width="48" height="12" rx="2"/><text class="t-eye" x="864" y="57" text-anchor="middle">SERVER</text>
+          <text class="t-name" x="864" y="80" text-anchor="middle">MCP App · server</text></g>
+
+          <g class="flow-dots"></g>
+
+          <line class="hair" x1="24" y1="1056" x2="912" y2="1056"/>
+          <text class="t-eye" x="24" y="1080">LEGEND</text>
+          <line class="a" x1="104" y1="1076" x2="136" y2="1076" marker-end="url(#arrow)"/><text class="t-lbl" x="144" y="1080">REQUEST</text>
+          <line class="a dash" x1="216" y1="1076" x2="248" y2="1076" marker-end="url(#arrow)"/><text class="t-lbl" x="256" y="1080">REPLY</text>
+          <line class="a dash" x1="320" y1="1076" x2="352" y2="1076" marker-end="url(#arrow-open)"/><text class="t-lbl" x="360" y="1080">NOTIFICATION · NO REPLY</text>
+          <line class="a-link" x1="508" y1="1076" x2="540" y2="1076" marker-end="url(#arrow-link)"/><text class="t-lbl" x="548" y="1080">YOUR OWN HTTP / CHAT STREAM</text>
+          <circle class="relay" cx="740" cy="1076" r="3.5"/><text class="t-lbl" x="750" y="1080">PASSED ON BY THE SANDBOX PAGE</text>
+          <rect class="act-bridge" x="111" y="1094" width="10" height="16" rx="2"/><text class="t-lbl" x="132" y="1105">APPBRIDGE AT WORK INSIDE THE APPFRAME. ORANGE MONO TEXT = THE APPBRIDGE CALL FOR THAT ARROW</text>
+        </svg>
+      </figure></div>
+
+      <div class="player sticky" id="p-panel">
+        <div class="player-bar">
+          <button type="button" class="pbtn" id="p-prev" aria-label="Previous step">◀ Back</button>
+          <button type="button" class="pbtn primary" id="p-play">▶ Play</button>
+          <button type="button" class="pbtn" id="p-next" aria-label="Next step">Next ▶</button>
+          <button type="button" class="pbtn pspeed" id="p-speed" aria-label="Playback speed 1 times">1×</button>
+          <ol class="pdots" id="p-dots" aria-label="Jump to a stage"></ol>
+        </div>
+        <div class="pcap" aria-live="polite">
+          <p class="eyebrow" id="p-eye">Overview</p>
+          <h4 id="p-title">One question becomes a screen</h4>
+          <p class="proute" id="p-route" hidden></p>
+          <p id="p-text">All 25 arrows are drawn at once. Press Play to watch them one at a time.</p>
+          <pre class="pcode" id="p-code" hidden></pre>
+        </div>
+      </div>
+      </div>
+      <p class="phint">Left band: what runs in the person's browser. Right band: servers. Any arrow that crosses the gap between the bands goes over the network, and its label sits in that gap. The two MCP App lanes are one app split in two: its server half runs on a server, and its UI half is HTML that the server hands over and the browser runs, like any web page. The tags give each lane's MCP role: HOST is everything you build, including your backend; VIEW is the app's UI; SERVER is the app's MCP server. Filled head: someone waits for an answer. Open head: one-way. Once the app is running, every note passes through the sandbox page untouched.</p>
+
+      <h3 class="sub">The same stages in code</h3>
+<pre><code><span class="k">import</span> { AppBridge, PostMessageTransport } <span class="k">from</span> "@modelcontextprotocol/ext-apps/app-bridge";
+
+<span class="k">async function</span> mountApp(iframe, call, chat) {
+  <span class="c">// Fetch the screen: HTML + CSP from your backend</span>
+  <span class="k">const</span> ui = <span class="k">await</span> api.getAppResource(call.server, call.resourceUri);
+
+  <span class="k">const</span> bridge = <span class="k">new</span> AppBridge(<span class="k">null</span>, { name: "my-chat", version: "1.0.0" },
+    { serverTools: {}, serverResources: {}, openLinks: {}, updateModelContext: { text: {} } },
+    { hostContext: {
+        theme: currentTheme(), platform: "web", displayMode: "inline",
+        availableDisplayModes: ["inline", "fullscreen"],
+        containerDimensions: { maxHeight: 6000 },
+        styles: { variables: myCssVariables },
+    } });
+
+  <span class="c">// Register every handler BEFORE connect()</span>
+  bridge.oncalltool           = (p) =&gt; api.callTool(call.server, p);
+  bridge.onreadresource       = (p) =&gt; api.readResource(call.server, p);
+  bridge.onmessage            = <span class="k">async</span> (p) =&gt; { chat.sendAsUser(p); <span class="k">return</span> {}; };
+  bridge.onupdatemodelcontext = <span class="k">async</span> (p) =&gt; { chat.setAppContext(call.toolCallId, p); <span class="k">return</span> {}; };
+  bridge.onopenlink           = <span class="k">async</span> ({ url }) =&gt; { window.open(url, "_blank", "noopener"); <span class="k">return</span> {}; };
+  bridge.onsizechange         = ({ height }) =&gt; { <span class="k">if</span> (height) iframe.style.height = `${height}px`; };
+  bridge.onrequestdisplaymode = <span class="k">async</span> ({ mode }) =&gt; { chat.setFullscreen(call.toolCallId, mode === "fullscreen"); <span class="k">return</span> { mode }; };
+  <span class="k">const</span> initialized = <span class="k">new</span> Promise((r) =&gt; (bridge.oninitialized = () =&gt; r()));
+
+  <span class="c">// Build the glass room: load sandbox.html?csp=... and wait for proxy-ready</span>
+  <span class="k">await</span> loadSandboxProxy(iframe, ui.csp, ui.permissions);
+  <span class="c">// connect: target AND source are this iframe, so other windows are ignored</span>
+  <span class="k">await</span> bridge.connect(<span class="k">new</span> PostMessageTransport(iframe.contentWindow, iframe.contentWindow));
+  <span class="c">// ...then hand over the HTML</span>
+  <span class="k">await</span> bridge.sendSandboxResourceReady({ html: ui.html, csp: ui.csp, permissions: ui.permissions });
+  <span class="c">// Say hello: AppBridge answers ui/initialize for you</span>
+  <span class="k">await</span> initialized;
+  <span class="c">// Send the data</span>
+  bridge.sendToolInput({ arguments: call.args });
+  call.result.then((r) =&gt; bridge.sendToolResult(r),
+                   (e) =&gt; bridge.sendToolCancelled({ reason: String(e) }));
+  <span class="k">return</span> bridge;
+}
+
+<span class="c">// When the bubble unmounts</span>
+<span class="k">await</span> bridge.teardownResource({});   <span class="c">// lets the app save, then remove the iframe</span></code></pre>
+
+      <div class="cards three">
+        <div class="card"><h3>Keep it in sync</h3><p>Theme changed? <code>bridge.sendHostContextChange({ theme })</code>. Width changed? A <code>ResizeObserver</code> sends <code>containerDimensions</code>.</p></div>
+        <div class="card"><h3>Don't talk early</h3><p>Send nothing to the app before <code>oninitialized</code> fires. The spec forbids it.</p></div>
+        <div class="card"><h3>Copy from</h3><p><code>examples/basic-host/src/implementation.ts</code> has <code>loadSandboxProxy</code>, <code>initializeApp</code> and <code>newAppBridge</code>.</p></div>
+      </div>
+    </section>
+
+    <!-- ============ TALK ============ -->
+    <section id="talk">
+      <p class="eyebrow">Piece 4</p>
+      <h2>How the UI and the model stay in touch</h2>
+      <p class="lede">After the first render, the UI can't reach the model directly. Everything goes through your host, by one of four routes, and your host decides what the model gets to see.</p>
+      <div class="flowwrap">
+      <div class="fig"><figure>
+<svg id="flow2" class="playable" viewBox="0 0 720 1256" role="img" aria-labelledby="talk-title talk-desc">
+          <title id="talk-title">Four routes between the UI and the model</title>
+          <desc id="talk-desc">Quiet update: the UI sends a model-context update, the host stores only the latest and replies ok; nothing reaches the model until later, when the next turn starts, and then the saved context goes along with that message. Speak up: the UI sends ui/message, the host accepts it, adds it as a new user turn and the model replies in the chat. Own work: the UI calls a tool through the host to the server and the model is not told. Model drives: the host lists the app's own tools, offers them to the model, and runs the model's calls inside the app.</desc>
+          <rect class="d-bg" width="720" height="1256"/>
+          <line class="life" x1="72" y1="76" x2="72" y2="1168"/>
+          <line class="life" x1="208" y1="76" x2="208" y2="1168"/>
+          <line class="life" x1="352" y1="76" x2="352" y2="1168"/>
+          <line class="life" x1="504" y1="76" x2="504" y2="1168"/>
+          <line class="life" x1="648" y1="76" x2="648" y2="1168"/>
+          <rect class="rowband" x="12" y="112" width="696" height="36" rx="4"/>
+          <rect class="route-pill" x="12" y="87" width="161" height="18" rx="9"/>
+          <text class="t-route" x="92.5" y="100" text-anchor="middle">ROUTE 1 · QUIET UPDATE</text>
+          <line class="route-div" x1="12" y1="418" x2="708" y2="418"/>
+          <rect class="route-pill" x="12" y="409" width="135" height="18" rx="9"/>
+          <text class="t-route" x="79.5" y="422" text-anchor="middle">ROUTE 2 · SPEAK UP</text>
+          <line class="route-div" x1="12" y1="670" x2="708" y2="670"/>
+          <rect class="route-pill" x="12" y="661" width="135" height="18" rx="9"/>
+          <text class="t-route" x="79.5" y="674" text-anchor="middle">ROUTE 3 · OWN WORK</text>
+          <line class="route-div" x1="12" y1="886" x2="708" y2="886"/>
+          <rect class="route-pill" x="12" y="877" width="161" height="18" rx="9"/>
+          <text class="t-route" x="92.5" y="890" text-anchor="middle">ROUTE 4 · MODEL DRIVES</text>
+          <line class="later" x1="12" y1="284" x2="708" y2="284"/>
+          <rect class="d-mask" x="220" y="276" width="264" height="16" rx="2"/>
+          <text class="t-later" x="352" y="288" text-anchor="middle">LATER · WHEN THE NEXT TURN STARTS</text>
+          <!-- 1 Quiet update -->
+          <g class="msg" data-step="1">
+            <line class="a" x1="72" y1="136" x2="206" y2="136" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="90" y="112" width="100" height="16" rx="2"/><text class="t-msg" x="140" y="124" text-anchor="middle">pans the map</text>
+          </g>
+          <g class="msg" data-step="1">
+            <line class="a" x1="208" y1="172" x2="350" y2="172" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="226" y="148" width="107" height="16" rx="2"/><text class="t-msg" x="280" y="160" text-anchor="middle">model context</text>
+          </g>
+          <g class="msg" data-step="1" data-tone="accent" data-x1="352" data-x2="352" data-y="224">
+            <path class="a-accent" d="M352,208 H384 Q392,208 392,216 V224 Q392,232 384,232 H354" marker-end="url(#arrow-accent)"/>
+            <rect class="d-mask" x="402" y="212" width="129" height="16" rx="2"/><text class="t-msg" x="408" y="224">keep latest only</text>
+          </g>
+          <g class="msg" data-step="1">
+            <line class="a dash" x1="352" y1="260" x2="210" y2="260" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="266" y="236" width="27" height="16" rx="2"/><text class="t-msg" x="280" y="248" text-anchor="middle">ok</text>
+          </g>
+          <g class="msg" data-step="1">
+            <line class="a" x1="72" y1="324" x2="350" y2="324" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="230" y="300" width="100" height="16" rx="2"/><text class="t-msg" x="280" y="312" text-anchor="middle">next message</text>
+          </g>
+          <g class="msg" data-step="1" data-tone="accent">
+            <line class="a-accent" x1="352" y1="360" x2="502" y2="360" marker-end="url(#arrow-accent)"/>
+            <rect class="d-mask" x="360" y="336" width="136" height="16" rx="2"/><text class="t-msg" x="428" y="348" text-anchor="middle">message + context</text>
+          </g>
+          <g class="msg" data-step="1">
+            <line class="a dash" x1="504" y1="396" x2="354" y2="396" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="404" y="372" width="48" height="16" rx="2"/><text class="t-msg" x="428" y="384" text-anchor="middle">reply</text>
+          </g>
+          <!-- 2 Speak up -->
+          <g class="msg" data-step="2">
+            <line class="a" x1="72" y1="468" x2="206" y2="468" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="86" y="444" width="107" height="16" rx="2"/><text class="t-msg" x="140" y="456" text-anchor="middle">taps a button</text>
+          </g>
+          <g class="msg" data-step="2">
+            <line class="a" x1="208" y1="504" x2="350" y2="504" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="238" y="480" width="85" height="16" rx="2"/><text class="t-msg" x="280" y="492" text-anchor="middle">ui/message</text>
+          </g>
+          <g class="msg" data-step="2">
+            <line class="a dash" x1="352" y1="540" x2="210" y2="540" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="245" y="516" width="70" height="16" rx="2"/><text class="t-msg" x="280" y="528" text-anchor="middle">accepted</text>
+          </g>
+          <g class="msg" data-step="2">
+            <line class="a" x1="352" y1="576" x2="502" y2="576" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="374" y="552" width="107" height="16" rx="2"/><text class="t-msg" x="428" y="564" text-anchor="middle">new user turn</text>
+          </g>
+          <g class="msg" data-step="2">
+            <line class="a dash" x1="504" y1="612" x2="354" y2="612" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="404" y="588" width="48" height="16" rx="2"/><text class="t-msg" x="428" y="600" text-anchor="middle">reply</text>
+          </g>
+          <g class="msg" data-step="2">
+            <line class="a dash" x1="352" y1="648" x2="74" y2="648" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="226" y="624" width="107" height="16" rx="2"/><text class="t-msg" x="280" y="636" text-anchor="middle">reply in chat</text>
+          </g>
+          <!-- 3 Own work -->
+          <g class="msg" data-step="3">
+            <line class="a" x1="72" y1="720" x2="206" y2="720" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="90" y="696" width="100" height="16" rx="2"/><text class="t-msg" x="140" y="708" text-anchor="middle">taps refresh</text>
+          </g>
+          <g class="msg" data-step="3">
+            <line class="a" x1="208" y1="756" x2="350" y2="756" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="238" y="732" width="85" height="16" rx="2"/><text class="t-msg" x="280" y="744" text-anchor="middle">tools/call</text>
+          </g>
+          <g class="msg" data-step="3">
+            <line class="a" x1="352" y1="792" x2="646" y2="792" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="534" y="768" width="85" height="16" rx="2"/><text class="t-msg" x="576" y="780" text-anchor="middle">tools/call</text>
+          </g>
+          <g class="msg" data-step="3">
+            <line class="a dash" x1="648" y1="828" x2="354" y2="828" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="548" y="804" width="56" height="16" rx="2"/><text class="t-msg" x="576" y="816" text-anchor="middle">result</text>
+          </g>
+          <g class="msg" data-step="3">
+            <line class="a dash" x1="352" y1="864" x2="210" y2="864" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="252" y="840" width="56" height="16" rx="2"/><text class="t-msg" x="280" y="852" text-anchor="middle">result</text>
+          </g>
+          <!-- 4 Model drives -->
+          <g class="msg" data-step="4">
+            <line class="a" x1="352" y1="936" x2="210" y2="936" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="238" y="912" width="85" height="16" rx="2"/><text class="t-msg" x="280" y="924" text-anchor="middle">tools/list</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a dash" x1="208" y1="972" x2="350" y2="972" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="223" y="948" width="114" height="16" rx="2"/><text class="t-msg" x="280" y="960" text-anchor="middle">navigate-to, …</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a" x1="352" y1="1008" x2="502" y2="1008" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="374" y="984" width="107" height="16" rx="2"/><text class="t-msg" x="428" y="996" text-anchor="middle">+ app's tools</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a dash" x1="504" y1="1044" x2="354" y2="1044" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="364" y="1020" width="129" height="16" rx="2"/><text class="t-msg" x="428" y="1032" text-anchor="middle">call navigate-to</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a" x1="352" y1="1080" x2="210" y2="1080" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="238" y="1056" width="85" height="16" rx="2"/><text class="t-msg" x="280" y="1068" text-anchor="middle">tools/call</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a dash" x1="208" y1="1116" x2="350" y2="1116" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="252" y="1092" width="56" height="16" rx="2"/><text class="t-msg" x="280" y="1104" text-anchor="middle">result</text>
+          </g>
+          <g class="msg" data-step="4">
+            <line class="a" x1="352" y1="1152" x2="502" y2="1152" marker-end="url(#arrow)"/>
+            <rect class="d-mask" x="400" y="1128" width="56" height="16" rx="2"/><text class="t-msg" x="428" y="1140" text-anchor="middle">result</text>
+          </g>
+          <g class="hd" data-x="72"><rect class="n-input" x="12" y="24" width="120" height="52" rx="6"/>
+          <rect class="tagbox" x="50" y="32" width="45" height="12" rx="2"/><text class="t-eye" x="72" y="41" text-anchor="middle">PERSON</text>
+          <text class="t-name" x="72" y="64" text-anchor="middle">You</text></g>
+          <g class="hd" data-x="208"><rect class="n-step" x="148" y="24" width="120" height="52" rx="6"/>
+          <rect class="tagbox" x="192" y="32" width="33" height="12" rx="2"/><text class="t-eye" x="208" y="41" text-anchor="middle">VIEW</text>
+          <text class="t-name" x="208" y="64" text-anchor="middle">MCP App · UI</text></g>
+          <g class="hd" data-x="352"><rect class="n-step" x="292" y="24" width="120" height="52" rx="6"/>
+          <rect class="tagbox" x="336" y="32" width="33" height="12" rx="2"/><text class="t-eye" x="352" y="41" text-anchor="middle">HOST</text>
+          <text class="t-name" x="352" y="64" text-anchor="middle">Your host</text></g>
+          <g class="hd" data-x="504"><rect class="n-ext" x="444" y="24" width="120" height="52" rx="6"/>
+          <rect class="tagbox" x="484" y="32" width="39" height="12" rx="2"/><text class="t-eye" x="504" y="41" text-anchor="middle">AGENT</text>
+          <text class="t-name" x="504" y="64" text-anchor="middle">Model · LLM</text></g>
+          <g class="hd" data-x="648"><rect class="n-ext" x="588" y="24" width="120" height="52" rx="6"/>
+          <rect class="tagbox" x="626" y="32" width="45" height="12" rx="2"/><text class="t-eye" x="648" y="41" text-anchor="middle">SERVER</text>
+          <text class="t-name" x="648" y="64" text-anchor="middle">MCP App · server</text></g>
+          <g class="flow-dots"></g>
+          <line class="hair" x1="24" y1="1196" x2="696" y2="1196"/>
+          <text class="t-eye" x="24" y="1220">LEGEND</text>
+          <line class="a" x1="96" y1="1216" x2="126" y2="1216" marker-end="url(#arrow)"/><text class="t-lbl" x="134" y="1220">REQUEST</text>
+          <line class="a dash" x1="196" y1="1216" x2="226" y2="1216" marker-end="url(#arrow)"/><text class="t-lbl" x="234" y="1220">REPLY</text>
+          <line class="a-accent" x1="290" y1="1216" x2="320" y2="1216" marker-end="url(#arrow-accent)"/><text class="t-lbl" x="328" y="1220">WHEN A CONTEXT UPDATE REACHES THE MODEL</text>
+          <line class="later" x1="96" y1="1238" x2="126" y2="1238"/><text class="t-lbl" x="134" y="1242">TIME PASSES: NOTHING ABOVE THE LINE HAS REACHED THE MODEL</text>
+        </svg>
+      </figure></div>
+
+      <div class="player sticky" id="p2-panel">
+        <div class="player-bar">
+          <button type="button" class="pbtn" id="p2-prev" aria-label="Previous step">◀ Back</button>
+          <button type="button" class="pbtn primary" id="p2-play">▶ Play</button>
+          <button type="button" class="pbtn" id="p2-next" aria-label="Next step">Next ▶</button>
+          <button type="button" class="pbtn pspeed" id="p2-speed" aria-label="Playback speed 1 times">1×</button>
+          <ol class="pdots" id="p2-dots" aria-label="Jump to a route"></ol>
+        </div>
+        <div class="pcap" aria-live="polite">
+          <p class="eyebrow" id="p2-eye">Overview</p>
+          <h4 id="p2-title">Four routes, one gatekeeper</h4>
+          <p class="proute" id="p2-route" hidden></p>
+          <p id="p2-text">All four routes are drawn at once. Press Play to watch them one arrow at a time.</p>
+          <pre class="pcode" id="p2-code" hidden></pre>
+        </div>
+      </div>
+      </div>
+      <p class="phint">"Your host" is your chat UI, AppFrame and backend together; the AppBridge inside the AppFrame handles every arrow between the app and your host. The dashed line in route 1 marks time passing: the context update has been saved, but the model hasn't seen it yet.</p>
+
+      <h3 class="sub">Who picks the route?</h3>
+      <p>The app's developer, one button at a time. Each click handler calls a different SDK method, each method sends a different message, and AppBridge hands it to a different handler. Your host never guesses.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Button</th><th>App calls</th><th>Your host gets</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Refresh</td><td><code>callServerTool</code></td><td><code>tools/call</code> → <code>oncalltool</code></td><td class="why">The tool runs on the server. The model isn't involved.</td></tr>
+            <tr><td>Explain this</td><td><code>sendMessage</code></td><td><code>ui/message</code> → <code>onmessage</code></td><td class="why">A new user turn starts now.</td></tr>
+            <tr><td>(panned the map)</td><td><code>updateModelContext</code></td><td><code>ui/update-model-context</code> → <code>onupdatemodelcontext</code></td><td class="why">Saved for the next turn.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="say">Your host can't change the route, but it can refuse one: reject the message, block tools without <code>"app"</code> visibility, or leave <code>message</code> or <code>serverTools</code> out of its capabilities.</p>
+
+      <h3 class="sub">What makes your host list the app's tools? (route 4)</h3>
+      <div class="cards two even">
+        <div class="card"><h3>1 · The handshake</h3><p>The app's <code>ui/initialize</code> includes the <code>tools</code> capability. <code>registerTool</code> adds it for you. When <code>oninitialized</code> fires, check <code>bridge.getAppCapabilities()?.tools</code> and call <code>bridge.listTools()</code>. No capability, no route 4.</p></div>
+        <div class="card"><h3>2 · The tools change</h3><p>If the app declared <code>tools.listChanged</code>, it sends <code>notifications/tools/list_changed</code> whenever it adds, removes or changes a tool. <code>registerTool</code> sends it for you. List again and replace what you offer the model.</p></div>
+      </div>
+      <p class="say">The model and the person never trigger it directly. The model can't ask for tools it hasn't been shown. You can list right away or just before the next model request. Keep one list per screen, keyed by <code>toolCallId</code>, and drop it at teardown.</p>
+
+      <h3 class="sub">What the model sees, and what it doesn't</h3>
+      <div class="cards two even">
+        <div class="card hot"><h3>The model sees</h3><ul>
+          <li><span>The tool result's <code>content</code> (text, and images if it has them)</span></li>
+          <li><span><code>ui/message</code>, as a user message, straight away</span></li>
+          <li><span>The latest <code>updateModelContext</code>, on the next turn</span></li>
+          <li><span>Results of the app's own tools that the model itself called</span></li>
+        </ul></div>
+        <div class="card"><h3>The model never sees</h3><ul>
+          <li><span>The tool result's <code>structuredContent</code> and <code>_meta</code>: those are for the UI</span></li>
+          <li><span>Tools the UI calls with <code>callServerTool</code>, or their results</span></li>
+          <li><span>Logs from <code>sendLog</code></span></li>
+          <li><span>Clicks, scrolls, typing, anything the app doesn't report</span></li>
+          <li><span>Older context updates that a newer one replaced</span></li>
+        </ul></div>
+      </div>
+
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>The app asks</th><th>Your handler</th><th>What your host does</th></tr></thead>
+          <tbody>
+            <tr><td>Here is what I show</td><td><code>onupdatemodelcontext</code></td><td class="why">Replace this app's context slot. Add it to the next model request, whoever starts the turn. Don't start a turn. You may skip duplicates and may show it to the person.</td></tr>
+            <tr><td>Say this in the chat</td><td><code>onmessage</code></td><td class="why">Optionally ask the person. Add it as a user message, reply to the app, and start a model turn. Reply with an error if you refuse.</td></tr>
+            <tr><td>Run a tool</td><td><code>oncalltool</code></td><td class="why">Check the tool is on this app's server and includes <code>"app"</code> in its visibility, then forward it. Nothing goes to the model.</td></tr>
+            <tr><td>My tools changed</td><td><code>notifications/tools/list_changed</code> from the app</td><td class="why">Call <code>bridge.listTools()</code> again and update what you offer the model.</td></tr>
+            <tr><td>Open this link</td><td><code>onopenlink</code></td><td class="why">Open in a new tab, or confirm first for unknown sites.</td></tr>
+            <tr><td>Make me bigger</td><td><code>onrequestdisplaymode</code></td><td class="why">Move the iframe to a fullscreen panel, and reply with the mode you actually chose.</td></tr>
+            <tr><td>I changed size</td><td><code>onsizechange</code></td><td class="why">Set the iframe height. No reply needed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cards three">
+        <div class="card"><h3>Keep it small</h3><p>Context costs tokens. Apps send short markdown, often with YAML frontmatter. <code>map-server</code> adds a screenshot only if your host declares <code>updateModelContext.image</code>, scaled to 768 px.</p></div>
+        <div class="card"><h3>Latest wins</h3><p>If several updates arrive before the next user message, send only the last one. An empty update can clear the slot, as basic-host does.</p></div>
+        <div class="card"><h3>Many apps, many slots</h3><p>Keep one slot per app instance (use <code>toolInfo.id</code>) and label each one, so the model knows which map moved.</p></div>
+      </div>
+      <p class="say">Rule of thumb: updateModelContext says "here is what I'm showing". sendMessage says "please do something now".</p>
+    </section>
+
+    <!-- ============ STATE ============ -->
+    <section id="state">
+      <p class="eyebrow">State</p>
+      <h2>Where state lives</h2>
+      <p class="lede">State sits in six places, owned by three parties. Knowing which is which answers most "why did it forget?" questions.</p>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 332" role="img" aria-labelledby="state-title state-desc">
+          <title id="state-title">The six places state lives</title>
+          <desc id="state-desc">In the sandbox, the UI keeps view memory and saves to localStorage under the viewUUID. Your host keeps the conversation, one model-context slot per app, and the host context; it replays the conversation into the UI, receives context updates and pushes host context. On the servers, the MCP App keeps server state, reached through app-only tools, and the model reads the conversation every turn and the context slot on the next turn.</desc>
+          <rect class="d-bg" width="720" height="332"/>
+          <rect class="zone" x="24" y="24" width="192" height="292" rx="8"/>
+          <rect class="d-mask" x="36" y="28" width="104" height="12" rx="2"/>
+          <text class="t-eye" x="88" y="37" text-anchor="middle">SANDBOX · THE UI</text>
+          <rect class="zone" x="264" y="24" width="208" height="292" rx="8"/>
+          <rect class="d-mask" x="276" y="28" width="64" height="12" rx="2"/>
+          <text class="t-eye" x="308" y="37" text-anchor="middle">YOUR HOST</text>
+          <rect class="zone" x="520" y="24" width="176" height="292" rx="8"/>
+          <rect class="d-mask" x="532" y="28" width="52" height="12" rx="2"/>
+          <text class="t-eye" x="558" y="37" text-anchor="middle">SERVERS</text>
+
+          <line class="a" x1="96" y1="112" x2="96" y2="232" marker-end="url(#arrow)"/>
+          <line class="a" x1="200" y1="70" x2="536" y2="70" marker-end="url(#arrow)"/>
+          <path class="a" d="M280,156 H248 Q240,156 240,148 V106 Q240,98 232,98 H200" marker-end="url(#arrow)"/>
+          <path class="a" d="M176,112 V212 Q176,220 184,220 H280" marker-end="url(#arrow)"/>
+          <path class="a dash" d="M280,284 H168 Q160,284 160,276 V112" marker-end="url(#arrow-open)"/>
+          <path class="a" d="M456,156 H600 Q608,156 608,164 V196" marker-end="url(#arrow)"/>
+          <line class="a-accent" x1="456" y1="220" x2="536" y2="220" marker-end="url(#arrow-accent)"/>
+
+          <rect class="d-mask" x="104" y="166" width="32" height="12" rx="2"/><text class="t-lbl" x="120" y="175" text-anchor="middle">SAVE</text>
+          <rect class="d-mask" x="322" y="50" width="92" height="12" rx="2"/><text class="t-lbl" x="368" y="59" text-anchor="middle">APP-ONLY TOOLS</text>
+          <text class="t-sub" x="368" y="86" text-anchor="middle">through your host</text>
+          <rect class="d-mask" x="188" y="120" width="44" height="12" rx="2"/><text class="t-lbl" x="210" y="129" text-anchor="middle">REPLAY</text>
+          <rect class="d-mask" x="196" y="200" width="48" height="12" rx="2"/><text class="t-lbl" x="220" y="209" text-anchor="middle">UPDATE</text>
+          <rect class="d-mask" x="204" y="264" width="36" height="12" rx="2"/><text class="t-lbl" x="222" y="273" text-anchor="middle">PUSH</text>
+          <rect class="d-mask" x="488" y="136" width="64" height="12" rx="2"/><text class="t-lbl" x="520" y="145" text-anchor="middle">EVERY TURN</text>
+          <rect class="d-mask" x="468" y="200" width="56" height="12" rx="2"/><text class="t-lbl" x="496" y="209" text-anchor="middle">NEXT TURN</text>
+
+          <rect class="n-step" x="40" y="56" width="160" height="56" rx="6"/>
+          <text class="t-name" x="120" y="82" text-anchor="middle">View memory</text>
+          <text class="t-sub" x="120" y="98" text-anchor="middle">JS variables · gone on reload</text>
+          <rect class="n-store" x="40" y="232" width="112" height="56" rx="6"/>
+          <text class="t-name" x="96" y="258" text-anchor="middle">localStorage</text>
+          <text class="t-sub" x="96" y="274" text-anchor="middle">key: viewUUID</text>
+
+          <rect class="n-store" x="280" y="132" width="176" height="48" rx="6"/>
+          <text class="t-name" x="368" y="152" text-anchor="middle">Conversation</text>
+          <text class="t-sub" x="368" y="168" text-anchor="middle">tool input, result, messages</text>
+          <rect class="n-focal" x="280" y="196" width="176" height="48" rx="6"/>
+          <text class="t-name" x="368" y="216" text-anchor="middle">Model context</text>
+          <text class="t-sub" x="368" y="232" text-anchor="middle">latest update, per app</text>
+          <rect class="n-store" x="280" y="260" width="176" height="48" rx="6"/>
+          <text class="t-name" x="368" y="280" text-anchor="middle">Host context</text>
+          <text class="t-sub" x="368" y="296" text-anchor="middle">theme, size, display mode</text>
+
+          <rect class="n-store" x="536" y="56" width="144" height="56" rx="6"/>
+          <text class="t-name" x="608" y="82" text-anchor="middle">Server state</text>
+          <text class="t-sub" x="608" y="98" text-anchor="middle">database, files</text>
+          <rect class="n-ext" x="536" y="196" width="144" height="48" rx="6"/>
+          <text class="t-name" x="608" y="216" text-anchor="middle">Model · LLM</text>
+          <text class="t-sub" x="608" y="232" text-anchor="middle">reads both, each turn</text>
+        </svg>
+        <figcaption>Grey boxes keep their contents; the white one forgets on reload. The orange path is the one UI changes take to reach the model.</figcaption>
+      </figure></div>
+
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>State</th><th>Owner</th><th>Survives a reload?</th><th>Model sees it?</th><th>How it's written and read</th></tr></thead>
+          <tbody>
+            <tr><td>View memory</td><td class="why">UI</td><td class="why">No, the iframe is new</td><td class="why">No</td><td class="why">Plain variables or React state</td></tr>
+            <tr><td>localStorage</td><td class="why">UI</td><td class="why">Yes, if your sandbox origin stays the same</td><td class="why">No</td><td class="why"><code>localStorage</code>, keyed by <code>result._meta.viewUUID</code></td></tr>
+            <tr><td>Server state</td><td class="why">App server</td><td class="why">Yes</td><td class="why">Only through tool results</td><td class="why">App-only tools via <code>callServerTool</code>, scoped by <code>viewUUID</code> or user</td></tr>
+            <tr><td>Conversation</td><td class="why">Your host</td><td class="why">Yes, you store it</td><td class="why"><code>content</code> yes; <code>structuredContent</code> and <code>_meta</code> no</td><td class="why">Tool calls, tool results, <code>ui/message</code></td></tr>
+            <tr><td>Model context</td><td class="why">Your host</td><td class="why">Only if you store it</td><td class="why">Yes, on the next turn</td><td class="why"><code>updateModelContext</code>, latest wins</td></tr>
+            <tr><td>Host context</td><td class="why">Your host</td><td class="why">Rebuilt each time</td><td class="why">No</td><td class="why"><code>hostContext</code> at start, then <code>sendHostContextChange</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">A screen's life</h3>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 232" role="img" aria-labelledby="life-title life-desc">
+          <title id="life-title">The life of one MCP App screen</title>
+          <desc id="life-desc">A screen goes from loading to saying hello, to having input (with optional partial input), to showing the result, where the person interacts, and finally is torn down. If the tool call is cancelled it goes to cancelled and then torn down.</desc>
+          <rect class="d-bg" width="720" height="232"/>
+          <line class="a" x1="128" y1="96" x2="160" y2="96" marker-end="url(#arrow)"/>
+          <line class="a" x1="272" y1="96" x2="304" y2="96" marker-end="url(#arrow)"/>
+          <line class="a" x1="416" y1="96" x2="448" y2="96" marker-end="url(#arrow)"/>
+          <line class="a" x1="560" y1="96" x2="592" y2="96" marker-end="url(#arrow)"/>
+          <line class="a dash" x1="360" y1="120" x2="360" y2="160" marker-end="url(#arrow)"/>
+          <path class="a dash" d="M416,180 H640 Q648,180 648,172 V120" marker-end="url(#arrow)"/>
+          <path class="a" d="M344,72 V56 Q344,48 352,48 H368 Q376,48 376,56 V72" marker-end="url(#arrow)"/>
+          <path class="a-accent" d="M488,72 V56 Q488,48 496,48 H512 Q520,48 520,56 V72" marker-end="url(#arrow-accent)"/>
+          <rect class="d-mask" x="320" y="24" width="80" height="12" rx="2"/><text class="t-lbl" x="360" y="33" text-anchor="middle">PARTIAL 0..N</text>
+          <rect class="d-mask" x="468" y="24" width="72" height="12" rx="2"/><text class="t-lbl" x="504" y="33" text-anchor="middle">YOU INTERACT</text>
+
+          <rect class="n-step" x="16" y="72" width="112" height="48" rx="8"/>
+          <text class="t-name" x="72" y="94" text-anchor="middle">Loading</text>
+          <text class="t-sub" x="72" y="110" text-anchor="middle">HTML into sandbox</text>
+          <rect class="n-step" x="160" y="72" width="112" height="48" rx="8"/>
+          <text class="t-name" x="216" y="94" text-anchor="middle">Saying hello</text>
+          <text class="t-sub" x="216" y="110" text-anchor="middle">ui/initialize</text>
+          <rect class="n-step" x="304" y="72" width="112" height="48" rx="8"/>
+          <text class="t-name" x="360" y="94" text-anchor="middle">Has input</text>
+          <text class="t-sub" x="360" y="110" text-anchor="middle">tool-input</text>
+          <rect class="n-focal" x="448" y="72" width="112" height="48" rx="8"/>
+          <text class="t-name" x="504" y="94" text-anchor="middle">Showing result</text>
+          <text class="t-sub" x="504" y="110" text-anchor="middle">tool-result</text>
+          <rect class="n-ext" x="592" y="72" width="112" height="48" rx="8"/>
+          <text class="t-name" x="648" y="94" text-anchor="middle">Torn down</text>
+          <text class="t-sub" x="648" y="110" text-anchor="middle">resource-teardown</text>
+          <rect class="n-ext" x="304" y="160" width="112" height="40" rx="8"/>
+          <text class="t-name" x="360" y="178" text-anchor="middle">Cancelled</text>
+          <text class="t-sub" x="360" y="192" text-anchor="middle">tool-cancelled</text>
+          <text class="t-note" x="16" y="220">Teardown can arrive in any state, and the app can ask for it with requestTeardown.</text>
+        </svg>
+      </figure></div>
+
+      <h3 class="sub">When the chat is reopened</h3>
+      <ol class="steps">
+        <li>Load the saved message: tool name, arguments, result and <code>resourceUri</code>, plus the latest model context if you keep it.</li>
+        <li>Mount a fresh AppFrame and sandbox, and get the HTML again (a cache is fine; the HTML is declared up front).</li>
+        <li>Handshake as usual, then send <code>tool-input</code> and <code>tool-result</code> from the saved copy. Replaying avoids running the tool, and its side effects, twice.</li>
+        <li>The app reads <code>_meta.viewUUID</code> from the result and restores the rest from <code>localStorage</code> or its server.</li>
+      </ol>
+      <div class="note"><strong>No widget state.</strong> OpenAI's Apps SDK has <code>setWidgetState</code>. MCP Apps doesn't: use <code>localStorage</code>, server-side state through app-only tools, and <code>updateModelContext</code>. The spec lists state persistence and restoration as future work.</div>
+    </section>
+
+    <!-- ============ API ============ -->
+    <section id="api">
+      <p class="eyebrow">Reference</p>
+      <h2>Every message, both directions</h2>
+      <p class="lede">For each thing the app can ask, you declare a capability and write a handler. If you leave a capability out, the app can see it's missing and hide that feature.</p>
+
+      <h3 class="sub">The app asks, your host answers</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>App calls</th><th>Message</th><th>Your AppBridge handler</th><th>Declare</th></tr></thead>
+          <tbody>
+            <tr><td><code>callServerTool</code></td><td class="why"><code>tools/call</code></td><td class="why"><code>oncalltool</code></td><td class="why"><code>serverTools</code></td></tr>
+            <tr><td><code>readServerResource</code></td><td class="why"><code>resources/read</code></td><td class="why"><code>onreadresource</code></td><td class="why"><code>serverResources</code></td></tr>
+            <tr><td><code>listServerResources</code></td><td class="why"><code>resources/list</code></td><td class="why"><code>onlistresources</code></td><td class="why"><code>serverResources</code></td></tr>
+            <tr><td><code>sendMessage</code></td><td class="why"><code>ui/message</code></td><td class="why"><code>onmessage</code></td><td class="why"><code>message</code></td></tr>
+            <tr><td><code>updateModelContext</code></td><td class="why"><code>ui/update-model-context</code></td><td class="why"><code>onupdatemodelcontext</code></td><td class="why"><code>updateModelContext</code></td></tr>
+            <tr><td><code>openLink</code></td><td class="why"><code>ui/open-link</code></td><td class="why"><code>onopenlink</code></td><td class="why"><code>openLinks</code></td></tr>
+            <tr><td><code>downloadFile</code></td><td class="why"><code>ui/download-file</code></td><td class="why"><code>ondownloadfile</code></td><td class="why"><code>downloadFile</code></td></tr>
+            <tr><td><code>requestDisplayMode</code></td><td class="why"><code>ui/request-display-mode</code></td><td class="why"><code>onrequestdisplaymode</code></td><td class="why"><code>availableDisplayModes</code> in host context</td></tr>
+            <tr><td><code>sendSizeChanged</code>, automatic</td><td class="why"><code>ui/notifications/size-changed</code></td><td class="why"><code>onsizechange</code></td><td class="why">none</td></tr>
+            <tr><td><code>sendLog</code></td><td class="why"><code>notifications/message</code></td><td class="why"><code>onloggingmessage</code></td><td class="why"><code>logging</code></td></tr>
+            <tr><td><code>requestTeardown</code></td><td class="why"><code>ui/notifications/request-teardown</code></td><td class="why"><code>onrequestteardown</code></td><td class="why">none</td></tr>
+            <tr><td><code>createSamplingMessage</code></td><td class="why"><code>sampling/createMessage</code></td><td class="why"><code>oncreatesamplingmessage</code></td><td class="why"><code>sampling</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Your host tells, the app listens</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>You call</th><th>Message</th><th>App handler</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td><code>sendToolInputPartial</code></td><td class="why"><code>ui/notifications/tool-input-partial</code></td><td class="why"><code>ontoolinputpartial</code></td><td class="why">While the model is still typing arguments. Optional.</td></tr>
+            <tr><td><code>sendToolInput</code></td><td class="why"><code>ui/notifications/tool-input</code></td><td class="why"><code>ontoolinput</code></td><td class="why">Right after the handshake. Required.</td></tr>
+            <tr><td><code>sendToolResult</code></td><td class="why"><code>ui/notifications/tool-result</code></td><td class="why"><code>ontoolresult</code></td><td class="why">When the tool call finishes.</td></tr>
+            <tr><td><code>sendToolCancelled</code></td><td class="why"><code>ui/notifications/tool-cancelled</code></td><td class="why"><code>ontoolcancelled</code></td><td class="why">When the call fails or the person stops it.</td></tr>
+            <tr><td><code>sendHostContextChange</code></td><td class="why"><code>ui/notifications/host-context-changed</code></td><td class="why"><code>onhostcontextchanged</code></td><td class="why">Theme, size or display mode changed.</td></tr>
+            <tr><td><code>teardownResource</code></td><td class="why"><code>ui/resource-teardown</code></td><td class="why"><code>onteardown</code></td><td class="why">Before you remove the iframe.</td></tr>
+            <tr><td><code>callTool</code>, <code>listTools</code></td><td class="why"><code>tools/call</code>, <code>tools/list</code></td><td class="why"><code>oncalltool</code>, <code>onlisttools</code></td><td class="why">Only if the app declared its own <code>tools</code>, so your model can operate the app.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cards two">
+        <div class="card hot"><h3>Free forwarding</h3><p>Pass an MCP <code>Client</code> to <code>new AppBridge(client, …)</code> and it fills in <code>oncalltool</code>, <code>onreadresource</code>, <code>onlistresources</code> and the list-changed notices for you. Pass <code>null</code> and you write them, forwarding each request to your backend. This page does the second, because your backend already holds the MCP clients; basic-host does the first. Either way, check that a tool includes <code>"app"</code> in its visibility before running it: the automatic forwarding doesn't.</p></div>
+        <div class="card"><h3>Register before connect</h3><p>Set every <code>on…</code> handler before <code>bridge.connect()</code>. The app may send requests right after the handshake, and a late handler misses them.</p></div>
+      </div>
+    </section>
+
+    <!-- ============ CONTEXT ============ -->
+    <section id="context">
+      <p class="eyebrow">Piece 3, continued</p>
+      <h2>What you tell the app about its surroundings</h2>
+      <p class="lede">When the app says hello, you answer with host context: a card describing where it lives. When something changes later, send just the changed fields with <code>sendHostContextChange</code>.</p>
+      <div class="cards two even">
+        <div class="card"><p class="tag">Look</p><h3>Match your chat</h3><ul>
+          <li><code>theme</code><span>"light" or "dark"</span></li>
+          <li><code>styles.variables</code><span>your CSS variables, like <code>--color-background-primary</code> and <code>--font-sans</code></span></li>
+          <li><code>styles.css.fonts</code><span>CSS that loads your fonts</span></li>
+        </ul></div>
+        <div class="card"><p class="tag">Space</p><h3>Where it can draw</h3><ul>
+          <li><code>displayMode</code>, <code>availableDisplayModes</code><span>inline, fullscreen, pip</span></li>
+          <li><code>containerDimensions</code><span>fixed <code>height</code> or flexible <code>maxHeight</code>, see below</span></li>
+          <li><code>safeAreaInsets</code><span>padding to stay clear of notches and system bars</span></li>
+        </ul></div>
+        <div class="card"><p class="tag">Place</p><h3>Who is looking</h3><ul>
+          <li><code>locale</code>, <code>timeZone</code><span>for dates, numbers and text</span></li>
+          <li><code>platform</code><span>"web", "desktop" or "mobile"</span></li>
+          <li><code>deviceCapabilities</code><span><code>{ touch, hover }</code></span></li>
+          <li><code>userAgent</code><span>your app's name and version</span></li>
+        </ul></div>
+        <div class="card hot"><p class="tag">Call</p><h3>Which call this is</h3><ul>
+          <li><code>toolInfo</code><span><code>{ id, tool }</code>: the tool call this screen belongs to, so one app can tell its instances apart</span></li>
+        </ul></div>
+      </div>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 232" role="img" aria-labelledby="dims-title dims-desc">
+          <title id="dims-title">Fixed versus flexible container size</title>
+          <desc id="dims-desc">With a fixed height the host picks the size and the app scrolls inside. With a flexible maxHeight the app reports its size and the host grows the iframe to fit.</desc>
+          <rect class="d-bg" width="720" height="232"/>
+          <text class="t-eye" x="48" y="36">FIXED · { height: 400 }</text>
+          <rect class="n-ext" x="48" y="48" width="240" height="140" rx="8"/>
+          <rect class="n-step" x="64" y="64" width="208" height="108" rx="6"/>
+          <text class="t-name" x="168" y="114" text-anchor="middle">App fills the box</text>
+          <text class="t-sub" x="168" y="130" text-anchor="middle">and scrolls inside it</text>
+          <text class="t-note" x="168" y="212" text-anchor="middle">Your host picks the height.</text>
+
+          <text class="t-eye" x="432" y="36">FLEXIBLE · { maxHeight: 6000 }</text>
+          <rect class="n-ext" x="432" y="48" width="240" height="140" rx="8"/>
+          <rect class="n-focal" x="448" y="64" width="208" height="72" rx="6"/>
+          <text class="t-name" x="552" y="96" text-anchor="middle">App reports its size</text>
+          <text class="t-sub" x="552" y="112" text-anchor="middle">ui/notifications/size-changed</text>
+          <rect x="448" y="136" width="208" height="36" rx="6" fill="none" stroke="var(--ring-1)" stroke-width="1" stroke-dasharray="4,3"/>
+          <text class="t-sub" x="552" y="158" text-anchor="middle">your host grows the iframe</text>
+          <text class="t-note" x="552" y="212" text-anchor="middle">The app picks the height, up to your limit.</text>
+        </svg>
+      </figure></div>
+      <p>Width works the same way, with <code>width</code> or <code>maxWidth</code>. Apps report size automatically by default, so in flexible mode set the iframe height in <code>onsizechange</code> and watch for resize loops if your iframe has a border.</p>
+    </section>
+
+    <!-- ============ TRUST ============ -->
+    <section id="trust">
+      <p class="eyebrow">Safety</p>
+      <h2>Permissions, CSP and sign-in</h2>
+      <p class="lede">The server half says what its UI needs. Your host decides what to allow and enforces it in the sandbox.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>The app asks for</th><th>Field in <code>_meta.ui</code></th><th>What your host does</th></tr></thead>
+          <tbody>
+            <tr><td>Call an API</td><td class="why"><code>csp.connectDomains</code></td><td class="why">Adds them to <code>connect-src</code> for fetch, XHR and WebSocket</td></tr>
+            <tr><td>Load scripts, styles, images, fonts</td><td class="why"><code>csp.resourceDomains</code></td><td class="why">Adds them to <code>script-src</code>, <code>style-src</code>, <code>img-src</code>, <code>font-src</code></td></tr>
+            <tr><td>Embed another site</td><td class="why"><code>csp.frameDomains</code></td><td class="why">Adds them to <code>frame-src</code>. Without it: <code>frame-src 'none'</code></td></tr>
+            <tr><td>Use a <code>&lt;base&gt;</code> URL</td><td class="why"><code>csp.baseUriDomains</code></td><td class="why">Adds them to <code>base-uri</code>. Without it: <code>base-uri 'self'</code></td></tr>
+            <tr><td>Camera, microphone, location, clipboard</td><td class="why"><code>permissions.camera</code>, <code>.microphone</code>, <code>.geolocation</code>, <code>.clipboardWrite</code></td><td class="why">May set the inner iframe's <code>allow</code> attribute: <code>buildAllowAttribute(permissions)</code></td></tr>
+            <tr><td>A fixed web address, so an API can allowlist it (CORS)</td><td class="why"><code>domain</code></td><td class="why">Serves the sandbox from that origin. The format is up to each host.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cards three">
+        <div class="card"><h3>Where to look</h3><p>These fields sit in <code>contents[]</code> of the <code>resources/read</code> result. If they're missing there, fall back to the <code>resources/list</code> entry.</p></div>
+        <div class="card"><h3>Say what you allowed</h3><p>Report what you approved in <code>hostCapabilities.sandbox</code> (<code>csp</code>, <code>permissions</code>) so the app can adapt.</p></div>
+        <div class="card"><h3>Nothing listed</h3><p>No CSP in <code>_meta</code> means strict defaults: the app can't reach any network address.</p></div>
+      </div>
+
+      <h3 class="sub">Signing in halfway through</h3>
+      <p>An app can start with public data and ask for sign-in only when you press a protected button. The app just calls a tool. Your host handles the rest.</p>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 528" role="img" aria-labelledby="auth-title auth-desc">
+          <title id="auth-title">Sign-in when a protected tool is called</title>
+          <desc id="auth-desc">The UI calls a tool through the AppFrame and your backend. The server answers HTTP 401, your host runs the OAuth sign-in with the person, retries the call with the token, and the result flows back to the UI.</desc>
+          <rect class="d-bg" width="720" height="528"/>
+          <line class="life" x1="96" y1="64" x2="96" y2="476"/>
+          <line class="life" x1="272" y1="64" x2="272" y2="476"/>
+          <line class="life" x1="448" y1="64" x2="448" y2="476"/>
+          <line class="life" x1="624" y1="64" x2="624" y2="476"/>
+
+          <line class="a" x1="96" y1="104" x2="272" y2="104" marker-end="url(#arrow)"/>
+          <line class="a-link" x1="272" y1="144" x2="448" y2="144" marker-end="url(#arrow-link)"/>
+          <line class="a" x1="448" y1="184" x2="624" y2="184" marker-end="url(#arrow)"/>
+          <line class="a dash" x1="624" y1="224" x2="448" y2="224" marker-end="url(#arrow)"/>
+          <path class="a-accent" d="M448,256 H480 Q488,256 488,264 V288 Q488,296 480,296 H448" marker-end="url(#arrow-accent)"/>
+          <line class="a" x1="448" y1="336" x2="624" y2="336" marker-end="url(#arrow)"/>
+          <line class="a dash" x1="624" y1="376" x2="448" y2="376" marker-end="url(#arrow)"/>
+          <line class="a-link dash" x1="448" y1="416" x2="272" y2="416" marker-end="url(#arrow-link)"/>
+          <line class="a-accent dash" x1="272" y1="456" x2="96" y2="456" marker-end="url(#arrow-accent)"/>
+
+          <rect class="d-mask" x="140" y="80" width="88" height="16" rx="2"/><text class="t-msg" x="184" y="92" text-anchor="middle">tools/call</text>
+          <rect class="d-mask" x="316" y="120" width="88" height="16" rx="2"/><text class="t-msg" x="360" y="132" text-anchor="middle">tools/call</text>
+          <rect class="d-mask" x="492" y="160" width="88" height="16" rx="2"/><text class="t-msg" x="536" y="172" text-anchor="middle">tools/call</text>
+          <rect class="d-mask" x="500" y="200" width="72" height="16" rx="2"/><text class="t-msg" x="536" y="212" text-anchor="middle">HTTP 401</text>
+          <rect class="d-mask" x="496" y="268" width="120" height="16" rx="2"/><text class="t-msg" x="500" y="280">sign in (OAuth)</text>
+          <rect class="d-mask" x="488" y="312" width="96" height="16" rx="2"/><text class="t-msg" x="536" y="324" text-anchor="middle">retry + token</text>
+          <rect class="d-mask" x="508" y="352" width="56" height="16" rx="2"/><text class="t-msg" x="536" y="364" text-anchor="middle">result</text>
+          <rect class="d-mask" x="332" y="392" width="56" height="16" rx="2"/><text class="t-msg" x="360" y="404" text-anchor="middle">result</text>
+          <rect class="d-mask" x="156" y="432" width="56" height="16" rx="2"/><text class="t-msg" x="184" y="444" text-anchor="middle">result</text>
+
+          <rect class="n-step" x="32" y="24" width="128" height="40" rx="6"/><text class="t-name" x="96" y="48" text-anchor="middle">MCP App · UI</text>
+          <rect class="n-step" x="208" y="24" width="128" height="40" rx="6"/><text class="t-name" x="272" y="48" text-anchor="middle">AppFrame</text>
+          <rect class="n-step" x="384" y="24" width="128" height="40" rx="6"/><text class="t-name" x="448" y="48" text-anchor="middle">Your backend</text>
+          <rect class="n-ext" x="560" y="24" width="128" height="40" rx="6"/><text class="t-name" x="624" y="48" text-anchor="middle">MCP App · server</text>
+
+          <line class="hair" x1="24" y1="496" x2="696" y2="496"/>
+          <text class="t-eye" x="24" y="516">LEGEND</text>
+          <line class="a" x1="104" y1="512" x2="136" y2="512" marker-end="url(#arrow)"/><text class="t-lbl" x="144" y="516">REQUEST</text>
+          <line class="a dash" x1="216" y1="512" x2="248" y2="512" marker-end="url(#arrow)"/><text class="t-lbl" x="256" y="516">REPLY</text>
+          <line class="a-link" x1="320" y1="512" x2="352" y2="512" marker-end="url(#arrow-link)"/><text class="t-lbl" x="360" y="516">YOUR OWN HTTP</text>
+        </svg>
+        <figcaption>The server answers <code>401</code> with a <code>WWW-Authenticate</code> header. The person sees your sign-in window, and the app only ever sees a slow tool call that succeeds. Try it with <code>examples/lazy-auth-server</code>.</figcaption>
+      </figure></div>
+    </section>
+
+    <!-- ============ PATTERNS ============ -->
+    <section id="patterns">
+      <p class="eyebrow">Real apps</p>
+      <h2>Patterns your host must handle</h2>
+      <p class="lede">These come from the patterns guide and the example apps. Each one needs a little support from your host.</p>
+      <div class="cards two even">
+        <div class="card"><p class="tag">pdf-server · system-monitor-server</p><h3>Buttons that call hidden tools</h3><p>Tools with <code>visibility: ["app"]</code> power refresh buttons, polling and paging. Let them through <code>oncalltool</code>, and keep them out of the model's tool list.</p></div>
+        <div class="card"><p class="tag">pdf-server</p><h3>Big files in pieces</h3><p>If you cap tool-result size, apps fetch large files in chunks through an app-only tool. Don't rate-limit those repeated calls away.</p></div>
+        <div class="card hot"><p class="tag">shadertoy-server · threejs-server</p><h3>Streaming arguments</h3><p>Send <code>tool-input-partial</code> while the model types. Close any open brackets first so it parses ("healed" JSON). Apps use it for previews only.</p></div>
+        <div class="card"><p class="tag">transcript-server</p><h3>Big follow-ups</h3><p>The app sends a long text through <code>updateModelContext</code>, then a short prompt through <code>sendMessage</code>. Store the context before you start the model turn.</p></div>
+        <div class="card"><p class="tag">pdf-server · map-server</p><h3>Remembering where you were</h3><p>A tool result can carry <code>_meta.viewUUID</code>, and the app saves state in <code>localStorage</code> under it. Keep your sandbox origin stable, and send the same saved result when you redraw the chat.</p></div>
+        <div class="card"><p class="tag">any app</p><h3>Errors</h3><p>The server half returns <code>isError: true</code> and the model reads it. The UI reports problems found later through <code>updateModelContext</code>.</p></div>
+        <div class="card"><p class="tag">shadertoy-server · threejs-server</p><h3>Offscreen apps</h3><p>Heavy apps pause themselves with <code>IntersectionObserver</code>. In long chats you can also tear down apps that scrolled far away.</p></div>
+        <div class="card"><p class="tag">debug-server</p><h3>Close, download, ask the model</h3><p><code>requestTeardown</code> asks you to close it, so call <code>teardownResource</code> if you agree. <code>downloadFile</code> exists because the sandbox blocks downloads. <code>createSamplingMessage</code> asks your model directly, only if you declare <code>sampling</code>.</p></div>
+      </div>
+    </section>
+
+    <!-- ============ FAQ ============ -->
+    <section id="faq">
+      <p class="eyebrow">Test yourself</p>
+      <h2>Questions an expert can answer</h2>
+      <p class="lede">These are the questions to ask when you build both an app and a host. If you can answer them all, you understand MCP Apps from both sides.</p>
+      <div class="faq">
+        <div>
+          <h3 class="sub">Rendering</h3>
+          <dl class="qa">
+            <dt>Where does the HTML come from, and when should I fetch it?</dt>
+            <dd>From the app server's <code>ui://</code> resource via <code>resources/read</code>. Resources are declared up front, so you may fetch and cache them when you connect. Data arrives later, as tool input and result.</dd>
+            <dt>Do I need the SDK?</dt>
+            <dd>No. It's JSON-RPC 2.0 over <code>postMessage</code>. <code>App</code> and <code>AppBridge</code> save you the bookkeeping and type checking.</dd>
+            <dt>Why two iframes?</dt>
+            <dd>On the web, the app must run on a different origin from your chat so it can't read your cookies or page. The middle sandbox page provides that origin and passes messages through. Desktop hosts may use one sandboxed frame.</dd>
+            <dt>Can two copies of the same app be on screen?</dt>
+            <dd>Yes, one per tool call, each with its own iframe and <code>AppBridge</code>. <code>toolInfo.id</code> and <code>viewUUID</code> tell them apart. Apps can't talk to each other; the spec lists that as future work.</dd>
+            <dt>What if a host doesn't support MCP Apps?</dt>
+            <dd>The tool still works and the person sees its <code>content</code> as text. Servers can check <code>getUiCapability()</code> and register a text-only tool instead.</dd>
+          </dl>
+        </div>
+        <div>
+          <h3 class="sub">The model</h3>
+          <dl class="qa">
+            <dt>What does the model see from a tool result?</dt>
+            <dd><code>content</code> only. <code>structuredContent</code> and <code>_meta</code> are for the UI.</dd>
+            <dt>How does the model learn what I did in the UI?</dt>
+            <dd>Only if the app tells it: <code>updateModelContext</code> (quiet, next turn, latest wins) or <code>sendMessage</code> (a user message, now). The app's own tool calls stay invisible.</dd>
+            <dt>Can the model operate the UI?</dt>
+            <dd>Yes, if the app registers tools with <code>app.registerTool()</code> and your host offers them to the model through <code>bridge.listTools()</code> and <code>bridge.callTool()</code>.</dd>
+            <dt>Can the app call the model directly?</dt>
+            <dd>With <code>createSamplingMessage</code>, if you declare <code>sampling</code> and handle <code>oncreatesamplingmessage</code>.</dd>
+            <dt>Can the app see the chat?</dt>
+            <dd>No. It only gets what you send: tool input and result, host context, and replies to its own requests.</dd>
+          </dl>
+        </div>
+        <div>
+          <h3 class="sub">State</h3>
+          <dl class="qa">
+            <dt>What happens when the chat reloads?</dt>
+            <dd>The iframe is new and its memory is gone. You mount it again and replay the saved input and result; the app restores the rest from <code>localStorage</code> or its server.</dd>
+            <dt>Should I save model context?</dt>
+            <dd>You should give the latest one to the model on future turns. Saving it with the conversation keeps it across reloads. That part is your choice.</dd>
+            <dt>Where should the app keep work the person can't lose?</dt>
+            <dd>On its server, through app-only tools, scoped by <code>viewUUID</code> or user. <code>localStorage</code> suits small view details like page number or camera position.</dd>
+          </dl>
+        </div>
+        <div>
+          <h3 class="sub">Safety and operations</h3>
+          <dl class="qa">
+            <dt>Can an app call any tool?</dt>
+            <dd>Only tools on its own server whose visibility includes <code>"app"</code>. You must reject others, and calls across servers are always blocked for app-only tools.</dd>
+            <dt>Can an app reach the internet?</dt>
+            <dd>Only the domains in its <code>_meta.ui.csp</code>. With no CSP it gets strict defaults and can't reach anything.</dd>
+            <dt>How do I debug?</dt>
+            <dd>Run <code>examples/basic-host</code>: it has Tool Input, Tool Result, Messages and Model Context panels, and logs <code>[HOST]</code> lines in the console. <code>debug-server</code> exercises every capability.</dd>
+            <dt>I have an OpenAI Apps SDK app. Now what?</dt>
+            <dd><code>docs/migrate_from_openai_apps.md</code> maps <code>window.openai</code> to <code>App</code> methods. The <code>migrate-oai-app</code> skill in <code>plugins/mcp-apps</code> walks through it.</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ORDER ============ -->
+    <section id="order">
+      <p class="eyebrow">Plan the work</p>
+      <h2>Build it in this order</h2>
+      <p class="lede">Each step gives you something you can see working before you start the next one.</p>
+      <div class="fig"><figure>
+        <svg viewBox="0 0 720 112" role="img" aria-labelledby="order-title order-desc">
+          <title id="order-title">Suggested build order</title>
+          <desc id="order-desc">First backend events, then the sandbox origin, then showing the app, then talking back, then polish.</desc>
+          <rect class="d-bg" width="720" height="112"/>
+          <line class="a" x1="140" y1="56" x2="160" y2="56" marker-end="url(#arrow)"/>
+          <line class="a" x1="280" y1="56" x2="300" y2="56" marker-end="url(#arrow)"/>
+          <line class="a" x1="420" y1="56" x2="440" y2="56" marker-end="url(#arrow)"/>
+          <line class="a" x1="560" y1="56" x2="580" y2="56" marker-end="url(#arrow)"/>
+          <rect class="n-step" x="20" y="24" width="120" height="64" rx="6"/>
+          <text class="t-eye" x="32" y="40">01</text>
+          <text class="t-name" x="80" y="60" text-anchor="middle">Backend events</text>
+          <text class="t-sub" x="80" y="76" text-anchor="middle">extension, app-start</text>
+          <rect class="n-step" x="160" y="24" width="120" height="64" rx="6"/>
+          <text class="t-eye" x="172" y="40">02</text>
+          <text class="t-name" x="220" y="60" text-anchor="middle">Sandbox origin</text>
+          <text class="t-sub" x="220" y="76" text-anchor="middle">relay, CSP header</text>
+          <rect class="n-focal" x="300" y="24" width="120" height="64" rx="6"/>
+          <text class="t-eye" x="312" y="40">03</text>
+          <text class="t-name" x="360" y="60" text-anchor="middle">Show the app</text>
+          <text class="t-sub" x="360" y="76" text-anchor="middle">input, result, size</text>
+          <rect class="n-step" x="440" y="24" width="120" height="64" rx="6"/>
+          <text class="t-eye" x="452" y="40">04</text>
+          <text class="t-name" x="500" y="60" text-anchor="middle">Talk back</text>
+          <text class="t-sub" x="500" y="76" text-anchor="middle">message, context</text>
+          <rect class="n-step" x="580" y="24" width="120" height="64" rx="6"/>
+          <text class="t-eye" x="592" y="40">05</text>
+          <text class="t-name" x="640" y="60" text-anchor="middle">Polish</text>
+          <text class="t-sub" x="640" y="76" text-anchor="middle">fullscreen, reload</text>
+        </svg>
+      </figure></div>
+      <ol class="steps">
+        <li><strong>Backend events.</strong> Connect with the extension, filter tools, stream <code>app-start</code> and <code>app-result</code>. Log them; no UI yet.</li>
+        <li><strong>Sandbox origin.</strong> Serve <code>sandbox.html</code> on a second port or domain with the CSP header.</li>
+        <li><strong>Show the app.</strong> <code>AppFrame</code> with tool input, tool result and resizing. Test with the <code>examples/basic-server-*</code> servers; <code>npm start</code> in this repo runs them all.</li>
+        <li><strong>Talk back.</strong> Add <code>onmessage</code>, <code>onupdatemodelcontext</code>, <code>onopenlink</code> and theme changes.</li>
+        <li><strong>Polish.</strong> Fullscreen and picture-in-picture, teardown, redrawing apps from saved chats, permission prompts, and tearing down iframes that scroll far away.</li>
+      </ol>
+    </section>
+
+    <!-- ============ CHECK ============ -->
+    <section id="check">
+      <p class="eyebrow">Before you ship</p>
+      <h2>Checklist</h2>
+      <p class="lede">"Must" items come from the spec. "Should" items are what makes it feel finished.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Item</th><th>Where</th><th>Level</th></tr></thead>
+          <tbody>
+            <tr><td>Sandbox page on a different origin from the chat</td><td class="why">Sandbox</td><td><span class="pill must">Must</span></td></tr>
+            <tr><td>Sandbox has <code>allow-scripts</code> and <code>allow-same-origin</code></td><td class="why">Sandbox</td><td><span class="pill must">Must</span></td></tr>
+            <tr><td>CSP built from the resource's <code>ui.csp</code>, strict when missing</td><td class="why">Sandbox server</td><td><span class="pill must">Must</span></td></tr>
+            <tr><td>Nothing sent to the app before <code>initialized</code></td><td class="why">AppFrame</td><td><span class="pill must">Must</span></td></tr>
+            <tr><td><code>tool-input</code> sent after the handshake</td><td class="why">AppFrame</td><td><span class="pill must">Must</span></td></tr>
+            <tr><td>App-only tools hidden from the model</td><td class="why">Backend</td><td><span class="pill must">Must</span></td></tr>
+            <tr><td>Model-only tools refused when the app calls them</td><td class="why">Backend</td><td><span class="pill must">Must</span></td></tr>
+            <tr><td>Advertise <code>io.modelcontextprotocol/ui</code> on connect</td><td class="why">Backend</td><td><span class="pill must">Must</span></td></tr>
+            <tr><td><code>teardownResource</code> before removing an iframe</td><td class="why">AppFrame</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>Theme and width changes sent with <code>sendHostContextChange</code></td><td class="why">AppFrame</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>Your CSS variables passed in <code>hostContext.styles</code></td><td class="why">AppFrame</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>Apps redrawn from saved chat history</td><td class="why">Backend + chat</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>Only declare capabilities you actually handle</td><td class="why">AppFrame</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>Partial arguments healed into valid JSON before <code>tool-input-partial</code></td><td class="why">Backend</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>Tool call retried after OAuth when the server answers <code>401</code></td><td class="why">Backend</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>Inner iframe <code>allow</code> set from <code>permissions</code></td><td class="why">Sandbox</td><td><span class="pill">May</span></td></tr>
+            <tr><td>One model-context slot per app; only the latest is sent, on the next turn</td><td class="why">Backend + chat</td><td><span class="pill">Should</span></td></tr>
+            <tr><td><code>ui/message</code> added to the conversation as a user turn</td><td class="why">Backend + chat</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>Saved tool result replayed on reload instead of calling the tool again</td><td class="why">Chat</td><td><span class="pill">Should</span></td></tr>
+            <tr><td>App's own tools offered to the model, when the app declares <code>tools</code></td><td class="why">Backend + AppFrame</td><td><span class="pill">May</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Test your host with these example apps</h3>
+      <p>Run <code>npm start</code> in this repo to serve them all, then connect your host to each one.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Example</th><th>What it exercises in your host</th></tr></thead>
+          <tbody>
+            <tr><td><code>basic-server-*</code></td><td class="why">Handshake, tool input and result, messages, links, logs, theme</td></tr>
+            <tr><td><code>integration-server</code></td><td class="why">Every App API; the E2E tests in this repo run against it</td></tr>
+            <tr><td><code>debug-server</code></td><td class="why">Every capability, callback and result format combination</td></tr>
+            <tr><td><code>system-monitor-server</code></td><td class="why">App-only tools and polling</td></tr>
+            <tr><td><code>pdf-server</code></td><td class="why">Chunked downloads, saved view state, fullscreen</td></tr>
+            <tr><td><code>map-server</code></td><td class="why">CSP with <code>connectDomains</code> and <code>resourceDomains</code>, fullscreen, model context</td></tr>
+            <tr><td><code>shadertoy-server</code></td><td class="why">Streaming partial arguments, fullscreen, pausing offscreen</td></tr>
+            <tr><td><code>transcript-server</code></td><td class="why">Microphone and clipboard permissions, model context with follow-up messages</td></tr>
+            <tr><td><code>video-resource-server</code></td><td class="why">Binary data through <code>resources/read</code></td></tr>
+            <tr><td><code>lazy-auth-server</code></td><td class="why">Sign-in on <code>401</code> and retrying the call</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><strong>One gap in the reference host.</strong> <code>examples/basic-host</code> connects with a plain <code>new Client(...)</code> and does not advertise the extension. The example servers don't mind, but a strict server may only send UI to clients that advertise it, so add it in your app.</div>
+
+      <h3 class="sub">Files to read in this repo</h3>
+      <div class="cards three">
+        <div class="card"><h3>Host side</h3><p><code>src/app-bridge.ts</code> for every <code>on…</code> handler and <code>send…</code> method.</p></div>
+        <div class="card"><h3>Reference host</h3><p><code>examples/basic-host/src/implementation.ts</code>, <code>sandbox.ts</code>, <code>serve.ts</code>.</p></div>
+        <div class="card"><h3>The rules</h3><p><code>specification/2026-01-26/apps.mdx</code>, sections Sandbox proxy, Lifecycle and Visibility.</p></div>
+      </div>
+      <footer>Based on @modelcontextprotocol/ext-apps 2.1.0 · spec 2026-01-26 · extension io.modelcontextprotocol/ui</footer>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var sections = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+  var bar = document.getElementById('bar'), pct = document.getElementById('pct');
+  var CELLS = 16, ticking = false;
+
+  function update() {
+    ticking = false;
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 1;
+    var filled = Math.round(p * CELLS);
+    bar.textContent = '█'.repeat(filled) + '░'.repeat(CELLS - filled);
+    pct.textContent = Math.round(p * 100) + '%';
+
+    var line = window.innerHeight * 0.35, current = 0;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].getBoundingClientRect().top <= line) current = i;
+    }
+    if (p >= 0.995) current = sections.length - 1;
+    links.forEach(function (a, i) {
+      a.classList.toggle('on', i === current);
+      if (i === current) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+  }
+  function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(update); } }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  update();
+})();
+
+/* ---------- playable sequences ---------- */
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var reduce = false;
+  try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  function setupPlayer(cfg) {
+    var svg = document.getElementById(cfg.svg);
+    if (!svg) return;
+    var $ = function (s) { return document.getElementById(cfg.prefix + '-' + s); };
+    var msgs = Array.prototype.slice.call(svg.querySelectorAll('.msg'));
+    var dotLayer = svg.querySelector('.flow-dots');
+    var band = svg.querySelector('.rowband');
+    var heads = {};
+    Array.prototype.forEach.call(svg.querySelectorAll('.hd'), function (h) { heads[h.getAttribute('data-x')] = h; });
+    var btnPrev = $('prev'), btnPlay = $('play'), btnNext = $('next'), btnSpeed = $('speed');
+    var dotsEl = $('dots'), eyeEl = $('eye'), titleEl = $('title'), textEl = $('text');
+    var routeEl = $('route'), codeEl = $('code'), panel = $('panel');
+    var STAGES = cfg.stages, STEPS = cfg.steps || null;
+    var LAST = STEPS ? msgs.length : STAGES.length - 1;
+    var STAGGER = reduce ? 0 : 750;
+    var speed = 1;
+    var at = 0, playing = false, timers = [];
+
+    var tabs = STAGES.map(function (s) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'pdot'; b.textContent = s.tab;
+      li.appendChild(b); dotsEl.appendChild(li);
+      return b;
+    });
+
+    function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+    function clearAll() {
+      timers.forEach(clearTimeout); timers = [];
+      while (dotLayer && dotLayer.firstChild) dotLayer.removeChild(dotLayer.firstChild);
+    }
+    function stageOf(g) { return +g.getAttribute('data-step'); }
+    function stageMsgs(n) { return msgs.filter(function (g) { return stageOf(g) === n; }); }
+    function lineOf(g) { return g.querySelector('line[class]'); }
+    /* where an arrow starts, ends and sits; self-loops carry data-x1/x2/y */
+    function geom(g) {
+      var l = lineOf(g);
+      if (l) return { x1: +l.getAttribute('x1'), x2: +l.getAttribute('x2'), y: +l.getAttribute('y1') };
+      return { x1: +g.getAttribute('data-x1'), x2: +g.getAttribute('data-x2'), y: +g.getAttribute('data-y') };
+    }
+
+    function travel(g, ms) {
+      if (reduce || !dotLayer) return;
+      var l = lineOf(g);
+      if (!l) return;
+      var x1 = +l.getAttribute('x1'), x2 = +l.getAttribute('x2'), y = +l.getAttribute('y1');
+      var c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', x1); c.setAttribute('cy', y); c.setAttribute('r', STEPS ? 6 : 5);
+      c.setAttribute('class', 'dot ' + (g.getAttribute('data-tone') || ''));
+      dotLayer.appendChild(c);
+      if (!c.animate) { dotLayer.removeChild(c); return; }
+      var a = c.animate([{ transform: 'translateX(0px)' }, { transform: 'translateX(' + (x2 - x1) + 'px)' }],
+                        { duration: ms || 650, easing: 'ease-in-out', fill: 'forwards' });
+      a.onfinish = function () { if (c.parentNode) c.parentNode.removeChild(c); };
+    }
+
+    function label() {
+      btnPlay.textContent = playing ? '❚❚ Pause' : (at === LAST ? '↺ Replay' : '▶ Play');
+    }
+    function setTabs(stage) {
+      tabs.forEach(function (b, i) {
+        b.classList.toggle('on', i === stage);
+        b.classList.toggle('done', stage > 0 && i > 0 && i < stage);
+        if (i === stage) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+      });
+    }
+    function setButtons() {
+      btnPrev.disabled = at === 0;
+      btnNext.disabled = at === LAST;
+      label();
+    }
+
+    /* keep the active arrow visible above the sticky panel */
+    function reveal(g) {
+      if (!panel) return;
+      var r = (lineOf(g) || g).getBoundingClientRect();
+      var top = 72, bottom = panel.getBoundingClientRect().top - 24;
+      if (r.top >= top && r.bottom <= bottom) return;
+      var target = top + (bottom - top) * 0.4;
+      window.scrollBy({ top: r.top - target, behavior: reduce ? 'auto' : 'smooth' });
+    }
+
+    function laneName(x) { return cfg.lanes && cfg.lanes[x] ? cfg.lanes[x] : ''; }
+    function setRoute(from, to) {
+      if (!routeEl) return;
+      routeEl.textContent = '';
+      if (!from) { routeEl.hidden = true; return; }
+      var a = document.createElement('span'); a.className = 'lane'; a.textContent = laneName(from);
+      var arr = document.createElement('span'); arr.className = 'arr'; arr.textContent = '→';
+      var b = document.createElement('span'); b.className = 'lane to'; b.textContent = laneName(to);
+      routeEl.appendChild(a); routeEl.appendChild(arr); routeEl.appendChild(b);
+      routeEl.hidden = false;
+    }
+    function setHeads(from, to) {
+      Object.keys(heads).forEach(function (k) {
+        heads[k].classList.toggle('from', k === String(from));
+        heads[k].classList.toggle('to', k === String(to));
+      });
+    }
+
+    /* ----- per-arrow mode (main diagram) ----- */
+    function renderStep(n) {
+      clearAll();
+      at = n;
+      if (n === 0) {
+        svg.removeAttribute('data-at');
+        msgs.forEach(function (g) { g.classList.remove('done', 'now'); });
+        if (band) band.classList.remove('on');
+        setHeads(null, null); setRoute(null);
+        eyeEl.textContent = 'Overview';
+        titleEl.textContent = STAGES[0].title;
+        textEl.textContent = STAGES[0].text;
+        if (codeEl) codeEl.hidden = true;
+        setTabs(0); setButtons();
+        return;
+      }
+      var g = msgs[n - 1], st = stageOf(g), info = STEPS[n - 1] || {};
+      svg.setAttribute('data-at', String(n));
+      msgs.forEach(function (m, i) {
+        m.classList.toggle('done', i < n - 1);
+        m.classList.toggle('now', i === n - 1);
+      });
+      var gm = geom(g), x1 = gm.x1, x2 = gm.x2, y = gm.y;
+      if (band) { band.setAttribute('y', y - 28); band.classList.add('on'); }
+      setHeads(x1, x2); setRoute(x1, x2);
+      travel(g, 900);
+      eyeEl.textContent = cfg.unit + ' ' + st + ' · ' + STAGES[st].tab + '  —  step ' + n + ' of ' + LAST;
+      titleEl.textContent = info.t || '';
+      textEl.textContent = info.b || '';
+      if (codeEl) {
+        codeEl.textContent = info.c || '';
+        codeEl.hidden = !info.c;
+      }
+      setTabs(st); setButtons();
+      reveal(g);
+      if (playing) {
+        var words = ((info.t || '') + ' ' + (info.b || '')).length;
+        var hold = Math.max(3200, Math.min(8500, 1600 + words * 26)) / speed;
+        if (n < LAST) later(function () { renderStep(n + 1); }, hold);
+        else later(function () { playing = false; label(); }, 600);
+      }
+    }
+
+    /* ----- per-stage mode (smaller diagrams) ----- */
+    function renderStage(n) {
+      clearAll();
+      at = n;
+      if (n === 0) svg.removeAttribute('data-at'); else svg.setAttribute('data-at', String(n));
+      msgs.forEach(function (g) {
+        var s = stageOf(g);
+        g.classList.toggle('done', n > 0 && s < n);
+        g.classList.remove('now');
+      });
+      var cur = stageMsgs(n);
+      cur.forEach(function (g, i) {
+        if (STAGGER === 0) { g.classList.add('now'); }
+        else later(function () { g.classList.add('now'); travel(g); }, i * STAGGER);
+      });
+      var s = STAGES[n];
+      eyeEl.textContent = n === 0 ? 'Overview' : cfg.unit + ' ' + n + ' of ' + LAST;
+      titleEl.textContent = s.title;
+      textEl.textContent = s.text;
+      setTabs(n); setButtons();
+      if (playing) {
+        var hold = cur.length * STAGGER + (reduce ? 4000 : 2600);
+        if (n < LAST) later(function () { renderStage(n + 1); }, hold);
+        else later(function () { playing = false; label(); }, cur.length * STAGGER + 300);
+      }
+    }
+
+    var render = STEPS ? renderStep : renderStage;
+
+    function pause() {
+      playing = false;
+      timers.forEach(clearTimeout); timers = [];
+      if (!STEPS) stageMsgs(at).forEach(function (g) { g.classList.add('now'); });
+      label();
+    }
+    function go(n) { playing = false; render(n); }
+
+    tabs.forEach(function (b, i) {
+      b.onclick = function () {
+        if (!STEPS || i === 0) { go(i); return; }
+        var first = msgs.findIndex(function (g) { return stageOf(g) === i; });
+        go(first + 1);
+      };
+    });
+    btnPlay.addEventListener('click', function () {
+      if (playing) { pause(); return; }
+      playing = true;
+      render((at === 0 || at === LAST) ? 1 : at);
+    });
+    btnNext.addEventListener('click', function () { go(Math.min(at + 1, LAST)); });
+    btnPrev.addEventListener('click', function () { go(Math.max(at - 1, 0)); });
+    if (btnSpeed) btnSpeed.addEventListener('click', function () {
+      speed = speed === 1 ? 2 : 1;
+      btnSpeed.textContent = speed + '×';
+      btnSpeed.setAttribute('aria-label', 'Playback speed ' + speed + ' times');
+    });
+    render(0);
+  }
+
+  setupPlayer({
+    svg: 'flow', prefix: 'p', unit: 'Stage',
+    lanes: { 72: 'You · chat UI', 200: 'AppFrame', 328: 'Sandbox page', 456: 'MCP App · UI',
+             608: 'Your backend', 736: 'Model · LLM', 864: 'MCP App · server' },
+    stages: [
+      { tab: 'All', title: 'One question becomes a screen',
+        text: 'All 25 arrows are drawn at once. Press Play to watch them one at a time, with what each one carries and why. Pick a stage to jump to it, or use Back and Next to step.' },
+      { tab: 'Ask' }, { tab: 'Screen?' }, { tab: 'Fetch' }, { tab: 'Sandbox' },
+      { tab: 'Hello' }, { tab: 'Data' }, { tab: 'Reply' }
+    ],
+    steps: [
+      { t: 'You send a message',
+        b: 'Your chat UI posts the message and keeps the response open as a stream (SSE or WebSocket), the same way it streams tokens today. Everything your backend tells the browser during this turn comes back down this one stream.',
+        c: 'POST /api/chat\n{ "message": "What\'s the weather in Paris?" }\n← 200 text/event-stream   (stays open)' },
+      { t: 'Your backend asks the model',
+        b: 'It sends the conversation plus the tool list it got from tools/list when it connected. Tools marked visibility ["app"] are left out, so the model never sees them.',
+        c: 'messages: [{ role: "user", content: "What\'s the weather in Paris?" }]\ntools: [{ name: "show-weather", description: "…", input_schema: {…} }]' },
+      { t: 'The model picks a tool',
+        b: 'To the model this is an ordinary tool call; it knows nothing about screens. Your backend looks the tool up and notices it has _meta.ui.resourceUri.',
+        c: '{ type: "tool_use", id: "call_1",\n  name: "show-weather", input: { city: "Paris" } }' },
+      { t: 'Your backend runs the tool',
+        b: 'Plain MCP to the app\'s server. It may take a while (the grey bar on the server lane), so your backend does not wait for the answer before telling the browser what is coming. The answer comes back at step 19.',
+        c: '{"jsonrpc":"2.0","id":7,"method":"tools/call",\n "params":{"name":"show-weather","arguments":{"city":"Paris"}}}' },
+      { t: 'Your backend says: this call has a screen',
+        b: 'It pushes an event of your own down the stream from step 1. This is not part of MCP: you choose the name and shape. It carries everything the browser needs to start the screen.',
+        c: 'event: app-start\ndata: {"toolCallId":"call_1","server":"weather",\n       "toolName":"show-weather","args":{"city":"Paris"},\n       "resourceUri":"ui://weather/view"}' },
+      { t: 'The chat UI makes room',
+        b: 'It renders an AppFrame inside the assistant\'s bubble and passes it the event\'s fields. The AppFrame creates one AppBridge for this screen and registers its handlers, but does not connect it yet. From here on, the AppFrame drives everything for this one screen.',
+        c: '<AppFrame toolCallId="call_1" server="weather"\n          resourceUri="ui://weather/view"\n          args={{ city: "Paris" }} />\n\n// inside AppFrame\nconst bridge = new AppBridge(null, hostInfo, hostCapabilities, { hostContext });\nbridge.oncalltool = …; bridge.onmessage = …; // handlers first' },
+      { t: 'The AppFrame asks for the screen\'s HTML',
+        b: 'A browser cannot open a ui:// address, and only your backend holds the MCP connection, so the AppFrame asks your backend. The HTML does not depend on this call, so you can cache it.',
+        c: 'GET /api/apps/weather/resource?uri=ui://weather/view' },
+      { t: 'Your backend reads the resource',
+        b: 'Plain MCP again. The server registered this resource with registerAppResource.',
+        c: '{"jsonrpc":"2.0","id":8,"method":"resources/read",\n "params":{"uri":"ui://weather/view"}}' },
+      { t: 'The server returns the UI half of the app',
+        b: 'One HTML file, usually with its JavaScript bundled in. Its _meta.ui says which domains it may reach and which permissions it wants.',
+        c: '{ contents: [{ uri: "ui://weather/view",\n  mimeType: "text/html;profile=mcp-app",\n  text: "<!doctype html>…",\n  _meta: { ui: { csp: { connectDomains: ["https://api.weather.example"] } } } }] }' },
+      { t: 'The HTML reaches the browser',
+        b: 'Your backend passes the HTML and the _meta.ui settings straight through. The AppFrame must not run it on your own page. That is what the next stage is for.',
+        c: '{ "html": "<!doctype html>…",\n  "csp": { "connectDomains": ["https://api.weather.example"] },\n  "permissions": {} }' },
+      { t: 'The AppFrame builds the outer glass room',
+        b: 'It creates an iframe pointing at your sandbox page on a different origin. Because the origin differs, the browser stops anything inside from reading your chat\'s cookies, storage or page. basic-host also puts the csp in the URL, and the sandbox server turns it into a Content-Security-Policy header, so the rules are locked in before any app code exists.',
+        c: '<iframe src="https://sandbox.yourchat.example/sandbox.html?csp={…}"\n        sandbox="allow-scripts allow-same-origin allow-forms">\n// sandbox server responds with\nContent-Security-Policy: connect-src https://api.weather.example; …' },
+      { t: 'The sandbox page says it is loaded',
+        b: 'A one-way notification, so the head is open. basic-host catches it with a plain window message listener, before AppBridge is connected. Now the AppFrame knows the sandbox can receive messages.',
+        c: '{"jsonrpc":"2.0","method":"ui/notifications/sandbox-proxy-ready","params":{}}' },
+      { t: 'The AppFrame hands over the HTML',
+        b: 'AppBridge starts working here (the orange bar). The AppFrame connects its bridge to the sandbox iframe, then calls sendSandboxResourceReady. The csp and permissions travel along too. The spec only requires the sandbox to enforce csp; basic-host already did it with the header in step 11. After this the sandbox page only relays messages.',
+        c: 'await bridge.connect(new PostMessageTransport(iframe.contentWindow, iframe.contentWindow));\nawait bridge.sendSandboxResourceReady({ html, csp, permissions });\n// sends:\n{"jsonrpc":"2.0","method":"ui/notifications/sandbox-resource-ready",\n "params":{"html":"<!doctype html>…","csp":{…},"permissions":{}}}' },
+      { t: 'The sandbox page runs the HTML',
+        b: 'This is what kicks off the next stage. The sandbox page writes the HTML into its inner iframe. That iframe already has a sandbox attribute from when the page loaded; now it gets an allow attribute built from permissions (camera, microphone and so on). The browser parses the page and runs its scripts, exactly like opening any web page. The app is now alive, but alone: it knows nothing yet.',
+        c: '// inside sandbox.html, at page load\ninner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");\n// later, on sandbox-resource-ready\nif (typeof sandbox === "string") inner.setAttribute("sandbox", sandbox); // optional override\ninner.setAttribute("allow", buildAllowAttribute(permissions));\ninner.contentDocument.write(html);   // or inner.srcdoc = html' },
+      { t: 'The app wakes up and says hello',
+        b: 'The app\'s first script line runs new App(...) and app.connect(). connect() posts ui/initialize to its parent window, which is the sandbox page. The sandbox page passes it up to the AppFrame unchanged (the small ring on the line). AppBridge receives it.',
+        c: '// app code: const app = new App({ name: "weather", version: "1.0.0" }); await app.connect();\n{"jsonrpc":"2.0","id":1,"method":"ui/initialize",\n "params":{"protocolVersion":"2026-01-26",\n   "appInfo":{"name":"weather","version":"1.0.0"},\n   "appCapabilities":{}}}' },
+      { t: 'The host describes the world',
+        b: 'AppBridge answers for you: what the host allows (call tools, open links, send messages, update model context) and the host context: theme, CSS variables, size, display mode, locale and which tool call this is.',
+        c: '{"jsonrpc":"2.0","id":1,"result":{\n  "protocolVersion":"2026-01-26","hostInfo":{"name":"my-chat",…},\n  "hostCapabilities":{"serverTools":{},"updateModelContext":{"text":{}}},\n  "hostContext":{"theme":"dark","displayMode":"inline",\n                 "toolInfo":{"id":"call_1",…}}}}' },
+      { t: 'The app says it is ready',
+        b: 'AppBridge fires its oninitialized handler. Until then, the AppFrame must not send the app anything. If the tool result came back early, hold on to it.',
+        c: '{"jsonrpc":"2.0","method":"ui/notifications/initialized"}' },
+      { t: 'The app learns what was asked',
+        b: 'The arguments from app-start. The app can show "Loading Paris…" straight away. With streaming, tool-input-partial notes can come before this one, carrying the arguments while the model is still writing them. Like everything else, they must wait until initialized.',
+        c: 'bridge.sendToolInput({ arguments: { city: "Paris" } });\n// sends:\n{"jsonrpc":"2.0","method":"ui/notifications/tool-input",\n "params":{"arguments":{"city":"Paris"}}}' },
+      { t: 'The tool finishes',
+        b: 'This is the reply to the tools/call from step 4, so the arrow is dashed. Meanwhile the screen has already loaded. The result has parts for different readers: content is text for the model, structuredContent is data for the UI, and _meta is for the UI and never the model.',
+        c: '{ content: [{ type: "text", text: "Paris: 18°C, sunny" }],\n  structuredContent: { temp: 18, sky: "sunny", hourly: […] } }' },
+      { t: 'Your backend sends the whole result to the browser',
+        b: 'Another event of your own on the same open stream, tagged with the toolCallId so the browser knows which screen it is for.',
+        c: 'event: app-result\ndata: {"toolCallId":"call_1",\n       "result":{"content":[…],"structuredContent":{…}}}' },
+      { t: 'The chat UI finds the right screen',
+        b: 'There may be several screens in the chat. The toolCallId picks the AppFrame that is waiting for this result.',
+        c: 'appFrames.get("call_1").deliverResult(result)' },
+      { t: 'The app draws the forecast',
+        b: 'bridge.sendToolResult(result) sends it in. The app\'s ontoolresult fires and it renders from structuredContent. This is the payoff.',
+        c: 'bridge.sendToolResult(result);\n// sends:\n{"jsonrpc":"2.0","method":"ui/notifications/tool-result",\n "params":{"content":[…],\n   "structuredContent":{"temp":18,"sky":"sunny",…}}}' },
+      { t: 'The model gets the result, text only',
+        b: 'Your backend adds the tool result to the conversation, but only content. structuredContent and _meta stay out of the model\'s context.',
+        c: '{ type: "tool_result", tool_use_id: "call_1",\n  content: "Paris: 18°C, sunny" }' },
+      { t: 'The model writes its answer',
+        b: 'It knows the result only from that text. It has not seen the screen.',
+        c: '"It\'s 18°C and sunny in Paris right now."' },
+      { t: 'The answer appears under the screen',
+        b: 'Streamed like any reply. The screen stays live: from here, clicks inside it can call tools or tell the model things. The next section shows how.',
+        c: 'event: token\ndata: "It\'s 18°C and sunny…"' }
+    ]
+  });
+
+  setupPlayer({
+    svg: 'flow2', prefix: 'p2', unit: 'Route',
+    lanes: { 72: 'You', 208: 'MCP App · UI', 352: 'Your host', 504: 'Model · LLM', 648: 'MCP App · server' },
+    stages: [
+      { tab: 'All', title: 'Four routes, one gatekeeper',
+        text: 'All four routes are drawn at once. "Your host" means your chat UI, AppFrame and backend together. Press Play to watch them one arrow at a time, or pick a route.' },
+      { tab: 'Quiet update' }, { tab: 'Speak up' }, { tab: 'Own work' }, { tab: 'Model drives' }
+    ],
+    steps: [
+      /* ---- route 1: quiet update ---- */
+      { t: 'You change what the screen shows',
+        b: 'Say you pan the map. Nothing leaves the iframe yet. The app decides whether this is worth telling the model.',
+        c: 'map.on("moveend", () => report());' },
+      { t: 'The app leaves a note for the model',
+        b: 'app.updateModelContext() sends ui/update-model-context to your host. It goes through the sandbox page like every other message. It is a request, so the app waits for an answer.',
+        c: 'app.updateModelContext({ content: [{ type: "text", text: "Map centred on Paris, zoom 12" }] });\n// sends:\n{"jsonrpc":"2.0","id":5,"method":"ui/update-model-context",\n "params":{"content":[{"type":"text","text":"Map centred on Paris, zoom 12"}]}}' },
+      { t: 'Your host saves it, replacing any older note',
+        b: 'Your onupdatemodelcontext handler overwrites this app\'s slot. If several notes arrive before the next turn, only the last one will be sent. The spec has the host save first, then reply.',
+        c: 'bridge.onupdatemodelcontext = async (params) => {\n  contextSlots.set(toolCallId, params);   // overwrite, don\'t append\n  return {};\n};' },
+      { t: 'Your host says ok, and stops there',
+        b: 'An empty result. The model still knows nothing, and your host does not start a turn for a context update. That is the difference from route 2.',
+        c: '{"jsonrpc":"2.0","id":5,"result":{}}' },
+      { t: 'Later: the next turn starts',
+        b: 'This is the dashed LATER line. Seconds or minutes may pass. The next turn starts when you type, or when an app calls ui/message (route 2). Whoever starts it, the saved note goes along.',
+        c: 'POST /api/chat\n{ "message": "Any good cafés around here?" }' },
+      { t: 'Only now does the model see the note',
+        b: 'Your backend adds the latest saved context to this request. This is the first moment the model learns you panned the map. Where you put it, such as before the user message or in the system prompt, is up to you.',
+        c: 'messages: [ …,\n  { role: "user", content: [\n    { type: "text", text: "[map app] Map centred on Paris, zoom 12" },\n    { type: "text", text: "Any good cafés around here?" } ] } ]' },
+      { t: 'The model answers with the map in mind',
+        b: 'It can say "near the Louvre" because of a note it received one turn late. It still has not seen the screen itself.',
+        c: '"There are three cafés within a few minutes of the Louvre…"' },
+
+      /* ---- route 2: speak up ---- */
+      { t: 'You ask the app to involve the AI',
+        b: 'For example, a button that says "Explain this chart".',
+        c: 'button.onclick = () => ask();' },
+      { t: 'The app speaks up',
+        b: 'app.sendMessage() sends ui/message with role "user". Your onmessage handler may ask the person to confirm first.',
+        c: 'app.sendMessage({ role: "user",\n  content: [{ type: "text", text: "Explain the spike on 3 March" }] });\n// sends:\n{"jsonrpc":"2.0","id":6,"method":"ui/message",\n "params":{"role":"user","content":[{"type":"text","text":"Explain the spike on 3 March"}]}}' },
+      { t: 'Your host accepts it',
+        b: 'An empty result means accepted. If your host refuses, it replies with an error instead and nothing else happens.',
+        c: '{"jsonrpc":"2.0","id":6,"result":{}}' },
+      { t: 'A new user turn starts right away',
+        b: 'Your host adds the message to the conversation as a user turn and asks the model now, without waiting for you to type. Any note saved in route 1 goes along with it.',
+        c: 'messages: [ …, { role: "user", content: "Explain the spike on 3 March" } ]' },
+      { t: 'The model replies',
+        b: 'Like any reply. It may also call tools, including the app\'s own (route 4).',
+        c: '"The spike on 3 March lines up with…"' },
+      { t: 'The reply appears in the chat',
+        b: 'It shows in the conversation, not inside the app. The app is not sent the reply. If the app needs to change, the model can call one of its tools (route 4).',
+        c: 'event: token\ndata: "The spike on 3 March…"' },
+
+      /* ---- route 3: own work ---- */
+      { t: 'You tap refresh',
+        b: 'An action that only the app cares about.',
+        c: 'refreshBtn.onclick = () => refresh();' },
+      { t: 'The app calls a server tool',
+        b: 'app.callServerTool() sends an ordinary tools/call to your host. The tool is often app-only (visibility ["app"]), so the model never had it in its tool list.',
+        c: 'app.callServerTool({ name: "refresh-forecast", arguments: { city: "Paris" } });\n// sends:\n{"jsonrpc":"2.0","id":7,"method":"tools/call",\n "params":{"name":"refresh-forecast","arguments":{"city":"Paris"}}}' },
+      { t: 'Your host checks it and forwards it',
+        b: 'Your oncalltool handler must check that the tool is on this app\'s server and that its visibility includes "app". The spec says to reject it otherwise. Then it forwards the call over your own MCP connection.',
+        c: 'bridge.oncalltool = async (params) => {\n  assertAppVisible(params.name);   // else throw\n  return mcpClient.callTool(params);\n};' },
+      { t: 'The server answers',
+        b: 'A normal tool result, with content and usually structuredContent.',
+        c: '{ content: [{ type: "text", text: "Paris: 19°C" }],\n  structuredContent: { temp: 19, … } }' },
+      { t: 'The app redraws, and the model is not told',
+        b: 'The result goes back to the app only. If the change matters to the conversation, the app follows up with updateModelContext (route 1).',
+        c: '{"jsonrpc":"2.0","id":7,"result":{"content":[…],"structuredContent":{…}}}' },
+
+      /* ---- route 4: the model drives ---- */
+      { t: 'Your host asks the app what tools it has',
+        b: 'Two things prompt this, and both come from the app. First, the handshake: if the app declared the tools capability in ui/initialize (registerTool adds it for you), your host asks once oninitialized fires. Second, a change: the app sends notifications/tools/list_changed when it adds or removes a tool, and your host asks again. The model can\'t prompt it, because it doesn\'t know these tools exist yet.',
+        c: '// 1. after the handshake\nbridge.oninitialized = async () => {\n  if (bridge.getAppCapabilities()?.tools) {\n    const { tools } = await bridge.listTools({});\n    appTools.set(toolCallId, tools);\n  }\n};\n// 2. when the app\'s tools change\n// app → host: {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}\n// → call bridge.listTools({}) again and replace appTools.get(toolCallId)' },
+      { t: 'The app lists its tools',
+        b: 'The app registered them with app.registerTool. They run inside the iframe, so they can change the screen directly.',
+        c: '{ tools: [{ name: "navigate-to",\n  description: "Pan the map to a place",\n  inputSchema: { … } }] }' },
+      { t: 'The model is offered them',
+        b: 'Your host adds them next to the server\'s tools on the next model request. Give them distinct names, and remove them when the screen goes away.',
+        c: 'tools: [ …server tools,\n  { name: "map__navigate-to", description: "Pan the map to a place", input_schema: {…} } ]' },
+      { t: 'The model calls one',
+        b: 'To the model it is just another tool.',
+        c: '{ type: "tool_use", id: "call_9",\n  name: "map__navigate-to", input: { place: "Louvre" } }' },
+      { t: 'Your host runs it inside the app',
+        b: 'bridge.callTool sends tools/call down to the app, the opposite direction from route 3.',
+        c: 'await bridge.callTool({ name: "navigate-to", arguments: { place: "Louvre" } });' },
+      { t: 'The app answers',
+        b: 'The map has moved. The app returns a short result for the model.',
+        c: '{ content: [{ type: "text", text: "Moved to the Louvre" }] }' },
+      { t: 'The model gets the result',
+        b: 'It goes back to the model as a normal tool result, so the model knows the screen changed.',
+        c: '{ type: "tool_result", tool_use_id: "call_9",\n  content: "Moved to the Louvre" }' }
+    ]
+  });
+})();
+</script>
+</body>
+</html>
