@@ -719,6 +719,22 @@ export interface McpUiResourceMeta {
    */
   domain?: string;
   /**
+   * @description Public homepage URL for the app represented by this UI resource.
+   *
+   * This is distinct from `domain`, which configures the host-assigned sandbox
+   * origin. Hosts MAY expose this URL to
+   * help users learn more about or return to the app, but MUST treat it as an
+   * untrusted external link and apply their normal link validation, policy,
+   * and consent behavior. Its presence does not grant navigation permission
+   * or establish trust in the destination.
+   *
+   * @example
+   * ```ts
+   * "https://weather.example.com"
+   * ```
+   */
+  homepage?: string;
+  /**
    * @description Visual boundary preference - true if view prefers a visible border.
    *
    * Boolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.
