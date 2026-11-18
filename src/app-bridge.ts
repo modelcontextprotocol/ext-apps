@@ -557,6 +557,10 @@ export class AppBridge extends Protocol<BaseContext> {
 
     // Default handler for requestDisplayMode - returns current mode from host context.
     // Hosts can override this by setting bridge.onrequestdisplaymode = ...
+    this._installDefaultRequestDisplayModeHandler();
+  }
+
+  private _installDefaultRequestDisplayModeHandler(): void {
     this.replaceRequestHandler(
       "ui/request-display-mode",
       {
@@ -830,18 +834,20 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<McpUiMessageResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced("onmessage", this._onmessage, callback);
+    const previous = this._onmessage;
+    this.warnIfRequestHandlerReplaced("onmessage", previous, callback);
     this._onmessage = callback;
+    if (!callback) {
+      if (previous) this.removeRequestHandler("ui/message");
+      return;
+    }
     this.replaceRequestHandler(
       "ui/message",
       {
         params: McpUiMessageRequestSchema.shape.params,
         result: McpUiMessageResultSchema,
       },
-      async (params, extra) => {
-        if (!this._onmessage) throw new Error("No onmessage handler set");
-        return this._onmessage(params, extra);
-      },
+      (params, extra) => callback(params, extra),
     );
   }
 
@@ -903,18 +909,20 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<McpUiOpenLinkResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced("onopenlink", this._onopenlink, callback);
+    const previous = this._onopenlink;
+    this.warnIfRequestHandlerReplaced("onopenlink", previous, callback);
     this._onopenlink = callback;
+    if (!callback) {
+      if (previous) this.removeRequestHandler("ui/open-link");
+      return;
+    }
     this.replaceRequestHandler(
       "ui/open-link",
       {
         params: McpUiOpenLinkRequestSchema.shape.params,
         result: McpUiOpenLinkResultSchema,
       },
-      async (params, extra) => {
-        if (!this._onopenlink) throw new Error("No onopenlink handler set");
-        return this._onopenlink(params, extra);
-      },
+      (params, extra) => callback(params, extra),
     );
   }
 
@@ -975,23 +983,20 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<McpUiDownloadFileResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced(
-      "ondownloadfile",
-      this._ondownloadfile,
-      callback,
-    );
+    const previous = this._ondownloadfile;
+    this.warnIfRequestHandlerReplaced("ondownloadfile", previous, callback);
     this._ondownloadfile = callback;
+    if (!callback) {
+      if (previous) this.removeRequestHandler("ui/download-file");
+      return;
+    }
     this.replaceRequestHandler(
       "ui/download-file",
       {
         params: McpUiDownloadFileRequestSchema.shape.params,
         result: McpUiDownloadFileResultSchema,
       },
-      async (params, extra) => {
-        if (!this._ondownloadfile)
-          throw new Error("No ondownloadfile handler set");
-        return this._ondownloadfile(params, extra);
-      },
+      (params, extra) => callback(params, extra),
     );
   }
 
@@ -1044,7 +1049,7 @@ export class AppBridge extends Protocol<BaseContext> {
    * display mode instead.
    *
    * By default, `AppBridge` returns the current `displayMode` from host context (or "inline").
-   * Setting this property replaces that default behavior.
+   * Setting this property replaces that default behavior; setting `undefined` restores it.
    *
    * @param callback - Handler that receives the requested mode and returns the actual mode set
    *   - `params.mode` - The display mode being requested ("inline" | "fullscreen" | "pip")
@@ -1079,23 +1084,24 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<McpUiRequestDisplayModeResult>)
       | undefined,
   ) {
+    const previous = this._onrequestdisplaymode;
     this.warnIfRequestHandlerReplaced(
       "onrequestdisplaymode",
-      this._onrequestdisplaymode,
+      previous,
       callback,
     );
     this._onrequestdisplaymode = callback;
+    if (!callback) {
+      if (previous) this._installDefaultRequestDisplayModeHandler();
+      return;
+    }
     this.replaceRequestHandler(
       "ui/request-display-mode",
       {
         params: McpUiRequestDisplayModeRequestSchema.shape.params,
         result: McpUiRequestDisplayModeResultSchema,
       },
-      async (params, extra) => {
-        if (!this._onrequestdisplaymode)
-          throw new Error("No onrequestdisplaymode handler set");
-        return this._onrequestdisplaymode(params, extra);
-      },
+      (params, extra) => callback(params, extra),
     );
   }
 
@@ -1180,23 +1186,24 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<EmptyResult>)
       | undefined,
   ) {
+    const previous = this._onupdatemodelcontext;
     this.warnIfRequestHandlerReplaced(
       "onupdatemodelcontext",
-      this._onupdatemodelcontext,
+      previous,
       callback,
     );
     this._onupdatemodelcontext = callback;
+    if (!callback) {
+      if (previous) this.removeRequestHandler("ui/update-model-context");
+      return;
+    }
     this.replaceRequestHandler(
       "ui/update-model-context",
       {
         params: McpUiUpdateModelContextRequestSchema.shape.params,
         result: EmptyResultSchema,
       },
-      async (params, extra) => {
-        if (!this._onupdatemodelcontext)
-          throw new Error("No onupdatemodelcontext handler set");
-        return this._onupdatemodelcontext(params, extra);
-      },
+      (params, extra) => callback(params, extra),
     );
   }
 
@@ -1240,12 +1247,16 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<CallToolResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced("oncalltool", this._oncalltool, callback);
+    const previous = this._oncalltool;
+    this.warnIfRequestHandlerReplaced("oncalltool", previous, callback);
     this._oncalltool = callback;
-    this.replaceRequestHandler("tools/call", async (request, extra) => {
-      if (!this._oncalltool) throw new Error("No oncalltool handler set");
-      return this._oncalltool(request.params, extra);
-    });
+    if (!callback) {
+      if (previous) this.removeRequestHandler("tools/call");
+      return;
+    }
+    this.replaceRequestHandler("tools/call", (request, extra) =>
+      callback(request.params, extra),
+    );
   }
 
   /**
@@ -1294,20 +1305,19 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<CreateMessageResult | CreateMessageResultWithTools>)
       | undefined,
   ) {
+    const previous = this._oncreatesamplingmessage;
     this.warnIfRequestHandlerReplaced(
       "oncreatesamplingmessage",
-      this._oncreatesamplingmessage,
+      previous,
       callback,
     );
     this._oncreatesamplingmessage = callback;
-    this.replaceRequestHandler(
-      "sampling/createMessage",
-      async (request, extra) => {
-        if (!this._oncreatesamplingmessage) {
-          throw new Error("No oncreatesamplingmessage handler set");
-        }
-        return this._oncreatesamplingmessage(request.params, extra);
-      },
+    if (!callback) {
+      if (previous) this.removeRequestHandler("sampling/createMessage");
+      return;
+    }
+    this.replaceRequestHandler("sampling/createMessage", (request, extra) =>
+      callback(request.params, extra),
     );
   }
 
@@ -1377,17 +1387,16 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<ListResourcesResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced(
-      "onlistresources",
-      this._onlistresources,
-      callback,
-    );
+    const previous = this._onlistresources;
+    this.warnIfRequestHandlerReplaced("onlistresources", previous, callback);
     this._onlistresources = callback;
-    this.replaceRequestHandler("resources/list", async (request, extra) => {
-      if (!this._onlistresources)
-        throw new Error("No onlistresources handler set");
-      return this._onlistresources(request.params, extra);
-    });
+    if (!callback) {
+      if (previous) this.removeRequestHandler("resources/list");
+      return;
+    }
+    this.replaceRequestHandler("resources/list", (request, extra) =>
+      callback(request.params, extra),
+    );
   }
 
   /**
@@ -1430,19 +1439,19 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<ListResourceTemplatesResult>)
       | undefined,
   ) {
+    const previous = this._onlistresourcetemplates;
     this.warnIfRequestHandlerReplaced(
       "onlistresourcetemplates",
-      this._onlistresourcetemplates,
+      previous,
       callback,
     );
     this._onlistresourcetemplates = callback;
-    this.replaceRequestHandler(
-      "resources/templates/list",
-      async (request, extra) => {
-        if (!this._onlistresourcetemplates)
-          throw new Error("No onlistresourcetemplates handler set");
-        return this._onlistresourcetemplates(request.params, extra);
-      },
+    if (!callback) {
+      if (previous) this.removeRequestHandler("resources/templates/list");
+      return;
+    }
+    this.replaceRequestHandler("resources/templates/list", (request, extra) =>
+      callback(request.params, extra),
     );
   }
 
@@ -1486,17 +1495,16 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<ReadResourceResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced(
-      "onreadresource",
-      this._onreadresource,
-      callback,
-    );
+    const previous = this._onreadresource;
+    this.warnIfRequestHandlerReplaced("onreadresource", previous, callback);
     this._onreadresource = callback;
-    this.replaceRequestHandler("resources/read", async (request, extra) => {
-      if (!this._onreadresource)
-        throw new Error("No onreadresource handler set");
-      return this._onreadresource(request.params, extra);
-    });
+    if (!callback) {
+      if (previous) this.removeRequestHandler("resources/read");
+      return;
+    }
+    this.replaceRequestHandler("resources/read", (request, extra) =>
+      callback(request.params, extra),
+    );
   }
 
   /**
@@ -1567,16 +1575,16 @@ export class AppBridge extends Protocol<BaseContext> {
         ) => Promise<ListPromptsResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced(
-      "onlistprompts",
-      this._onlistprompts,
-      callback,
-    );
+    const previous = this._onlistprompts;
+    this.warnIfRequestHandlerReplaced("onlistprompts", previous, callback);
     this._onlistprompts = callback;
-    this.replaceRequestHandler("prompts/list", async (request, extra) => {
-      if (!this._onlistprompts) throw new Error("No onlistprompts handler set");
-      return this._onlistprompts(request.params, extra);
-    });
+    if (!callback) {
+      if (previous) this.removeRequestHandler("prompts/list");
+      return;
+    }
+    this.replaceRequestHandler("prompts/list", (request, extra) =>
+      callback(request.params, extra),
+    );
   }
 
   /**
