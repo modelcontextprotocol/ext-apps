@@ -341,7 +341,8 @@ export class App extends Protocol<BaseContext> {
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
-  private _registeredTools: { [name: string]: RegisteredAppTool } = {};
+  private _registeredTools: { [name: string]: RegisteredAppTool } =
+    Object.create(null);
   private readonly _webMcpMirrors = new Map<string, AbortController>();
   private _webMcpCallCount = 0;
   private _webMcpWatched?: { consumer: WebMcpConsumer; listener: () => void };
