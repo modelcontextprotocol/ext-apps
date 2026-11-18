@@ -101,6 +101,44 @@ afterEach(async () => {
 });
 
 describe("App base MCP SDK v2 Protocol migration", () => {
+  for (const name of ["constructor", "toString", "__proto__"]) {
+    it(`registers and calls a tool named ${name}`, async () => {
+      const app = new App(
+        { name: "tool-names", version: "1.0.0" },
+        {},
+        { autoResize: false },
+      );
+      const tool = app.registerTool(
+        name,
+        { description: "Returns its name" },
+        async () => ({
+          content: [{ type: "text", text: name }],
+        }),
+      );
+      const pair = await connectPair(app);
+      connected.push(pair);
+
+      const listed = await pair.server.request({
+        method: "tools/list",
+        params: {},
+      });
+      const result = await pair.server.request({
+        method: "tools/call",
+        params: { name, arguments: {} },
+      });
+
+      expect(listed.tools.map((entry) => entry.name)).toEqual([name]);
+      expect(result.content).toEqual([{ type: "text", text: name }]);
+      expect(() =>
+        app.registerTool(name, {}, async () => ({ content: [] })),
+      ).toThrow(/already registered/);
+      tool.remove();
+      expect(
+        (await pair.server.request({ method: "tools/list", params: {} })).tools,
+      ).toEqual([]);
+    });
+  }
+
   it("performs only the Apps handshake — no MCP initialize on the wire", async () => {
     const pair = await connectPair();
     connected.push(pair);

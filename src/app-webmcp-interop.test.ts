@@ -191,6 +191,31 @@ describe("WebMCP interop: registerTool mirrored into document.modelContext", () 
 });
 
 describe("WebMCP interop: page-registered tools served over tools/list and tools/call", () => {
+  for (const name of ["constructor", "toString", "__proto__"]) {
+    it(`serves a page tool named ${name}`, async () => {
+      const doc = fakeDocument();
+      setDocument(doc);
+      await doc.modelContext.registerTool({
+        name,
+        description: "Returns its name",
+        execute: async () => ({ name }),
+      });
+      const pair = await connectPair();
+
+      const listed = await pair.server.request({
+        method: "tools/list",
+        params: {},
+      });
+      const result = await pair.server.request({
+        method: "tools/call",
+        params: { name, arguments: {} },
+      });
+
+      expect(listed.tools.map((tool) => tool.name)).toEqual([name]);
+      expect(result.structuredContent).toEqual({ name });
+    });
+  }
+
   it("declares the tools capability and serves WebMCP tools to an Apps host", async () => {
     const doc = fakeDocument();
     setDocument(doc);
