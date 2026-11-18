@@ -60,5 +60,10 @@ registerAppResource(
 
 Note that `_meta.ui.csp` and `_meta.ui.domain` are set in the `contents[]` objects returned by the resource read callback, not in `registerAppResource()`'s config object.
 
+> [!IMPORTANT]
+> Hosts validate `_meta.ui.domain` when it is present, and a value they do not accept can stop the app rendering entirely rather than falling back to the default origin. On Claude, a domain that doesn't match the expected value means no iframe is created at all, reported only as a generic failure to reach the server. Omitting the field is safe — the host uses its default sandbox origin — so only set it when you need a stable origin to allowlist.
+>
+> When deriving the value, hash exactly the endpoint URL the app is connected as. A trailing slash, a missing path segment, or a different scheme each produce a different hash, and therefore a domain the host rejects.
+
 > [!NOTE]
 > For full examples that configures CSP, see: [`examples/sheet-music-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/sheet-music-server) (`connectDomains`) and [`examples/map-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/map-server) (`connectDomains` and `resourceDomains`).
