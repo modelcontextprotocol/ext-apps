@@ -3077,6 +3077,114 @@ describe("isToolVisibilityAppOnly", () => {
       bridge2.oncreatesamplingmessage = undefined;
       expect(bridge2.oncreatesamplingmessage).toBeUndefined();
     });
+
+    it("clearing AppBridge on* request setters unregisters optional methods and restores default requestDisplayMode", async () => {
+      await bridgeTransport.close();
+      [appTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
+      bridge = new AppBridge(null, testHostInfo, {
+        ...testHostCapabilities,
+        sampling: {},
+      });
+      await bridge.connect(bridgeTransport);
+
+      bridge.onrequestdisplaymode = undefined;
+
+      bridge.onopenlink = async () => ({});
+      bridge.onmessage = async () => ({});
+      bridge.ondownloadfile = async () => ({});
+      bridge.onupdatemodelcontext = async () => ({});
+      bridge.oncalltool = async () => ({ content: [] });
+      bridge.oncreatesamplingmessage = async () => ({
+        role: "assistant",
+        content: { type: "text", text: "ok" },
+        model: "m",
+      });
+      bridge.onlistresources = async () => ({ resources: [] });
+      bridge.onlistresourcetemplates = async () => ({ resourceTemplates: [] });
+      bridge.onreadresource = async () => ({ contents: [] });
+      bridge.onlistprompts = async () => ({ prompts: [] });
+      bridge.onrequestdisplaymode = async () => ({ mode: "fullscreen" });
+
+      bridge.onopenlink = undefined;
+      bridge.onmessage = undefined;
+      bridge.ondownloadfile = undefined;
+      bridge.onupdatemodelcontext = undefined;
+      bridge.oncalltool = undefined;
+      bridge.oncreatesamplingmessage = undefined;
+      bridge.onlistresources = undefined;
+      bridge.onlistresourcetemplates = undefined;
+      bridge.onreadresource = undefined;
+      bridge.onlistprompts = undefined;
+      bridge.onrequestdisplaymode = undefined;
+
+      await app.connect(appTransport);
+
+      expect(await app.requestDisplayMode({ mode: "fullscreen" })).toEqual({
+        mode: "inline",
+      });
+      bridge.setHostContext({ displayMode: "pip" });
+      await flush();
+      expect(await app.requestDisplayMode({ mode: "fullscreen" })).toEqual({
+        mode: "pip",
+      });
+
+      await expect(
+        app.openLink({ url: "https://example.com" }),
+      ).rejects.toMatchObject({ code: -32601 });
+      await expect(
+        app.sendMessage({ role: "user", content: [] }),
+      ).rejects.toMatchObject({ code: -32601 });
+      await expect(
+        app.downloadFile({
+          contents: [
+            {
+              type: "resource",
+              resource: { uri: "file:///a.txt", text: "a" },
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: -32601 });
+      await expect(
+        app.updateModelContext({ content: [{ type: "text", text: "ctx" }] }),
+      ).rejects.toMatchObject({ code: -32601 });
+      await expect(
+        app.callServerTool({ name: "t", arguments: {} }),
+      ).rejects.toMatchObject({ code: -32601 });
+      await expect(
+        app.createSamplingMessage({
+          messages: [{ role: "user", content: { type: "text", text: "hi" } }],
+          maxTokens: 10,
+        }),
+      ).rejects.toMatchObject({ code: -32601 });
+      await expect(app.listServerResources()).rejects.toMatchObject({
+        code: -32601,
+      });
+      await expect(
+        app.request({ method: "resources/templates/list", params: {} }),
+      ).rejects.toMatchObject({ code: -32601 });
+      await expect(
+        app.readServerResource({ uri: "test://r" }),
+      ).rejects.toMatchObject({ code: -32601 });
+      await expect(
+        app.request({ method: "prompts/list", params: {} }),
+      ).rejects.toMatchObject({ code: -32601 });
+
+      let directOpenLinkCalls = 0;
+      bridge.setRequestHandler(
+        "ui/open-link",
+        {
+          params: z.object({ url: z.string() }),
+          result: McpUiOpenLinkResultSchema,
+        },
+        () => {
+          directOpenLinkCalls += 1;
+          return {};
+        },
+      );
+      bridge.onopenlink = undefined;
+      expect(await app.openLink({ url: "https://example.com" })).toEqual({});
+      expect(directOpenLinkCalls).toBe(1);
+    });
   });
 });
 
