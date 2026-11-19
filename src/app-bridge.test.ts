@@ -629,6 +629,24 @@ describe("App <-> AppBridge integration", () => {
       expect(result).toEqual({});
     });
 
+    it("app.sendMessage passes the send and target options to the host", async () => {
+      const receivedMessages: unknown[] = [];
+      bridge.onmessage = async (params) => {
+        receivedMessages.push(params);
+        return {};
+      };
+
+      await app.connect(appTransport);
+      await app.sendMessage({
+        role: "user",
+        content: [{ type: "text", text: "Draft from app" }],
+        send: false,
+        target: "new",
+      });
+
+      expect(receivedMessages[0]).toMatchObject({ send: false, target: "new" });
+    });
+
     it("app.sendMessage returns error result when handler indicates error", async () => {
       bridge.onmessage = async () => {
         return { isError: true };

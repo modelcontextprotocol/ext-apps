@@ -775,6 +775,13 @@ interface HostCapabilities {
   updateModelContext?: SupportedContentBlockModalities;
   /** Host supports receiving content messages (ui/message) from the view. */
   message?: SupportedContentBlockModalities;
+  /** Host supports the `send` and `target` options of ui/message. */
+  messageOptions?: {
+    /** Host supports `send: false` with `target: "active"`: add the content to the current draft. */
+    draft?: {};
+    /** Host supports `target: "new"`. With `draft` also present, `send: false` opens an editable draft in a new conversation. */
+    newConversation?: {};
+  };
   /**
    * Host supports LLM sampling (sampling/createMessage) from the view.
    * Mirrors MCP ClientCapabilities.sampling so hosts can pass it through.
@@ -1195,7 +1202,9 @@ Host behavior:
     content: {
       type: "text",
       text: string
-    }
+    },
+    send?: boolean,             // false: add to the user's draft without sending. Default true.
+    target?: "active" | "new"   // Conversation that receives it. Default "active".
   }
 }
 
@@ -1219,6 +1228,41 @@ Host behavior:
 Host behavior:
 * Host SHOULD add the message to the conversation context, preserving the specified role.
 * Host MAY request user consent.
+
+**Drafts and new conversations.** By default, `ui/message` sends the message in the conversation that contains the View. Two optional parameters change that, when the Host advertises them in `hostCapabilities.messageOptions`:
+
+| `send` | `target` | Effect | Capability |
+| --- | --- | --- | --- |
+| `true` (default) | `"active"` (default) | Send in the current conversation (today's behavior) | none |
+| `false` | `"active"` | Add the content to the user's current draft, without sending | `draft` |
+| `true` | `"new"` | Start a new conversation with the content as its first message | `newConversation` |
+| `false` | `"new"` | Open a new conversation with the content as an editable draft | `draft` and `newConversation` |
+
+```typescript
+// "Ask about this": put a prompt and the selected item in the user's draft
+{
+  jsonrpc: "2.0",
+  id: 4,
+  method: "ui/message",
+  params: {
+    role: "user",
+    content: [
+      { type: "text", text: "Compare this part with the M6 hex bolt: " },
+      { type: "resource_link", uri: "cad://parts/m8-hex-bolt", name: "M8 hex bolt" }
+    ],
+    send: false
+  }
+}
+```
+
+Host behavior:
+* With `send: false`, Host MUST NOT send the content. Host SHOULD append it to the draft and keep what the user has already typed.
+* With `target: "new"`, Host starts a new conversation. Host MAY ask the user to confirm before switching to it, and SHOULD do so only after a user action in the View.
+* If Host does not support the requested combination, it MUST return an error (or `isError: true`) and MUST NOT send the content instead.
+* Non-text content follows `hostCapabilities.message`. Host MAY show `resource_link` and `image` blocks as attachments on the draft.
+
+View behavior:
+* View MUST NOT set `send: false` or `target: "new"` unless the matching `hostCapabilities.messageOptions` field is present. A Host that does not support these options ignores them and sends the message.
 
 `ui/request-display-mode` - Request host to change display mode
 
@@ -2705,6 +2749,7 @@ App tools MUST be tied to the app's lifecycle:
 ### Other risks
 
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
+- **Message drafts and new conversations:** `ui/message` with `send: false` lets the user read and edit View-supplied text before it reaches the model, which limits prompt injection through View content. `target: "new"` changes what the user is looking at, so Hosts tie it to a user action in the View.
 - **Resource consumption:** Malicious View can consume CPU/memory. Hosts should implement resource limits.
 
 ## Reservations in MCP

@@ -563,6 +563,26 @@ export const McpUiHostCapabilitiesSchema = z.object({
   message: McpUiSupportedContentBlockModalitiesSchema.optional().describe(
     "Host supports receiving content messages (ui/message) from the view.",
   ),
+  /** @description Host supports the `send` and `target` options of ui/message. */
+  messageOptions: z
+    .object({
+      /** @description Host supports `send: false` with `target: "active"`: add the content to the current draft. */
+      draft: z
+        .object({})
+        .optional()
+        .describe(
+          'Host supports `send: false` with `target: "active"`: add the content to the current draft.',
+        ),
+      /** @description Host supports `target: "new"`. With `draft` also present, `send: false` opens an editable draft in a new conversation. */
+      newConversation: z
+        .object({})
+        .optional()
+        .describe(
+          'Host supports `target: "new"`. With `draft` also present, `send: false` opens an editable draft in a new conversation.',
+        ),
+    })
+    .optional()
+    .describe("Host supports the `send` and `target` options of ui/message."),
   /**
    * @description Host supports LLM sampling (sampling/createMessage) from the view.
    * Mirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.
@@ -809,6 +829,28 @@ export const McpUiMessageRequestSchema = z.object({
     content: z
       .array(ContentBlockSchema)
       .describe("Message content blocks (text, image, etc.)."),
+    /**
+     * @description Whether to send the message. `false` adds the content to the user's draft without sending it. Default: `true`.
+     *
+     * Only set `false` when `hostCapabilities.messageOptions` advertises the matching option: hosts that do not support it send the message.
+     */
+    send: z
+      .boolean()
+      .optional()
+      .describe(
+        "Whether to send the message. `false` adds the content to the user's draft without sending it. Default: `true`.\n\nOnly set `false` when `hostCapabilities.messageOptions` advertises the matching option: hosts that do not support it send the message.",
+      ),
+    /**
+     * @description Conversation that receives the message: `"active"`, the one that contains the View (default), or `"new"`, a new conversation.
+     *
+     * Only set `"new"` when `hostCapabilities.messageOptions.newConversation` is present.
+     */
+    target: z
+      .union([z.literal("active"), z.literal("new")])
+      .optional()
+      .describe(
+        'Conversation that receives the message: `"active"`, the one that contains the View (default), or `"new"`, a new conversation.\n\nOnly set `"new"` when `hostCapabilities.messageOptions.newConversation` is present.',
+      ),
   }),
 });
 

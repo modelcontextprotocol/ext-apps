@@ -520,6 +520,25 @@
           },
           "additionalProperties": false
         },
+        "messageOptions": {
+          "description": "Host supports the `send` and `target` options of ui/message.",
+          "type": "object",
+          "properties": {
+            "draft": {
+              "description": "Host supports `send: false` with `target: \"active\"`: add the content to the current draft.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "newConversation": {
+              "description": "Host supports `target: \"new\"`. With `draft` also present, `send: false` opens an editable draft in a new conversation.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "sampling": {
           "description": "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
           "type": "object",
@@ -2931,6 +2950,25 @@
               },
               "additionalProperties": false
             },
+            "messageOptions": {
+              "description": "Host supports the `send` and `target` options of ui/message.",
+              "type": "object",
+              "properties": {
+                "draft": {
+                  "description": "Host supports `send: false` with `target: \"active\"`: add the content to the current draft.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                },
+                "newConversation": {
+                  "description": "Host supports `target: \"new\"`. With `draft` also present, `send: false` opens an editable draft in a new conversation.",
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
             "sampling": {
               "description": "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
               "type": "object",
@@ -4087,6 +4125,23 @@
                 ]
               },
               "description": "Message content blocks (text, image, etc.)."
+            },
+            "send": {
+              "description": "Whether to send the message. `false` adds the content to the user's draft without sending it. Default: `true`.\n\nOnly set `false` when `hostCapabilities.messageOptions` advertises the matching option: hosts that do not support it send the message.",
+              "type": "boolean"
+            },
+            "target": {
+              "description": "Conversation that receives the message: `\"active\"`, the one that contains the View (default), or `\"new\"`, a new conversation.\n\nOnly set `\"new\"` when `hostCapabilities.messageOptions.newConversation` is present.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "active"
+                },
+                {
+                  "type": "string",
+                  "const": "new"
+                }
+              ]
             }
           },
           "required": ["role", "content"],

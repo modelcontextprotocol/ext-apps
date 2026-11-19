@@ -212,6 +212,18 @@ export interface McpUiMessageRequest {
     role: "user";
     /** @description Message content blocks (text, image, etc.). */
     content: ContentBlock[];
+    /**
+     * @description Whether to send the message. `false` adds the content to the user's draft without sending it. Default: `true`.
+     *
+     * Only set `false` when `hostCapabilities.messageOptions` advertises the matching option: hosts that do not support it send the message.
+     */
+    send?: boolean;
+    /**
+     * @description Conversation that receives the message: `"active"`, the one that contains the View (default), or `"new"`, a new conversation.
+     *
+     * Only set `"new"` when `hostCapabilities.messageOptions.newConversation` is present.
+     */
+    target?: "active" | "new";
   };
 }
 
@@ -521,6 +533,13 @@ export interface McpUiHostCapabilities {
   updateModelContext?: McpUiSupportedContentBlockModalities;
   /** @description Host supports receiving content messages (ui/message) from the view. */
   message?: McpUiSupportedContentBlockModalities;
+  /** @description Host supports the `send` and `target` options of ui/message. */
+  messageOptions?: {
+    /** @description Host supports `send: false` with `target: "active"`: add the content to the current draft. */
+    draft?: {};
+    /** @description Host supports `target: "new"`. With `draft` also present, `send: false` opens an editable draft in a new conversation. */
+    newConversation?: {};
+  };
   /**
    * @description Host supports LLM sampling (sampling/createMessage) from the view.
    * Mirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.
