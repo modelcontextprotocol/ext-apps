@@ -33,6 +33,7 @@ import type {
   ToolListChangedNotification,
 } from "@modelcontextprotocol/client";
 import type {
+  McpUiDocumentInfoChangedNotification,
   McpUiDownloadFileRequest,
   McpUiDownloadFileResult,
   McpUiHostContextChangedNotification,
@@ -73,6 +74,7 @@ export {
   TOOL_CANCELLED_METHOD,
   HOST_CONTEXT_CHANGED_METHOD,
   REQUEST_TEARDOWN_METHOD,
+  DOCUMENT_INFO_CHANGED_METHOD,
   RESOURCE_TEARDOWN_METHOD,
   INITIALIZE_METHOD,
   INITIALIZED_METHOD,
@@ -103,6 +105,7 @@ export {
   type McpUiResourceTeardownRequest,
   type McpUiResourceTeardownResult,
   type McpUiRequestTeardownNotification,
+  type McpUiDocumentInfoChangedNotification,
   type McpUiHostCapabilities,
   type McpUiAppCapabilities,
   type McpUiInitializeRequest,
@@ -144,6 +147,7 @@ export {
   McpUiResourceTeardownRequestSchema,
   McpUiResourceTeardownResultSchema,
   McpUiRequestTeardownNotificationSchema,
+  McpUiDocumentInfoChangedNotificationSchema,
   McpUiHostCapabilitiesSchema,
   McpUiAppCapabilitiesSchema,
   McpUiInitializeRequestSchema,
@@ -202,6 +206,7 @@ export type AppNotification =
   | McpUiSizeChangedNotification
   | McpUiSandboxProxyReadyNotification
   | McpUiRequestTeardownNotification
+  | McpUiDocumentInfoChangedNotification
   | LoggingMessageNotification;
 
 /**

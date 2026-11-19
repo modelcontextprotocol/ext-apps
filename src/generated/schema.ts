@@ -6,6 +6,7 @@ import {
   ContentBlockSchema,
   CallToolResultSchema,
   EmbeddedResourceSchema,
+  IconSchema,
   ImplementationSchema,
   RequestIdSchema,
   ResourceLinkSchema,
@@ -516,6 +517,13 @@ export const McpUiHostCapabilitiesSchema = z.object({
     .object({})
     .optional()
     .describe("Host supports file downloads via ui/download-file."),
+  /** @description Host may label the View with its document title and icon (ui/notifications/document-info-changed). */
+  documentInfo: z
+    .object({})
+    .optional()
+    .describe(
+      "Host may label the View with its document title and icon (ui/notifications/document-info-changed).",
+    ),
   /** @description Host can proxy tool calls to the MCP server. */
   serverTools: z
     .object({
@@ -1009,6 +1017,29 @@ export const McpUiUpdateModelContextRequestSchema = z.object({
       )
       .optional()
       .describe("Structured content for machine-readable context data."),
+  }),
+});
+
+/**
+ * @description Notification of the View's document title and icon (View -> Host).
+ * Hosts that show the View in their own chrome (a tab, panel header or window title) may use them as its label.
+ * Omitted fields leave the previous value unchanged.
+ */
+export const McpUiDocumentInfoChangedNotificationSchema = z.object({
+  method: z.literal("ui/notifications/document-info-changed"),
+  params: z.object({
+    /** @description The View's current document title, as plain text. An empty string clears it. */
+    title: z
+      .string()
+      .optional()
+      .describe(
+        "The View's current document title, as plain text. An empty string clears it.",
+      ),
+    /** @description Icons for the View. An empty array clears them. */
+    icons: z
+      .array(IconSchema)
+      .optional()
+      .describe("Icons for the View. An empty array clears them."),
   }),
 });
 

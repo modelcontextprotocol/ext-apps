@@ -90,6 +90,55 @@
       ],
       "description": "Display mode for UI presentation."
     },
+    "McpUiDocumentInfoChangedNotification": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/notifications/document-info-changed"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "description": "The View's current document title, as plain text. An empty string clears it.",
+              "type": "string"
+            },
+            "icons": {
+              "description": "Icons for the View. An empty array clears them.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "src": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "sizes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "theme": {
+                    "type": "string",
+                    "enum": ["light", "dark"]
+                  }
+                },
+                "required": ["src"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
     "McpUiDownloadFileRequest": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -329,6 +378,12 @@
         },
         "downloadFile": {
           "description": "Host supports file downloads via ui/download-file.",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "documentInfo": {
+          "description": "Host may label the View with its document title and icon (ui/notifications/document-info-changed).",
           "type": "object",
           "properties": {},
           "additionalProperties": false
@@ -2740,6 +2795,12 @@
             },
             "downloadFile": {
               "description": "Host supports file downloads via ui/download-file.",
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "documentInfo": {
+              "description": "Host may label the View with its document title and icon (ui/notifications/document-info-changed).",
               "type": "object",
               "properties": {},
               "additionalProperties": false

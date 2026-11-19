@@ -159,6 +159,10 @@ export type McpUiUpdateModelContextRequestSchemaInferredType = z.infer<
   typeof generated.McpUiUpdateModelContextRequestSchema
 >;
 
+export type McpUiDocumentInfoChangedNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiDocumentInfoChangedNotificationSchema
+>;
+
 export type McpUiInitializeRequestSchemaInferredType = z.infer<
   typeof generated.McpUiInitializeRequestSchema
 >;
@@ -348,6 +352,12 @@ expectType<spec.McpUiUpdateModelContextRequest>(
 );
 expectType<McpUiUpdateModelContextRequestSchemaInferredType>(
   {} as spec.McpUiUpdateModelContextRequest,
+);
+expectType<spec.McpUiDocumentInfoChangedNotification>(
+  {} as McpUiDocumentInfoChangedNotificationSchemaInferredType,
+);
+expectType<McpUiDocumentInfoChangedNotificationSchemaInferredType>(
+  {} as spec.McpUiDocumentInfoChangedNotification,
 );
 expectType<spec.McpUiInitializeRequest>(
   {} as McpUiInitializeRequestSchemaInferredType,

@@ -14,6 +14,7 @@ import type {
   CallToolResult,
   ContentBlock,
   EmbeddedResource,
+  Icon,
   Implementation,
   RequestId,
   ResourceLink,
@@ -488,6 +489,21 @@ export interface McpUiRequestTeardownNotification {
 }
 
 /**
+ * @description Notification of the View's document title and icon (View -> Host).
+ * Hosts that show the View in their own chrome (a tab, panel header or window title) may use them as its label.
+ * Omitted fields leave the previous value unchanged.
+ */
+export interface McpUiDocumentInfoChangedNotification {
+  method: "ui/notifications/document-info-changed";
+  params: {
+    /** @description The View's current document title, as plain text. An empty string clears it. */
+    title?: string;
+    /** @description Icons for the View. An empty array clears them. */
+    icons?: Icon[];
+  };
+}
+
+/**
  * @description Capabilities supported by the host application.
  * @see {@link McpUiInitializeResult `McpUiInitializeResult`} for the initialization result that includes these capabilities
  */
@@ -498,6 +514,8 @@ export interface McpUiHostCapabilities {
   openLinks?: {};
   /** @description Host supports file downloads via ui/download-file. */
   downloadFile?: {};
+  /** @description Host may label the View with its document title and icon (ui/notifications/document-info-changed). */
+  documentInfo?: {};
   /** @description Host can proxy tool calls to the MCP server. */
   serverTools?: {
     /** @description Host supports tools/list_changed notifications. */
@@ -833,6 +851,8 @@ export const HOST_CONTEXT_CHANGED_METHOD: McpUiHostContextChangedNotification["m
   "ui/notifications/host-context-changed";
 export const REQUEST_TEARDOWN_METHOD: McpUiRequestTeardownNotification["method"] =
   "ui/notifications/request-teardown";
+export const DOCUMENT_INFO_CHANGED_METHOD: McpUiDocumentInfoChangedNotification["method"] =
+  "ui/notifications/document-info-changed";
 export const RESOURCE_TEARDOWN_METHOD: McpUiResourceTeardownRequest["method"] =
   "ui/resource-teardown";
 export const INITIALIZE_METHOD: McpUiInitializeRequest["method"] =

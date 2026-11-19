@@ -78,6 +78,7 @@ const EXTERNAL_TYPE_SCHEMAS = [
   "ContentBlockSchema",
   "CallToolResultSchema",
   "EmbeddedResourceSchema",
+  "IconSchema",
   "ImplementationSchema",
   "RequestIdSchema",
   "ResourceLinkSchema",

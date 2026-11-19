@@ -735,6 +735,8 @@ interface HostCapabilities {
   openLinks?: {};
   /** Host supports file downloads via ui/download-file. */
   downloadFile?: {};
+  /** Host may label the View with its document title and icon (ui/notifications/document-info-changed). */
+  documentInfo?: {};
   /** Host can proxy tool calls to the MCP server. */
   serverTools?: {
     /** Host supports tools/list_changed notifications. */
@@ -907,6 +909,39 @@ Hosts notify views of display mode changes via `ui/notifications/host-context-ch
 - Host MUST return the resulting mode (whether updated or not) in the response to `ui/request-display-mode`.
 - If the requested mode is not available, Host SHOULD return the current display mode in the response.
 - Host MAY decline display mode requests from Views that did not declare said modes in their capabilities.
+
+### View Title and Icon
+
+Hosts that show a View in their own chrome, such as a tab, a panel header or a window title, need a label and an icon for it. A View already names itself the way any web page does, with `document.title` and `<link rel="icon">`, but the Host cannot read them from a sandboxed cross-origin iframe. Hosts get them in two ways:
+
+- **From the resource HTML.** A Host MAY take the `<title>` element and the first `<link rel="icon">` from the HTML returned by `resources/read`, to label the View before it runs.
+- **From the View.** A View MAY send `ui/notifications/document-info-changed` with its current `title` and `icons`, after initialization and whenever they change.
+
+```typescript
+// View -> Host, e.g. after the user opens a document in the View
+{
+  jsonrpc: "2.0",
+  method: "ui/notifications/document-info-changed",
+  params: {
+    title: "Q3 board deck",
+    icons: [{ src: "data:image/svg+xml;base64,...", mimeType: "image/svg+xml" }]
+  }
+}
+```
+
+For the label, the Host SHOULD use, in order: the latest title from `ui/notifications/document-info-changed`, the `<title>` of the resource HTML, the tool's display name (`title`, then `annotations.title`, then `name`), the UI resource's `title` or `name`, then the server's name. For the icon: the latest notified icon, the resource HTML's icon, the tool's icon, then the server's icon.
+
+**Host behavior:**
+- Host MAY use the View's title and icon wherever it shows the View in its own chrome.
+- Host MUST render the title as plain text. Host SHOULD truncate it (for example to 80 characters) and strip control and bidirectional-override characters.
+- Host MUST keep the server's identity, taken from information the Host controls (such as the server's name and icon), visible next to the View's label. The View's title and icon MUST NOT replace that identity in permission prompts, consent dialogs, or anywhere else the user decides whom to trust.
+- Host SHOULD rate-limit updates, for example to one per second, and MAY ignore a title that copies the Host's own UI strings.
+- Host SHOULD only load icons from `data:` URIs or from origins in the resource's `csp.resourceDomains`, MUST fetch them without credentials, and MAY rasterize or size-limit them.
+- Host that does not support this omits `hostCapabilities.documentInfo` and ignores the notification.
+
+**View behavior:**
+- View SHOULD keep its `<title>` meaningful, since Hosts may show it without a notification.
+- View SHOULD NOT use a title or icon that imitates the Host or another app.
 
 ### Theming
 
@@ -1509,6 +1544,21 @@ The View MAY send this notification to request that the host tear it down. This 
 **Host behavior:**
 - Host MAY defer or ignore the teardown request.
 - If the Host accepts the request, it MUST follow the graceful termination process by sending `ui/resource-teardown` to the View. The Host SHOULD wait for a response before tearing down the resource (to prevent data loss).
+
+`ui/notifications/document-info-changed` - View's document title or icon changed
+
+```typescript
+{
+  jsonrpc: "2.0",
+  method: "ui/notifications/document-info-changed",
+  params: {
+    title?: string,  // The View's document title, as plain text. "" clears it.
+    icons?: Icon[]   // MCP Icon objects (src, mimeType, sizes, theme). [] clears them.
+  }
+}
+```
+
+The View MAY send this notification after `ui/notifications/initialized`, and whenever its title or icon changes. Omitted fields leave the previous value unchanged. Views SHOULD only send it when `hostCapabilities.documentInfo` is present. See [View Title and Icon](#view-title-and-icon) for how Hosts use it.
 
 `ui/notifications/host-context-changed` - Host context has changed
 
@@ -2705,6 +2755,7 @@ App tools MUST be tied to the app's lifecycle:
 ### Other risks
 
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
+- **View titles and icons:** A View can name itself after the Host or another app ("Settings", "Sign in"). Hosts that show a View's title or icon keep the server's identity visible next to it and never use them in trust decisions. See [View Title and Icon](#view-title-and-icon).
 - **Resource consumption:** Malicious View can consume CPU/memory. Hosts should implement resource limits.
 
 ## Reservations in MCP
