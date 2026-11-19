@@ -458,11 +458,13 @@ function onNotification(method: string, handler: (params: any) => void) {
 }
 
 
-const initializeResult = await sendRequest("initialize", {
-  capabilities: {},
-  clientInfo: {name: "My UI", version: "1.0.0"},
+// The View <-> Host handshake is `ui/initialize` (not MCP's `initialize`)
+const initializeResult = await sendRequest("ui/initialize", {
+  appCapabilities: {availableDisplayModes: ["inline"]},
+  appInfo: {name: "My UI", version: "1.0.0"},
   protocolVersion: "2026-01-26",
 });
+sendNotification("ui/notifications/initialized", {});
 ```
 
 Hosts act as MCP servers (that can proxy the actual MCP server), receiving and handling requests from UI iframes.
