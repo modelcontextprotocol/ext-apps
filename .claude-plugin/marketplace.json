@@ -1,10 +1,8 @@
 {
   "name": "mcp-apps",
   "description": "Plugins for MCP Apps development",
-  "owner": {
-    "name": "MCP Apps"
-  },
-  "plugins": [
+  "owner": {chefsourav146-cyber
+    "name": 
     {
       "name": "mcp-apps",
       "source": "./plugins/mcp-apps",
