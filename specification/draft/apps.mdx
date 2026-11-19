@@ -2235,6 +2235,74 @@ A tool's return value `v` becomes `{ "content": [], "structuredContent": v }` wh
 
 See [ext-apps#35](https://github.com/modelcontextprotocol/ext-apps/issues/35), [ext-apps#796](https://github.com/modelcontextprotocol/ext-apps/issues/796) and [ext-apps#797](https://github.com/modelcontextprotocol/ext-apps/issues/797) for discussion.
 
+### Composer Mentions
+
+Hosts often let users mention a server in the composer. A server can also let users mention the items inside it (a person, a file, a ticket, a part) by naming one of its tools as a mention search tool. The Host calls that tool as the user types, shows the results in its mention picker, and adds the picked item to the user's message.
+
+#### Server Declaration
+
+The server names the tool in its extension settings:
+
+```json
+{
+  "capabilities": {
+    "extensions": {
+      "io.modelcontextprotocol/ui": {
+        "mentions": { "searchTool": "parts_mention_search" }
+      }
+    }
+  }
+}
+```
+
+```typescript
+interface McpUiServerCapabilities {
+  mentions?: {
+    /** Name of a read-only tool on this server that searches mentionable items. */
+    searchTool: string;
+  };
+}
+```
+
+#### Search Tool
+
+```typescript
+// Tool arguments
+interface McpUiMentionSearchParams {
+  /** What the user has typed after the mention trigger. May be empty. */
+  query: string;
+}
+
+// Tool result structuredContent
+interface McpUiMentionSearchResult {
+  /** Items the user can mention, best match first. */
+  items: ResourceLink[];
+}
+```
+
+```json
+// tools/call result
+{
+  "content": [{ "type": "text", "text": "{\"items\":[...]}" }],
+  "structuredContent": {
+    "items": [
+      { "type": "resource_link", "uri": "cad://parts/m8-hex-bolt", "name": "m8-hex-bolt", "title": "M8 hex bolt" }
+    ]
+  }
+}
+```
+
+Server behavior:
+- The tool named by `searchTool` MUST exist on the server, MUST set `annotations.readOnlyHint` to `true`, and MUST accept `{ query: string }` with no other required arguments.
+- The tool SHOULD set `_meta.ui.visibility` to `["app"]`, so that it stays out of the model's tool list.
+
+Host behavior:
+- Host MAY offer the server's items in its mention picker, calling `searchTool` with the text the user has typed. These calls are made by the Host, not the model, and do not depend on the tool's visibility.
+- Host MUST send only the mention query to the server, never the rest of the user's draft. Host SHOULD debounce calls and SHOULD only query servers the user has enabled.
+- When the user picks an item, Host adds it to the user's message as a `resource_link` content block and MAY show it as a chip. Host MAY resolve it with `resources/read` on the same server, and MUST NOT resolve it through a different server.
+- Host MUST render item names and titles as plain text.
+- Host applies its usual tool policy to these calls. Since the user starts the search and the tool is declared read-only, Host MAY skip per-call approval.
+
 ### Client\<\>Server Capability Negotiation
 
 Clients and servers negotiate MCP Apps support through the standard MCP extensions capability mechanism (defined in SEP-1724).
@@ -2298,6 +2366,10 @@ if (uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE)) {
   });
 }
 ```
+
+**Server Settings:**
+
+Servers MAY advertise MCP Apps settings under the same extension identifier in their own capabilities. The only setting defined today is `mentions` (see [Composer Mentions](#composer-mentions)).
 
 **Graceful Degradation:**
 
@@ -2705,6 +2777,7 @@ App tools MUST be tied to the app's lifecycle:
 ### Other risks
 
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
+- **Mention search:** A mention search tool receives what the user types after the mention trigger. Hosts send only that text, only to servers the user has enabled, and treat the returned items as untrusted server data.
 - **Resource consumption:** Malicious View can consume CPU/memory. Hosts should implement resource limits.
 
 ## Reservations in MCP

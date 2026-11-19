@@ -856,3 +856,39 @@ export interface McpUiClientCapabilities {
    */
   mimeTypes?: string[];
 }
+
+/**
+ * @description MCP Apps settings advertised by servers to clients.
+ *
+ * Servers advertise these under `capabilities.extensions["io.modelcontextprotocol/ui"]`.
+ */
+export interface McpUiServerCapabilities {
+  /**
+   * @description The server offers per-item composer mentions through one of its tools.
+   */
+  mentions?: {
+    /**
+     * @description Name of a read-only tool on this server that searches mentionable items.
+     * It takes {@link McpUiMentionSearchParams `McpUiMentionSearchParams`} and returns {@link McpUiMentionSearchResult `McpUiMentionSearchResult`} as `structuredContent`.
+     */
+    searchTool: string;
+  };
+}
+
+/**
+ * @description Arguments of a server's mention search tool.
+ * @see {@link McpUiServerCapabilities `McpUiServerCapabilities`}
+ */
+export interface McpUiMentionSearchParams {
+  /** @description What the user has typed after the mention trigger. May be empty. */
+  query: string;
+}
+
+/**
+ * @description `structuredContent` returned by a server's mention search tool.
+ * @see {@link McpUiServerCapabilities `McpUiServerCapabilities`}
+ */
+export interface McpUiMentionSearchResult {
+  /** @description Items the user can mention, best match first. */
+  items: ResourceLink[];
+}

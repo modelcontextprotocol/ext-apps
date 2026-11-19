@@ -3752,6 +3752,113 @@
       "required": ["method"],
       "additionalProperties": false
     },
+    "McpUiMentionSearchParams": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "What the user has typed after the mention trigger. May be empty."
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "McpUiMentionSearchResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "icons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "src": {
+                      "type": "string"
+                    },
+                    "mimeType": {
+                      "type": "string"
+                    },
+                    "sizes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "theme": {
+                      "type": "string",
+                      "enum": ["light", "dark"]
+                    }
+                  },
+                  "required": ["src"],
+                  "additionalProperties": false
+                }
+              },
+              "uri": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "size": {
+                "type": "number"
+              },
+              "annotations": {
+                "type": "object",
+                "properties": {
+                  "audience": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["user", "assistant"]
+                    }
+                  },
+                  "priority": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "lastModified": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "_meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              "type": {
+                "type": "string",
+                "const": "resource_link"
+              }
+            },
+            "required": ["name", "uri", "type"],
+            "additionalProperties": false
+          },
+          "description": "Items the user can mention, best match first."
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
     "McpUiMessageRequest": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4499,6 +4606,24 @@
         }
       },
       "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiServerCapabilities": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mentions": {
+          "description": "The server offers per-item composer mentions through one of its tools.",
+          "type": "object",
+          "properties": {
+            "searchTool": {
+              "type": "string"
+            }
+          },
+          "required": ["searchTool"],
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     },
     "McpUiSizeChangedNotification": {

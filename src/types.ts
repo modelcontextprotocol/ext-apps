@@ -116,6 +116,9 @@ export {
   type McpUiToolVisibility,
   type McpUiToolMeta,
   type McpUiClientCapabilities,
+  type McpUiServerCapabilities,
+  type McpUiMentionSearchParams,
+  type McpUiMentionSearchResult,
 } from "./spec.types.js";
 
 // Re-export all schemas from generated/schema.ts (already PascalCase)

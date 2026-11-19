@@ -131,6 +131,14 @@ export type McpUiClientCapabilitiesSchemaInferredType = z.infer<
   typeof generated.McpUiClientCapabilitiesSchema
 >;
 
+export type McpUiServerCapabilitiesSchemaInferredType = z.infer<
+  typeof generated.McpUiServerCapabilitiesSchema
+>;
+
+export type McpUiMentionSearchParamsSchemaInferredType = z.infer<
+  typeof generated.McpUiMentionSearchParamsSchema
+>;
+
 export type McpUiDownloadFileRequestSchemaInferredType = z.infer<
   typeof generated.McpUiDownloadFileRequestSchema
 >;
@@ -165,6 +173,10 @@ export type McpUiInitializeRequestSchemaInferredType = z.infer<
 
 export type McpUiInitializeResultSchemaInferredType = z.infer<
   typeof generated.McpUiInitializeResultSchema
+>;
+
+export type McpUiMentionSearchResultSchemaInferredType = z.infer<
+  typeof generated.McpUiMentionSearchResultSchema
 >;
 
 expectType<spec.McpUiTheme>({} as McpUiThemeSchemaInferredType);
@@ -311,6 +323,18 @@ expectType<spec.McpUiClientCapabilities>(
 expectType<McpUiClientCapabilitiesSchemaInferredType>(
   {} as spec.McpUiClientCapabilities,
 );
+expectType<spec.McpUiServerCapabilities>(
+  {} as McpUiServerCapabilitiesSchemaInferredType,
+);
+expectType<McpUiServerCapabilitiesSchemaInferredType>(
+  {} as spec.McpUiServerCapabilities,
+);
+expectType<spec.McpUiMentionSearchParams>(
+  {} as McpUiMentionSearchParamsSchemaInferredType,
+);
+expectType<McpUiMentionSearchParamsSchemaInferredType>(
+  {} as spec.McpUiMentionSearchParams,
+);
 expectType<spec.McpUiDownloadFileRequest>(
   {} as McpUiDownloadFileRequestSchemaInferredType,
 );
@@ -360,4 +384,10 @@ expectType<spec.McpUiInitializeResult>(
 );
 expectType<McpUiInitializeResultSchemaInferredType>(
   {} as spec.McpUiInitializeResult,
+);
+expectType<spec.McpUiMentionSearchResult>(
+  {} as McpUiMentionSearchResultSchemaInferredType,
+);
+expectType<McpUiMentionSearchResultSchemaInferredType>(
+  {} as spec.McpUiMentionSearchResult,
 );

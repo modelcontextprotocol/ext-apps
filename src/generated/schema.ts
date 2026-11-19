@@ -773,6 +773,42 @@ export const McpUiClientCapabilitiesSchema = z.object({
 });
 
 /**
+ * @description MCP Apps settings advertised by servers to clients.
+ *
+ * Servers advertise these under `capabilities.extensions["io.modelcontextprotocol/ui"]`.
+ */
+export const McpUiServerCapabilitiesSchema = z.object({
+  /**
+   * @description The server offers per-item composer mentions through one of its tools.
+   */
+  mentions: z
+    .object({
+      /**
+       * @description Name of a read-only tool on this server that searches mentionable items.
+       * It takes {@link McpUiMentionSearchParams `McpUiMentionSearchParams`} and returns {@link McpUiMentionSearchResult `McpUiMentionSearchResult`} as `structuredContent`.
+       */
+      searchTool: z.string(),
+    })
+    .optional()
+    .describe(
+      "The server offers per-item composer mentions through one of its tools.",
+    ),
+});
+
+/**
+ * @description Arguments of a server's mention search tool.
+ * @see {@link McpUiServerCapabilities `McpUiServerCapabilities`}
+ */
+export const McpUiMentionSearchParamsSchema = z.object({
+  /** @description What the user has typed after the mention trigger. May be empty. */
+  query: z
+    .string()
+    .describe(
+      "What the user has typed after the mention trigger. May be empty.",
+    ),
+});
+
+/**
  * @description Request to download a file through the host.
  *
  * Sent from the View to the Host when the app wants to trigger a file download.
@@ -1056,3 +1092,14 @@ export const McpUiInitializeResultSchema = z
     ),
   })
   .passthrough();
+
+/**
+ * @description `structuredContent` returned by a server's mention search tool.
+ * @see {@link McpUiServerCapabilities `McpUiServerCapabilities`}
+ */
+export const McpUiMentionSearchResultSchema = z.object({
+  /** @description Items the user can mention, best match first. */
+  items: z
+    .array(ResourceLinkSchema)
+    .describe("Items the user can mention, best match first."),
+});
