@@ -614,14 +614,6 @@ export const McpUiAppCapabilitiesSchema = z.object({
     .array(McpUiDisplayModeSchema)
     .optional()
     .describe("Display modes the app supports."),
-  /**
-   * @description Display mode in which the app prefers to be first shown.
-   *
-   * A hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.
-   */
-  preferredDisplayMode: McpUiDisplayModeSchema.optional().describe(
-    "Display mode in which the app prefers to be first shown.\n\nA hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.",
-  ),
 });
 
 /**
@@ -687,6 +679,25 @@ export const McpUiResourceMetaSchema = z.object({
     .describe(
       "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
     ),
+  /**
+   * @description Display modes the view supports, known before the view loads.
+   *
+   * Same meaning as `appCapabilities.availableDisplayModes`, which stays authoritative once the view has initialized. Lets the host choose how it first shows the view without waiting for `ui/initialize`.
+   */
+  availableDisplayModes: z
+    .array(McpUiDisplayModeSchema)
+    .optional()
+    .describe(
+      "Display modes the view supports, known before the view loads.\n\nSame meaning as `appCapabilities.availableDisplayModes`, which stays authoritative once the view has initialized. Lets the host choose how it first shows the view without waiting for `ui/initialize`.",
+    ),
+  /**
+   * @description Display mode in which the view prefers to be first shown.
+   *
+   * A hint: the host chooses how it first shows the view and may ignore this value. The view reads the mode it is displayed in from `hostContext.displayMode`. If `availableDisplayModes` is set, it must list this mode.
+   */
+  preferredDisplayMode: McpUiDisplayModeSchema.optional().describe(
+    "Display mode in which the view prefers to be first shown.\n\nA hint: the host chooses how it first shows the view and may ignore this value. The view reads the mode it is displayed in from `hostContext.displayMode`. If `availableDisplayModes` is set, it must list this mode.",
+  ),
 });
 
 /**

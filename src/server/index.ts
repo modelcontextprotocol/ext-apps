@@ -384,6 +384,35 @@ export type ReadResourceCallback = McpUiReadResourceCallback;
  * );
  * ```
  *
+ * @example With a preferred initial display mode
+ * ```ts source="./index.examples.ts#registerAppResource_preferredDisplayMode"
+ * registerAppResource(
+ *   server,
+ *   "Map",
+ *   "ui://map/view.html",
+ *   {
+ *     description: "Interactive map",
+ *   },
+ *   async () => ({
+ *     contents: [
+ *       {
+ *         uri: "ui://map/view.html",
+ *         mimeType: RESOURCE_MIME_TYPE,
+ *         text: mapHtml,
+ *         _meta: {
+ *           ui: {
+ *             // Known before the View loads, so the host can open it in fullscreen
+ *             // right away. A hint: the host may still show it inline.
+ *             availableDisplayModes: ["inline", "fullscreen"],
+ *             preferredDisplayMode: "fullscreen",
+ *           },
+ *         },
+ *       },
+ *     ],
+ *   }),
+ * );
+ * ```
+ *
  * @example With stable origin for external API CORS allowlists
  * ```ts source="./index.examples.ts#registerAppResource_withDomain"
  * // Computes a stable origin from an MCP server URL for hosting in Claude.

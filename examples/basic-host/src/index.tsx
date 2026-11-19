@@ -2,7 +2,7 @@ import { getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol
 import type { Tool } from "@modelcontextprotocol/client";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { callTool, connectToServer, hasAppHtml, initialDisplayMode, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
 import styles from "./index.module.css";
 
@@ -434,13 +434,17 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
 
     // First get CSP and permissions from resource, then load sandbox
     // CSP is set via HTTP headers (tamper-proof), permissions via iframe allow attribute
-    toolCallInfo.appResourcePromise.then(({ csp, permissions }) => {
+    toolCallInfo.appResourcePromise.then((resource) => {
+      const { csp, permissions } = resource;
       loadSandboxProxy(iframe, csp, permissions).then((firstTime) => {
         // The `firstTime` check guards against React Strict Mode's double
         // invocation (mount → unmount → remount simulation in development).
         // Outside of Strict Mode, this `useEffect` runs only once per
         // `toolCallInfo`.
         if (firstTime) {
+          // Apply the resource's display mode hints before the app is shown.
+          const firstMode = initialDisplayMode(resource);
+          setDisplayMode(firstMode);
           const appBridge = newAppBridge(toolCallInfo.serverInfo, iframe, {
             onContextUpdate: setModelContext,
             onMessage: (msg) => setMessages((prev) => [...prev, msg]),
@@ -448,7 +452,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
           }, {
             // Provide container dimensions - maxHeight for flexible sizing
             containerDimensions: { maxHeight: 6000 },
-            displayMode: "inline",
+            displayMode: firstMode,
           });
           appBridgeRef.current = appBridge;
           initializeApp(iframe, appBridge, toolCallInfo);

@@ -447,23 +447,35 @@ In fullscreen mode, remove the container's border radius so content extends to t
 }
 ```
 
-If your View is mainly useful on a large surface, declare `fullscreen` as its preferred display mode. This is a hint for how the host first shows the View. The host may ignore it, or apply it just after the View is first shown, so keep the `onhostcontextchanged` handler above:
+If your View is mainly useful on a large surface, declare `fullscreen` as its preferred display mode on the UI resource. The host reads it before the View loads, so it can open the View in fullscreen right away. It is a hint: the host may ignore it, or apply it just after the View is first shown, so keep the `onhostcontextchanged` handler above:
 
 <!-- prettier-ignore -->
-```ts source="../src/app.examples.ts#App_constructor_preferredDisplayMode"
-const app = new App(
-  { name: "MyApp", version: "1.0.0" },
+```ts source="../src/server/index.examples.ts#registerAppResource_preferredDisplayMode"
+registerAppResource(
+  server,
+  "Map",
+  "ui://map/view.html",
   {
-    availableDisplayModes: ["inline", "fullscreen"],
-    preferredDisplayMode: "fullscreen",
+    description: "Interactive map",
   },
+  async () => ({
+    contents: [
+      {
+        uri: "ui://map/view.html",
+        mimeType: RESOURCE_MIME_TYPE,
+        text: mapHtml,
+        _meta: {
+          ui: {
+            // Known before the View loads, so the host can open it in fullscreen
+            // right away. A hint: the host may still show it inline.
+            availableDisplayModes: ["inline", "fullscreen"],
+            preferredDisplayMode: "fullscreen",
+          },
+        },
+      },
+    ],
+  }),
 );
-await app.connect();
-
-// The host may ignore the preference: read the actual mode.
-const container = document.getElementById("main")!;
-const isFullscreen = app.getHostContext()?.displayMode === "fullscreen";
-container.classList.toggle("fullscreen", isFullscreen);
 ```
 
 > [!NOTE]

@@ -197,6 +197,43 @@ function registerAppResource_withCsp(
 }
 
 /**
+ * Example: registerAppResource declaring the display modes the View supports
+ * and the one it prefers to be first shown in.
+ */
+function registerAppResource_preferredDisplayMode(
+  server: McpServer,
+  mapHtml: string,
+) {
+  //#region registerAppResource_preferredDisplayMode
+  registerAppResource(
+    server,
+    "Map",
+    "ui://map/view.html",
+    {
+      description: "Interactive map",
+    },
+    async () => ({
+      contents: [
+        {
+          uri: "ui://map/view.html",
+          mimeType: RESOURCE_MIME_TYPE,
+          text: mapHtml,
+          _meta: {
+            ui: {
+              // Known before the View loads, so the host can open it in fullscreen
+              // right away. A hint: the host may still show it inline.
+              availableDisplayModes: ["inline", "fullscreen"],
+              preferredDisplayMode: "fullscreen",
+            },
+          },
+        },
+      ],
+    }),
+  );
+  //#endregion registerAppResource_preferredDisplayMode
+}
+
+/**
  * Example: registerAppResource with stable origin for external API CORS allowlists.
  */
 function registerAppResource_withDomain(

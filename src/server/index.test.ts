@@ -14,6 +14,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { Client } from "@modelcontextprotocol/client";
 import { z } from "zod/v4";
+import { McpUiResourceMetaSchema, type McpUiResourceMeta } from "../types.js";
 
 describe("registerAppTool", () => {
   it("should pass through config to server.registerTool", () => {
@@ -437,6 +438,23 @@ describe("registerAppResource", () => {
 
     expect(callback).toHaveBeenCalledTimes(1);
     expect(result).toEqual(expectedResult);
+  });
+});
+
+describe("McpUiResourceMetaSchema display mode hints", () => {
+  it("accepts available and preferred display modes", () => {
+    const meta: McpUiResourceMeta = {
+      availableDisplayModes: ["inline", "fullscreen"],
+      preferredDisplayMode: "fullscreen",
+    };
+    expect(McpUiResourceMetaSchema.parse(meta)).toEqual(meta);
+  });
+
+  it("rejects a preferred display mode that is not a known mode", () => {
+    expect(
+      McpUiResourceMetaSchema.safeParse({ preferredDisplayMode: "split" })
+        .success,
+    ).toBe(false);
   });
 });
 

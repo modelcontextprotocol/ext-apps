@@ -54,23 +54,6 @@
             ],
             "description": "Display mode for UI presentation."
           }
-        },
-        "preferredDisplayMode": {
-          "description": "Display mode in which the app prefers to be first shown.\n\nA hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.",
-          "anyOf": [
-            {
-              "type": "string",
-              "const": "inline"
-            },
-            {
-              "type": "string",
-              "const": "fullscreen"
-            },
-            {
-              "type": "string",
-              "const": "pip"
-            }
-          ]
         }
       },
       "additionalProperties": false
@@ -2657,23 +2640,6 @@
                     ],
                     "description": "Display mode for UI presentation."
                   }
-                },
-                "preferredDisplayMode": {
-                  "description": "Display mode in which the app prefers to be first shown.\n\nA hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.",
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "const": "inline"
-                    },
-                    {
-                      "type": "string",
-                      "const": "fullscreen"
-                    },
-                    {
-                      "type": "string",
-                      "const": "pip"
-                    }
-                  ]
                 }
               },
               "additionalProperties": false,
@@ -4365,6 +4331,44 @@
         "prefersBorder": {
           "description": "Visual boundary preference - true if view prefers a visible border.\n\nBoolean requesting whether a visible border and background is provided by the host. Specifying an explicit value for this is recommended because hosts' defaults may vary.\n\n- `true`: request visible border + background\n- `false`: request no visible border + background\n- omitted: host decides border",
           "type": "boolean"
+        },
+        "availableDisplayModes": {
+          "description": "Display modes the view supports, known before the view loads.\n\nSame meaning as `appCapabilities.availableDisplayModes`, which stays authoritative once the view has initialized. Lets the host choose how it first shows the view without waiting for `ui/initialize`.",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "inline"
+              },
+              {
+                "type": "string",
+                "const": "fullscreen"
+              },
+              {
+                "type": "string",
+                "const": "pip"
+              }
+            ],
+            "description": "Display mode for UI presentation."
+          }
+        },
+        "preferredDisplayMode": {
+          "description": "Display mode in which the view prefers to be first shown.\n\nA hint: the host chooses how it first shows the view and may ignore this value. The view reads the mode it is displayed in from `hostContext.displayMode`. If `availableDisplayModes` is set, it must list this mode.",
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "inline"
+            },
+            {
+              "type": "string",
+              "const": "fullscreen"
+            },
+            {
+              "type": "string",
+              "const": "pip"
+            }
+          ]
         }
       },
       "additionalProperties": false

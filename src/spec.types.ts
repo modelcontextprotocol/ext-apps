@@ -545,12 +545,6 @@ export interface McpUiAppCapabilities {
   };
   /** @description Display modes the app supports. */
   availableDisplayModes?: McpUiDisplayMode[];
-  /**
-   * @description Display mode in which the app prefers to be first shown.
-   *
-   * A hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.
-   */
-  preferredDisplayMode?: McpUiDisplayMode;
 }
 
 /**
@@ -734,6 +728,18 @@ export interface McpUiResourceMeta {
    * - omitted: host decides border
    */
   prefersBorder?: boolean;
+  /**
+   * @description Display modes the view supports, known before the view loads.
+   *
+   * Same meaning as `appCapabilities.availableDisplayModes`, which stays authoritative once the view has initialized. Lets the host choose how it first shows the view without waiting for `ui/initialize`.
+   */
+  availableDisplayModes?: McpUiDisplayMode[];
+  /**
+   * @description Display mode in which the view prefers to be first shown.
+   *
+   * A hint: the host chooses how it first shows the view and may ignore this value. The view reads the mode it is displayed in from `hostContext.displayMode`. If `availableDisplayModes` is set, it must list this mode.
+   */
+  preferredDisplayMode?: McpUiDisplayMode;
 }
 
 /**
