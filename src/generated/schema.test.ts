@@ -79,6 +79,10 @@ export type McpUiHostStylesSchemaInferredType = z.infer<
   typeof generated.McpUiHostStylesSchema
 >;
 
+export type McpUiContentBlockMetaSchemaInferredType = z.infer<
+  typeof generated.McpUiContentBlockMetaSchema
+>;
+
 export type McpUiResourceTeardownRequestSchemaInferredType = z.infer<
   typeof generated.McpUiResourceTeardownRequestSchema
 >;
@@ -241,6 +245,12 @@ expectType<spec.McpUiHostCss>({} as McpUiHostCssSchemaInferredType);
 expectType<McpUiHostCssSchemaInferredType>({} as spec.McpUiHostCss);
 expectType<spec.McpUiHostStyles>({} as McpUiHostStylesSchemaInferredType);
 expectType<McpUiHostStylesSchemaInferredType>({} as spec.McpUiHostStyles);
+expectType<spec.McpUiContentBlockMeta>(
+  {} as McpUiContentBlockMetaSchemaInferredType,
+);
+expectType<McpUiContentBlockMetaSchemaInferredType>(
+  {} as spec.McpUiContentBlockMeta,
+);
 expectType<spec.McpUiResourceTeardownRequest>(
   {} as McpUiResourceTeardownRequestSchemaInferredType,
 );

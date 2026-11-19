@@ -418,6 +418,22 @@ export interface McpUiHostContextChangedNotification {
 }
 
 /**
+ * @description Presentation hints a View may set under `_meta.ui` on content blocks it sends in `ui/update-model-context`.
+ * Hosts should not send these hints to the model.
+ */
+export interface McpUiContentBlockMeta {
+  /**
+   * @description Groups related content blocks for display. Blocks with the same `title` belong together.
+   *
+   * Display only: it does not change what the model receives, and each `ui/update-model-context` request still replaces the View's whole context.
+   */
+  group?: {
+    /** @description Non-empty, plain-text label shared by related blocks. */
+    title: string;
+  };
+}
+
+/**
  * @description Request to update the agent's context without requiring a follow-up action (View -> Host).
  *
  * Unlike `notifications/message` which is for debugging/logging, this request is intended

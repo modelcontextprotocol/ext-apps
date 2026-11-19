@@ -72,6 +72,25 @@
       },
       "additionalProperties": false
     },
+    "McpUiContentBlockMeta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "group": {
+          "description": "Groups related content blocks for display. Blocks with the same `title` belong together.\n\nDisplay only: it does not change what the model receives, and each `ui/update-model-context` request still replaces the View's whole context.",
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Non-empty, plain-text label shared by related blocks."
+            }
+          },
+          "required": ["title"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "McpUiDisplayMode": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "anyOf": [

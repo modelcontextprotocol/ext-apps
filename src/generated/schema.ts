@@ -431,6 +431,29 @@ export const McpUiHostStylesSchema = z.object({
 });
 
 /**
+ * @description Presentation hints a View may set under `_meta.ui` on content blocks it sends in `ui/update-model-context`.
+ * Hosts should not send these hints to the model.
+ */
+export const McpUiContentBlockMetaSchema = z.object({
+  /**
+   * @description Groups related content blocks for display. Blocks with the same `title` belong together.
+   *
+   * Display only: it does not change what the model receives, and each `ui/update-model-context` request still replaces the View's whole context.
+   */
+  group: z
+    .object({
+      /** @description Non-empty, plain-text label shared by related blocks. */
+      title: z
+        .string()
+        .describe("Non-empty, plain-text label shared by related blocks."),
+    })
+    .optional()
+    .describe(
+      "Groups related content blocks for display. Blocks with the same `title` belong together.\n\nDisplay only: it does not change what the model receives, and each `ui/update-model-context` request still replaces the View's whole context.",
+    ),
+});
+
+/**
  * @description Request for graceful shutdown of the View (Host -> View).
  * @see {@link app-bridge!AppBridge.teardownResource `AppBridge.teardownResource`} for the host method that sends this
  */

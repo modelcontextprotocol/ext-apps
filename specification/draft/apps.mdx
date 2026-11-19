@@ -1288,6 +1288,48 @@ Host behavior:
 - If multiple updates are received before the next user message, Host SHOULD only send the last update to the model
 - MAY display context updates to the user
 
+**Groups and audience.** Hosts that display context to the user (for example as chips or attachments next to the composer) need to know which blocks belong together and which are not meant for the user. Content blocks in `ui/update-model-context` MAY carry:
+
+- **`_meta.ui.group`**: `{ title: string }`, a non-empty, plain-text label shared by related blocks.
+- **`annotations.audience`**: the standard MCP content annotation (`Array<"user" | "assistant">`).
+
+```typescript
+interface McpUiContentBlockMeta {
+  /** Groups related content blocks for display. */
+  group?: {
+    /** Non-empty, plain-text label shared by related blocks. */
+    title: string;
+  };
+}
+```
+
+```typescript
+// Five selected rows shown as one "Selected rows" item, the filter as another,
+// and an internal ID the user does not need to see
+{
+  jsonrpc: "2.0",
+  id: 5,
+  method: "ui/update-model-context",
+  params: {
+    content: [
+      { type: "text", text: "Row 12: ACME Corp, $1.2M", _meta: { ui: { group: { title: "Selected rows" } } } },
+      { type: "text", text: "Row 31: Globex, $0.8M", _meta: { ui: { group: { title: "Selected rows" } } } },
+      { type: "text", text: "Region = EMEA", _meta: { ui: { group: { title: "Filter" } } } },
+      { type: "text", text: "Sheet ID: 8f3c2a", annotations: { audience: ["assistant"] } }
+    ]
+  }
+}
+```
+
+Host behavior:
+- Host that displays context MAY show the blocks that share a `group.title` as one item labelled with that title. Blocks without a group go in a Host-defined default group. Host MUST render the title as plain text and SHOULD truncate it.
+- Grouping is for display only. Each request still replaces the View's whole context.
+- A block whose `annotations.audience` is `["assistant"]` is background context: Host SHOULD NOT show it as a user-visible or removable item, and still provides it to the model.
+- A block whose `annotations.audience` does not include `"assistant"` MAY be shown to the user, and SHOULD NOT be sent to the model.
+- A block without `annotations.audience` is for both, as before.
+- Host SHOULD still let the user inspect all context a View has provided, including background context, for example in a details view.
+- Host SHOULD NOT send `_meta.ui` presentation hints to the model.
+
 #### Requests (Host → App)
 
 When Apps declare the `tools` capability, the Host can send standard MCP tool requests to the App:
@@ -2705,6 +2747,7 @@ App tools MUST be tied to the app's lifecycle:
 ### Other risks
 
 - **Social engineering:** UI can still display misleading content. Hosts should clearly indicate sandboxed UI boundaries.
+- **Background model context:** Context marked `annotations.audience: ["assistant"]` is hidden from the user's view of the conversation and could carry injected instructions. Hosts treat it as untrusted View content, like all model context, and let users inspect it on request.
 - **Resource consumption:** Malicious View can consume CPU/memory. Hosts should implement resource limits.
 
 ## Reservations in MCP
