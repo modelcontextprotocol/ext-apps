@@ -17,6 +17,11 @@ import type {
   ContentBlock,
 } from "@modelcontextprotocol/client";
 import { z } from "zod";
+
+import {
+  AnnotationDefSchema,
+  AnnotationUpdateSchema,
+} from "./annotation-schemas.js";
 import * as pdfjsLib from "pdfjs-dist";
 import { AnnotationLayer, AnnotationMode, TextLayer } from "pdfjs-dist";
 import "pdfjs-dist/web/pdf_viewer.css";
@@ -1785,7 +1790,7 @@ function paintAnnotationsOnCanvas(
         ctx.save();
         ctx.fillStyle = color;
         ctx.font = `${(def.fontSize || 12) * viewport.scale}px Helvetica, Arial, sans-serif`;
-        ctx.fillText(def.content, pos.left, pos.top);
+        ctx.fillText(String(def.content ?? ""), pos.left, pos.top);
         ctx.restore();
         break;
       }
@@ -1800,7 +1805,9 @@ function paintAnnotationsOnCanvas(
         ctx.lineWidth = 3;
         ctx.globalAlpha = 0.6;
         ctx.font = `bold ${24 * viewport.scale}px Helvetica, Arial, sans-serif`;
-        const metrics = ctx.measureText(def.label);
+        // Legacy persisted defs can lack label (pre-schema-validation data).
+        const stampLabel = String(def.label ?? "STAMP");
+        const metrics = ctx.measureText(stampLabel);
         const pad = 8 * viewport.scale;
         ctx.strokeRect(
           -pad,
@@ -1808,7 +1815,7 @@ function paintAnnotationsOnCanvas(
           metrics.width + pad * 2,
           24 * viewport.scale + pad * 2,
         );
-        ctx.fillText(def.label, 0, 0);
+        ctx.fillText(stampLabel, 0, 0);
         ctx.restore();
         break;
       }
@@ -2073,7 +2080,7 @@ function renderNoteAnnotation(
 
   const tooltip = document.createElement("div");
   tooltip.className = "annotation-tooltip";
-  tooltip.textContent = def.content;
+  tooltip.textContent = String(def.content ?? "");
   el.appendChild(tooltip);
 
   return el;
@@ -2113,7 +2120,7 @@ function renderFreetextAnnotation(
   el.style.top = `${pos.top}px`;
   el.style.fontSize = `${(def.fontSize || 12) * viewport.scale}px`;
   if (def.color) el.style.color = def.color;
-  el.textContent = def.content;
+  el.textContent = String(def.content ?? "");
   return el;
 }
 
@@ -2132,7 +2139,8 @@ function renderStampAnnotation(
     el.style.transform = `rotate(${def.rotation}deg)`;
     el.style.transformOrigin = "center center";
   }
-  el.textContent = def.label;
+  // Legacy persisted defs can lack label (pre-schema-validation data).
+  el.textContent = String(def.label ?? "STAMP");
   return el;
 }
 
@@ -4287,14 +4295,14 @@ canvasContainerEl.addEventListener("touchcancel", () => {
 function parseToolResult(result: CallToolResult): {
   url: string;
   title?: string;
-  pageCount: number;
+  viewUUID?: string;
   initialPage: number;
   totalBytes: number;
 } | null {
   return result.structuredContent as {
     url: string;
     title?: string;
-    pageCount: number;
+    viewUUID?: string;
     initialPage: number;
     totalBytes: number;
   } | null;
@@ -4682,18 +4690,25 @@ app.ontoolresult = async (result: CallToolResult) => {
 
   pdfUrl = parsed.url;
   pdfTitle = parsed.title;
-  // Note: pageCount may not be accurate until document loads
-  totalPages = parsed.pageCount || 1;
-  viewUUID = result._meta?.viewUUID ? String(result._meta.viewUUID) : undefined;
+  // Placeholder until the document loads — the tool result carries no page
+  // count since the server stopped pre-parsing the PDF.
+  totalPages = 1;
+  // Prefer _meta, but fall back to structuredContent: the server sends
+  // viewUUID in both, and some hosts drop _meta from replayed tool results.
+  viewUUID = result._meta?.viewUUID
+    ? String(result._meta.viewUUID)
+    : parsed.viewUUID
+      ? String(parsed.viewUUID)
+      : undefined;
   interactEnabled = result._meta?.interactEnabled === true;
   fileWritable = result._meta?.writable === true;
   // Debug bubble: server only emits _debug when --debug is set.
   if (result._meta?._debug !== undefined) showDebugBubble(result._meta._debug);
 
-  // Restore saved page or use initial page
+  // Restore saved page or use initial page. The saved page can't be
+  // bounds-checked yet; it's clamped once the document loads below.
   const savedPage = loadSavedPage();
-  currentPage =
-    savedPage && savedPage <= parsed.pageCount ? savedPage : parsed.initialPage;
+  currentPage = savedPage ?? parsed.initialPage;
 
   log.info("URL:", pdfUrl, "Starting at page:", currentPage);
 
@@ -4704,6 +4719,8 @@ app.ontoolresult = async (result: CallToolResult) => {
     const { document, totalBytes } = await loadPdfProgressively(pdfUrl);
     pdfDocument = document;
     totalPages = document.numPages;
+    // A restored page may point past the end of a changed document.
+    currentPage = Math.max(1, Math.min(currentPage, totalPages));
 
     log.info("PDF loaded, pages:", totalPages, "bytes:", totalBytes);
 
@@ -5174,12 +5191,20 @@ app.onteardown = async () => {
 app.onhostcontextchanged = handleHostContextChanged;
 
 // =============================================================================
-// App-registered tools — 1:1 with the server's `interact` commands.
+// App-registered tools.
 //
-// Each tool constructs the matching PdfCommand and dispatches through
-// processCommands(), so the command-handling logic lives in exactly one
-// place. The server-side `interact` tool remains for hosts that don't
-// support app-registered tools.
+// By default the view registers a single `interact` app tool that mirrors
+// the server-side `interact` (an `action` plus flat parameters, with an
+// optional `commands` batch). Hosts that ask the user to approve each app
+// tool separately then show one approval instead of thirteen. Start the
+// server with --split-app-tools to register each action as its own
+// narrowly-scoped tool instead (one tool per action, each with its own
+// schema).
+//
+// Either way, each action constructs the matching PdfCommand and
+// dispatches through processCommands(), so the command-handling logic
+// lives in exactly one place. The server-side `interact` tool remains for
+// hosts that don't support app-registered tools.
 // =============================================================================
 
 /** Shared zod shapes mirroring server.ts interact schema. */
@@ -5208,140 +5233,150 @@ async function runCommand(
   return { content: [{ type: "text" as const, text }] };
 }
 
-app.registerTool(
-  "get-document-info",
-  {
+/** One action of the app-side tool surface. */
+type AppToolDef = {
+  name: string;
+  title: string;
+  description: string;
+  /** Validates the action's own parameters (required fields per action). */
+  inputSchema?: z.ZodObject<z.ZodRawShape>;
+  handler: (args: Record<string, unknown>) => Promise<CallToolResult>;
+};
+
+/** Keeps each handler typed by its own schema while storing defs uniformly. */
+function defineAppTool<Shape extends z.ZodRawShape>(def: {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema?: z.ZodObject<Shape>;
+  handler: (args: z.output<z.ZodObject<Shape>>) => Promise<CallToolResult>;
+}): AppToolDef {
+  return def as unknown as AppToolDef;
+}
+
+const APP_TOOL_DEFS: AppToolDef[] = [
+  defineAppTool({
+    name: "get_document_info",
     title: "Get Document Info",
     description:
       "Get information about the current PDF document including title, current page, total pages, and zoom level",
-  },
-  async () => {
-    if (!pdfDocument) {
-      return {
-        content: [{ type: "text" as const, text: "Error: No document loaded" }],
-        isError: true,
+    handler: async () => {
+      if (!pdfDocument) {
+        return {
+          content: [
+            { type: "text" as const, text: "Error: No document loaded" },
+          ],
+          isError: true,
+        };
+      }
+      const info = {
+        title: pdfTitle || "Untitled",
+        url: pdfUrl,
+        currentPage,
+        totalPages,
+        scale,
+        displayMode: currentDisplayMode,
       };
-    }
-    const info = {
-      title: pdfTitle || "Untitled",
-      url: pdfUrl,
-      currentPage,
-      totalPages,
-      scale,
-      displayMode: currentDisplayMode,
-    };
-    return {
-      content: [{ type: "text" as const, text: JSON.stringify(info, null, 2) }],
-      structuredContent: info,
-    };
-  },
-);
-
-app.registerTool(
-  "navigate",
-  {
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(info, null, 2) },
+        ],
+        structuredContent: info,
+      };
+    },
+  }),
+  defineAppTool({
+    name: "navigate",
     title: "Navigate",
     description: "Jump to a specific page in the document",
     inputSchema: z.object({
       page: z.number().int().min(1).describe("Page number (1-indexed)"),
     }),
-  },
-  async ({ page }) => {
-    if (pdfDocument && (page < 1 || page > totalPages)) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: Page ${page} out of range (1-${totalPages})`,
-          },
-        ],
-        isError: true,
-      };
-    }
-    return runCommand(
-      { type: "navigate", page },
-      `Navigated to page ${page}/${totalPages}`,
-    );
-  },
-);
-
-app.registerTool(
-  "search",
-  {
+    handler: async ({ page }) => {
+      if (pdfDocument && (page < 1 || page > totalPages)) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: Page ${page} out of range (1-${totalPages})`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      return runCommand(
+        { type: "navigate", page },
+        `Navigated to page ${page}/${totalPages}`,
+      );
+    },
+  }),
+  defineAppTool({
+    name: "search",
     title: "Search",
     description:
       "Search for text and highlight matches in the viewer UI. Opens the search bar and jumps to the first match.",
     inputSchema: z.object({
       query: z.string().describe("Text to search for"),
     }),
-  },
-  async ({ query }) =>
-    runCommand(
-      { type: "search", query },
-      () => `Searched for "${query}": ${allMatches.length} match(es)`,
-    ),
-);
-
-app.registerTool(
-  "find",
-  {
+    handler: async ({ query }) =>
+      runCommand(
+        { type: "search", query },
+        () => `Searched for "${query}": ${allMatches.length} match(es)`,
+      ),
+  }),
+  defineAppTool({
+    name: "find",
     title: "Find",
     description:
       "Silent search — locate matches without opening the search UI. Use before search_navigate.",
     inputSchema: z.object({
       query: z.string().describe("Text to search for"),
     }),
-  },
-  async ({ query }) =>
-    runCommand(
-      { type: "find", query },
-      () => `Found ${allMatches.length} match(es) for "${query}"`,
-    ),
-);
-
-app.registerTool(
-  "search_navigate",
-  {
+    handler: async ({ query }) =>
+      runCommand(
+        { type: "find", query },
+        () => `Found ${allMatches.length} match(es) for "${query}"`,
+      ),
+  }),
+  defineAppTool({
+    name: "search_navigate",
     title: "Search Navigate",
     description:
       "Jump to the Nth search match (0-indexed). Call search or find first.",
     inputSchema: z.object({
       matchIndex: z.number().int().min(0).describe("Match index (0-indexed)"),
     }),
-  },
-  async ({ matchIndex }) => {
-    if (allMatches.length === 0) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: "Error: No search results. Call search or find first.",
-          },
-        ],
-        isError: true,
-      };
-    }
-    if (matchIndex >= allMatches.length) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: matchIndex ${matchIndex} out of range (0-${allMatches.length - 1})`,
-          },
-        ],
-        isError: true,
-      };
-    }
-    return runCommand(
-      { type: "search_navigate", matchIndex },
-      `Jumped to match ${matchIndex + 1}/${allMatches.length} on page ${allMatches[matchIndex].pageNum}`,
-    );
-  },
-);
-
-app.registerTool(
-  "zoom",
-  {
+    handler: async ({ matchIndex }) => {
+      if (allMatches.length === 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: No search results. Call search or find first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (matchIndex >= allMatches.length) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: matchIndex ${matchIndex} out of range (0-${allMatches.length - 1})`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      return runCommand(
+        { type: "search_navigate", matchIndex },
+        `Jumped to match ${matchIndex + 1}/${allMatches.length} on page ${allMatches[matchIndex].pageNum}`,
+      );
+    },
+  }),
+  defineAppTool({
+    name: "zoom",
     title: "Zoom",
     description: "Set the zoom scale for the document",
     inputSchema: z.object({
@@ -5351,84 +5386,72 @@ app.registerTool(
         .max(3.0)
         .describe("Zoom scale, 1.0 = 100% (range: 0.5-3.0)"),
     }),
-  },
-  async ({ scale }) =>
-    runCommand(
-      { type: "zoom", scale },
-      `Zoom set to ${Math.round(scale * 100)}%`,
-    ),
-);
-
-app.registerTool(
-  "add_annotations",
-  {
+    handler: async ({ scale }) =>
+      runCommand(
+        { type: "zoom", scale },
+        `Zoom set to ${Math.round(scale * 100)}%`,
+      ),
+  }),
+  defineAppTool({
+    name: "add_annotations",
     title: "Add Annotations",
     description:
       "Add one or more annotations (highlight, note, rectangle, circle, line, stamp, image, freetext). Each needs id, type, page, and type-specific geometry.",
     inputSchema: z.object({
       annotations: z
-        .array(z.record(z.string(), z.any()))
+        .array(AnnotationDefSchema)
         .min(1)
         .describe(
-          "Annotation objects. Each needs: id, type, page, plus type-specific fields (x, y, width, height, rects, color, content, etc.)",
+          "Annotation objects. Each needs: id, type, page, plus the type's own required fields (rects for highlight/underline/strikethrough, content for note/freetext, label for stamp, imageUrl for image, geometry for the shapes).",
         ),
     }),
-  },
-  async ({ annotations }) =>
-    runCommand(
-      {
-        type: "add_annotations",
-        annotations: annotations as PdfAnnotationDef[],
-      },
-      `Added ${annotations.length} annotation(s)`,
-    ),
-);
-
-app.registerTool(
-  "update_annotations",
-  {
+    handler: async ({ annotations }) =>
+      runCommand(
+        {
+          type: "add_annotations",
+          annotations: annotations as PdfAnnotationDef[],
+        },
+        `Added ${annotations.length} annotation(s)`,
+      ),
+  }),
+  defineAppTool({
+    name: "update_annotations",
     title: "Update Annotations",
     description:
       "Patch existing annotations by id. Only id and type are required; other fields are merged.",
     inputSchema: z.object({
       annotations: z
-        .array(z.record(z.string(), z.any()))
+        .array(AnnotationUpdateSchema)
         .min(1)
         .describe("Partial annotation objects. Each needs: id, type."),
     }),
-  },
-  async ({ annotations }) =>
-    runCommand(
-      {
-        type: "update_annotations",
-        annotations: annotations as Extract<
-          PdfCommand,
-          { type: "update_annotations" }
-        >["annotations"],
-      },
-      `Updated ${annotations.length} annotation(s)`,
-    ),
-);
-
-app.registerTool(
-  "remove_annotations",
-  {
+    handler: async ({ annotations }) =>
+      runCommand(
+        {
+          type: "update_annotations",
+          annotations: annotations as Extract<
+            PdfCommand,
+            { type: "update_annotations" }
+          >["annotations"],
+        },
+        `Updated ${annotations.length} annotation(s)`,
+      ),
+  }),
+  defineAppTool({
+    name: "remove_annotations",
     title: "Remove Annotations",
     description: "Delete annotations by id",
     inputSchema: z.object({
       ids: z.array(z.string()).min(1).describe("Annotation IDs to remove"),
     }),
-  },
-  async ({ ids }) =>
-    runCommand(
-      { type: "remove_annotations", ids },
-      `Removed ${ids.length} annotation(s)`,
-    ),
-);
-
-app.registerTool(
-  "highlight_text",
-  {
+    handler: async ({ ids }) =>
+      runCommand(
+        { type: "remove_annotations", ids },
+        `Removed ${ids.length} annotation(s)`,
+      ),
+  }),
+  defineAppTool({
+    name: "highlight_text",
     title: "Highlight Text",
     description:
       "Auto-locate text and add a highlight annotation. Searches the document (or a specific page) and highlights the first match.",
@@ -5443,19 +5466,16 @@ app.registerTool(
       color: z.string().optional().describe("Highlight color (CSS color)"),
       content: z.string().optional().describe("Tooltip/note content"),
     }),
-  },
-  async ({ query, page, color, content }) => {
-    const id = `ht_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    return runCommand(
-      { type: "highlight_text", id, query, page, color, content },
-      `Highlighted "${query}"${page ? ` on page ${page}` : ""} (id: ${id})`,
-    );
-  },
-);
-
-app.registerTool(
-  "fill_form",
-  {
+    handler: async ({ query, page, color, content }) => {
+      const id = `ht_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      return runCommand(
+        { type: "highlight_text", id, query, page, color, content },
+        `Highlighted "${query}"${page ? ` on page ${page}` : ""} (id: ${id})`,
+      );
+    },
+  }),
+  defineAppTool({
+    name: "fill_form",
     title: "Fill Form",
     description: "Fill PDF form fields by name",
     inputSchema: z.object({
@@ -5466,17 +5486,14 @@ app.registerTool(
           "Form fields: { name, value } where value is string or boolean",
         ),
     }),
-  },
-  async ({ fields }) =>
-    runCommand(
-      { type: "fill_form", fields },
-      `Filled ${fields.length} field(s): ${fields.map((f) => f.name).join(", ")}`,
-    ),
-);
-
-app.registerTool(
-  "get_text",
-  {
+    handler: async ({ fields }) =>
+      runCommand(
+        { type: "fill_form", fields },
+        `Filled ${fields.length} field(s): ${fields.map((f) => f.name).join(", ")}`,
+      ),
+  }),
+  defineAppTool({
+    name: "get_text",
     title: "Get Text",
     description:
       "Extract text from one or more pages. Returns one text block per page.",
@@ -5494,76 +5511,314 @@ app.registerTool(
           "Page ranges. Each has optional start/end. [{start:1,end:5}], [{}] = all pages. Max 20 pages.",
         ),
     }),
-  },
-  async ({ page, intervals }) => {
-    if (!pdfDocument) {
+    handler: async ({ page, intervals }) => {
+      if (!pdfDocument) {
+        return {
+          content: [
+            { type: "text" as const, text: "Error: No document loaded" },
+          ],
+          isError: true,
+        };
+      }
+      const resolved =
+        intervals ?? (page ? [{ start: page, end: page }] : [{}]);
+      const data = await collectPageData(resolved, true, false);
+      const parts = data
+        .filter((e) => e.text != null)
+        .map((e) => ({
+          type: "text" as const,
+          text: `--- Page ${e.page} ---\n${e.text}`,
+        }));
       return {
-        content: [{ type: "text" as const, text: "Error: No document loaded" }],
-        isError: true,
+        content:
+          parts.length > 0
+            ? parts
+            : [{ type: "text" as const, text: "No text content returned" }],
+        structuredContent: { pages: data },
       };
-    }
-    const resolved = intervals ?? (page ? [{ start: page, end: page }] : [{}]);
-    const data = await collectPageData(resolved, true, false);
-    const parts = data
-      .filter((e) => e.text != null)
-      .map((e) => ({
-        type: "text" as const,
-        text: `--- Page ${e.page} ---\n${e.text}`,
-      }));
-    return {
-      content:
-        parts.length > 0
-          ? parts
-          : [{ type: "text" as const, text: "No text content returned" }],
-      structuredContent: { pages: data },
-    };
-  },
-);
-
-app.registerTool(
-  "get_screenshot",
-  {
+    },
+  }),
+  defineAppTool({
+    name: "get_screenshot",
     title: "Get Screenshot",
     description: "Render a page to a JPEG image for visual analysis",
     inputSchema: z.object({
       page: z.number().int().min(1).describe("Page number to render"),
     }),
-  },
-  async ({ page }) => {
-    if (!pdfDocument) {
-      return {
-        content: [{ type: "text" as const, text: "Error: No document loaded" }],
-        isError: true,
-      };
-    }
-    const data = await collectPageData(
-      [{ start: page, end: page }],
-      false,
-      true,
-    );
-    const entry = data[0];
-    if (entry?.image) {
+    handler: async ({ page }) => {
+      if (!pdfDocument) {
+        return {
+          content: [
+            { type: "text" as const, text: "Error: No document loaded" },
+          ],
+          isError: true,
+        };
+      }
+      const data = await collectPageData(
+        [{ start: page, end: page }],
+        false,
+        true,
+      );
+      const entry = data[0];
+      if (entry?.image) {
+        return {
+          content: [
+            {
+              type: "image" as const,
+              data: entry.image,
+              mimeType: "image/jpeg",
+            },
+          ],
+        };
+      }
       return {
         content: [
           {
-            type: "image" as const,
-            data: entry.image,
-            mimeType: "image/jpeg",
+            type: "text" as const,
+            text: `Error: screenshot failed for page ${page}`,
           },
         ],
+        isError: true,
       };
-    }
+    },
+  }),
+];
+
+/** Run one action of the app-side `interact` tool. */
+async function runAppInteractCommand(
+  cmd: Record<string, unknown>,
+): Promise<CallToolResult> {
+  const def = APP_TOOL_DEFS.find((d) => d.name === cmd.action);
+  if (!def) {
     return {
       content: [
         {
           type: "text" as const,
-          text: `Error: screenshot failed for page ${page}`,
+          text: `Unknown action: ${String(cmd.action)}`,
         },
       ],
       isError: true,
     };
-  },
-);
+  }
+  let args: Record<string, unknown> = cmd;
+  if (def.inputSchema) {
+    const parsed = def.inputSchema.safeParse(cmd);
+    if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((i) => `${i.path.join(".") || "(input)"}: ${i.message}`)
+        .join("; ");
+      return {
+        content: [{ type: "text" as const, text: `${def.name}: ${issues}` }],
+        isError: true,
+      };
+    }
+    args = parsed.data as Record<string, unknown>;
+  }
+  return def.handler(args);
+}
+
+/**
+ * Load-time config injected into the served HTML by the server
+ * (see --split-app-tools in main.ts). Must be read before connect(),
+ * because the tool list is declared during the handshake.
+ */
+const PDF_APP_CONFIG =
+  (globalThis as { PDF_APP_CONFIG?: { splitAppTools?: boolean } })
+    .PDF_APP_CONFIG ?? {};
+
+if (PDF_APP_CONFIG.splitAppTools) {
+  // One narrowly-scoped tool per action.
+  for (const def of APP_TOOL_DEFS) {
+    app.registerTool(
+      def.name,
+      {
+        title: def.title,
+        description: def.description,
+        ...(def.inputSchema ? { inputSchema: def.inputSchema } : {}),
+      },
+      (args) => def.handler((args ?? {}) as Record<string, unknown>),
+    );
+  }
+} else {
+  // Default: a single `interact` app tool, mirroring the server-side
+  // `interact` — hosts that approve each app tool separately then ask once.
+  app.registerTool(
+    "interact",
+    {
+      title: "Interact with PDF",
+      description: `Interact with this PDF viewer: navigate, search, zoom, annotate, extract text/screenshots, fill forms.
+
+**BATCHING**: Send multiple commands in one call via \`commands\` array. Commands run sequentially; content[i] is the result of commands[i]. If a command fails, the batch stops there and that command's slot contains text starting with \`ERROR\` — content.length tells you how far it got.
+
+**ANNOTATION** — add_annotations with array of annotation objects. Each needs: id (unique string), type, page (1-indexed).
+
+**COORDINATE SYSTEM**: PDF points (1pt = 1/72in), origin at page TOP-LEFT corner. X increases rightward, Y increases downward.
+- US Letter = 612×792pt. Margins: top≈y=50, bottom≈y=742, left≈x=72, right≈x=540, center≈(306, 396).
+- Rectangle/circle/stamp x,y is the TOP-LEFT corner.
+- For highlights/underlines, each rect's y is the TOP of the highlighted region.
+
+Annotation types:
+• highlight: rects:[{x,y,width,height}], color?, content? • underline: rects:[{x,y,width,height}], color?
+• strikethrough: rects:[{x,y,width,height}], color? • note: x, y, content, color?
+• rectangle: x, y, width, height, color?, fillColor?, rotation? • circle: x, y, width, height, color?, fillColor?
+• line: x1, y1, x2, y2, color? • freetext: x, y, content, fontSize?, color?
+• stamp: x, y, label (REQUIRED — the stamp's text, e.g. APPROVED, DRAFT, CONFIDENTIAL), color?, rotation?
+• image: imageUrl (required), x?, y?, width?, height?, mimeType?, rotation?, aspect?
+
+TIP: For text annotations, prefer highlight_text (auto-finds text) over manual rects.
+• highlight_text: auto-find and highlight text (query, page?, color?, content?)
+• update_annotations: partial update (id+type required) • remove_annotations: remove by ids
+
+**NAVIGATION**: navigate (page), search (query), find (query, silent), search_navigate (matchIndex), zoom (scale 0.5–3.0)
+
+**TEXT/SCREENSHOTS/INFO**:
+• get_text: extract text from pages. Optional \`page\` for single page, or \`intervals\` for ranges [{start?,end?}]. Max 20 pages.
+• get_screenshot: capture a single page as a JPEG image. Requires \`page\`.
+• get_document_info: title, current page, total pages, zoom, display mode.
+
+**FORMS** — fill_form: fill fields with \`fields\` array of {name, value}.`,
+      inputSchema: z.object({
+        action: z
+          .enum([
+            "get_document_info",
+            "navigate",
+            "search",
+            "find",
+            "search_navigate",
+            "zoom",
+            "add_annotations",
+            "update_annotations",
+            "remove_annotations",
+            "highlight_text",
+            "fill_form",
+            "get_text",
+            "get_screenshot",
+          ])
+          .optional()
+          .describe(
+            "Action to perform (for a single command). Use \`commands\` for batching.",
+          ),
+        page: z
+          .number()
+          .min(1)
+          .optional()
+          .describe(
+            "Page number (for navigate, highlight_text, get_screenshot, get_text)",
+          ),
+        query: z
+          .string()
+          .optional()
+          .describe("Search text (for search / find / highlight_text)"),
+        matchIndex: z
+          .number()
+          .min(0)
+          .optional()
+          .describe("Match index (for search_navigate)"),
+        scale: z
+          .number()
+          .min(0.5)
+          .max(3.0)
+          .optional()
+          .describe("Zoom scale, 1.0 = 100% (for zoom)"),
+        annotations: z
+          .array(z.record(z.string(), z.any()))
+          .optional()
+          .describe(
+            "Annotation objects (see types in description). Each needs: id, type, page. For update_annotations only id+type are required.",
+          ),
+        ids: z
+          .array(z.string())
+          .optional()
+          .describe("Annotation IDs (for remove_annotations)"),
+        color: z
+          .string()
+          .optional()
+          .describe("Color override (for highlight_text)"),
+        content: z
+          .string()
+          .optional()
+          .describe("Tooltip/note content (for highlight_text)"),
+        fields: z
+          .array(FormFieldSchema)
+          .optional()
+          .describe(
+            "Form fields to fill (for fill_form): { name, value } where value is string or boolean",
+          ),
+        intervals: z
+          .array(PageIntervalSchema)
+          .optional()
+          .describe(
+            "Page ranges for get_text. Each has optional start/end. [{start:1,end:5}], [{}] = all pages. Max 20 pages.",
+          ),
+        commands: z
+          .array(z.record(z.string(), z.any()))
+          .optional()
+          .describe(
+            "Array of {action, ...params} commands to execute sequentially. More efficient than separate calls.",
+          ),
+      }),
+    },
+    async ({ action, commands, ...rest }) => {
+      if (commands && commands.length > 0) {
+        // Mirror the server-side interact's batch contract: content[i] is
+        // the result of commands[i], a failed step's slot is text starting
+        // with "ERROR", and isError is only set for single-command calls —
+        // some host SDKs collapse isError results to content[0].text,
+        // which would drop images from earlier successful steps.
+        const content: CallToolResult["content"] = [];
+        let failed = false;
+        for (let i = 0; i < commands.length; i++) {
+          const res = await runAppInteractCommand(commands[i]);
+          if (res.isError) {
+            const errText = res.content
+              .map((c) => (c.type === "text" ? c.text : null))
+              .filter((t) => t != null)
+              .join(" — ")
+              .replace(/^error:\s*/i, "");
+            content.push({
+              type: "text" as const,
+              text:
+                commands.length > 1
+                  ? `ERROR at step ${i + 1}/${commands.length} (${String(commands[i].action)}): ${errText}`
+                  : `ERROR: ${errText}`,
+            });
+            failed = true;
+            break;
+          }
+          // Squash multi-part successes (e.g. get_text returning multiple
+          // text blocks) into one slot so 1:1 indexing holds. Preserve a
+          // lone image as-is — that's the screenshot the model wants.
+          if (res.content.length === 1) {
+            content.push(res.content[0]);
+          } else {
+            const texts = res.content
+              .map((c) => (c.type === "text" ? c.text : null))
+              .filter((t) => t != null);
+            content.push({ type: "text" as const, text: texts.join("\n") });
+          }
+        }
+        return {
+          content,
+          ...(failed && commands.length === 1 ? { isError: true } : {}),
+        };
+      }
+      if (!action) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: provide `action` (or a `commands` array)",
+            },
+          ],
+          isError: true,
+        };
+      }
+      // Single-action calls return the handler's result verbatim —
+      // structuredContent, image content and isError included.
+      return runAppInteractCommand({ action, ...rest });
+    },
+  );
+}
 
 // Connect to host
 app

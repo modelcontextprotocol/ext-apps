@@ -24,7 +24,8 @@ jobs:
       (github.event.issue.pull_request &&
       contains(github.event.comment.body, '/update-snapshots') &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
-    runs-on: ubuntu-latest
+    # Pinned to the same image as the e2e job in ci.yml
+    runs-on: ubuntu-24.04
     steps:
       - name: Get PR branch
         if: github.event_name == 'issue_comment'

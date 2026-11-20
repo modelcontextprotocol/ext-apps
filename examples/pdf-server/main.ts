@@ -97,6 +97,7 @@ function parseArgs(): {
   useClientRoots: boolean;
   enableInteract: boolean;
   debug: boolean;
+  splitAppTools: boolean;
 } {
   const args = process.argv.slice(2);
   const urls: string[] = [];
@@ -104,6 +105,7 @@ function parseArgs(): {
   let useClientRoots = false;
   let enableInteract = false;
   let debug = false;
+  let splitAppTools = false;
 
   for (const arg of args) {
     if (arg === "--stdio") {
@@ -118,6 +120,11 @@ function parseArgs(): {
       enableInteract = true;
     } else if (arg === "--debug") {
       debug = true;
+    } else if (arg === "--split-app-tools") {
+      // Register the view's actions as separate app tools instead of the
+      // default single `interact` app tool. Hosts that ask the user to
+      // approve each app tool separately then show one card per tool.
+      splitAppTools = true;
     } else if (arg === "--writeable-uploads-root") {
       // Claude Desktop mounts attachments under a dir root named "uploads";
       // by default we refuse to write there. This flag opts back in.
@@ -144,11 +151,13 @@ function parseArgs(): {
     useClientRoots,
     enableInteract,
     debug,
+    splitAppTools,
   };
 }
 
 async function main() {
-  const { urls, stdio, useClientRoots, enableInteract, debug } = parseArgs();
+  const { urls, stdio, useClientRoots, enableInteract, debug, splitAppTools } =
+    parseArgs();
 
   // Register local files in whitelist
   for (const url of urls) {
@@ -175,7 +184,12 @@ async function main() {
   if (stdio) {
     // stdio → client is local (e.g. Claude Desktop), roots are safe
     await startStdioServer(() =>
-      createServer({ enableInteract: true, useClientRoots: true, debug }),
+      createServer({
+        enableInteract: true,
+        useClientRoots: true,
+        debug,
+        splitAppTools,
+      }),
     );
   } else {
     // HTTP → client is remote, only honour roots with explicit opt-in
@@ -186,7 +200,7 @@ async function main() {
       );
     }
     await startStreamableHTTPServer(() =>
-      createServer({ useClientRoots, enableInteract, debug }),
+      createServer({ useClientRoots, enableInteract, debug, splitAppTools }),
     );
   }
 }

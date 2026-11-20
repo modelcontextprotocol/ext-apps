@@ -1,6 +1,6 @@
 {
   "name": "@modelcontextprotocol/server-basic-solid",
-  "version": "2.0.3",
+  "version": "2.1.0",
   "type": "module",
   "description": "Basic MCP App Server example using Solid",
   "repository": {
@@ -29,12 +29,12 @@
   "dependencies": {
     "@modelcontextprotocol/client": "2.1.0",
     "@modelcontextprotocol/express": "2.0.0",
-    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "@modelcontextprotocol/ext-apps": "^2.1.0",
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.1.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "solid-js": "1.9.15",
+    "solid-js": "1.9.17",
     "zod": "^4.2.0"
   },
   "devDependencies": {

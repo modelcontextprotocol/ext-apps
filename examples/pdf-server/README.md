@@ -153,6 +153,7 @@ bun examples/pdf-server/main.ts --stdio ./papers/
 
 - `--debug` — Enable verbose server-side logging.
 - `--enable-interact` — Enable the `interact` tool in HTTP mode (see [Deployment](#deployment)). Not needed for stdio.
+- `--split-app-tools` — Register the view's actions as separate app tools (`navigate`, `search`, `add_annotations`, ...) instead of the default single `interact` app tool. Hosts that ask the user to approve each app tool separately show one approval card per tool, so the default keeps that to one approval; split tools can still be useful for hosts that pick tools by name.
 - `--writeable-uploads-root` — Allow saving annotated PDFs back to files under client roots named `uploads` (Claude Desktop mounts attachments there; writes are refused by default).
 
 ## Deployment
