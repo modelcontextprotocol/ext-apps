@@ -581,6 +581,16 @@ export const McpUiHostCapabilitiesSchema = z.object({
     .describe(
       "Host supports LLM sampling (sampling/createMessage) from the view.\nMirrors the MCP `ClientCapabilities.sampling` shape so hosts can pass it through.",
     ),
+  /**
+   * @description Host can forward form-mode `elicitation/create` requests to
+   * this app and return its standard MCP `ElicitResult` to the server.
+   */
+  elicitation: z
+    .object({})
+    .optional()
+    .describe(
+      "Host can forward form-mode `elicitation/create` requests to\nthis app and return its standard MCP `ElicitResult` to the server.",
+    ),
 });
 
 /**
@@ -614,6 +624,16 @@ export const McpUiAppCapabilitiesSchema = z.object({
     .array(McpUiDisplayModeSchema)
     .optional()
     .describe("Display modes the app supports."),
+  /**
+   * @description App can render and resolve form-mode `elicitation/create`
+   * requests using the standard MCP request and result shapes.
+   */
+  elicitation: z
+    .object({})
+    .optional()
+    .describe(
+      "App can render and resolve form-mode `elicitation/create`\nrequests using the standard MCP request and result shapes.",
+    ),
 });
 
 /**
@@ -769,6 +789,47 @@ export const McpUiClientCapabilitiesSchema = z.object({
     .optional()
     .describe(
       'Array of supported MIME types for UI resources.\nMust include `"text/html;profile=mcp-app"` for MCP Apps support.',
+    ),
+  /**
+   * @description Client can use an MCP App to render form-mode elicitations
+   * when a request identifies a UI resource.
+   */
+  elicitation: z
+    .object({})
+    .optional()
+    .describe(
+      "Client can use an MCP App to render form-mode elicitations\nwhen a request identifies a UI resource.",
+    ),
+});
+
+/**
+ * @description MCP Apps capability settings advertised by servers to clients.
+ */
+export const McpUiServerCapabilitiesSchema = z.object({
+  /**
+   * @description Server may attach an MCP App resource to form-mode
+   * `elicitation/create` requests.
+   */
+  elicitation: z
+    .object({})
+    .optional()
+    .describe(
+      "Server may attach an MCP App resource to form-mode\n`elicitation/create` requests.",
+    ),
+});
+
+/**
+ * @description MCP Apps metadata attached to a form-mode elicitation request.
+ */
+export const McpUiElicitationMetaSchema = z.object({
+  /**
+   * @description Absolute `ui://` URI of the MCP App resource that can render
+   * and resolve this elicitation.
+   */
+  resourceUri: z
+    .string()
+    .describe(
+      "Absolute `ui://` URI of the MCP App resource that can render\nand resolve this elicitation.",
     ),
 });
 
