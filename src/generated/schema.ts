@@ -708,6 +708,49 @@ export const McpUiRequestDisplayModeResultSchema = z
   })
   .passthrough();
 
+/** Experimental companion View v1 advertisement from a View. */
+export const McpUiCompanionViewAppCapabilitySchema = z.object({
+  version: z.literal(1),
+  role: z.union([z.literal("parent"), z.literal("detail")]),
+});
+
+/** Experimental acknowledgement of companion View v1 by the host. */
+export const McpUiCompanionViewHostCapabilitySchema = z.object({
+  version: z.literal(1),
+});
+
+/** Experimental request to show, switch, or close the parent's companion View. */
+export const McpUiSetCompanionViewRequestSchema = z.object({
+  method: z.literal("ui/set-companion-view"),
+  params: z.object({
+    generation: z.number(),
+    seq: z.number(),
+    itemId: z.string().nullable(),
+  }),
+});
+
+/** Experimental companion View outcome and the host's actual selection. */
+export const McpUiSetCompanionViewResultSchema = z.object({
+  status: z.union([
+    z.literal("shown"),
+    z.literal("closed"),
+    z.literal("unavailable"),
+    z.literal("denied"),
+    z.literal("failed"),
+    z.literal("stale"),
+  ]),
+  generation: z.number(),
+  itemId: z.string().nullable(),
+});
+
+/** Experimental notification of a host-initiated companion dismissal. */
+export const McpUiCompanionViewClosedNotificationSchema = z.object({
+  method: z.literal("ui/notifications/companion-view-closed"),
+  params: z.object({
+    generation: z.number(),
+  }),
+});
+
 /**
  * @description Tool visibility scope - who can access the tool.
  */
@@ -728,6 +771,13 @@ export const McpUiToolMetaSchema = z.object({
    * ```
    */
   resourceUri: z.string().optional(),
+  /** @description Experimental same-server UI resource for a companion detail View. */
+  companionResourceUri: z
+    .string()
+    .optional()
+    .describe(
+      "Experimental same-server UI resource for a companion detail View.",
+    ),
   /**
    * @description Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
@@ -866,6 +916,15 @@ export const McpUiHostContextSchema = z
       })
       .optional()
       .describe("Metadata of the tool call that instantiated this App."),
+    /** @description Experimental companion View bootstrap, supplied only to the detail View. */
+    companionView: z
+      .object({
+        itemId: z.string(),
+      })
+      .optional()
+      .describe(
+        "Experimental companion View bootstrap, supplied only to the detail View.",
+      ),
     /** @description Current color theme preference. */
     theme: McpUiThemeSchema.optional().describe(
       "Current color theme preference.",

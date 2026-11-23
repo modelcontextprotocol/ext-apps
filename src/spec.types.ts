@@ -347,6 +347,8 @@ export interface McpUiHostContext {
     /** @description Tool definition including name, inputSchema, etc. */
     tool: Tool;
   };
+  /** @description Experimental companion View bootstrap, supplied only to the detail View. */
+  companionView?: { itemId: string };
   /** @description Current color theme preference. */
   theme?: McpUiTheme;
   /** @description Style configuration for theming the app. */
@@ -758,6 +760,40 @@ export interface McpUiRequestDisplayModeResult {
   [key: string]: unknown;
 }
 
+/** Experimental companion View v1 advertisement from a View. */
+export interface McpUiCompanionViewAppCapability {
+  version: 1;
+  role: "parent" | "detail";
+}
+
+/** Experimental acknowledgement of companion View v1 by the host. */
+export interface McpUiCompanionViewHostCapability {
+  version: 1;
+}
+
+/** Experimental request to show, switch, or close the parent's companion View. */
+export interface McpUiSetCompanionViewRequest {
+  method: "ui/set-companion-view";
+  params: {
+    generation: number;
+    seq: number;
+    itemId: string | null;
+  };
+}
+
+/** Experimental companion View outcome and the host's actual selection. */
+export interface McpUiSetCompanionViewResult {
+  status: "shown" | "closed" | "unavailable" | "denied" | "failed" | "stale";
+  generation: number;
+  itemId: string | null;
+}
+
+/** Experimental notification of a host-initiated companion dismissal. */
+export interface McpUiCompanionViewClosedNotification {
+  method: "ui/notifications/companion-view-closed";
+  params: { generation: number };
+}
+
 /**
  * @description Tool visibility scope - who can access the tool.
  */
@@ -776,6 +812,8 @@ export interface McpUiToolMeta {
    * ```
    */
   resourceUri?: string;
+  /** @description Experimental same-server UI resource for a companion detail View. */
+  companionResourceUri?: string;
   /**
    * @description Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
@@ -841,6 +879,7 @@ export const INITIALIZED_METHOD: McpUiInitializedNotification["method"] =
   "ui/notifications/initialized";
 export const REQUEST_DISPLAY_MODE_METHOD: McpUiRequestDisplayModeRequest["method"] =
   "ui/request-display-mode";
+export const COMPANION_VIEW = "io.modelcontextprotocol/companion-view";
 
 /**
  * @description MCP Apps capability settings advertised by clients to servers.

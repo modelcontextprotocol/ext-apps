@@ -48,6 +48,14 @@ type MethodSchema = ZodObject<{
 }>;
 
 import {
+  COMPANION_VIEW,
+  McpUiCompanionViewAppCapabilitySchema,
+  McpUiCompanionViewClosedNotificationSchema,
+  McpUiSetCompanionViewRequestSchema,
+  McpUiSetCompanionViewResultSchema,
+  type McpUiCompanionViewClosedNotification,
+  type McpUiSetCompanionViewRequest,
+  type McpUiSetCompanionViewResult,
   type McpUiSandboxResourceReadyNotification,
   type McpUiSizeChangedNotification,
   type McpUiToolCancelledNotification,
@@ -93,6 +101,7 @@ import {
   McpUiResourcePermissions,
   McpUiToolMeta,
 } from "./types.js";
+import { companionViewParams } from "./companion-view.js";
 export * from "./types.js";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./constants.js";
 import { RESOURCE_URI_META_KEY } from "./constants.js";
@@ -210,6 +219,15 @@ export function buildAllowAttribute(
  */
 export type HostOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
   hostContext?: McpUiHostContext;
+  /** Experimental companion role bound to this bridge by the host. */
+  companionView?:
+    | {
+        role: "parent";
+        setView: (
+          params: McpUiSetCompanionViewRequest["params"],
+        ) => Promise<McpUiSetCompanionViewResult>;
+      }
+    | { role: "detail"; itemId: string };
 };
 
 /**
@@ -307,6 +325,8 @@ export class AppBridge extends Protocol<BaseContext> {
   private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
   private _initializedReceived = false;
+  private readonly _companionView: HostOptions["companionView"];
+  private _companionViewNegotiated = false;
   private readonly _registeredEvents = new Set<keyof AppBridgeEventMap>();
   private readonly _events = new EventDispatcher<AppBridgeEventMap>();
   private readonly _methods = new MethodRegistry();
@@ -540,6 +560,7 @@ export class AppBridge extends Protocol<BaseContext> {
     this._ensureEventSlot("initialized");
 
     this._hostContext = options?.hostContext || {};
+    this._companionView = options?.companionView;
 
     this.replaceRequestHandler(
       "ui/initialize",
@@ -549,6 +570,27 @@ export class AppBridge extends Protocol<BaseContext> {
       },
       (params) => this._onAppsInitialize(params),
     );
+
+    if (this._companionView) {
+      this.replaceRequestHandler(
+        McpUiSetCompanionViewRequestSchema.shape.method.value,
+        {
+          params: companionViewParams,
+          result: McpUiSetCompanionViewResultSchema,
+        },
+        async (params) => {
+          if (
+            this._companionView?.role !== "parent" ||
+            !this.isCompanionViewNegotiated()
+          ) {
+            throw new Error(
+              "Companion View v1 was not negotiated for this parent",
+            );
+          }
+          return this._companionView.setView(params);
+        },
+      );
+    }
 
     this.replaceRequestHandler("ping", (request, extra) => {
       this.onping?.(request.params, extra);
@@ -1616,6 +1658,27 @@ export class AppBridge extends Protocol<BaseContext> {
     return this._hostCapabilities;
   }
 
+  /** Whether the View completed the experimental companion v1 handshake. */
+  isCompanionViewNegotiated(): boolean {
+    return this._initializedReceived && this._companionViewNegotiated;
+  }
+
+  /** Notify the negotiated parent after a host-initiated dismissal. */
+  sendCompanionViewClosed(
+    params: McpUiCompanionViewClosedNotification["params"],
+  ) {
+    if (
+      this._companionView?.role !== "parent" ||
+      !this.isCompanionViewNegotiated()
+    ) {
+      throw new Error("Companion View v1 was not negotiated for this parent");
+    }
+    return this.notification({
+      method: McpUiCompanionViewClosedNotificationSchema.shape.method.value,
+      params,
+    });
+  }
+
   /**
    * Handle the ui/initialize request from the guest.
    * @internal
@@ -1637,6 +1700,34 @@ export class AppBridge extends Protocol<BaseContext> {
     this._appCapabilities = params.appCapabilities;
     this._appInfo = params.appInfo;
 
+    const role = McpUiCompanionViewAppCapabilitySchema.safeParse(
+      params.appCapabilities.experimental?.[COMPANION_VIEW],
+    ).data?.role;
+    this._companionViewNegotiated =
+      !!role && role === this._companionView?.role;
+    let hostCapabilities = this.getCapabilities();
+    let hostContext = this._hostContext;
+    if (hostCapabilities.experimental?.[COMPANION_VIEW]) {
+      const experimental = { ...hostCapabilities.experimental };
+      delete experimental[COMPANION_VIEW];
+      hostCapabilities = { ...hostCapabilities, experimental };
+    }
+    if (this._companionViewNegotiated) {
+      hostCapabilities = {
+        ...hostCapabilities,
+        experimental: {
+          ...hostCapabilities.experimental,
+          [COMPANION_VIEW]: { version: 1 },
+        },
+      };
+      if (this._companionView?.role === "detail") {
+        hostContext = {
+          ...hostContext,
+          companionView: { itemId: this._companionView.itemId },
+        };
+      }
+    }
+
     const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(
       requestedVersion,
     )
@@ -1645,9 +1736,9 @@ export class AppBridge extends Protocol<BaseContext> {
 
     return {
       protocolVersion,
-      hostCapabilities: this.getCapabilities(),
+      hostCapabilities,
       hostInfo: this._hostInfo,
-      hostContext: this._hostContext,
+      hostContext,
     };
   }
 
@@ -2004,6 +2095,7 @@ export class AppBridge extends Protocol<BaseContext> {
       );
     }
     this._initializedReceived = false;
+    this._companionViewNegotiated = false;
     if (this._client) {
       // When a client was passed to the constructor, automatically forward
       // MCP requests/notifications between the view and the server
@@ -2019,7 +2111,10 @@ export class AppBridge extends Protocol<BaseContext> {
             { signal: extra.mcpReq.signal },
           );
         };
-        if (serverCapabilities.tools.listChanged) {
+        if (
+          serverCapabilities.tools.listChanged &&
+          this._companionView?.role !== "detail"
+        ) {
           this._client.setNotificationHandler(
             "notifications/tools/list_changed",
             (n) => this.sendToolListChanged(n.params),
@@ -2045,7 +2140,10 @@ export class AppBridge extends Protocol<BaseContext> {
             { signal: extra.mcpReq.signal },
           );
         };
-        if (serverCapabilities.resources.listChanged) {
+        if (
+          serverCapabilities.resources.listChanged &&
+          this._companionView?.role !== "detail"
+        ) {
           this._client.setNotificationHandler(
             "notifications/resources/list_changed",
             (n) => this.sendResourceListChanged(n.params),
@@ -2059,7 +2157,10 @@ export class AppBridge extends Protocol<BaseContext> {
             { signal: extra.mcpReq.signal },
           );
         };
-        if (serverCapabilities.prompts.listChanged) {
+        if (
+          serverCapabilities.prompts.listChanged &&
+          this._companionView?.role !== "detail"
+        ) {
           this._client.setNotificationHandler(
             "notifications/prompts/list_changed",
             (n) => this.sendPromptListChanged(n.params),

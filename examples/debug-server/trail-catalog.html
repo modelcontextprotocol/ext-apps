@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trail Catalog</title>
+  </head>
+  <body>
+    <main aria-busy="true">
+      <h1>Trail Catalog</h1>
+      <label for="trail-filter">Filter trails</label>
+      <input id="trail-filter" type="search" />
+      <ul id="trail-list" aria-label="Trails"></ul>
+      <button id="hide-detail" type="button" disabled>
+        Hide selected detail
+      </button>
+      <section id="inline-detail" aria-label="Inline detail" hidden></section>
+    </main>
+    <script type="module" src="/src/trail-catalog.ts"></script>
+  </body>
+</html>

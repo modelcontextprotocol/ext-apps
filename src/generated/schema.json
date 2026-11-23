@@ -72,6 +72,64 @@
       },
       "additionalProperties": false
     },
+    "McpUiCompanionViewAppCapability": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "parent"
+            },
+            {
+              "type": "string",
+              "const": "detail"
+            }
+          ]
+        }
+      },
+      "required": ["version", "role"],
+      "additionalProperties": false
+    },
+    "McpUiCompanionViewClosedNotification": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/notifications/companion-view-closed"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "generation": {
+              "type": "number"
+            }
+          },
+          "required": ["generation"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiCompanionViewHostCapability": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "const": 1
+        }
+      },
+      "required": ["version"],
+      "additionalProperties": false
+    },
     "McpUiDisplayMode": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "anyOf": [
@@ -682,6 +740,17 @@
                 }
               },
               "required": ["tool"],
+              "additionalProperties": false
+            },
+            "companionView": {
+              "description": "Experimental companion View bootstrap, supplied only to the detail View.",
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string"
+                }
+              },
+              "required": ["itemId"],
               "additionalProperties": false
             },
             "theme": {
@@ -1465,6 +1534,17 @@
             }
           },
           "required": ["tool"],
+          "additionalProperties": false
+        },
+        "companionView": {
+          "description": "Experimental companion View bootstrap, supplied only to the detail View.",
+          "type": "object",
+          "properties": {
+            "itemId": {
+              "type": "string"
+            }
+          },
+          "required": ["itemId"],
           "additionalProperties": false
         },
         "theme": {
@@ -3088,6 +3168,17 @@
               "required": ["tool"],
               "additionalProperties": false
             },
+            "companionView": {
+              "description": "Experimental companion View bootstrap, supplied only to the detail View.",
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string"
+                }
+              },
+              "required": ["itemId"],
+              "additionalProperties": false
+            },
             "theme": {
               "description": "Current color theme preference.",
               "anyOf": [
@@ -4501,6 +4592,76 @@
       "required": ["method", "params"],
       "additionalProperties": false
     },
+    "McpUiSetCompanionViewRequest": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/set-companion-view"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "generation": {
+              "type": "number"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "itemId": {
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["generation", "seq", "itemId"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiSetCompanionViewResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "shown"
+            },
+            {
+              "type": "string",
+              "const": "closed"
+            },
+            {
+              "type": "string",
+              "const": "unavailable"
+            },
+            {
+              "type": "string",
+              "const": "denied"
+            },
+            {
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "type": "string",
+              "const": "stale"
+            }
+          ]
+        },
+        "generation": {
+          "type": "number"
+        },
+        "itemId": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["status", "generation", "itemId"],
+      "additionalProperties": false
+    },
     "McpUiSizeChangedNotification": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5378,6 +5539,10 @@
       "type": "object",
       "properties": {
         "resourceUri": {
+          "type": "string"
+        },
+        "companionResourceUri": {
+          "description": "Experimental same-server UI resource for a companion detail View.",
           "type": "string"
         },
         "visibility": {

@@ -33,6 +33,9 @@ import type {
   ToolListChangedNotification,
 } from "@modelcontextprotocol/client";
 import type {
+  McpUiCompanionViewClosedNotification,
+  McpUiSetCompanionViewRequest,
+  McpUiSetCompanionViewResult,
   McpUiDownloadFileRequest,
   McpUiDownloadFileResult,
   McpUiHostContextChangedNotification,
@@ -77,6 +80,12 @@ export {
   INITIALIZE_METHOD,
   INITIALIZED_METHOD,
   REQUEST_DISPLAY_MODE_METHOD,
+  COMPANION_VIEW,
+  type McpUiCompanionViewAppCapability,
+  type McpUiCompanionViewHostCapability,
+  type McpUiCompanionViewClosedNotification,
+  type McpUiSetCompanionViewRequest,
+  type McpUiSetCompanionViewResult,
   type McpUiTheme,
   type McpUiDisplayMode,
   type McpUiStyleVariableKey,
@@ -154,6 +163,11 @@ export {
   McpUiResourceMetaSchema,
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResultSchema,
+  McpUiCompanionViewAppCapabilitySchema,
+  McpUiCompanionViewHostCapabilitySchema,
+  McpUiCompanionViewClosedNotificationSchema,
+  McpUiSetCompanionViewRequestSchema,
+  McpUiSetCompanionViewResultSchema,
   McpUiToolVisibilitySchema,
   McpUiToolMetaSchema,
 } from "./generated/schema.js";
@@ -172,6 +186,7 @@ export type AppRequest =
   | McpUiUpdateModelContextRequest
   | McpUiResourceTeardownRequest
   | McpUiRequestDisplayModeRequest
+  | McpUiSetCompanionViewRequest
   | CallToolRequest
   | ListToolsRequest
   | ListResourcesRequest
@@ -189,6 +204,7 @@ export type AppRequest =
 export type AppNotification =
   // Sent to app
   | McpUiHostContextChangedNotification
+  | McpUiCompanionViewClosedNotification
   | McpUiToolInputNotification
   | McpUiToolInputPartialNotification
   | McpUiToolResultNotification
@@ -216,6 +232,7 @@ export type AppResult =
   | McpUiMessageResult
   | McpUiResourceTeardownResult
   | McpUiRequestDisplayModeResult
+  | McpUiSetCompanionViewResult
   | CallToolResult
   | ListToolsResult
   | ListResourcesResult

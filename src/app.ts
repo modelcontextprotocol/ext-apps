@@ -54,6 +54,14 @@ import {
   type WebMcpModelContext,
 } from "./webmcp.js";
 import {
+  COMPANION_VIEW,
+  McpUiCompanionViewAppCapabilitySchema,
+  McpUiCompanionViewClosedNotificationSchema,
+  McpUiCompanionViewHostCapabilitySchema,
+  McpUiSetCompanionViewRequestSchema,
+  McpUiSetCompanionViewResultSchema,
+  type McpUiCompanionViewClosedNotification,
+  type McpUiSetCompanionViewRequest,
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
   McpUiUpdateModelContextRequest,
@@ -87,6 +95,7 @@ import {
   McpUiRequestDisplayModeRequest,
   McpUiRequestDisplayModeResultSchema,
 } from "./types.js";
+import { companionViewParams } from "./companion-view.js";
 import {
   StandardSchemaV1,
   standardSchemaToJsonSchema,
@@ -276,6 +285,7 @@ export type AppEventMap = {
   toolresult: McpUiToolResultNotification["params"];
   toolcancelled: McpUiToolCancelledNotification["params"];
   hostcontextchanged: McpUiHostContextChangedNotification["params"];
+  companionviewclosed: McpUiCompanionViewClosedNotification["params"];
 };
 
 /**
@@ -457,6 +467,7 @@ export class App extends Protocol<BaseContext> {
     toolresult: McpUiToolResultNotificationSchema,
     toolcancelled: McpUiToolCancelledNotificationSchema,
     hostcontextchanged: McpUiHostContextChangedNotificationSchema,
+    companionviewclosed: McpUiCompanionViewClosedNotificationSchema,
   };
 
   /**
@@ -2115,6 +2126,33 @@ export class App extends Protocol<BaseContext> {
         params,
       },
       McpUiRequestDisplayModeResultSchema,
+      options,
+    );
+  }
+
+  /** Request a selection or close from a negotiated experimental parent View. */
+  setCompanionView(
+    params: McpUiSetCompanionViewRequest["params"],
+    options?: RequestOptions,
+  ) {
+    const app = McpUiCompanionViewAppCapabilitySchema.safeParse(
+      this._appCapabilities.experimental?.[COMPANION_VIEW],
+    );
+    if (
+      !this._initializedSent ||
+      app.data?.role !== "parent" ||
+      !McpUiCompanionViewHostCapabilitySchema.safeParse(
+        this._hostCapabilities?.experimental?.[COMPANION_VIEW],
+      ).success
+    ) {
+      throw new Error("Companion View v1 was not negotiated for this parent");
+    }
+    return this.request(
+      {
+        method: McpUiSetCompanionViewRequestSchema.shape.method.value,
+        params: companionViewParams.parse(params),
+      },
+      McpUiSetCompanionViewResultSchema,
       options,
     );
   }

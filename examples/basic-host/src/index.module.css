@@ -171,17 +171,57 @@
     display: flex;
     flex-direction: column;
 
+    .appSurfaces {
+      flex: 1;
+      min-height: 0;
+    }
+
     /* Hide collapsible panels in fullscreen */
     .collapsiblePanel {
       display: none;
     }
 
-    iframe {
+    .appSurfaces > iframe {
       flex: 1;
       height: 100%;
       border: none;
       border-radius: 0;
     }
+  }
+}
+
+.appSurfaces:has(.companionPane:not([hidden])) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  overflow: auto;
+
+  > iframe {
+    flex: 1 1 min(100%, 28rem);
+    width: 0;
+  }
+}
+
+.companionOutlet {
+  display: none;
+
+  &:has(.companionPane:not([hidden])) {
+    display: block;
+    flex: 1 1 18rem;
+    padding: 0.5rem;
+  }
+}
+
+.companionPane {
+  padding: 0.75rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+
+  iframe:not([hidden]) {
+    display: block;
+    height: 220px;
+    margin-top: 0.5rem;
   }
 }
 
