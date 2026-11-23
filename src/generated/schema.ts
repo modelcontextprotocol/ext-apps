@@ -430,6 +430,8 @@ export const McpUiHostStylesSchema = z.object({
   ),
 });
 
+const CompanionViewItemIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
+
 /**
  * @description Request for graceful shutdown of the View (Host -> View).
  * @see {@link app-bridge!AppBridge.teardownResource `AppBridge.teardownResource`} for the host method that sends this
@@ -714,19 +716,19 @@ export const McpUiCompanionViewAppCapabilitySchema = z.object({
   role: z.union([z.literal("parent"), z.literal("detail")]),
 });
 
-/** Experimental acknowledgement of companion View v1 by the host. */
-export const McpUiCompanionViewHostCapabilitySchema = z.object({
-  version: z.literal(1),
+const CompanionViewGenerationSchema = z.number().int().nonnegative();
+
+const CompanionViewSelectionSchema = z.strictObject({
+  generation: CompanionViewGenerationSchema,
+  /** @schema .int().positive() */
+  seq: z.number().int().positive(),
+  itemId: CompanionViewItemIdSchema.nullable(),
 });
 
 /** Experimental request to show, switch, or close the parent's companion View. */
 export const McpUiSetCompanionViewRequestSchema = z.object({
   method: z.literal("ui/set-companion-view"),
-  params: z.object({
-    generation: z.number(),
-    seq: z.number(),
-    itemId: z.string().nullable(),
-  }),
+  params: CompanionViewSelectionSchema,
 });
 
 /** Experimental companion View outcome and the host's actual selection. */
@@ -739,15 +741,15 @@ export const McpUiSetCompanionViewResultSchema = z.object({
     z.literal("failed"),
     z.literal("stale"),
   ]),
-  generation: z.number(),
-  itemId: z.string().nullable(),
+  generation: CompanionViewGenerationSchema,
+  itemId: CompanionViewItemIdSchema.nullable(),
 });
 
 /** Experimental notification of a host-initiated companion dismissal. */
 export const McpUiCompanionViewClosedNotificationSchema = z.object({
   method: z.literal("ui/notifications/companion-view-closed"),
   params: z.object({
-    generation: z.number(),
+    generation: CompanionViewGenerationSchema,
   }),
 });
 
@@ -919,7 +921,7 @@ export const McpUiHostContextSchema = z
     /** @description Experimental companion View bootstrap, supplied only to the detail View. */
     companionView: z
       .object({
-        itemId: z.string(),
+        itemId: CompanionViewItemIdSchema,
       })
       .optional()
       .describe(
@@ -1115,3 +1117,12 @@ export const McpUiInitializeResultSchema = z
     ),
   })
   .passthrough();
+
+/** Experimental acknowledgement of companion View v1 by the host. */
+export const McpUiCompanionViewHostCapabilitySchema = z.object({
+  version: z.literal(1),
+  /** @description Initial generation for this parent session. Omitted for detail Views. */
+  generation: CompanionViewGenerationSchema.optional().describe(
+    "Initial generation for this parent session. Omitted for detail Views.",
+  ),
+});

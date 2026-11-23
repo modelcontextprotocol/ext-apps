@@ -16,6 +16,7 @@ function fixture(slot: CompanionSlot = {}) {
     (generation) => events.push(`dismiss:${generation}`),
     (error) => events.push(`failure:${String(error)}`),
   );
+  companion.startSession();
   const open = (itemId: string | null, seq: number, generation = 0) =>
     companion.setView({ generation, seq, itemId });
   const complete = (id: string) => mounts.get(id)!.resolve({
@@ -52,6 +53,27 @@ test("host dismissal and parent teardown both fence pending work", async () => {
   expect(await quartz).toEqual({ status: "stale", generation: 2, itemId: null });
   expect(await open("cedar", 4, 2)).toMatchObject({ status: "stale" });
   expect(events).toEqual(["dismiss:1", "dispose:cedar", "dispose:quartz"]);
+});
+
+test("reinitializing closes the old detail and restarts the selection sequence", async () => {
+  const slot = {};
+  const { companion, events, mounts, open, complete } = fixture(slot);
+  const cedar = open("cedar", 5);
+  complete("cedar");
+  expect(await cedar).toEqual({ status: "shown", generation: 0, itemId: "cedar" });
+
+  expect(companion.startSession()).toBe(1);
+  expect(events).toEqual(["show:cedar", "dispose:cedar"]);
+  const quartz = open("quartz", 1, 1);
+  expect(companion.startSession()).toBe(2);
+  expect(mounts.get("quartz")!.signal.aborted).toBe(true);
+  expect(slot).toMatchObject({ owner: undefined });
+  const next = open("cedar", 1, 2);
+  complete("cedar");
+  expect(await next).toEqual({ status: "shown", generation: 2, itemId: "cedar" });
+  complete("quartz");
+  expect(await quartz).toEqual({ status: "stale", generation: 2, itemId: "cedar" });
+  expect(events).toEqual(["show:cedar", "dispose:cedar", "show:cedar", "dispose:quartz"]);
 });
 
 test("another parent is denied while the slot is held; failures release it", async () => {

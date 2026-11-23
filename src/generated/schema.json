@@ -108,7 +108,9 @@
           "type": "object",
           "properties": {
             "generation": {
-              "type": "number"
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
             }
           },
           "required": ["generation"],
@@ -125,6 +127,12 @@
         "version": {
           "type": "number",
           "const": 1
+        },
+        "generation": {
+          "description": "Initial generation for this parent session. Omitted for detail Views.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": ["version"],
@@ -747,7 +755,8 @@
               "type": "object",
               "properties": {
                 "itemId": {
-                  "type": "string"
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
                 }
               },
               "required": ["itemId"],
@@ -1541,7 +1550,8 @@
           "type": "object",
           "properties": {
             "itemId": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
             }
           },
           "required": ["itemId"],
@@ -3173,7 +3183,8 @@
               "type": "object",
               "properties": {
                 "itemId": {
-                  "type": "string"
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
                 }
               },
               "required": ["itemId"],
@@ -4604,13 +4615,25 @@
           "type": "object",
           "properties": {
             "generation": {
-              "type": "number"
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "seq": {
-              "type": "number"
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
             },
             "itemId": {
-              "type": ["string", "null"]
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": ["generation", "seq", "itemId"],
@@ -4653,10 +4676,20 @@
           ]
         },
         "generation": {
-          "type": "number"
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "itemId": {
-          "type": ["string", "null"]
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": ["status", "generation", "itemId"],

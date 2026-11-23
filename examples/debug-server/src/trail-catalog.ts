@@ -91,9 +91,13 @@ app.addEventListener("companionviewclosed", (params) => {
 app
   .connect()
   .then(() => {
-    companion = McpUiCompanionViewHostCapabilitySchema.safeParse(
+    const capability = McpUiCompanionViewHostCapabilitySchema.safeParse(
       app.getHostCapabilities()?.experimental?.[COMPANION_VIEW],
-    ).success;
+    ).data;
+    if (capability?.generation !== undefined) {
+      generation = capability.generation;
+      companion = true;
+    }
   })
   .catch((error) =>
     console.warn("Trail Catalog could not connect to its host:", error),

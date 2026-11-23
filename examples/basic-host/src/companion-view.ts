@@ -16,7 +16,7 @@ export interface CompanionSlot {
 }
 
 export class CompanionView {
-  private generation = 0;
+  private generation = -1;
   private lastSeq = 0;
   private destroyed = false;
   private pending?: AbortController;
@@ -28,6 +28,14 @@ export class CompanionView {
     private readonly notifyClosed: (generation: number) => void,
     private readonly reportFailure: (error: unknown) => void,
   ) {}
+
+  startSession(): number {
+    this.generation++;
+    this.lastSeq = 0;
+    this.clearSelection();
+    this.release();
+    return this.generation;
+  }
 
   async setView({ generation, seq, itemId }: Params): Promise<Result> {
     if (this.destroyed || generation !== this.generation || seq <= this.lastSeq) {

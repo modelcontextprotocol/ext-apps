@@ -471,14 +471,18 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
 
     const start = async () => {
       const { csp, permissions } = await toolCallInfo.appResourcePromise;
-      await loadSandboxProxy(iframe, csp, permissions, { isolated: !!uri, signal });
+      await loadSandboxProxy(iframe, csp, permissions, { signal });
       signal.throwIfAborted();
       appBridge = newAppBridge(toolCallInfo.serverInfo, iframe, {
         onContextUpdate: setModelContext,
         onMessage: (msg) => setMessages((prev) => [...prev, msg]),
         onDisplayModeChange: setDisplayMode,
       }, {
-        companionView: companion && { role: "parent", setView: companion.setView.bind(companion) },
+        companionView: companion && {
+          role: "parent",
+          startSession: companion.startSession.bind(companion),
+          setView: companion.setView.bind(companion),
+        },
       });
       const onClose = appBridge.onclose;
       appBridge.onclose = () => {

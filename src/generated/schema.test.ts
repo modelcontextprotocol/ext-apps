@@ -123,10 +123,6 @@ export type McpUiCompanionViewAppCapabilitySchemaInferredType = z.infer<
   typeof generated.McpUiCompanionViewAppCapabilitySchema
 >;
 
-export type McpUiCompanionViewHostCapabilitySchemaInferredType = z.infer<
-  typeof generated.McpUiCompanionViewHostCapabilitySchema
->;
-
 export type McpUiSetCompanionViewRequestSchemaInferredType = z.infer<
   typeof generated.McpUiSetCompanionViewRequestSchema
 >;
@@ -185,6 +181,10 @@ export type McpUiInitializeRequestSchemaInferredType = z.infer<
 
 export type McpUiInitializeResultSchemaInferredType = z.infer<
   typeof generated.McpUiInitializeResultSchema
+>;
+
+export type McpUiCompanionViewHostCapabilitySchemaInferredType = z.infer<
+  typeof generated.McpUiCompanionViewHostCapabilitySchema
 >;
 
 expectType<spec.McpUiTheme>({} as McpUiThemeSchemaInferredType);
@@ -323,12 +323,6 @@ expectType<spec.McpUiCompanionViewAppCapability>(
 expectType<McpUiCompanionViewAppCapabilitySchemaInferredType>(
   {} as spec.McpUiCompanionViewAppCapability,
 );
-expectType<spec.McpUiCompanionViewHostCapability>(
-  {} as McpUiCompanionViewHostCapabilitySchemaInferredType,
-);
-expectType<McpUiCompanionViewHostCapabilitySchemaInferredType>(
-  {} as spec.McpUiCompanionViewHostCapability,
-);
 expectType<spec.McpUiSetCompanionViewRequest>(
   {} as McpUiSetCompanionViewRequestSchemaInferredType,
 );
@@ -410,4 +404,10 @@ expectType<spec.McpUiInitializeResult>(
 );
 expectType<McpUiInitializeResultSchemaInferredType>(
   {} as spec.McpUiInitializeResult,
+);
+expectType<spec.McpUiCompanionViewHostCapability>(
+  {} as McpUiCompanionViewHostCapabilitySchemaInferredType,
+);
+expectType<McpUiCompanionViewHostCapabilitySchemaInferredType>(
+  {} as spec.McpUiCompanionViewHostCapability,
 );

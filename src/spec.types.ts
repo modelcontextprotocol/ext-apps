@@ -348,7 +348,7 @@ export interface McpUiHostContext {
     tool: Tool;
   };
   /** @description Experimental companion View bootstrap, supplied only to the detail View. */
-  companionView?: { itemId: string };
+  companionView?: { itemId: CompanionViewItemId };
   /** @description Current color theme preference. */
   theme?: McpUiTheme;
   /** @description Style configuration for theming the app. */
@@ -769,29 +769,41 @@ export interface McpUiCompanionViewAppCapability {
 /** Experimental acknowledgement of companion View v1 by the host. */
 export interface McpUiCompanionViewHostCapability {
   version: 1;
+  /** @description Initial generation for this parent session. Omitted for detail Views. */
+  generation?: CompanionViewGeneration;
 }
+
+/** @schema .int().nonnegative() */
+type CompanionViewGeneration = number;
+
+/** @pattern ^[A-Za-z0-9_-]{1,128}$ */
+type CompanionViewItemId = string;
+
+/** @strict */
+type CompanionViewSelection = {
+  generation: CompanionViewGeneration;
+  /** @schema .int().positive() */
+  seq: number;
+  itemId: CompanionViewItemId | null;
+};
 
 /** Experimental request to show, switch, or close the parent's companion View. */
 export interface McpUiSetCompanionViewRequest {
   method: "ui/set-companion-view";
-  params: {
-    generation: number;
-    seq: number;
-    itemId: string | null;
-  };
+  params: CompanionViewSelection;
 }
 
 /** Experimental companion View outcome and the host's actual selection. */
 export interface McpUiSetCompanionViewResult {
   status: "shown" | "closed" | "unavailable" | "denied" | "failed" | "stale";
-  generation: number;
-  itemId: string | null;
+  generation: CompanionViewGeneration;
+  itemId: CompanionViewItemId | null;
 }
 
 /** Experimental notification of a host-initiated companion dismissal. */
 export interface McpUiCompanionViewClosedNotification {
   method: "ui/notifications/companion-view-closed";
-  params: { generation: number };
+  params: { generation: CompanionViewGeneration };
 }
 
 /**

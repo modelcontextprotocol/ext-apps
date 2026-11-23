@@ -95,7 +95,6 @@ import {
   McpUiRequestDisplayModeRequest,
   McpUiRequestDisplayModeResultSchema,
 } from "./types.js";
-import { companionViewParams } from "./companion-view.js";
 import {
   StandardSchemaV1,
   standardSchemaToJsonSchema,
@@ -2138,19 +2137,20 @@ export class App extends Protocol<BaseContext> {
     const app = McpUiCompanionViewAppCapabilitySchema.safeParse(
       this._appCapabilities.experimental?.[COMPANION_VIEW],
     );
+    const host = McpUiCompanionViewHostCapabilitySchema.safeParse(
+      this._hostCapabilities?.experimental?.[COMPANION_VIEW],
+    );
     if (
       !this._initializedSent ||
       app.data?.role !== "parent" ||
-      !McpUiCompanionViewHostCapabilitySchema.safeParse(
-        this._hostCapabilities?.experimental?.[COMPANION_VIEW],
-      ).success
+      host.data?.generation === undefined
     ) {
       throw new Error("Companion View v1 was not negotiated for this parent");
     }
     return this.request(
       {
         method: McpUiSetCompanionViewRequestSchema.shape.method.value,
-        params: companionViewParams.parse(params),
+        params: McpUiSetCompanionViewRequestSchema.shape.params.parse(params),
       },
       McpUiSetCompanionViewResultSchema,
       options,

@@ -101,7 +101,6 @@ import {
   McpUiResourcePermissions,
   McpUiToolMeta,
 } from "./types.js";
-import { companionViewParams } from "./companion-view.js";
 export * from "./types.js";
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE } from "./constants.js";
 import { RESOURCE_URI_META_KEY } from "./constants.js";
@@ -223,6 +222,8 @@ export type HostOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
   companionView?:
     | {
         role: "parent";
+        /** Clear prior companion state and return a fresh generation for this initialization. */
+        startSession: () => number;
         setView: (
           params: McpUiSetCompanionViewRequest["params"],
         ) => Promise<McpUiSetCompanionViewResult>;
@@ -327,6 +328,10 @@ export class AppBridge extends Protocol<BaseContext> {
   private _initializedReceived = false;
   private readonly _companionView: HostOptions["companionView"];
   private _companionViewNegotiated = false;
+  private _companionViewReady = false;
+  private readonly _pendingCompanionReplies = new Set<
+    (result: McpUiSetCompanionViewResult) => void
+  >();
   private readonly _registeredEvents = new Set<keyof AppBridgeEventMap>();
   private readonly _events = new EventDispatcher<AppBridgeEventMap>();
   private readonly _methods = new MethodRegistry();
@@ -483,7 +488,10 @@ export class AppBridge extends Protocol<BaseContext> {
     if (!schema) throw new Error(`Unknown event: ${String(event)}`);
 
     const dispatch = (params: AppBridgeEventMap[K]) => {
-      if (event === "initialized") this._initializedReceived = true;
+      if (event === "initialized") {
+        this._initializedReceived = true;
+        this._companionViewReady = this._companionViewNegotiated;
+      }
       this._events.dispatch(event, params);
     };
 
@@ -575,7 +583,7 @@ export class AppBridge extends Protocol<BaseContext> {
       this.replaceRequestHandler(
         McpUiSetCompanionViewRequestSchema.shape.method.value,
         {
-          params: companionViewParams,
+          params: McpUiSetCompanionViewRequestSchema.shape.params,
           result: McpUiSetCompanionViewResultSchema,
         },
         async (params) => {
@@ -587,7 +595,21 @@ export class AppBridge extends Protocol<BaseContext> {
               "Companion View v1 was not negotiated for this parent",
             );
           }
-          return this._companionView.setView(params);
+          let invalidate!: (result: McpUiSetCompanionViewResult) => void;
+          const invalidated = new Promise<McpUiSetCompanionViewResult>(
+            (resolve) => {
+              invalidate = resolve;
+            },
+          );
+          this._pendingCompanionReplies.add(invalidate);
+          try {
+            return await Promise.race([
+              invalidated,
+              this._companionView.setView(params),
+            ]);
+          } finally {
+            this._pendingCompanionReplies.delete(invalidate);
+          }
         },
       );
     }
@@ -1660,7 +1682,7 @@ export class AppBridge extends Protocol<BaseContext> {
 
   /** Whether the View completed the experimental companion v1 handshake. */
   isCompanionViewNegotiated(): boolean {
-    return this._initializedReceived && this._companionViewNegotiated;
+    return this._companionViewReady;
   }
 
   /** Notify the negotiated parent after a host-initiated dismissal. */
@@ -1687,6 +1709,19 @@ export class AppBridge extends Protocol<BaseContext> {
     params: McpUiInitializeRequest["params"],
   ): Promise<McpUiInitializeResult> {
     const requestedVersion = params.protocolVersion;
+    this._companionViewReady = false;
+    this._companionViewNegotiated = false;
+    const generation =
+      this._companionView?.role === "parent"
+        ? this._companionView.startSession()
+        : undefined;
+    if (generation !== undefined) {
+      // Settle replies before the replacement View can reuse JSON-RPC IDs.
+      for (const invalidate of this._pendingCompanionReplies) {
+        invalidate({ status: "stale", generation, itemId: null });
+      }
+      this._pendingCompanionReplies.clear();
+    }
 
     if (this._appInfo !== undefined) {
       console.warn(
@@ -1717,7 +1752,10 @@ export class AppBridge extends Protocol<BaseContext> {
         ...hostCapabilities,
         experimental: {
           ...hostCapabilities.experimental,
-          [COMPANION_VIEW]: { version: 1 },
+          [COMPANION_VIEW]:
+            generation === undefined
+              ? { version: 1 }
+              : { version: 1, generation },
         },
       };
       if (this._companionView?.role === "detail") {
@@ -2096,6 +2134,7 @@ export class AppBridge extends Protocol<BaseContext> {
     }
     this._initializedReceived = false;
     this._companionViewNegotiated = false;
+    this._companionViewReady = false;
     if (this._client) {
       // When a client was passed to the constructor, automatically forward
       // MCP requests/notifications between the view and the server

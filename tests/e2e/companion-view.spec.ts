@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test.skip(
   !!process.env.EXAMPLE && process.env.EXAMPLE !== "debug-server",
@@ -45,6 +46,26 @@ test("switches only the detail iframe and preserves the interactive list on dism
   await expect(
     detail(page).getByRole("heading", { name: "Cedar Loop" }),
   ).toBeVisible();
+  // The detail cannot share the source View's proxy origin or sandbox privileges.
+  const parentProxy = page.locator("iframe").first();
+  const detailProxy = page.locator(
+    'iframe[title="Companion detail view"]:visible',
+  );
+  await expect(parentProxy).toHaveAttribute(
+    "src",
+    /^http:\/\/localhost:8081\//,
+  );
+  await expect(parentProxy.contentFrame().locator("iframe")).toHaveAttribute(
+    "sandbox",
+    /\ballow-same-origin\b/,
+  );
+  await expect(detailProxy).toHaveAttribute(
+    "src",
+    /^http:\/\/127\.0\.0\.1:8081\//,
+  );
+  await expect(
+    detailProxy.contentFrame().locator("iframe"),
+  ).not.toHaveAttribute("sandbox", /\ballow-same-origin\b/);
   await expect(
     list.getByRole("region", { name: "Inline detail" }),
   ).toBeHidden();
@@ -100,6 +121,47 @@ test("switches only the detail iframe and preserves the interactive list on dism
   ).toBeVisible();
   await page.getByRole("button", { name: "Close View", exact: true }).click();
   await expect(page.locator("iframe")).toHaveCount(0);
+});
+
+test("a fresh list document can open its first companion on the same host bridge", async ({
+  page,
+}) => {
+  const list = await openCatalog(page);
+  for (const trail of ["Cedar Loop", "Quartz Ridge"]) {
+    await list.getByRole("button", { name: trail }).click();
+    await expect(
+      detail(page).getByRole("heading", { name: trail }),
+    ).toBeVisible();
+  }
+
+  const html = await readFile(
+    new URL(
+      "../../examples/debug-server/dist/trail-catalog.html",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  // Reload the inner document as the basic host does, leaving the outer iframe and bridge in place.
+  await page
+    .locator("iframe")
+    .first()
+    .contentFrame()
+    .locator("iframe")
+    .evaluate((iframe: HTMLIFrameElement, html) => {
+      const doc = iframe.contentDocument!;
+      doc.open();
+      doc.write(html);
+      doc.close();
+    }, html);
+
+  await expect(list.locator("main")).toHaveAttribute("aria-busy", "false");
+  await expect(
+    page.getByRole("complementary", { name: "Companion detail" }),
+  ).toHaveCount(0);
+  await list.getByRole("button", { name: "Cedar Loop" }).click();
+  await expect(
+    detail(page).getByRole("heading", { name: "Cedar Loop" }),
+  ).toBeVisible();
 });
 
 test("shows the selection inline without the capability or if the resource cannot load", async ({
