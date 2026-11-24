@@ -67,4 +67,5 @@ Open [Trail Catalog](http://localhost:8080/?server=Debug%20MCP%20App%20Server&to
 and select Cedar Loop or Quartz Ridge. The nonmodal detail can be dismissed with
 **Close detail** or Escape while focused in the detail; the list stays mounted.
 Add `&companion=off` to the host URL to see the inline fallback.
-See the [experimental wire contract](../../specification/draft/companion-view.md).
+Use `&companion=blocked` to simulate a host that supports `openView` but
+declines the placement. See the [experimental wire contract](../../specification/draft/open-view.md).

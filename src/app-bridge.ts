@@ -48,14 +48,15 @@ type MethodSchema = ZodObject<{
 }>;
 
 import {
-  COMPANION_VIEW,
-  McpUiCompanionViewAppCapabilitySchema,
-  McpUiCompanionViewClosedNotificationSchema,
-  McpUiSetCompanionViewRequestSchema,
-  McpUiSetCompanionViewResultSchema,
-  type McpUiCompanionViewClosedNotification,
-  type McpUiSetCompanionViewRequest,
-  type McpUiSetCompanionViewResult,
+  OPEN_VIEW,
+  McpUiOpenViewAppCapabilitySchema,
+  McpUiViewClosedNotificationSchema,
+  McpUiOpenViewRequestSchema,
+  McpUiOpenViewResultSchema,
+  type McpUiViewClosedNotification,
+  type McpUiOpenViewRequest,
+  type McpUiOpenViewResult,
+  type McpUiViewLaunchContext,
   type McpUiSandboxResourceReadyNotification,
   type McpUiSizeChangedNotification,
   type McpUiToolCancelledNotification,
@@ -218,17 +219,17 @@ export function buildAllowAttribute(
  */
 export type HostOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
   hostContext?: McpUiHostContext;
-  /** Experimental companion role bound to this bridge by the host. */
-  companionView?:
+  /** Experimental Open View role bound to this bridge by the host. */
+  openView?:
     | {
-        role: "parent";
-        /** Clear prior companion state and return a fresh generation for this initialization. */
+        role: "source";
+        /** Clear prior launch state and return a fresh generation for this initialization. */
         startSession: () => number;
-        setView: (
-          params: McpUiSetCompanionViewRequest["params"],
-        ) => Promise<McpUiSetCompanionViewResult>;
+        open: (
+          params: McpUiOpenViewRequest["params"],
+        ) => Promise<McpUiOpenViewResult>;
       }
-    | { role: "detail"; itemId: string };
+    | { role: "opened"; launch: McpUiViewLaunchContext };
 };
 
 /**
@@ -326,11 +327,11 @@ export class AppBridge extends Protocol<BaseContext> {
   private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
   private _initializedReceived = false;
-  private readonly _companionView: HostOptions["companionView"];
-  private _companionViewNegotiated = false;
-  private _companionViewReady = false;
-  private readonly _pendingCompanionReplies = new Set<
-    (result: McpUiSetCompanionViewResult) => void
+  private readonly _openView: HostOptions["openView"];
+  private _openViewNegotiated = false;
+  private _openViewReady = false;
+  private readonly _pendingOpenViewReplies = new Set<
+    (result: McpUiOpenViewResult) => void
   >();
   private readonly _registeredEvents = new Set<keyof AppBridgeEventMap>();
   private readonly _events = new EventDispatcher<AppBridgeEventMap>();
@@ -490,7 +491,7 @@ export class AppBridge extends Protocol<BaseContext> {
     const dispatch = (params: AppBridgeEventMap[K]) => {
       if (event === "initialized") {
         this._initializedReceived = true;
-        this._companionViewReady = this._companionViewNegotiated;
+        this._openViewReady = this._openViewNegotiated;
       }
       this._events.dispatch(event, params);
     };
@@ -568,7 +569,7 @@ export class AppBridge extends Protocol<BaseContext> {
     this._ensureEventSlot("initialized");
 
     this._hostContext = options?.hostContext || {};
-    this._companionView = options?.companionView;
+    this._openView = options?.openView;
 
     this.replaceRequestHandler(
       "ui/initialize",
@@ -579,36 +580,32 @@ export class AppBridge extends Protocol<BaseContext> {
       (params) => this._onAppsInitialize(params),
     );
 
-    if (this._companionView) {
+    if (this._openView) {
       this.replaceRequestHandler(
-        McpUiSetCompanionViewRequestSchema.shape.method.value,
+        McpUiOpenViewRequestSchema.shape.method.value,
         {
-          params: McpUiSetCompanionViewRequestSchema.shape.params,
-          result: McpUiSetCompanionViewResultSchema,
+          params: McpUiOpenViewRequestSchema.shape.params,
+          result: McpUiOpenViewResultSchema,
         },
         async (params) => {
           if (
-            this._companionView?.role !== "parent" ||
-            !this.isCompanionViewNegotiated()
+            this._openView?.role !== "source" ||
+            !this.isOpenViewNegotiated()
           ) {
-            throw new Error(
-              "Companion View v1 was not negotiated for this parent",
-            );
+            throw new Error("Open View v1 was not negotiated for this source");
           }
-          let invalidate!: (result: McpUiSetCompanionViewResult) => void;
-          const invalidated = new Promise<McpUiSetCompanionViewResult>(
-            (resolve) => {
-              invalidate = resolve;
-            },
-          );
-          this._pendingCompanionReplies.add(invalidate);
+          let invalidate!: (result: McpUiOpenViewResult) => void;
+          const invalidated = new Promise<McpUiOpenViewResult>((resolve) => {
+            invalidate = resolve;
+          });
+          this._pendingOpenViewReplies.add(invalidate);
           try {
             return await Promise.race([
               invalidated,
-              this._companionView.setView(params),
+              this._openView.open(params),
             ]);
           } finally {
-            this._pendingCompanionReplies.delete(invalidate);
+            this._pendingOpenViewReplies.delete(invalidate);
           }
         },
       );
@@ -1680,23 +1677,18 @@ export class AppBridge extends Protocol<BaseContext> {
     return this._hostCapabilities;
   }
 
-  /** Whether the View completed the experimental companion v1 handshake. */
-  isCompanionViewNegotiated(): boolean {
-    return this._companionViewReady;
+  /** Whether the View completed the experimental Open View v1 handshake. */
+  isOpenViewNegotiated(): boolean {
+    return this._openViewReady;
   }
 
-  /** Notify the negotiated parent after a host-initiated dismissal. */
-  sendCompanionViewClosed(
-    params: McpUiCompanionViewClosedNotification["params"],
-  ) {
-    if (
-      this._companionView?.role !== "parent" ||
-      !this.isCompanionViewNegotiated()
-    ) {
-      throw new Error("Companion View v1 was not negotiated for this parent");
+  /** Notify the negotiated source after a host-initiated dismissal. */
+  sendViewClosed(params: McpUiViewClosedNotification["params"]) {
+    if (this._openView?.role !== "source" || !this.isOpenViewNegotiated()) {
+      throw new Error("Open View v1 was not negotiated for this source");
     }
     return this.notification({
-      method: McpUiCompanionViewClosedNotificationSchema.shape.method.value,
+      method: McpUiViewClosedNotificationSchema.shape.method.value,
       params,
     });
   }
@@ -1709,18 +1701,18 @@ export class AppBridge extends Protocol<BaseContext> {
     params: McpUiInitializeRequest["params"],
   ): Promise<McpUiInitializeResult> {
     const requestedVersion = params.protocolVersion;
-    this._companionViewReady = false;
-    this._companionViewNegotiated = false;
+    this._openViewReady = false;
+    this._openViewNegotiated = false;
     const generation =
-      this._companionView?.role === "parent"
-        ? this._companionView.startSession()
+      this._openView?.role === "source"
+        ? this._openView.startSession()
         : undefined;
     if (generation !== undefined) {
       // Settle replies before the replacement View can reuse JSON-RPC IDs.
-      for (const invalidate of this._pendingCompanionReplies) {
-        invalidate({ status: "stale", generation, itemId: null });
+      for (const invalidate of this._pendingOpenViewReplies) {
+        invalidate({ status: "stale", generation });
       }
-      this._pendingCompanionReplies.clear();
+      this._pendingOpenViewReplies.clear();
     }
 
     if (this._appInfo !== undefined) {
@@ -1735,33 +1727,32 @@ export class AppBridge extends Protocol<BaseContext> {
     this._appCapabilities = params.appCapabilities;
     this._appInfo = params.appInfo;
 
-    const role = McpUiCompanionViewAppCapabilitySchema.safeParse(
-      params.appCapabilities.experimental?.[COMPANION_VIEW],
+    const role = McpUiOpenViewAppCapabilitySchema.safeParse(
+      params.appCapabilities.experimental?.[OPEN_VIEW],
     ).data?.role;
-    this._companionViewNegotiated =
-      !!role && role === this._companionView?.role;
+    this._openViewNegotiated = !!role && role === this._openView?.role;
     let hostCapabilities = this.getCapabilities();
     let hostContext = this._hostContext;
-    if (hostCapabilities.experimental?.[COMPANION_VIEW]) {
+    if (hostCapabilities.experimental?.[OPEN_VIEW]) {
       const experimental = { ...hostCapabilities.experimental };
-      delete experimental[COMPANION_VIEW];
+      delete experimental[OPEN_VIEW];
       hostCapabilities = { ...hostCapabilities, experimental };
     }
-    if (this._companionViewNegotiated) {
+    if (this._openViewNegotiated) {
       hostCapabilities = {
         ...hostCapabilities,
         experimental: {
           ...hostCapabilities.experimental,
-          [COMPANION_VIEW]:
+          [OPEN_VIEW]:
             generation === undefined
               ? { version: 1 }
               : { version: 1, generation },
         },
       };
-      if (this._companionView?.role === "detail") {
+      if (this._openView?.role === "opened") {
         hostContext = {
           ...hostContext,
-          companionView: { itemId: this._companionView.itemId },
+          [OPEN_VIEW]: this._openView.launch,
         };
       }
     }
@@ -2133,8 +2124,8 @@ export class AppBridge extends Protocol<BaseContext> {
       );
     }
     this._initializedReceived = false;
-    this._companionViewNegotiated = false;
-    this._companionViewReady = false;
+    this._openViewNegotiated = false;
+    this._openViewReady = false;
     if (this._client) {
       // When a client was passed to the constructor, automatically forward
       // MCP requests/notifications between the view and the server
@@ -2152,7 +2143,7 @@ export class AppBridge extends Protocol<BaseContext> {
         };
         if (
           serverCapabilities.tools.listChanged &&
-          this._companionView?.role !== "detail"
+          this._openView?.role !== "opened"
         ) {
           this._client.setNotificationHandler(
             "notifications/tools/list_changed",
@@ -2181,7 +2172,7 @@ export class AppBridge extends Protocol<BaseContext> {
         };
         if (
           serverCapabilities.resources.listChanged &&
-          this._companionView?.role !== "detail"
+          this._openView?.role !== "opened"
         ) {
           this._client.setNotificationHandler(
             "notifications/resources/list_changed",
@@ -2198,7 +2189,7 @@ export class AppBridge extends Protocol<BaseContext> {
         };
         if (
           serverCapabilities.prompts.listChanged &&
-          this._companionView?.role !== "detail"
+          this._openView?.role !== "opened"
         ) {
           this._client.setNotificationHandler(
             "notifications/prompts/list_changed",

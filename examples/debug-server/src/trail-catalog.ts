@@ -1,23 +1,16 @@
-import {
-  App,
-  COMPANION_VIEW,
-  McpUiCompanionViewHostCapabilitySchema,
-} from "@modelcontextprotocol/ext-apps";
+import { App, OPEN_VIEW } from "@modelcontextprotocol/ext-apps";
 import { showTrail, trails } from "./trails";
 
 const app = new App(
   { name: "Trail Catalog", version: "1.0.0" },
-  { experimental: { [COMPANION_VIEW]: { version: 1, role: "parent" } } },
+  { experimental: { [OPEN_VIEW]: { version: 1, role: "source" } } },
 );
 const filter = document.querySelector<HTMLInputElement>("#trail-filter")!;
 const list = document.querySelector<HTMLUListElement>("#trail-list")!;
 const inline = document.querySelector<HTMLElement>("#inline-detail")!;
-const hide = document.querySelector<HTMLButtonElement>("#hide-detail")!;
+const status = document.querySelector<HTMLElement>("#detail-status")!;
 
-let generation = 0;
-let seq = 0;
 let selected: string | null = null;
-let companion = false;
 const rows = new Map<string, HTMLLIElement>();
 for (const trail of trails) {
   const row = document.createElement("li");
@@ -44,61 +37,38 @@ filter.addEventListener("input", () => {
   for (const trail of trails)
     rows.get(trail.id)!.hidden = !trail.name.toLowerCase().includes(query);
 });
-hide.addEventListener("click", () => {
-  void setDetail(null);
-});
-
-async function setDetail(itemId: string | null) {
-  const requestedSeq = ++seq;
-  const requestedGeneration = generation;
-  hide.disabled = itemId === null;
+async function setDetail(itemId: string) {
+  status.textContent = "";
   inline.hidden = true;
-  const fallback = () => {
+  const fallback = (message: string) => {
+    status.textContent = message;
     const trail = trails.find((trail) => trail.id === itemId);
     if (trail) showTrail(inline, trail, "h2");
   };
-  if (!companion) {
-    fallback();
-    return;
-  }
   try {
-    const result = await app.setCompanionView({
-      generation,
-      seq: requestedSeq,
-      itemId,
+    const result = await app.openView({
+      target: "trail-detail",
+      input: { itemId },
     });
-    if (requestedSeq !== seq || requestedGeneration !== generation) return;
-    generation = result.generation;
-    if (
-      result.status === "unavailable" ||
-      result.status === "denied" ||
-      result.status === "failed"
-    )
-      fallback();
-    if (result.status === "stale") hide.disabled = result.itemId === null;
+    switch (result.status) {
+      case "unavailable":
+        fallback("A separate detail view is unavailable.");
+        break;
+      case "denied":
+        fallback("The host declined to open a separate detail view.");
+        break;
+      case "failed":
+        fallback("The separate detail view could not load.");
+        break;
+    }
   } catch (error) {
-    console.warn("Companion request failed:", error);
-    if (requestedSeq === seq && requestedGeneration === generation) fallback();
+    console.warn("Open View request failed:", error);
+    fallback("The separate detail view could not load.");
   }
 }
 
-app.addEventListener("companionviewclosed", (params) => {
-  if (params.generation <= generation) return;
-  generation = params.generation;
-  inline.hidden = true;
-  hide.disabled = true;
-});
 app
   .connect()
-  .then(() => {
-    const capability = McpUiCompanionViewHostCapabilitySchema.safeParse(
-      app.getHostCapabilities()?.experimental?.[COMPANION_VIEW],
-    ).data;
-    if (capability?.generation !== undefined) {
-      generation = capability.generation;
-      companion = true;
-    }
-  })
   .catch((error) =>
     console.warn("Trail Catalog could not connect to its host:", error),
   )

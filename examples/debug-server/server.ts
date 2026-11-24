@@ -1,4 +1,5 @@
 import {
+  OPEN_VIEW,
   registerAppResource,
   registerAppTool,
   RESOURCE_MIME_TYPE,
@@ -173,7 +174,8 @@ export function createServer(): McpServer {
       description: "Browse a synthetic trail catalog with companion detail.",
       inputSchema: z.object({}),
       _meta: {
-        ui: { resourceUri: catalogUri, companionResourceUri: detailUri },
+        ui: { resourceUri: catalogUri },
+        [OPEN_VIEW]: { targets: { "trail-detail": detailUri } },
       },
     },
     async () => ({

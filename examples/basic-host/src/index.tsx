@@ -2,8 +2,8 @@ import { getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol
 import type { Tool } from "@modelcontextprotocol/client";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { callTool, connectToServer, getCompanionResourceUri, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
-import { CompanionView, type CompanionSlot } from "./companion-view";
+import { callTool, connectToServer, getOpenViewTargets, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { OpenViewController, type CompanionSlot } from "./open-view";
 import { mountCompanionPane } from "./companion-pane";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
 import styles from "./index.module.css";
@@ -430,7 +430,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const appBridgeRef = useRef<ReturnType<typeof newAppBridge> | null>(null);
   const companionOutlet = useRef<HTMLDivElement | null>(null);
-  const companionRef = useRef<CompanionView | undefined>(undefined);
+  const companionRef = useRef<OpenViewController | undefined>(undefined);
   const lifecycleRef = useRef<AbortController | null>(null);
   const [modelContext, setModelContext] = useState<ModelContext | null>(null);
   const [messages, setMessages] = useState<AppMessage[]>([]);
@@ -442,26 +442,29 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
     lifecycleRef.current = lifecycle;
     const { signal } = lifecycle;
     let appBridge: ReturnType<typeof newAppBridge> | undefined;
-    const uri = new URLSearchParams(location.search).get("companion") !== "off"
-      ? getCompanionResourceUri(toolCallInfo)
-      : undefined;
-    let companion: CompanionView | undefined;
-    if (uri) {
+    const companionPolicy = new URLSearchParams(location.search).get("companion");
+    const targets = getOpenViewTargets(toolCallInfo);
+    let companion: OpenViewController | undefined;
+    let sourceMode: "inline" | "fullscreen" = "inline";
+    if (companionPolicy !== "off" && targets.size) {
       const dismiss = () => {
         if (companionOutlet.current?.contains(document.activeElement)) iframe.focus();
         companion?.dismiss();
       };
-      companion = new CompanionView(
+      companion = new OpenViewController(
         companionSlot,
-        async (itemId, signal) => {
+        async ({ target, input }, signal) => {
+          const uri = targets.get(target);
+          if (!uri || companionPolicy === "blocked" || sourceMode !== "inline") return "denied";
           const outlet = companionOutlet.current;
-          if (outlet?.isConnected) {
-            return mountCompanionPane(outlet, toolCallInfo.serverInfo, uri, itemId, signal, dismiss);
-          }
+          if (!outlet?.isConnected) return "unavailable";
+          // This host only offers an inline secondary pane, regardless of the preference.
+          const pane = await mountCompanionPane(outlet, toolCallInfo.serverInfo, uri, { target, input }, signal, dismiss);
+          return { pane, displayMode: "inline" };
         },
         (generation) => {
-          if (appBridge?.isCompanionViewNegotiated()) {
-            void appBridge.sendCompanionViewClosed({ generation }).catch((error) => log.warn("Could not notify parent of dismissal:", error));
+          if (appBridge?.isOpenViewNegotiated()) {
+            void appBridge.sendViewClosed({ generation }).catch((error) => log.warn("Could not notify source of dismissal:", error));
           }
         },
         (error) => log.warn("Companion detail could not open:", error),
@@ -476,12 +479,16 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
       appBridge = newAppBridge(toolCallInfo.serverInfo, iframe, {
         onContextUpdate: setModelContext,
         onMessage: (msg) => setMessages((prev) => [...prev, msg]),
-        onDisplayModeChange: setDisplayMode,
+        onDisplayModeChange: (mode) => {
+          sourceMode = mode;
+          if (mode !== "inline") companion?.dismiss();
+          setDisplayMode(mode);
+        },
       }, {
-        companionView: companion && {
-          role: "parent",
+        openView: companion && {
+          role: "source",
           startSession: companion.startSession.bind(companion),
-          setView: companion.setView.bind(companion),
+          open: companion.open.bind(companion),
         },
       });
       const onClose = appBridge.onclose;

@@ -33,9 +33,9 @@ import type {
   ToolListChangedNotification,
 } from "@modelcontextprotocol/client";
 import type {
-  McpUiCompanionViewClosedNotification,
-  McpUiSetCompanionViewRequest,
-  McpUiSetCompanionViewResult,
+  McpUiViewClosedNotification,
+  McpUiOpenViewRequest,
+  McpUiOpenViewResult,
   McpUiDownloadFileRequest,
   McpUiDownloadFileResult,
   McpUiHostContextChangedNotification,
@@ -80,12 +80,14 @@ export {
   INITIALIZE_METHOD,
   INITIALIZED_METHOD,
   REQUEST_DISPLAY_MODE_METHOD,
-  COMPANION_VIEW,
-  type McpUiCompanionViewAppCapability,
-  type McpUiCompanionViewHostCapability,
-  type McpUiCompanionViewClosedNotification,
-  type McpUiSetCompanionViewRequest,
-  type McpUiSetCompanionViewResult,
+  OPEN_VIEW,
+  type McpUiOpenViewAppCapability,
+  type McpUiOpenViewHostCapability,
+  type McpUiOpenViewToolMeta,
+  type McpUiViewLaunchContext,
+  type McpUiViewClosedNotification,
+  type McpUiOpenViewRequest,
+  type McpUiOpenViewResult,
   type McpUiTheme,
   type McpUiDisplayMode,
   type McpUiStyleVariableKey,
@@ -163,11 +165,13 @@ export {
   McpUiResourceMetaSchema,
   McpUiRequestDisplayModeRequestSchema,
   McpUiRequestDisplayModeResultSchema,
-  McpUiCompanionViewAppCapabilitySchema,
-  McpUiCompanionViewHostCapabilitySchema,
-  McpUiCompanionViewClosedNotificationSchema,
-  McpUiSetCompanionViewRequestSchema,
-  McpUiSetCompanionViewResultSchema,
+  McpUiOpenViewAppCapabilitySchema,
+  McpUiOpenViewHostCapabilitySchema,
+  McpUiOpenViewToolMetaSchema,
+  McpUiViewLaunchContextSchema,
+  McpUiViewClosedNotificationSchema,
+  McpUiOpenViewRequestSchema,
+  McpUiOpenViewResultSchema,
   McpUiToolVisibilitySchema,
   McpUiToolMetaSchema,
 } from "./generated/schema.js";
@@ -186,7 +190,7 @@ export type AppRequest =
   | McpUiUpdateModelContextRequest
   | McpUiResourceTeardownRequest
   | McpUiRequestDisplayModeRequest
-  | McpUiSetCompanionViewRequest
+  | McpUiOpenViewRequest
   | CallToolRequest
   | ListToolsRequest
   | ListResourcesRequest
@@ -204,7 +208,7 @@ export type AppRequest =
 export type AppNotification =
   // Sent to app
   | McpUiHostContextChangedNotification
-  | McpUiCompanionViewClosedNotification
+  | McpUiViewClosedNotification
   | McpUiToolInputNotification
   | McpUiToolInputPartialNotification
   | McpUiToolResultNotification
@@ -232,7 +236,7 @@ export type AppResult =
   | McpUiMessageResult
   | McpUiResourceTeardownResult
   | McpUiRequestDisplayModeResult
-  | McpUiSetCompanionViewResult
+  | McpUiOpenViewResult
   | CallToolResult
   | ListToolsResult
   | ListResourcesResult

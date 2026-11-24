@@ -105,9 +105,8 @@ test("switches only the detail iframe and preserves the interactive list on dism
   await expect(
     detail(page).getByRole("heading", { name: "Cedar Loop" }),
   ).toBeVisible();
-  await list
-    .getByRole("button", { name: "Hide selected detail" })
-    .press("Enter");
+  await detail(page).getByRole("heading", { name: "Cedar Loop" }).click();
+  await page.keyboard.press("Escape");
   await expect(
     page.getByRole("complementary", { name: "Companion detail" }),
   ).toHaveCount(0);
@@ -164,16 +163,24 @@ test("a fresh list document can open its first companion on the same host bridge
   ).toBeVisible();
 });
 
-test("shows the selection inline without the capability or if the resource cannot load", async ({
+for (const [policy, status] of [
+  ["off", "A separate detail view is unavailable."],
+  ["blocked", "The host declined to open a separate detail view."],
+]) {
+  test(`shows details inline with companion=${policy}`, async ({ page }) => {
+    const list = await openCatalog(page, `&companion=${policy}`);
+    await list.getByRole("button", { name: "Cedar Loop" }).click();
+    await expect(list.getByRole("status")).toHaveText(status);
+    await expect(
+      list.getByRole("heading", { name: "Cedar Loop" }),
+    ).toBeVisible();
+    await expect(page.locator("iframe")).toHaveCount(1);
+  });
+}
+
+test("shows details inline if the declared resource cannot load", async ({
   page,
 }) => {
-  const legacy = await openCatalog(page, "&companion=off");
-  await legacy.getByRole("button", { name: "Cedar Loop" }).click();
-  await expect(
-    legacy.getByRole("heading", { name: "Cedar Loop" }),
-  ).toBeVisible();
-  await expect(page.locator("iframe")).toHaveCount(1);
-
   await page.route("**/mcp", async (route) => {
     const request = route.request();
     const message =
@@ -191,6 +198,9 @@ test("shows the selection inline without the capability or if the resource canno
   await list.getByRole("button", { name: "Quartz Ridge" }).click();
   await expect(list.getByRole("heading", { name: "Quartz Ridge" })).toBeVisible(
     { timeout: 10000 },
+  );
+  await expect(list.getByRole("status")).toHaveText(
+    "The separate detail view could not load.",
   );
   await expect(
     page.getByRole("complementary", { name: "Companion detail" }),

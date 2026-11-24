@@ -7,6 +7,7 @@ import {
   CallToolResultSchema,
   EmbeddedResourceSchema,
   ImplementationSchema,
+  JSONObjectSchema,
   RequestIdSchema,
   ResourceLinkSchema,
   ToolSchema,
@@ -430,8 +431,6 @@ export const McpUiHostStylesSchema = z.object({
   ),
 });
 
-const CompanionViewItemIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
-
 /**
  * @description Request for graceful shutdown of the View (Host -> View).
  * @see {@link app-bridge!AppBridge.teardownResource `AppBridge.teardownResource`} for the host method that sends this
@@ -710,46 +709,39 @@ export const McpUiRequestDisplayModeResultSchema = z
   })
   .passthrough();
 
-/** Experimental companion View v1 advertisement from a View. */
-export const McpUiCompanionViewAppCapabilitySchema = z.object({
+/** Experimental Open View v1 advertisement from a View. */
+export const McpUiOpenViewAppCapabilitySchema = z.object({
   version: z.literal(1),
-  role: z.union([z.literal("parent"), z.literal("detail")]),
+  role: z.union([z.literal("source"), z.literal("opened")]),
 });
 
-const CompanionViewGenerationSchema = z.number().int().nonnegative();
+const OpenViewGenerationSchema = z.number().int().nonnegative();
 
-const CompanionViewSelectionSchema = z.strictObject({
-  generation: CompanionViewGenerationSchema,
-  /** @schema .int().positive() */
-  seq: z.number().int().positive(),
-  itemId: CompanionViewItemIdSchema.nullable(),
+const ViewTargetSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
+
+/** Experimental metadata on the source tool under `_meta[OPEN_VIEW]`. */
+export const McpUiOpenViewToolMetaSchema = z.object({
+  targets: z.record(ViewTargetSchema, z.string()),
 });
 
-/** Experimental request to show, switch, or close the parent's companion View. */
-export const McpUiSetCompanionViewRequestSchema = z.object({
-  method: z.literal("ui/set-companion-view"),
-  params: CompanionViewSelectionSchema,
-});
-
-/** Experimental companion View outcome and the host's actual selection. */
-export const McpUiSetCompanionViewResultSchema = z.object({
+/** Experimental outcome and actual display mode, if the View opened. */
+export const McpUiOpenViewResultSchema = z.object({
   status: z.union([
-    z.literal("shown"),
-    z.literal("closed"),
+    z.literal("opened"),
     z.literal("unavailable"),
     z.literal("denied"),
     z.literal("failed"),
     z.literal("stale"),
   ]),
-  generation: CompanionViewGenerationSchema,
-  itemId: CompanionViewItemIdSchema.nullable(),
+  generation: OpenViewGenerationSchema,
+  displayMode: McpUiDisplayModeSchema.optional(),
 });
 
-/** Experimental notification of a host-initiated companion dismissal. */
-export const McpUiCompanionViewClosedNotificationSchema = z.object({
-  method: z.literal("ui/notifications/companion-view-closed"),
+/** Experimental notification of host dismissal of a secondary View. */
+export const McpUiViewClosedNotificationSchema = z.object({
+  method: z.literal("ui/notifications/view-closed"),
   params: z.object({
-    generation: CompanionViewGenerationSchema,
+    generation: OpenViewGenerationSchema,
   }),
 });
 
@@ -773,13 +765,6 @@ export const McpUiToolMetaSchema = z.object({
    * ```
    */
   resourceUri: z.string().optional(),
-  /** @description Experimental same-server UI resource for a companion detail View. */
-  companionResourceUri: z
-    .string()
-    .optional()
-    .describe(
-      "Experimental same-server UI resource for a companion detail View.",
-    ),
   /**
    * @description Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
@@ -918,15 +903,6 @@ export const McpUiHostContextSchema = z
       })
       .optional()
       .describe("Metadata of the tool call that instantiated this App."),
-    /** @description Experimental companion View bootstrap, supplied only to the detail View. */
-    companionView: z
-      .object({
-        itemId: CompanionViewItemIdSchema,
-      })
-      .optional()
-      .describe(
-        "Experimental companion View bootstrap, supplied only to the detail View.",
-      ),
     /** @description Current color theme preference. */
     theme: McpUiThemeSchema.optional().describe(
       "Current color theme preference.",
@@ -1118,11 +1094,37 @@ export const McpUiInitializeResultSchema = z
   })
   .passthrough();
 
-/** Experimental acknowledgement of companion View v1 by the host. */
-export const McpUiCompanionViewHostCapabilitySchema = z.object({
+/** Experimental acknowledgement of Open View v1 by the host. */
+export const McpUiOpenViewHostCapabilitySchema = z.object({
   version: z.literal(1),
-  /** @description Initial generation for this parent session. Omitted for detail Views. */
-  generation: CompanionViewGenerationSchema.optional().describe(
-    "Initial generation for this parent session. Omitted for detail Views.",
+  /** @description Initial generation for the source session. Omitted for opened Views. */
+  generation: OpenViewGenerationSchema.optional().describe(
+    "Initial generation for the source session. Omitted for opened Views.",
   ),
+});
+
+const ViewLaunchInputSchema = JSONObjectSchema.refine(
+  (value) => new TextEncoder().encode(JSON.stringify(value)).length <= 4096,
+  "View launch input exceeds 4096 bytes",
+);
+
+/** Experimental bootstrap passed under `hostContext[OPEN_VIEW]` to the opened View. */
+export const McpUiViewLaunchContextSchema = z.object({
+  target: ViewTargetSchema,
+  input: ViewLaunchInputSchema,
+});
+
+const OpenViewRequestParamsSchema = z.strictObject({
+  generation: OpenViewGenerationSchema,
+  /** @schema .int().positive() */
+  seq: z.number().int().positive(),
+  target: ViewTargetSchema,
+  input: ViewLaunchInputSchema,
+  preferredDisplayMode: McpUiDisplayModeSchema.optional(),
+});
+
+/** Experimental request to open a server-declared View in a separate surface. */
+export const McpUiOpenViewRequestSchema = z.object({
+  method: z.literal("ui/open-view"),
+  params: OpenViewRequestParamsSchema,
 });

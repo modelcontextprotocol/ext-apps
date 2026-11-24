@@ -1,4 +1,4 @@
-import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest, type HostOptions } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest, type HostOptions, OPEN_VIEW, McpUiOpenViewToolMetaSchema } from "@modelcontextprotocol/ext-apps/app-bridge";
 import {
   Client,
   SSEClientTransport,
@@ -118,15 +118,26 @@ export function callTool(
 }
 
 
-export function getCompanionResourceUri({ serverInfo, tool }: ToolCallInfo): string | undefined {
-  const ui = tool._meta?.ui;
-  if (!ui || typeof ui !== "object" || !("companionResourceUri" in ui)) return;
-  const uri = ui.companionResourceUri;
+export function getOpenViewTargets({ serverInfo, tool }: ToolCallInfo): ReadonlyMap<string, string> {
+  const targets = new Map<string, string>();
+  const declaration = tool._meta?.[OPEN_VIEW];
+  if (declaration === undefined) return targets;
+  const parsed = McpUiOpenViewToolMetaSchema.safeParse(declaration);
+  if (!parsed.success) {
+    log.warn("Invalid Open View declaration:", parsed.error.message);
+    return targets;
+  }
   const source = getToolUiResourceUri(tool);
-  if (typeof uri !== "string" || !uri.startsWith("ui://") || !source || !serverInfo.resources.has(uri)) return;
-  if (!URL.canParse(uri) || !URL.canParse(source)) return;
-  const resource = new URL(uri);
-  if (resource.hostname && !resource.username && !resource.password && !uri.includes("#") && resource.href !== new URL(source).href) return uri;
+  if (!source || !URL.canParse(source)) return targets;
+  const sourceHref = new URL(source).href;
+  for (const [target, uri] of Object.entries(parsed.data.targets)) {
+    if (!uri.startsWith("ui://") || !serverInfo.resources.has(uri) || !URL.canParse(uri)) continue;
+    const resource = new URL(uri);
+    if (resource.hostname && !resource.username && !resource.password && !uri.includes("#") && resource.href !== sourceHref) {
+      targets.set(target, uri);
+    }
+  }
+  return targets;
 }
 
 export async function getUiResource(
@@ -303,7 +314,7 @@ export interface AppBridgeCallbacks {
 export interface AppBridgeOptions {
   containerDimensions?: { maxHeight?: number; width?: number } | { height: number; width?: number };
   displayMode?: "inline" | "fullscreen";
-  companionView?: HostOptions["companionView"];
+  openView?: HostOptions["openView"];
 }
 
 export function newAppBridge(
@@ -313,15 +324,15 @@ export function newAppBridge(
   options?: AppBridgeOptions,
 ): AppBridge {
   const serverCapabilities = serverInfo.client.getServerCapabilities();
-  const isDetail = options?.companionView?.role === "detail";
+  const isOpenedView = options?.openView?.role === "opened";
   const appBridge = new AppBridge(serverInfo.client, IMPLEMENTATION, {
     openLinks: {},
-    serverTools: isDetail && serverCapabilities?.tools ? {} : serverCapabilities?.tools,
-    serverResources: isDetail && serverCapabilities?.resources ? {} : serverCapabilities?.resources,
+    serverTools: isOpenedView && serverCapabilities?.tools ? {} : serverCapabilities?.tools,
+    serverResources: isOpenedView && serverCapabilities?.resources ? {} : serverCapabilities?.resources,
     // Declare support for model context updates
     updateModelContext: { text: {} },
   }, {
-    companionView: options?.companionView,
+    openView: options?.openView,
     // Pass initial host context with theme, display mode, and style variables
     hostContext: {
       theme: getTheme(),
@@ -331,7 +342,7 @@ export function newAppBridge(
       },
       containerDimensions: options?.containerDimensions ?? { maxHeight: 6000 },
       displayMode: options?.displayMode ?? "inline",
-      availableDisplayModes: isDetail ? ["inline"] : ["inline", "fullscreen"],
+      availableDisplayModes: isOpenedView ? ["inline"] : ["inline", "fullscreen"],
     },
   });
 
@@ -431,7 +442,7 @@ export function newAppBridge(
   // Handle display mode change requests from the app
   appBridge.onrequestdisplaymode = async (params) => {
     log.info("Display mode request from MCP App:", params);
-    const newMode = !isDetail && params.mode === "fullscreen" ? "fullscreen" : "inline";
+    const newMode = !isOpenedView && params.mode === "fullscreen" ? "fullscreen" : "inline";
     // Update host context and notify the app
     appBridge.sendHostContextChange({
       displayMode: newMode,

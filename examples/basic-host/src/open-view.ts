@@ -1,10 +1,11 @@
 import type {
-  McpUiSetCompanionViewRequest,
-  McpUiSetCompanionViewResult,
+  McpUiDisplayMode,
+  McpUiOpenViewRequest,
+  McpUiOpenViewResult,
 } from "@modelcontextprotocol/ext-apps/app-bridge";
 
-type Params = McpUiSetCompanionViewRequest["params"];
-type Result = McpUiSetCompanionViewResult;
+type Params = McpUiOpenViewRequest["params"];
+type Result = McpUiOpenViewResult;
 
 export interface CompanionPane {
   show(): void;
@@ -12,19 +13,21 @@ export interface CompanionPane {
 }
 
 export interface CompanionSlot {
-  owner?: CompanionView;
+  owner?: OpenViewController;
 }
 
-export class CompanionView {
+type Placement = { pane: CompanionPane; displayMode: McpUiDisplayMode };
+
+export class OpenViewController {
   private generation = -1;
   private lastSeq = 0;
   private destroyed = false;
   private pending?: AbortController;
-  private visible?: { itemId: string; pane: CompanionPane };
+  private visible?: CompanionPane;
 
   constructor(
     private readonly slot: CompanionSlot,
-    private readonly mount: (itemId: string, signal: AbortSignal) => Promise<CompanionPane | undefined>,
+    private readonly mount: (params: Params, signal: AbortSignal) => Promise<Placement | "denied" | "unavailable">,
     private readonly notifyClosed: (generation: number) => void,
     private readonly reportFailure: (error: unknown) => void,
   ) {}
@@ -37,17 +40,14 @@ export class CompanionView {
     return this.generation;
   }
 
-  async setView({ generation, seq, itemId }: Params): Promise<Result> {
+  async open(params: Params): Promise<Result> {
+    const { generation, seq } = params;
     if (this.destroyed || generation !== this.generation || seq <= this.lastSeq) {
       return this.result("stale");
     }
 
     this.lastSeq = seq;
     this.clearSelection();
-    if (itemId === null) {
-      this.release();
-      return this.result("closed");
-    }
     if (this.slot.owner && this.slot.owner !== this) return this.result("denied");
 
     this.slot.owner = this;
@@ -58,18 +58,18 @@ export class CompanionView {
       && this.pending === pending;
 
     try {
-      const pane = await this.mount(itemId, pending.signal);
+      const placement = await this.mount(params, pending.signal);
       if (!isCurrent()) {
-        pane?.dispose();
+        if (typeof placement !== "string") placement.pane.dispose();
         return this.result("stale");
       }
-      if (!pane) {
+      if (typeof placement === "string") {
         this.release();
-        return this.result("unavailable");
+        return this.result(placement);
       }
-      this.visible = { itemId, pane };
-      pane.show();
-      return this.result("shown");
+      this.visible = placement.pane;
+      placement.pane.show();
+      return { ...this.result("opened"), displayMode: placement.displayMode };
     } catch (error) {
       if (!isCurrent()) return this.result("stale");
       this.clearSelection();
@@ -100,7 +100,7 @@ export class CompanionView {
   private clearSelection(): void {
     this.pending?.abort();
     this.pending = undefined;
-    this.visible?.pane.dispose();
+    this.visible?.dispose();
     this.visible = undefined;
   }
 
@@ -109,6 +109,6 @@ export class CompanionView {
   }
 
   private result(status: Result["status"]): Result {
-    return { status, generation: this.generation, itemId: this.visible?.itemId ?? null };
+    return { status, generation: this.generation };
   }
 }

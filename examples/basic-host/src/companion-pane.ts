@@ -1,5 +1,5 @@
-import type { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { CompanionPane } from "./companion-view";
+import type { AppBridge, McpUiViewLaunchContext } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { CompanionPane } from "./open-view";
 import { getUiResource, initializeView, loadSandboxProxy, log, newAppBridge, type ServerInfo } from "./implementation";
 import styles from "./index.module.css";
 
@@ -7,7 +7,7 @@ export async function mountCompanionPane(
   outlet: HTMLElement,
   serverInfo: ServerInfo,
   uri: string,
-  itemId: string,
+  launch: McpUiViewLaunchContext,
   signal: AbortSignal,
   dismiss: () => void,
 ): Promise<CompanionPane> {
@@ -61,11 +61,13 @@ export async function mountCompanionPane(
     });
     await loadSandboxProxy(iframe, resource.csp, resource.permissions, { isolated: true, signal: deadline });
     deadline.throwIfAborted();
-    bridge = newAppBridge(serverInfo, iframe, undefined, { companionView: { role: "detail", itemId } });
+    bridge = newAppBridge(serverInfo, iframe, undefined, { openView: { role: "opened", launch } });
     bridge.onrequestteardown = dismissCurrent;
     await initializeView(iframe, bridge, resource, deadline);
     ready = true;
-    if (!bridge.isCompanionViewNegotiated()) throw new Error("Detail View did not negotiate companion v1");
+    if (!bridge.isOpenViewNegotiated()) throw new Error("Opened View did not negotiate Open View v1");
+    const modes = bridge.getAppCapabilities()?.availableDisplayModes;
+    if (modes && !modes.includes("inline")) throw new Error("Opened View does not support inline display");
     return {
       show() {
         status.remove();

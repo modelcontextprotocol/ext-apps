@@ -79,6 +79,7 @@ const EXTERNAL_TYPE_SCHEMAS = [
   "CallToolResultSchema",
   "EmbeddedResourceSchema",
   "ImplementationSchema",
+  "JSONObjectSchema",
   "RequestIdSchema",
   "ResourceLinkSchema",
   "ToolSchema",

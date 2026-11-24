@@ -15,6 +15,7 @@ import type {
   ContentBlock,
   EmbeddedResource,
   Implementation,
+  JSONObject,
   RequestId,
   ResourceLink,
   Tool,
@@ -347,8 +348,6 @@ export interface McpUiHostContext {
     /** @description Tool definition including name, inputSchema, etc. */
     tool: Tool;
   };
-  /** @description Experimental companion View bootstrap, supplied only to the detail View. */
-  companionView?: { itemId: CompanionViewItemId };
   /** @description Current color theme preference. */
   theme?: McpUiTheme;
   /** @description Style configuration for theming the app. */
@@ -760,50 +759,66 @@ export interface McpUiRequestDisplayModeResult {
   [key: string]: unknown;
 }
 
-/** Experimental companion View v1 advertisement from a View. */
-export interface McpUiCompanionViewAppCapability {
+/** Experimental Open View v1 advertisement from a View. */
+export interface McpUiOpenViewAppCapability {
   version: 1;
-  role: "parent" | "detail";
+  role: "source" | "opened";
 }
 
-/** Experimental acknowledgement of companion View v1 by the host. */
-export interface McpUiCompanionViewHostCapability {
+/** Experimental acknowledgement of Open View v1 by the host. */
+export interface McpUiOpenViewHostCapability {
   version: 1;
-  /** @description Initial generation for this parent session. Omitted for detail Views. */
-  generation?: CompanionViewGeneration;
+  /** @description Initial generation for the source session. Omitted for opened Views. */
+  generation?: OpenViewGeneration;
 }
 
 /** @schema .int().nonnegative() */
-type CompanionViewGeneration = number;
+type OpenViewGeneration = number;
 
 /** @pattern ^[A-Za-z0-9_-]{1,128}$ */
-type CompanionViewItemId = string;
+type ViewTarget = string;
+
+/** @schema .refine((value) => new TextEncoder().encode(JSON.stringify(value)).length <= 4096, "View launch input exceeds 4096 bytes") */
+type ViewLaunchInput = JSONObject;
+
+/** Experimental metadata on the source tool under `_meta[OPEN_VIEW]`. */
+export interface McpUiOpenViewToolMeta {
+  targets: Record<ViewTarget, string>;
+}
+
+/** Experimental bootstrap passed under `hostContext[OPEN_VIEW]` to the opened View. */
+export interface McpUiViewLaunchContext {
+  target: ViewTarget;
+  input: ViewLaunchInput;
+}
+
+/** Experimental request to open a server-declared View in a separate surface. */
+export interface McpUiOpenViewRequest {
+  method: "ui/open-view";
+  params: OpenViewRequestParams;
+}
 
 /** @strict */
-type CompanionViewSelection = {
-  generation: CompanionViewGeneration;
+type OpenViewRequestParams = {
+  generation: OpenViewGeneration;
   /** @schema .int().positive() */
   seq: number;
-  itemId: CompanionViewItemId | null;
+  target: ViewTarget;
+  input: ViewLaunchInput;
+  preferredDisplayMode?: McpUiDisplayMode;
 };
 
-/** Experimental request to show, switch, or close the parent's companion View. */
-export interface McpUiSetCompanionViewRequest {
-  method: "ui/set-companion-view";
-  params: CompanionViewSelection;
+/** Experimental outcome and actual display mode, if the View opened. */
+export interface McpUiOpenViewResult {
+  status: "opened" | "unavailable" | "denied" | "failed" | "stale";
+  generation: OpenViewGeneration;
+  displayMode?: McpUiDisplayMode;
 }
 
-/** Experimental companion View outcome and the host's actual selection. */
-export interface McpUiSetCompanionViewResult {
-  status: "shown" | "closed" | "unavailable" | "denied" | "failed" | "stale";
-  generation: CompanionViewGeneration;
-  itemId: CompanionViewItemId | null;
-}
-
-/** Experimental notification of a host-initiated companion dismissal. */
-export interface McpUiCompanionViewClosedNotification {
-  method: "ui/notifications/companion-view-closed";
-  params: { generation: CompanionViewGeneration };
+/** Experimental notification of host dismissal of a secondary View. */
+export interface McpUiViewClosedNotification {
+  method: "ui/notifications/view-closed";
+  params: { generation: OpenViewGeneration };
 }
 
 /**
@@ -824,8 +839,6 @@ export interface McpUiToolMeta {
    * ```
    */
   resourceUri?: string;
-  /** @description Experimental same-server UI resource for a companion detail View. */
-  companionResourceUri?: string;
   /**
    * @description Who can access this tool. Default: ["model", "app"]
    * - "model": Tool visible to and callable by the agent
@@ -891,7 +904,7 @@ export const INITIALIZED_METHOD: McpUiInitializedNotification["method"] =
   "ui/notifications/initialized";
 export const REQUEST_DISPLAY_MODE_METHOD: McpUiRequestDisplayModeRequest["method"] =
   "ui/request-display-mode";
-export const COMPANION_VIEW = "io.modelcontextprotocol/companion-view";
+export const OPEN_VIEW = "io.modelcontextprotocol/open-view";
 
 /**
  * @description MCP Apps capability settings advertised by clients to servers.

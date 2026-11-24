@@ -119,20 +119,20 @@ export type McpUiRequestDisplayModeResultSchemaInferredType = z.infer<
   typeof generated.McpUiRequestDisplayModeResultSchema
 >;
 
-export type McpUiCompanionViewAppCapabilitySchemaInferredType = z.infer<
-  typeof generated.McpUiCompanionViewAppCapabilitySchema
+export type McpUiOpenViewAppCapabilitySchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewAppCapabilitySchema
 >;
 
-export type McpUiSetCompanionViewRequestSchemaInferredType = z.infer<
-  typeof generated.McpUiSetCompanionViewRequestSchema
+export type McpUiOpenViewToolMetaSchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewToolMetaSchema
 >;
 
-export type McpUiSetCompanionViewResultSchemaInferredType = z.infer<
-  typeof generated.McpUiSetCompanionViewResultSchema
+export type McpUiOpenViewResultSchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewResultSchema
 >;
 
-export type McpUiCompanionViewClosedNotificationSchemaInferredType = z.infer<
-  typeof generated.McpUiCompanionViewClosedNotificationSchema
+export type McpUiViewClosedNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiViewClosedNotificationSchema
 >;
 
 export type McpUiToolVisibilitySchemaInferredType = z.infer<
@@ -183,8 +183,16 @@ export type McpUiInitializeResultSchemaInferredType = z.infer<
   typeof generated.McpUiInitializeResultSchema
 >;
 
-export type McpUiCompanionViewHostCapabilitySchemaInferredType = z.infer<
-  typeof generated.McpUiCompanionViewHostCapabilitySchema
+export type McpUiOpenViewHostCapabilitySchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewHostCapabilitySchema
+>;
+
+export type McpUiViewLaunchContextSchemaInferredType = z.infer<
+  typeof generated.McpUiViewLaunchContextSchema
+>;
+
+export type McpUiOpenViewRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewRequestSchema
 >;
 
 expectType<spec.McpUiTheme>({} as McpUiThemeSchemaInferredType);
@@ -317,29 +325,29 @@ expectType<spec.McpUiRequestDisplayModeResult>(
 expectType<McpUiRequestDisplayModeResultSchemaInferredType>(
   {} as spec.McpUiRequestDisplayModeResult,
 );
-expectType<spec.McpUiCompanionViewAppCapability>(
-  {} as McpUiCompanionViewAppCapabilitySchemaInferredType,
+expectType<spec.McpUiOpenViewAppCapability>(
+  {} as McpUiOpenViewAppCapabilitySchemaInferredType,
 );
-expectType<McpUiCompanionViewAppCapabilitySchemaInferredType>(
-  {} as spec.McpUiCompanionViewAppCapability,
+expectType<McpUiOpenViewAppCapabilitySchemaInferredType>(
+  {} as spec.McpUiOpenViewAppCapability,
 );
-expectType<spec.McpUiSetCompanionViewRequest>(
-  {} as McpUiSetCompanionViewRequestSchemaInferredType,
+expectType<spec.McpUiOpenViewToolMeta>(
+  {} as McpUiOpenViewToolMetaSchemaInferredType,
 );
-expectType<McpUiSetCompanionViewRequestSchemaInferredType>(
-  {} as spec.McpUiSetCompanionViewRequest,
+expectType<McpUiOpenViewToolMetaSchemaInferredType>(
+  {} as spec.McpUiOpenViewToolMeta,
 );
-expectType<spec.McpUiSetCompanionViewResult>(
-  {} as McpUiSetCompanionViewResultSchemaInferredType,
+expectType<spec.McpUiOpenViewResult>(
+  {} as McpUiOpenViewResultSchemaInferredType,
 );
-expectType<McpUiSetCompanionViewResultSchemaInferredType>(
-  {} as spec.McpUiSetCompanionViewResult,
+expectType<McpUiOpenViewResultSchemaInferredType>(
+  {} as spec.McpUiOpenViewResult,
 );
-expectType<spec.McpUiCompanionViewClosedNotification>(
-  {} as McpUiCompanionViewClosedNotificationSchemaInferredType,
+expectType<spec.McpUiViewClosedNotification>(
+  {} as McpUiViewClosedNotificationSchemaInferredType,
 );
-expectType<McpUiCompanionViewClosedNotificationSchemaInferredType>(
-  {} as spec.McpUiCompanionViewClosedNotification,
+expectType<McpUiViewClosedNotificationSchemaInferredType>(
+  {} as spec.McpUiViewClosedNotification,
 );
 expectType<spec.McpUiToolVisibility>(
   {} as McpUiToolVisibilitySchemaInferredType,
@@ -405,9 +413,21 @@ expectType<spec.McpUiInitializeResult>(
 expectType<McpUiInitializeResultSchemaInferredType>(
   {} as spec.McpUiInitializeResult,
 );
-expectType<spec.McpUiCompanionViewHostCapability>(
-  {} as McpUiCompanionViewHostCapabilitySchemaInferredType,
+expectType<spec.McpUiOpenViewHostCapability>(
+  {} as McpUiOpenViewHostCapabilitySchemaInferredType,
 );
-expectType<McpUiCompanionViewHostCapabilitySchemaInferredType>(
-  {} as spec.McpUiCompanionViewHostCapability,
+expectType<McpUiOpenViewHostCapabilitySchemaInferredType>(
+  {} as spec.McpUiOpenViewHostCapability,
+);
+expectType<spec.McpUiViewLaunchContext>(
+  {} as McpUiViewLaunchContextSchemaInferredType,
+);
+expectType<McpUiViewLaunchContextSchemaInferredType>(
+  {} as spec.McpUiViewLaunchContext,
+);
+expectType<spec.McpUiOpenViewRequest>(
+  {} as McpUiOpenViewRequestSchemaInferredType,
+);
+expectType<McpUiOpenViewRequestSchemaInferredType>(
+  {} as spec.McpUiOpenViewRequest,
 );

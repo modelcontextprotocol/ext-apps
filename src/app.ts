@@ -54,14 +54,14 @@ import {
   type WebMcpModelContext,
 } from "./webmcp.js";
 import {
-  COMPANION_VIEW,
-  McpUiCompanionViewAppCapabilitySchema,
-  McpUiCompanionViewClosedNotificationSchema,
-  McpUiCompanionViewHostCapabilitySchema,
-  McpUiSetCompanionViewRequestSchema,
-  McpUiSetCompanionViewResultSchema,
-  type McpUiCompanionViewClosedNotification,
-  type McpUiSetCompanionViewRequest,
+  OPEN_VIEW,
+  McpUiOpenViewAppCapabilitySchema,
+  McpUiViewClosedNotificationSchema,
+  McpUiOpenViewHostCapabilitySchema,
+  McpUiOpenViewRequestSchema,
+  McpUiOpenViewResultSchema,
+  type McpUiOpenViewRequest,
+  type McpUiOpenViewResult,
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
   McpUiUpdateModelContextRequest,
@@ -284,7 +284,7 @@ export type AppEventMap = {
   toolresult: McpUiToolResultNotification["params"];
   toolcancelled: McpUiToolCancelledNotification["params"];
   hostcontextchanged: McpUiHostContextChangedNotification["params"];
-  companionviewclosed: McpUiCompanionViewClosedNotification["params"];
+  viewclosed: undefined;
 };
 
 /**
@@ -355,6 +355,7 @@ export class App extends Protocol<BaseContext> {
   private _webMcpCallCount = 0;
   private _webMcpWatched?: { consumer: WebMcpConsumer; listener: () => void };
   private _initializedSent = false;
+  private _openViewSession?: { generation: number; seq: number };
   private readonly _registeredEvents = new Set<keyof AppEventMap>();
   private readonly _events = new EventDispatcher<AppEventMap>();
   private readonly _methods = new MethodRegistry();
@@ -466,7 +467,7 @@ export class App extends Protocol<BaseContext> {
     toolresult: McpUiToolResultNotificationSchema,
     toolcancelled: McpUiToolCancelledNotificationSchema,
     hostcontextchanged: McpUiHostContextChangedNotificationSchema,
-    companionviewclosed: McpUiCompanionViewClosedNotificationSchema,
+    viewclosed: McpUiViewClosedNotificationSchema,
   };
 
   /**
@@ -543,6 +544,15 @@ export class App extends Protocol<BaseContext> {
       schema.shape.method.value,
       { params: schema.shape.params },
       (params) => {
+        if (event === "viewclosed") {
+          const session = this._openViewSession;
+          const { generation } =
+            McpUiViewClosedNotificationSchema.shape.params.parse(params);
+          if (!session || generation <= session.generation) return;
+          session.generation = generation;
+          this._events.dispatch("viewclosed", undefined);
+          return;
+        }
         const eventParams = params as AppEventMap[K];
         if (event === "hostcontextchanged") {
           this._hostContext = { ...this._hostContext, ...eventParams };
@@ -995,6 +1005,7 @@ export class App extends Protocol<BaseContext> {
   }
 
   protected override _onclose(): void {
+    this._openViewSession = undefined;
     // Unwatch before aborting the mirrors: unregistering them fires
     // `toolchange`, which must not try to notify over the closed transport.
     this.unwatchWebMcpToolChanges();
@@ -2129,32 +2140,57 @@ export class App extends Protocol<BaseContext> {
     );
   }
 
-  /** Request a selection or close from a negotiated experimental parent View. */
-  setCompanionView(
-    params: McpUiSetCompanionViewRequest["params"],
+  /**
+   * Open a server-declared View in a separate surface. Experimental.
+   *
+   * Treat `unavailable`, `denied`, and `failed` as reasons to fall back inline.
+   * Ignore `stale`: a newer open, dismissal, or reconnect superseded the request.
+   */
+  async openView(
+    params: Omit<
+      McpUiOpenViewRequest["params"],
+      "generation" | "seq" | "input"
+    > & {
+      input?: McpUiOpenViewRequest["params"]["input"];
+    },
     options?: RequestOptions,
-  ) {
-    const app = McpUiCompanionViewAppCapabilitySchema.safeParse(
-      this._appCapabilities.experimental?.[COMPANION_VIEW],
-    );
-    const host = McpUiCompanionViewHostCapabilitySchema.safeParse(
-      this._hostCapabilities?.experimental?.[COMPANION_VIEW],
-    );
-    if (
-      !this._initializedSent ||
-      app.data?.role !== "parent" ||
-      host.data?.generation === undefined
-    ) {
-      throw new Error("Companion View v1 was not negotiated for this parent");
+  ): Promise<Pick<McpUiOpenViewResult, "status" | "displayMode">> {
+    const session = this._openViewSession;
+    if (!this._initializedSent || !session) return { status: "unavailable" };
+    const { generation } = session;
+    const seq = session.seq + 1;
+    const request = McpUiOpenViewRequestSchema.shape.params.parse({
+      ...params,
+      input: params.input ?? {},
+      generation,
+      seq,
+    });
+    session.seq = seq;
+    const isCurrent = () =>
+      this._openViewSession === session &&
+      session.seq === seq &&
+      session.generation === generation;
+    try {
+      const result = await this.request(
+        {
+          method: McpUiOpenViewRequestSchema.shape.method.value,
+          params: request,
+        },
+        McpUiOpenViewResultSchema,
+        options,
+      );
+      if (!isCurrent()) return { status: "stale" };
+      if (result.generation !== generation) {
+        session.generation = Math.max(session.generation, result.generation);
+        return { status: "stale" };
+      }
+      return result.status === "opened" && result.displayMode
+        ? { status: result.status, displayMode: result.displayMode }
+        : { status: result.status };
+    } catch (error) {
+      if (!isCurrent()) return { status: "stale" };
+      throw error;
     }
-    return this.request(
-      {
-        method: McpUiSetCompanionViewRequestSchema.shape.method.value,
-        params: McpUiSetCompanionViewRequestSchema.shape.params.parse(params),
-      },
-      McpUiSetCompanionViewResultSchema,
-      options,
-    );
   }
 
   /**
@@ -2360,6 +2396,16 @@ export class App extends Protocol<BaseContext> {
       this._hostCapabilities = result.hostCapabilities;
       this._hostInfo = result.hostInfo;
       this._hostContext = result.hostContext;
+      const launchRole = McpUiOpenViewAppCapabilitySchema.safeParse(
+        this._appCapabilities.experimental?.[OPEN_VIEW],
+      ).data?.role;
+      const generation = McpUiOpenViewHostCapabilitySchema.safeParse(
+        this._hostCapabilities.experimental?.[OPEN_VIEW],
+      ).data?.generation;
+      if (launchRole === "source" && generation !== undefined) {
+        this._openViewSession = { generation, seq: 0 };
+        this._ensureEventSlot("viewclosed");
+      }
 
       await this.notification(<McpUiInitializedNotification>{
         method: "ui/notifications/initialized",
