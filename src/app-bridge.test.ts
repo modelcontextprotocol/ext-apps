@@ -13,7 +13,10 @@ import {
   isToolVisibilityAppOnly,
   McpUiOpenLinkResultSchema,
   type McpUiHostCapabilities,
+  type McpUiHostContext,
 } from "./app-bridge.js";
+import { McpUiContrastPreferenceSchema } from "./types.js";
+import jsonSchema from "./generated/schema.json";
 
 /** Wait for pending microtasks to complete */
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -3128,5 +3131,69 @@ describe("buildAllowAttribute", () => {
         }),
       ).toBe("camera; microphone; geolocation; clipboard-write");
     });
+  });
+});
+
+describe("hostContext.prefersContrast", () => {
+  async function connectWith(hostContext: McpUiHostContext) {
+    const [appTransport, bridgeTransport] =
+      InMemoryTransport.createLinkedPair();
+    const bridge = new AppBridge(
+      createMockClient() as Client,
+      testHostInfo,
+      testHostCapabilities,
+      { hostContext },
+    );
+    const app = new App(testAppInfo, {}, { autoResize: false });
+    await bridge.connect(bridgeTransport);
+    await app.connect(appTransport);
+    return {
+      app,
+      bridge,
+      close: async () => {
+        await appTransport.close();
+        await bridgeTransport.close();
+      },
+    };
+  }
+
+  it("accepts the three known values and unrecognized strings", () => {
+    for (const value of ["no-preference", "more", "less", "custom"]) {
+      expect(McpUiContrastPreferenceSchema.safeParse(value).success).toBe(true);
+    }
+    expect(McpUiContrastPreferenceSchema.safeParse(1).success).toBe(false);
+  });
+
+  it("is a separate property from theme in the published JSON Schema", () => {
+    const hostContext = jsonSchema.$defs.McpUiHostContext;
+    expect(Object.keys(hostContext.properties)).toContain("prefersContrast");
+  });
+
+  it("delivers prefersContrast to the App in the initial hostContext", async () => {
+    const { app, close } = await connectWith({
+      theme: "dark",
+      prefersContrast: "more",
+    });
+    expect(app.getHostContext()?.prefersContrast).toBe("more");
+    expect(app.getHostContext()?.theme).toBe("dark");
+    await close();
+  });
+
+  it("still connects when the host sends an unrecognized value", async () => {
+    const { app, close } = await connectWith({ prefersContrast: "custom" });
+    expect(app.getHostContext()?.prefersContrast).toBe("custom");
+    await close();
+  });
+
+  it("merges a prefersContrast change without touching theme", async () => {
+    const { app, bridge, close } = await connectWith({
+      theme: "light",
+      prefersContrast: "no-preference",
+    });
+    bridge.sendHostContextChange({ prefersContrast: "more" });
+    await flush();
+    expect(app.getHostContext()?.prefersContrast).toBe("more");
+    expect(app.getHostContext()?.theme).toBe("light");
+    await close();
   });
 });

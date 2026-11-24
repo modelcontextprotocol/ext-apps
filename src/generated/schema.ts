@@ -20,6 +20,20 @@ export const McpUiThemeSchema = z
   .describe("Color theme preference for the host environment.");
 
 /**
+ * @description User's contrast preference, mirroring the CSS `prefers-contrast` media feature. Views MUST treat unrecognized values as "no-preference".
+ */
+export const McpUiContrastPreferenceSchema = z
+  .union([
+    z.literal("no-preference"),
+    z.literal("more"),
+    z.literal("less"),
+    z.string(),
+  ])
+  .describe(
+    'User\'s contrast preference, mirroring the CSS `prefers-contrast` media feature. Views MUST treat unrecognized values as "no-preference".',
+  );
+
+/**
  * @description Display mode for UI presentation.
  */
 export const McpUiDisplayModeSchema = z
@@ -869,6 +883,10 @@ export const McpUiHostContextSchema = z
     /** @description Current color theme preference. */
     theme: McpUiThemeSchema.optional().describe(
       "Current color theme preference.",
+    ),
+    /** @description User's contrast preference, independent of theme. Absent means unknown. */
+    prefersContrast: McpUiContrastPreferenceSchema.optional().describe(
+      "User's contrast preference, independent of theme. Absent means unknown.",
     ),
     /** @description Style configuration for theming the app. */
     styles: McpUiHostStylesSchema.optional().describe(

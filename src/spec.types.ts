@@ -34,6 +34,15 @@ export const LATEST_PROTOCOL_VERSION = "2026-01-26";
 export type McpUiTheme = "light" | "dark";
 
 /**
+ * @description User's contrast preference, mirroring the CSS `prefers-contrast` media feature. Views MUST treat unrecognized values as "no-preference".
+ */
+export type McpUiContrastPreference =
+  | "no-preference"
+  | "more"
+  | "less"
+  | (string & {});
+
+/**
  * @description Display mode for UI presentation.
  */
 export type McpUiDisplayMode = "inline" | "fullscreen" | "pip";
@@ -349,6 +358,8 @@ export interface McpUiHostContext {
   };
   /** @description Current color theme preference. */
   theme?: McpUiTheme;
+  /** @description User's contrast preference, independent of theme. Absent means unknown. */
+  prefersContrast?: McpUiContrastPreference;
   /** @description Style configuration for theming the app. */
   styles?: McpUiHostStyles;
   /** @description How the UI is currently displayed. */
