@@ -20,17 +20,12 @@ export const McpUiThemeSchema = z
   .describe("Color theme preference for the host environment.");
 
 /**
- * @description User's contrast preference, mirroring the CSS `prefers-contrast` media feature. Views MUST treat unrecognized values as "no-preference".
+ * @description User's contrast preference, mirroring the CSS `prefers-contrast` media feature.
  */
 export const McpUiContrastPreferenceSchema = z
-  .union([
-    z.literal("no-preference"),
-    z.literal("more"),
-    z.literal("less"),
-    z.string(),
-  ])
+  .union([z.literal("no-preference"), z.literal("more"), z.literal("less")])
   .describe(
-    'User\'s contrast preference, mirroring the CSS `prefers-contrast` media feature. Views MUST treat unrecognized values as "no-preference".',
+    "User's contrast preference, mirroring the CSS `prefers-contrast` media feature.",
   );
 
 /**

@@ -86,12 +86,9 @@
         {
           "type": "string",
           "const": "less"
-        },
-        {
-          "type": "string"
         }
       ],
-      "description": "User's contrast preference, mirroring the CSS `prefers-contrast` media feature. Views MUST treat unrecognized values as \"no-preference\"."
+      "description": "User's contrast preference, mirroring the CSS `prefers-contrast` media feature."
     },
     "McpUiDisplayMode": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -732,9 +729,6 @@
                 {
                   "type": "string",
                   "const": "less"
-                },
-                {
-                  "type": "string"
                 }
               ]
             },
@@ -1535,9 +1529,6 @@
             {
               "type": "string",
               "const": "less"
-            },
-            {
-              "type": "string"
             }
           ]
         },
@@ -3176,9 +3167,6 @@
                 {
                   "type": "string",
                   "const": "less"
-                },
-                {
-                  "type": "string"
                 }
               ]
             },
