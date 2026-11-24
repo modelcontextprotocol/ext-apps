@@ -155,8 +155,9 @@ export function applyHostStyleVariables(
  * self-hosted fonts, `@import` statements for Google Fonts or other font services,
  * or a combination of both.
  *
- * The styles are only injected once. Subsequent calls are no-ops and will not
- * create duplicate style tags.
+ * The styles live in a single `<style>` tag. Later calls replace its contents,
+ * so fonts sent in a `ui/notifications/host-context-changed` update take
+ * effect, and repeated calls never create duplicate style tags.
  *
  * @param fontCss - CSS string containing `@font-face` rules and/or `@import` statements
  *
@@ -212,8 +213,10 @@ export function applyHostStyleVariables(
 export function applyHostFonts(fontCss: string): void {
   const styleId = "__mcp-host-fonts";
 
-  // Check if already loaded
-  if (document.getElementById(styleId)) {
+  // Reuse the existing tag so updated fonts replace the previous ones
+  const existing = document.getElementById(styleId);
+  if (existing) {
+    if (existing.textContent !== fontCss) existing.textContent = fontCss;
     return;
   }
 
