@@ -2,7 +2,8 @@ import { getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol
 import type { Tool } from "@modelcontextprotocol/client";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, restoreToolCalls, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { addStoredToolCall, removeStoredToolCall, setStoredToolCallResult } from "./storage";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
 import styles from "./index.module.css";
 
@@ -52,9 +53,6 @@ interface HostProps {
   serversPromise: Promise<ServerInfo[]>;
 }
 
-type ToolCallEntry = ToolCallInfo & { id: number };
-let nextToolCallId = 0;
-
 // Parse URL query params for debugging: ?server=name&tool=name&call=true&theme=hide
 function getQueryParams() {
   const params = new URLSearchParams(window.location.search);
@@ -89,21 +87,51 @@ function ThemeToggle() {
 
 
 function Host({ serversPromise }: HostProps) {
-  const [toolCalls, setToolCalls] = useState<ToolCallEntry[]>([]);
-  const [destroyingIds, setDestroyingIds] = useState<Set<number>>(new Set());
+  const [toolCalls, setToolCalls] = useState<ToolCallInfo[]>([]);
+  const [destroyingIds, setDestroyingIds] = useState<Set<string>>(new Set());
   const queryParams = useMemo(() => getQueryParams(), []);
 
-  const requestClose = (id: number) => {
+  // After a page reload, render the stored tool calls again once the servers
+  // are connected. (The `cancelled` flag guards against React Strict Mode's
+  // double invocation.)
+  useEffect(() => {
+    let cancelled = false;
+    serversPromise.then((servers) => {
+      if (cancelled) return;
+      const restored = restoreToolCalls(servers);
+      setToolCalls((calls) => [...restored, ...calls]);
+    }, () => { /* Reported by ServerSelect's error boundary */ });
+    return () => { cancelled = true; };
+  }, [serversPromise]);
+
+  const addToolCall = (info: ToolCallInfo) => {
+    setToolCalls((calls) => [...calls, info]);
+
+    // Store a call that has a View, then its result, so that a page reload can
+    // render the View again without calling the tool. A failed call is not kept.
+    if (!hasAppHtml(info)) return;
+    const { id, serverInfo, tool, input } = info;
+    addStoredToolCall({ id, serverUrl: serverInfo.url, serverName: serverInfo.name, toolName: tool.name, input });
+    info.resultPromise.then(
+      (result) => setStoredToolCallResult(id, result),
+      () => removeStoredToolCall(serverInfo.url, id),
+    );
+  };
+
+  const requestClose = (id: string) => {
     setDestroyingIds((s) => new Set(s).add(id));
   };
 
-  const completeClose = (id: number) => {
+  const completeClose = ({ id, serverInfo }: ToolCallInfo) => {
     setDestroyingIds((s) => {
       const next = new Set(s);
       next.delete(id);
       return next;
     });
     setToolCalls((calls) => calls.filter((c) => c.id !== id));
+    // Closing a call is this host's "delete the conversation": the state that
+    // its View saved goes with it.
+    removeStoredToolCall(serverInfo.url, id);
   };
 
   return (
@@ -115,12 +143,12 @@ function Host({ serversPromise }: HostProps) {
           toolCallInfo={info}
           isDestroying={destroyingIds.has(info.id)}
           onRequestClose={() => requestClose(info.id)}
-          onCloseComplete={() => completeClose(info.id)}
+          onCloseComplete={() => completeClose(info)}
         />
       ))}
       <CallToolPanel
         serversPromise={serversPromise}
-        addToolCall={(info) => setToolCalls([...toolCalls, { ...info, id: nextToolCallId++ }])}
+        addToolCall={addToolCall}
         initialServer={queryParams.server}
         initialTool={queryParams.tool}
         autoCall={queryParams.call}
@@ -197,7 +225,8 @@ function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool
     const url = new URL(window.location.href);
     url.searchParams.set("server", server.name);
     url.searchParams.set("tool", tool);
-    url.searchParams.set("call", "true"); // Auto-call on refresh
+    // The call is stored and restored on refresh, so don't auto-call again
+    url.searchParams.delete("call");
     history.replaceState(null, "", url.toString());
   };
 
@@ -214,6 +243,8 @@ function CallToolPanel({ serversPromise, addToolCall, initialServer, initialTool
               initialTool={initialTool}
               autoCall={autoCall && !hasAutoCalledRef.called}
               onAutoCall={(server, tool) => {
+                // React Strict Mode runs the calling effect twice
+                if (hasAutoCalledRef.called) return;
                 hasAutoCalledRef.called = true;
                 handleSubmit(server, tool);
               }}
@@ -449,6 +480,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
             // Provide container dimensions - maxHeight for flexible sizing
             containerDimensions: { maxHeight: 6000 },
             displayMode: "inline",
+            toolCallId: toolCallInfo.id,
           });
           appBridgeRef.current = appBridge;
           initializeApp(iframe, appBridge, toolCallInfo);

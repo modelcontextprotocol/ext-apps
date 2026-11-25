@@ -12,6 +12,7 @@
  * - {@link useHostStyleVariables `useHostStyleVariables`} - React hook to apply host style variables and theme
  * - {@link useHostFonts `useHostFonts`} - React hook to apply host fonts
  * - {@link useDocumentTheme `useDocumentTheme`} - React hook for reactive document theme
+ * - {@link useViewState `useViewState`} - React hook for state that the host saves and restores
  * - {@link useAutoResize `useAutoResize`} - React hook for manual auto-resize control (rarely needed)
  *
  * @module @modelcontextprotocol/ext-apps/react
@@ -35,3 +36,4 @@ export * from "./useApp.js";
 export * from "./useAutoResize.js";
 export * from "./useDocumentTheme.js";
 export * from "./useHostStyles.js";
+export * from "./useViewState.js";

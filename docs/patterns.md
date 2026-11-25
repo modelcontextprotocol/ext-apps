@@ -502,7 +502,73 @@ await app.sendMessage({
 
 ## Persisting view state
 
-For recoverable view state (e.g., current page in a PDF viewer, camera position in a map), use [`localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) with a stable identifier provided by the server.
+A View loses what it holds in memory whenever its iframe is destroyed: on a page reload, when the conversation is reopened, or when the host unmounts it. The host re-sends the tool input and result, but not what the user did afterwards.
+
+For recoverable view state (e.g., current page in a PDF viewer, camera position in a map), ask the host to keep it with {@link app!App.setViewState `setViewState`}. The host stores it for this View instance (the View it renders for one tool call) and hands it back as `viewState` in {@link app!App.getHostContext `getHostContext()`} the next time it renders that View:
+
+<!-- prettier-ignore -->
+```ts source="./patterns.tsx#persistViewState"
+await app.connect();
+
+// Restore: the host hands back what this view last saved, or null
+const saved = app.getHostContext()?.viewState;
+if (saved?.version === 1 && typeof saved.currentPage === "number") {
+  showPage(saved.currentPage);
+}
+
+// Save as the user changes things, debounced. Each save replaces the last.
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+function saveState(state: { currentPage: number }) {
+  if (!app.getHostCapabilities()?.viewState) return; // see the fallback below
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    app.setViewState({ version: 1, ...state }).catch((err) => {
+      console.error("Failed to save view state:", err);
+    });
+  }, 500);
+}
+
+// e.g., saveState({ currentPage: 5 });
+```
+
+- Each save replaces the saved state as a whole, and `null` clears it.
+- Save as changes happen, debounced: a View can be destroyed without warning.
+- Version the state. An older build of your View may have written it.
+- The host shows the state neither to the model nor to your server. To tell the model what the user is looking at, use {@link app!App.updateModelContext `updateModelContext`} as well.
+
+**React**: {@link @modelcontextprotocol/ext-apps/react!useViewState `useViewState`} does the restore and the debounced save. Use one such hook per View, with all the state to save in one object, because each save replaces the last. On a host that cannot save view state it behaves like plain `useState`:
+
+<!-- prettier-ignore -->
+```tsx source="./patterns.tsx#persistViewStateReact"
+type ViewerState = { version: 1; currentPage: number };
+const INITIAL_STATE: ViewerState = { version: 1, currentPage: 1 };
+
+function PdfViewer() {
+  const { app } = useApp({
+    appInfo: { name: "PDF Viewer", version: "1.0.0" },
+    capabilities: {},
+  });
+
+  // Like useState, but restored from the host and saved back (debounced)
+  const [saved, setState] = useViewState<ViewerState>(app, INITIAL_STATE);
+  // The saved state may come from an older version of this View
+  const state = saved.version === 1 ? saved : INITIAL_STATE;
+
+  return (
+    <button
+      onClick={() =>
+        setState({ ...state, currentPage: state.currentPage + 1 })
+      }
+    >
+      Page {state.currentPage}
+    </button>
+  );
+}
+```
+
+### Fallback: `localStorage` with a server-provided key
+
+Not every host can save view state: check `app.getHostCapabilities()?.viewState`. Where it is missing, fall back to [`localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) with a stable identifier provided by the server.
 
 **Server-side**: Tool handler generates a unique `viewUUID` and returns it in `CallToolResult._meta.viewUUID`:
 
@@ -564,10 +630,20 @@ app.ontoolresult = (result) => {
 // e.g., saveState({ currentPage: 5 });
 ```
 
+Compared with `setViewState`, this fallback asks more of you and promises less:
+
+|                | `setViewState`                                                    | `viewUUID` + `localStorage`                                                                                       |
+| -------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Storage key    | Derived by the host                                               | Your server makes a `viewUUID` and returns it in every tool result                                                |
+| Available      | Right after `connect()`                                           | Only once the tool result arrives                                                                                 |
+| Where it lives | With the host, which may let it follow the user to another device | In one browser, under the sandbox origin that the host assigned, if that origin allows storage and stays the same |
+| Cleanup        | Deleted with the conversation                                     | Never                                                                                                             |
+| Needs          | A host that advertises `viewState`                                | Nothing from the host                                                                                             |
+
 For state that represents user effort (e.g., saved bookmarks, annotations, custom configurations), consider persisting it server-side using [app-only tools](#tools-that-are-private-to-apps) instead. Pass the `viewUUID` to the app-only tool to scope the saved data to that view instance.
 
 > [!NOTE]
-> For full examples using `localStorage`, see: [`examples/pdf-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/pdf-server) (persists current page) and [`examples/map-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/map-server) (persists camera position).
+> For full examples that use `setViewState` with the `localStorage` fallback, see: [`examples/pdf-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/pdf-server) (persists current page) and [`examples/map-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/map-server) (persists camera position). For `useViewState`, see [`examples/basic-server-react/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-server-react).
 
 ## Pausing computation-heavy views when offscreen
 

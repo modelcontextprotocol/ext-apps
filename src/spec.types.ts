@@ -405,6 +405,8 @@ export interface McpUiHostContext {
     /** @description Left safe area inset in pixels. */
     left: number;
   };
+  /** @description State last saved for this View instance via ui/set-view-state, or null if nothing is saved. Sent only in the ui/initialize result. */
+  viewState?: Record<string, unknown> | null;
 }
 
 /**
@@ -437,6 +439,36 @@ export interface McpUiUpdateModelContextRequest {
     /** @description Structured content for machine-readable context data. */
     structuredContent?: Record<string, unknown>;
   };
+}
+
+/**
+ * @description Request to save the View's state for when it is rendered again (View -> Host).
+ *
+ * Each request replaces the saved state as a whole. The Host picks the storage key and answers
+ * with an empty result once the state is stored. The saved state comes back in
+ * {@link McpUiHostContext `McpUiHostContext.viewState`}; the Host gives it to neither the model
+ * nor the MCP server.
+ *
+ * @see {@link app!App.setViewState `App.setViewState`} for the method that sends this request
+ * @see {@link app-bridge!AppBridge.onsetviewstate `AppBridge.onsetviewstate`} for the host handler
+ */
+export interface McpUiSetViewStateRequest {
+  method: "ui/set-view-state";
+  params: {
+    /** @description State to save; replaces any saved state, and `null` clears it. */
+    state: Record<string, unknown> | null;
+  };
+}
+
+/**
+ * @description Result from saving the View's state.
+ * @see {@link McpUiSetViewStateRequest `McpUiSetViewStateRequest`}
+ */
+export interface McpUiSetViewStateResult {
+  /**
+   * Additional result properties are preserved for protocol extensibility.
+   */
+  [key: string]: unknown;
 }
 
 /**
@@ -519,6 +551,11 @@ export interface McpUiHostCapabilities {
   };
   /** @description Host accepts context updates (ui/update-model-context) to be included in the model's context for future turns. */
   updateModelContext?: McpUiSupportedContentBlockModalities;
+  /** @description Host supports saving View state via ui/set-view-state. */
+  viewState?: {
+    /** @description Largest state accepted: its length in bytes as UTF-8 JSON with no whitespace between tokens. */
+    maxBytes: number;
+  };
   /** @description Host supports receiving content messages (ui/message) from the view. */
   message?: McpUiSupportedContentBlockModalities;
   /**

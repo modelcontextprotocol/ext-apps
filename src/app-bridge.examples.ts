@@ -7,7 +7,12 @@
  * @module
  */
 
-import { Client, type Transport } from "@modelcontextprotocol/client";
+import {
+  Client,
+  ProtocolError,
+  ProtocolErrorCode,
+  type Transport,
+} from "@modelcontextprotocol/client";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
@@ -164,6 +169,11 @@ declare const modelContextManager: {
   update(context: { content?: unknown; structuredContent?: unknown }): void;
 };
 
+// Stub for example code - represents a hypothetical store, keyed by the host
+declare const savedStateStore: {
+  put(key: string, state: Record<string, unknown> | null): Promise<void>;
+};
+
 /**
  * Example: Handle external link requests from the View.
  */
@@ -204,6 +214,31 @@ function AppBridge_onupdatemodelcontext_storeContext(bridge: AppBridge) {
     return {};
   };
   //#endregion AppBridge_onupdatemodelcontext_storeContext
+}
+
+/**
+ * Example: Store view state saved by the View.
+ */
+function AppBridge_onsetviewstate_store(
+  bridge: AppBridge,
+  viewInstanceKey: string,
+  maxBytes: number,
+) {
+  //#region AppBridge_onsetviewstate_store
+  bridge.onsetviewstate = async ({ state }) => {
+    if (new TextEncoder().encode(JSON.stringify(state)).length > maxBytes) {
+      // -32602: this state will never be stored as it is
+      throw new ProtocolError(
+        ProtocolErrorCode.InvalidParams,
+        "View state too large",
+      );
+    }
+    // The host derives the key (user, server, View instance), never the View.
+    // A plain Error from put() reaches the View as -32603: try again later
+    await savedStateStore.put(viewInstanceKey, state);
+    return {};
+  };
+  //#endregion AppBridge_onsetviewstate_store
 }
 
 /**

@@ -57,6 +57,8 @@ import {
   LATEST_PROTOCOL_VERSION,
   McpUiAppCapabilities,
   McpUiUpdateModelContextRequest,
+  McpUiSetViewStateRequest,
+  McpUiSetViewStateResultSchema,
   McpUiHostCapabilities,
   McpUiHostContext,
   McpUiHostContextChangedNotification,
@@ -341,6 +343,10 @@ export class App extends Protocol<BaseContext> {
   private _hostCapabilities?: McpUiHostCapabilities;
   private _hostInfo?: Implementation;
   private _hostContext?: McpUiHostContext;
+  /** Counts calls to {@link setViewState `setViewState`}, so that answers arriving out of order can be told apart. */
+  private _viewStateSaves = 0;
+  /** Number of the newest save that succeeded; 0 until one has. */
+  private _lastStoredViewStateSave = 0;
   private _registeredTools: { [name: string]: RegisteredAppTool } = {};
   private readonly _webMcpMirrors = new Map<string, AbortController>();
   private _webMcpCallCount = 0;
@@ -1914,6 +1920,85 @@ export class App extends Protocol<BaseContext> {
       EmptyResultSchema,
       options,
     );
+  }
+
+  /**
+   * Save this View's state with the host, to get it back the next time the
+   * View is rendered (for example after a reload, or in a reopened
+   * conversation).
+   *
+   * Each call replaces the saved state as a whole; `null` clears it. The host
+   * does not show the saved state to the model: use
+   * {@link updateModelContext `updateModelContext`} for that.
+   *
+   * The host hands the saved state over once, as `viewState` in
+   * {@link getHostContext `getHostContext()`} after `connect()` (`null` means
+   * that nothing is saved), and does not echo saves. When a save succeeds, this
+   * method sets that `viewState` to a JSON copy of `state`. It does not call
+   * the `hostcontextchanged` listeners: saves are usually debounced, so a
+   * listener that applies `viewState` would put the screen back to the saved
+   * value and lose what the user did since. A failed save changes nothing.
+   *
+   * @param state - State to save (a JSON object), or `null` to clear it
+   * @param options - Request options (timeout, etc.)
+   *
+   * @throws {Error} If the host does not advertise the `viewState` capability (nothing is sent)
+   * @throws {Error} If the host refuses the state (`-32602`: do not resend it as it is) or cannot store it now (`-32603`: retry later)
+   * @throws {Error} If the request times out or the connection is lost
+   *
+   * @example Restore saved state, then save as the user changes things
+   * ```ts source="./app.examples.ts#App_setViewState_restoreAndSave"
+   * // After connect(): what the host stored for this View, or null
+   * const saved = app.getHostContext()?.viewState;
+   * if (saved?.version === 1) {
+   *   showTab(String(saved.tab));
+   * }
+   *
+   * // Later, as the user changes things (debounce this)
+   * if (app.getHostCapabilities()?.viewState) {
+   *   await app.setViewState({ version: 1, tab: "details" });
+   * }
+   * ```
+   *
+   * @returns Promise that resolves once the host has stored the state
+   *
+   * @see {@link McpUiSetViewStateRequest `McpUiSetViewStateRequest`} for request structure
+   * @see {@link McpUiSetViewStateResult `McpUiSetViewStateResult`} for result structure
+   */
+  async setViewState(
+    state: McpUiSetViewStateRequest["params"]["state"],
+    options?: RequestOptions,
+  ) {
+    this._assertInitialized("setViewState");
+    if (!this._hostCapabilities?.viewState) {
+      // Not left to `strict`: a host that could not read the saved state does
+      // not advertise the capability, and a save would overwrite that state.
+      throw new Error(
+        "Host does not support saving view state (required for ui/set-view-state)",
+      );
+    }
+    const save = ++this._viewStateSaves;
+    // Copied now, through JSON: this is what the host is sent and what
+    // `getHostContext().viewState` becomes, so that the two cannot differ and
+    // later changes to the caller's object do not look as if they were saved.
+    const viewState: McpUiHostContext["viewState"] = JSON.parse(
+      JSON.stringify(state),
+    );
+    const result = await this.request(
+      <McpUiSetViewStateRequest>{
+        method: "ui/set-view-state",
+        params: { state: viewState },
+      },
+      McpUiSetViewStateResultSchema,
+      options,
+    );
+    if (save < this._lastStoredViewStateSave) {
+      // A later save has already succeeded; its state is newer, so keep it.
+      return result;
+    }
+    this._lastStoredViewStateSave = save;
+    this._hostContext = { ...this._hostContext, viewState };
+    return result;
   }
 
   /**
