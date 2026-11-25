@@ -22,6 +22,7 @@ if (!document.referrer.match(ALLOWED_REFERRER_PATTERN)) {
 const EXPECTED_HOST_ORIGIN = new URL(document.referrer).origin;
 
 const OWN_ORIGIN = new URL(window.location.href).origin;
+const ISOLATED_VIEW = new URLSearchParams(location.search).get("isolated") === "true";
 
 // Security self-test: verify iframe isolation is working correctly.
 // This MUST throw a SecurityError -- if `window.top` is accessible, the sandbox
@@ -43,7 +44,10 @@ try {
 // origins.
 const inner = document.createElement("iframe");
 inner.style = "width:100%; height:100%; border:none;";
-inner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
+inner.setAttribute(
+  "sandbox",
+  ISOLATED_VIEW ? "allow-scripts allow-forms" : "allow-scripts allow-same-origin allow-forms",
+);
 // Note: allow attribute is set later when receiving sandbox-resource-ready notification
 // based on the permissions requested by the app
 document.body.appendChild(inner);
@@ -85,7 +89,7 @@ window.addEventListener("message", async (event) => {
 
     if (event.data && event.data.method === RESOURCE_READY_NOTIFICATION) {
       const { html, sandbox, permissions } = event.data.params;
-      if (typeof sandbox === "string") {
+      if (!ISOLATED_VIEW && typeof sandbox === "string") {
         inner.setAttribute("sandbox", sandbox);
       }
       // Set Permission Policy allow attribute if permissions are requested
@@ -95,6 +99,10 @@ window.addEventListener("message", async (event) => {
         inner.setAttribute("allow", allowAttribute);
       }
       if (typeof html === "string") {
+        if (ISOLATED_VIEW) {
+          inner.srcdoc = html;
+          return;
+        }
         // Use document.write instead of srcdoc (which the CesiumJS Map won't work with)
         const doc = inner.contentDocument || inner.contentWindow?.document;
         if (doc) {
@@ -113,7 +121,7 @@ window.addEventListener("message", async (event) => {
       }
     }
   } else if (event.source === inner.contentWindow) {
-    if (event.origin !== OWN_ORIGIN) {
+    if (event.origin !== (ISOLATED_VIEW ? "null" : OWN_ORIGIN)) {
       console.error(
         "[Sandbox] Rejecting message from inner iframe with unexpected origin:",
         event.origin,

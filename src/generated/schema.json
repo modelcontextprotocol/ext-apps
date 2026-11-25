@@ -4141,6 +4141,212 @@
       },
       "additionalProperties": {}
     },
+    "McpUiOpenViewAppCapability": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "source"
+            },
+            {
+              "type": "string",
+              "const": "opened"
+            }
+          ]
+        }
+      },
+      "required": ["version", "role"],
+      "additionalProperties": false
+    },
+    "McpUiOpenViewHostCapability": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "generation": {
+          "description": "Initial generation for the source session. Omitted for opened Views.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["version"],
+      "additionalProperties": false
+    },
+    "McpUiOpenViewRequest": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/open-view"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "generation": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "seq": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "target": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
+            },
+            "input": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            "preferredDisplayMode": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "inline"
+                },
+                {
+                  "type": "string",
+                  "const": "fullscreen"
+                },
+                {
+                  "type": "string",
+                  "const": "pip"
+                }
+              ],
+              "description": "Display mode for UI presentation."
+            }
+          },
+          "required": ["generation", "seq", "target", "input"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "McpUiOpenViewResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "opened"
+            },
+            {
+              "type": "string",
+              "const": "unavailable"
+            },
+            {
+              "type": "string",
+              "const": "denied"
+            },
+            {
+              "type": "string",
+              "const": "failed"
+            },
+            {
+              "type": "string",
+              "const": "stale"
+            }
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "displayMode": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "inline"
+            },
+            {
+              "type": "string",
+              "const": "fullscreen"
+            },
+            {
+              "type": "string",
+              "const": "pip"
+            }
+          ],
+          "description": "Display mode for UI presentation."
+        }
+      },
+      "required": ["status", "generation"],
+      "additionalProperties": false
+    },
+    "McpUiOpenViewToolMeta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "targets": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,128}$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["targets"],
+      "additionalProperties": false
+    },
     "McpUiRequestDisplayModeRequest": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -6165,6 +6371,84 @@
       },
       "required": ["method", "params"],
       "additionalProperties": false
+    },
+    "McpUiViewClosedNotification": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "ui/notifications/view-closed"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "generation": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["generation"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["method", "params"],
+      "additionalProperties": false
+    },
+    "McpUiViewLaunchContext": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "input": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          }
+        }
+      },
+      "required": ["target", "input"],
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          ]
+        }
+      }
     }
   }
 }

@@ -53,3 +53,19 @@ npm start
 ```
 
 Then open `http://localhost:8080/basic-host/` and select "Debug MCP App Server" from the dropdown.
+
+## Trail Catalog companion demo
+
+From the SDK root:
+
+```sh
+npm run build
+npx cross-env EXAMPLE=debug-server bun examples/run-all.ts start
+```
+
+Open [Trail Catalog](http://localhost:8080/?server=Debug%20MCP%20App%20Server&tool=trail-catalog&call=true)
+and select Cedar Loop or Quartz Ridge. The nonmodal detail can be dismissed with
+**Close detail** or Escape while focused in the detail; the list stays mounted.
+Add `&companion=off` to the host URL to see the inline fallback.
+Use `&companion=blocked` to simulate a host that supports `openView` but
+declines the placement. See the [experimental wire contract](../../specification/draft/open-view.md).

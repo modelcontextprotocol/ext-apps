@@ -1,0 +1,35 @@
+:root {
+  color-scheme: light dark;
+  font:
+    1rem system-ui,
+    sans-serif;
+}
+
+main {
+  padding: 0.5rem;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+#trail-list {
+  list-style: none;
+  overflow: auto;
+  max-height: 7rem;
+  padding: 0;
+  border: 1px solid GrayText;
+}
+
+#trail-list button {
+  width: 100%;
+  min-height: 4.5rem;
+  text-align: start;
+  padding: 0.5rem;
+}
+
+#trail-list button[aria-pressed="true"] {
+  color: HighlightText;
+  background: Highlight;
+}

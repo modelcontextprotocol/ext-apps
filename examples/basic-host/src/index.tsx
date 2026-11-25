@@ -2,7 +2,9 @@ import { getToolUiResourceUri, McpUiToolMetaSchema } from "@modelcontextprotocol
 import type { Tool } from "@modelcontextprotocol/client";
 import { Component, type ErrorInfo, type ReactNode, StrictMode, Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { callTool, connectToServer, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { callTool, connectToServer, getOpenViewTargets, hasAppHtml, initializeApp, loadSandboxProxy, log, newAppBridge, type ServerInfo, type ToolCallInfo, type ModelContext, type AppMessage } from "./implementation";
+import { OpenViewController, type CompanionSlot } from "./open-view";
+import { mountCompanionPane } from "./companion-pane";
 import { getTheme, toggleTheme, onThemeChange, type Theme } from "./theme";
 import styles from "./index.module.css";
 
@@ -54,6 +56,7 @@ interface HostProps {
 
 type ToolCallEntry = ToolCallInfo & { id: number };
 let nextToolCallId = 0;
+const companionSlot: CompanionSlot = {};
 
 // Parse URL query params for debugging: ?server=name&tool=name&call=true&theme=hide
 function getQueryParams() {
@@ -347,6 +350,7 @@ function ToolCallInfoPanel({ toolCallInfo, isDestroying, onRequestClose, onClose
             className={styles.closeButton}
             onClick={onRequestClose}
             title="Close"
+            aria-label="Close View"
           >
             ×
           </button>
@@ -425,37 +429,84 @@ interface AppIFramePanelProps {
 function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppIFramePanelProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const appBridgeRef = useRef<ReturnType<typeof newAppBridge> | null>(null);
+  const companionOutlet = useRef<HTMLDivElement | null>(null);
+  const companionRef = useRef<OpenViewController | undefined>(undefined);
+  const lifecycleRef = useRef<AbortController | null>(null);
   const [modelContext, setModelContext] = useState<ModelContext | null>(null);
   const [messages, setMessages] = useState<AppMessage[]>([]);
   const [displayMode, setDisplayMode] = useState<"inline" | "fullscreen">("inline");
 
   useEffect(() => {
     const iframe = iframeRef.current!;
+    const lifecycle = new AbortController();
+    lifecycleRef.current = lifecycle;
+    const { signal } = lifecycle;
+    let appBridge: ReturnType<typeof newAppBridge> | undefined;
+    const companionPolicy = new URLSearchParams(location.search).get("companion");
+    const targets = getOpenViewTargets(toolCallInfo);
+    let companion: OpenViewController | undefined;
+    let sourceMode: "inline" | "fullscreen" = "inline";
+    if (companionPolicy !== "off" && targets.size) {
+      const dismiss = () => {
+        if (companionOutlet.current?.contains(document.activeElement)) iframe.focus();
+        companion?.dismiss();
+      };
+      companion = new OpenViewController(
+        companionSlot,
+        async ({ target, input }, signal) => {
+          const uri = targets.get(target);
+          if (!uri || companionPolicy === "blocked" || sourceMode !== "inline") return "denied";
+          const outlet = companionOutlet.current;
+          if (!outlet?.isConnected) return "unavailable";
+          // This host only offers an inline secondary pane, regardless of the preference.
+          const pane = await mountCompanionPane(outlet, toolCallInfo.serverInfo, uri, { target, input }, signal, dismiss);
+          return { pane, displayMode: "inline" };
+        },
+        (generation) => {
+          if (appBridge?.isOpenViewNegotiated()) {
+            void appBridge.sendViewClosed({ generation }).catch((error) => log.warn("Could not notify source of dismissal:", error));
+          }
+        },
+        (error) => log.warn("Companion detail could not open:", error),
+      );
+      companionRef.current = companion;
+    }
 
-    // First get CSP and permissions from resource, then load sandbox
-    // CSP is set via HTTP headers (tamper-proof), permissions via iframe allow attribute
-    toolCallInfo.appResourcePromise.then(({ csp, permissions }) => {
-      loadSandboxProxy(iframe, csp, permissions).then((firstTime) => {
-        // The `firstTime` check guards against React Strict Mode's double
-        // invocation (mount → unmount → remount simulation in development).
-        // Outside of Strict Mode, this `useEffect` runs only once per
-        // `toolCallInfo`.
-        if (firstTime) {
-          const appBridge = newAppBridge(toolCallInfo.serverInfo, iframe, {
-            onContextUpdate: setModelContext,
-            onMessage: (msg) => setMessages((prev) => [...prev, msg]),
-            onDisplayModeChange: setDisplayMode,
-          }, {
-            // Provide container dimensions - maxHeight for flexible sizing
-            containerDimensions: { maxHeight: 6000 },
-            displayMode: "inline",
-          });
-          appBridgeRef.current = appBridge;
-          initializeApp(iframe, appBridge, toolCallInfo);
-        }
+    const start = async () => {
+      const { csp, permissions } = await toolCallInfo.appResourcePromise;
+      await loadSandboxProxy(iframe, csp, permissions, { signal });
+      signal.throwIfAborted();
+      appBridge = newAppBridge(toolCallInfo.serverInfo, iframe, {
+        onContextUpdate: setModelContext,
+        onMessage: (msg) => setMessages((prev) => [...prev, msg]),
+        onDisplayModeChange: (mode) => {
+          sourceMode = mode;
+          if (mode !== "inline") companion?.dismiss();
+          setDisplayMode(mode);
+        },
+      }, {
+        openView: companion && {
+          role: "source",
+          startSession: companion.startSession.bind(companion),
+          open: companion.open.bind(companion),
+        },
       });
+      const onClose = appBridge.onclose;
+      appBridge.onclose = () => {
+        companion?.dispose();
+        onClose?.();
+      };
+      appBridgeRef.current = appBridge;
+      await initializeApp(iframe, appBridge, toolCallInfo, signal);
+    };
+    void start().catch((error) => {
+      if (!signal.aborted) log.error("Could not initialize MCP App:", error);
     });
-
+    return () => {
+      companion?.dispose();
+      lifecycle.abort();
+      if (appBridge) void appBridge.close().catch((error) => log.warn("App bridge close failed:", error));
+    };
   }, [toolCallInfo]);
 
   // Graceful teardown: wait for guest to respond before unmounting
@@ -463,6 +514,8 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
   // down the resource (to prevent data loss)."
   useEffect(() => {
     if (!isDestroying) return;
+    companionRef.current?.dispose();
+    lifecycleRef.current?.abort();
 
     if (!appBridgeRef.current) {
       // Bridge not ready yet (e.g., user closed before iframe loaded)
@@ -471,7 +524,7 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
     }
 
     log.info("Sending teardown notification to MCP App");
-    appBridgeRef.current.teardownResource({})
+    appBridgeRef.current.teardownResource({}, { timeout: 1000 })
       .catch((err) => {
         log.warn("Teardown request failed (app may have already closed):", err);
       })
@@ -516,7 +569,10 @@ function AppIFramePanel({ toolCallInfo, isDestroying, onTeardownComplete }: AppI
 
   return (
     <div className={panelClassName}>
-      <iframe ref={iframeRef} />
+      <div className={styles.appSurfaces}>
+        <iframe ref={iframeRef} />
+        <div ref={companionOutlet} className={styles.companionOutlet} />
+      </div>
       {messages.length > 0 && (
         <CollapsiblePanel
           icon="💬"

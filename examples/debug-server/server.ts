@@ -1,4 +1,5 @@
 import {
+  OPEN_VIEW,
   registerAppResource,
   registerAppTool,
   RESOURCE_MIME_TYPE,
@@ -162,6 +163,45 @@ export function createServer(): McpServer {
   });
 
   const resourceUri = "ui://debug-tool/mcp-app.html";
+  const catalogUri = "ui://trail-catalog/list.html";
+  const detailUri = "ui://trail-catalog/detail.html";
+
+  registerAppTool(
+    server,
+    "trail-catalog",
+    {
+      title: "Trail Catalog",
+      description: "Browse a synthetic trail catalog with companion detail.",
+      inputSchema: z.object({}),
+      _meta: {
+        ui: { resourceUri: catalogUri },
+        [OPEN_VIEW]: { targets: { "trail-detail": detailUri } },
+      },
+    },
+    async () => ({
+      content: [{ type: "text", text: "Trail Catalog opened." }],
+    }),
+  );
+  for (const [uri, file] of [
+    [catalogUri, "trail-catalog.html"],
+    [detailUri, "trail-detail.html"],
+  ]) {
+    registerAppResource(
+      server,
+      uri,
+      uri,
+      { mimeType: RESOURCE_MIME_TYPE },
+      async () => ({
+        contents: [
+          {
+            uri,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: await fs.readFile(path.join(DIST_DIR, file), "utf-8"),
+          },
+        ],
+      }),
+    );
+  }
 
   // Main debug tool - exercises all result variations
   registerAppTool(

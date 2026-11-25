@@ -119,6 +119,22 @@ export type McpUiRequestDisplayModeResultSchemaInferredType = z.infer<
   typeof generated.McpUiRequestDisplayModeResultSchema
 >;
 
+export type McpUiOpenViewAppCapabilitySchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewAppCapabilitySchema
+>;
+
+export type McpUiOpenViewToolMetaSchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewToolMetaSchema
+>;
+
+export type McpUiOpenViewResultSchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewResultSchema
+>;
+
+export type McpUiViewClosedNotificationSchemaInferredType = z.infer<
+  typeof generated.McpUiViewClosedNotificationSchema
+>;
+
 export type McpUiToolVisibilitySchemaInferredType = z.infer<
   typeof generated.McpUiToolVisibilitySchema
 >;
@@ -165,6 +181,18 @@ export type McpUiInitializeRequestSchemaInferredType = z.infer<
 
 export type McpUiInitializeResultSchemaInferredType = z.infer<
   typeof generated.McpUiInitializeResultSchema
+>;
+
+export type McpUiOpenViewHostCapabilitySchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewHostCapabilitySchema
+>;
+
+export type McpUiViewLaunchContextSchemaInferredType = z.infer<
+  typeof generated.McpUiViewLaunchContextSchema
+>;
+
+export type McpUiOpenViewRequestSchemaInferredType = z.infer<
+  typeof generated.McpUiOpenViewRequestSchema
 >;
 
 expectType<spec.McpUiTheme>({} as McpUiThemeSchemaInferredType);
@@ -297,6 +325,30 @@ expectType<spec.McpUiRequestDisplayModeResult>(
 expectType<McpUiRequestDisplayModeResultSchemaInferredType>(
   {} as spec.McpUiRequestDisplayModeResult,
 );
+expectType<spec.McpUiOpenViewAppCapability>(
+  {} as McpUiOpenViewAppCapabilitySchemaInferredType,
+);
+expectType<McpUiOpenViewAppCapabilitySchemaInferredType>(
+  {} as spec.McpUiOpenViewAppCapability,
+);
+expectType<spec.McpUiOpenViewToolMeta>(
+  {} as McpUiOpenViewToolMetaSchemaInferredType,
+);
+expectType<McpUiOpenViewToolMetaSchemaInferredType>(
+  {} as spec.McpUiOpenViewToolMeta,
+);
+expectType<spec.McpUiOpenViewResult>(
+  {} as McpUiOpenViewResultSchemaInferredType,
+);
+expectType<McpUiOpenViewResultSchemaInferredType>(
+  {} as spec.McpUiOpenViewResult,
+);
+expectType<spec.McpUiViewClosedNotification>(
+  {} as McpUiViewClosedNotificationSchemaInferredType,
+);
+expectType<McpUiViewClosedNotificationSchemaInferredType>(
+  {} as spec.McpUiViewClosedNotification,
+);
 expectType<spec.McpUiToolVisibility>(
   {} as McpUiToolVisibilitySchemaInferredType,
 );
@@ -360,4 +412,22 @@ expectType<spec.McpUiInitializeResult>(
 );
 expectType<McpUiInitializeResultSchemaInferredType>(
   {} as spec.McpUiInitializeResult,
+);
+expectType<spec.McpUiOpenViewHostCapability>(
+  {} as McpUiOpenViewHostCapabilitySchemaInferredType,
+);
+expectType<McpUiOpenViewHostCapabilitySchemaInferredType>(
+  {} as spec.McpUiOpenViewHostCapability,
+);
+expectType<spec.McpUiViewLaunchContext>(
+  {} as McpUiViewLaunchContextSchemaInferredType,
+);
+expectType<McpUiViewLaunchContextSchemaInferredType>(
+  {} as spec.McpUiViewLaunchContext,
+);
+expectType<spec.McpUiOpenViewRequest>(
+  {} as McpUiOpenViewRequestSchemaInferredType,
+);
+expectType<McpUiOpenViewRequestSchemaInferredType>(
+  {} as spec.McpUiOpenViewRequest,
 );

@@ -53,6 +53,8 @@ export class PostMessageTransport implements Transport {
    * @param eventTarget - Target window to send messages to (default: `window.parent`)
    * @param eventSource - Source window for message validation. For views, pass
    *   `window.parent`. For hosts, pass `iframe.contentWindow`.
+   * @param peerOrigin - Optional origin to require on incoming messages and
+   *   target on outgoing messages. Defaults to `"*"`.
    *
    * @example View connecting to parent
    * ```ts source="./message-transport.examples.ts#PostMessageTransport_constructor_view"
@@ -71,9 +73,13 @@ export class PostMessageTransport implements Transport {
   constructor(
     private eventTarget: Window = window.parent,
     private eventSource: MessageEventSource,
+    private peerOrigin = "*",
   ) {
     this.messageListener = (event) => {
-      if (eventSource && event.source !== this.eventSource) {
+      if (
+        (eventSource && event.source !== this.eventSource) ||
+        (this.peerOrigin !== "*" && event.origin !== this.peerOrigin)
+      ) {
         console.debug("Ignoring message from unknown source", event);
         return;
       }
@@ -115,8 +121,7 @@ export class PostMessageTransport implements Transport {
   /**
    * Send a JSON-RPC message to the target window.
    *
-   * Messages are sent using `postMessage` with `"*"` origin, meaning they are visible
-   * to all frames. The receiver should validate the message source for security.
+   * Messages target the configured peer origin (or `"*"` when unspecified).
    *
    * @param message - JSON-RPC message to send
    * @param options - Optional send options (currently unused)
@@ -127,7 +132,7 @@ export class PostMessageTransport implements Transport {
     if ((message as { method?: string }).method !== TOOL_INPUT_PARTIAL_METHOD) {
       console.debug("Sending message", message);
     }
-    this.eventTarget.postMessage(message, "*");
+    this.eventTarget.postMessage(message, this.peerOrigin);
   }
 
   /**

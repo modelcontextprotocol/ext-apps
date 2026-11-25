@@ -95,10 +95,7 @@ describe("PostMessageTransport", () => {
 
   // ==========================================================================
   // Source validation — the security boundary at this layer.
-  // The transport validates `event.source` (window identity), not `event.origin`.
-  // Origin checks live in the sandbox proxy relay between the two endpoints
-  // (see examples/basic-host/src/sandbox.ts). Here, source===contentWindow is
-  // the narrower check; the app side can't know its sandbox's origin anyway.
+  // The transport always checks window identity and can also pin the peer origin.
   // ==========================================================================
   describe("source validation", () => {
     it("delivers messages from the configured eventSource", async () => {
@@ -131,6 +128,31 @@ describe("PostMessageTransport", () => {
       // able to DoS the error handler.
       expect(received).toEqual([]);
       expect(errors).toEqual([]);
+    });
+
+    it("requires and targets the configured peer origin", async () => {
+      const peerOrigin = "https://sandbox.example";
+      const transport = new PostMessageTransport(
+        eventTarget as unknown as Window,
+        trustedSource as MessageEventSource,
+        peerOrigin,
+      );
+      const received: JSONRPCMessage[] = [];
+      transport.onmessage = (msg) => received.push(msg);
+      await transport.start();
+      fakeWindow.dispatch("message", {
+        source: trustedSource,
+        origin: "https://other.example",
+        data: validRequest,
+      });
+      fakeWindow.dispatch("message", {
+        source: trustedSource,
+        origin: peerOrigin,
+        data: validRequest,
+      });
+      expect(received).toEqual([validRequest]);
+      await transport.send(validRequest);
+      expect(targetPostMessage).toHaveBeenCalledWith(validRequest, peerOrigin);
     });
 
     it("drops messages with a null source", async () => {

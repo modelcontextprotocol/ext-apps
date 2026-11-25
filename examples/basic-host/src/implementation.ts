@@ -1,4 +1,4 @@
-import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { RESOURCE_MIME_TYPE, getToolUiResourceUri, type McpUiSandboxProxyReadyNotification, AppBridge, PostMessageTransport, type McpUiResourceCsp, type McpUiResourcePermissions, buildAllowAttribute, type McpUiUpdateModelContextRequest, type McpUiMessageRequest, type HostOptions, OPEN_VIEW, McpUiOpenViewToolMetaSchema } from "@modelcontextprotocol/ext-apps/app-bridge";
 import {
   Client,
   SSEClientTransport,
@@ -12,6 +12,8 @@ import { HOST_STYLE_VARIABLES } from "./host-styles";
 
 
 const SANDBOX_PROXY_BASE_URL = "http://localhost:8081/sandbox.html";
+// Keep the isolated proxies off the origin used by legacy same-origin Views.
+const ISOLATED_SANDBOX_PROXY_BASE_URL = "http://127.0.0.1:8081/sandbox.html";
 const IMPLEMENTATION = { name: "MCP Apps Host", version: "1.0.0" };
 
 
@@ -116,9 +118,35 @@ export function callTool(
 }
 
 
-async function getUiResource(serverInfo: ServerInfo, uri: string): Promise<UiResourceData> {
+export function getOpenViewTargets({ serverInfo, tool }: ToolCallInfo): ReadonlyMap<string, string> {
+  const targets = new Map<string, string>();
+  const declaration = tool._meta?.[OPEN_VIEW];
+  if (declaration === undefined) return targets;
+  const parsed = McpUiOpenViewToolMetaSchema.safeParse(declaration);
+  if (!parsed.success) {
+    log.warn("Invalid Open View declaration:", parsed.error.message);
+    return targets;
+  }
+  const source = getToolUiResourceUri(tool);
+  if (!source || !URL.canParse(source)) return targets;
+  const sourceHref = new URL(source).href;
+  for (const [target, uri] of Object.entries(parsed.data.targets)) {
+    if (!uri.startsWith("ui://") || !serverInfo.resources.has(uri) || !URL.canParse(uri)) continue;
+    const resource = new URL(uri);
+    if (resource.hostname && !resource.username && !resource.password && !uri.includes("#") && resource.href !== sourceHref) {
+      targets.set(target, uri);
+    }
+  }
+  return targets;
+}
+
+export async function getUiResource(
+  serverInfo: ServerInfo,
+  uri: string,
+  options?: { signal: AbortSignal; requireExactUri: boolean },
+): Promise<UiResourceData> {
   log.info("Reading UI resource:", uri);
-  const resource = await serverInfo.client.readResource({ uri });
+  const resource = await serverInfo.client.readResource({ uri }, { signal: options?.signal });
 
   if (!resource) {
     throw new Error(`Resource not found: ${uri}`);
@@ -129,6 +157,9 @@ async function getUiResource(serverInfo: ServerInfo, uri: string): Promise<UiRes
   }
 
   const content = resource.contents[0];
+  if (options?.requireExactUri && content.uri !== uri) {
+    throw new Error(`Unexpected resource URI: ${content.uri}`);
+  }
 
   // Per the MCP App specification, "text/html;profile=mcp-app" signals this
   // resource is indeed for an MCP App UI.
@@ -164,10 +195,10 @@ export function loadSandboxProxy(
   iframe: HTMLIFrameElement,
   csp?: McpUiResourceCsp,
   permissions?: McpUiResourcePermissions,
-): Promise<boolean> {
-  // Prevent reload
-  if (iframe.src) return Promise.resolve(false);
-
+  options?: { isolated?: boolean; signal?: AbortSignal },
+): Promise<void> {
+  const { isolated, signal } = options ?? {};
+  signal?.throwIfAborted();
   iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
 
   // Set Permission Policy allow attribute based on requested permissions
@@ -179,27 +210,72 @@ export function loadSandboxProxy(
   const readyNotification: McpUiSandboxProxyReadyNotification["method"] =
     "ui/notifications/sandbox-proxy-ready";
 
-  const readyPromise = new Promise<boolean>((resolve) => {
-    const listener = ({ source, data }: MessageEvent) => {
-      if (source === iframe.contentWindow && data?.method === readyNotification) {
-        log.info("Sandbox proxy loaded")
-        window.removeEventListener("message", listener);
-        resolve(true);
-      }
-    };
-    window.addEventListener("message", listener);
-  });
-
   // Build sandbox URL with CSP query param for HTTP header-based CSP
-  const sandboxUrl = new URL(SANDBOX_PROXY_BASE_URL);
+  const sandboxUrl = new URL(isolated ? ISOLATED_SANDBOX_PROXY_BASE_URL : SANDBOX_PROXY_BASE_URL);
+  if (isolated) sandboxUrl.searchParams.set("isolated", "true");
   if (csp) {
     sandboxUrl.searchParams.set("csp", JSON.stringify(csp));
   }
 
-  log.info("Loading sandbox proxy...", csp ? `(CSP: ${JSON.stringify(csp)})` : "");
-  iframe.src = sandboxUrl.href;
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      window.removeEventListener("message", listener);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const listener = ({ source, origin, data }: MessageEvent) => {
+      if (source === iframe.contentWindow && origin === sandboxUrl.origin && data?.method === readyNotification) {
+        cleanup();
+        resolve();
+      }
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(signal?.reason);
+    };
+    window.addEventListener("message", listener);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    iframe.src = sandboxUrl.href;
+  });
+}
 
-  return readyPromise;
+
+export async function initializeView(
+  iframe: HTMLIFrameElement,
+  appBridge: AppBridge,
+  resource: UiResourceData,
+  signal: AbortSignal,
+): Promise<void> {
+  signal.throwIfAborted();
+  // Bind incoming requests to the proxy for this specific iframe.
+  const view = iframe.contentWindow;
+  if (!view) throw new Error("Sandbox iframe is not mounted");
+  const origin = new URL(iframe.src).origin;
+  await appBridge.connect(
+    new PostMessageTransport(view, view, origin),
+  );
+  signal.throwIfAborted();
+
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      appBridge.removeEventListener("initialized", onInitialized);
+      signal.removeEventListener("abort", onAbort);
+    };
+    const onInitialized = () => {
+      cleanup();
+      resolve();
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(signal.reason);
+    };
+    appBridge.addEventListener("initialized", onInitialized);
+    signal.addEventListener("abort", onAbort, { once: true });
+    appBridge.sendSandboxResourceReady(resource).catch((error) => {
+      cleanup();
+      reject(error);
+    });
+  });
+  signal.throwIfAborted();
 }
 
 
@@ -207,61 +283,24 @@ export async function initializeApp(
   iframe: HTMLIFrameElement,
   appBridge: AppBridge,
   { input, resultPromise, appResourcePromise }: Required<ToolCallInfo>,
+  signal: AbortSignal,
 ): Promise<void> {
-  const appInitializedPromise = hookInitializedCallback(appBridge);
+  await initializeView(iframe, appBridge, await appResourcePromise, signal);
+  await appBridge.sendToolInput({ arguments: input });
 
-  // Connect app bridge (triggers MCP initialization handshake)
-  //
-  // IMPORTANT: Pass `iframe.contentWindow` as BOTH target and source to ensure
-  // this proxy only responds to messages from its specific iframe.
-  await appBridge.connect(
-    new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!),
-  );
-
-  // Load inner iframe HTML with CSP and permissions metadata
-  const { html, csp, permissions } = await appResourcePromise;
-  log.info("Sending UI resource HTML to MCP App", csp ? `(CSP: ${JSON.stringify(csp)})` : "", permissions ? `(Permissions: ${JSON.stringify(permissions)})` : "");
-  await appBridge.sendSandboxResourceReady({ html, csp, permissions });
-
-  // Wait for inner iframe to be ready
-  log.info("Waiting for MCP App to initialize...");
-  await appInitializedPromise;
-  log.info("MCP App initialized");
-
-  // Send tool call input to iframe
-  log.info("Sending tool call input to MCP App:", input);
-  appBridge.sendToolInput({ arguments: input });
-
-  // Schedule tool call result (or cancellation) to be sent to MCP App
-  resultPromise.then(
+  await resultPromise.then(
     (result) => {
-      log.info("Sending tool call result to MCP App:", result);
-      appBridge.sendToolResult(result);
+      if (!signal.aborted) return appBridge.sendToolResult(result);
     },
     (error) => {
+      if (signal.aborted) return;
       log.error("Tool call failed, sending cancellation to MCP App:", error);
-      appBridge.sendToolCancelled({
+      return appBridge.sendToolCancelled({
         reason: error instanceof Error ? error.message : String(error),
       });
     },
   );
 }
-
-/**
- * Hooks into `AppBridge.oninitialized` and returns a Promise that resolves when
- * the MCP App is initialized (i.e., when the inner iframe is ready).
- */
-function hookInitializedCallback(appBridge: AppBridge): Promise<void> {
-  const oninitialized = appBridge.oninitialized;
-  return new Promise<void>((resolve) => {
-    appBridge.oninitialized = (...args) => {
-      resolve();
-      appBridge.oninitialized = oninitialized;
-      appBridge.oninitialized?.(...args);
-    };
-  });
-}
-
 
 export type ModelContext = McpUiUpdateModelContextRequest["params"];
 export type AppMessage = McpUiMessageRequest["params"];
@@ -275,6 +314,7 @@ export interface AppBridgeCallbacks {
 export interface AppBridgeOptions {
   containerDimensions?: { maxHeight?: number; width?: number } | { height: number; width?: number };
   displayMode?: "inline" | "fullscreen";
+  openView?: HostOptions["openView"];
 }
 
 export function newAppBridge(
@@ -284,13 +324,15 @@ export function newAppBridge(
   options?: AppBridgeOptions,
 ): AppBridge {
   const serverCapabilities = serverInfo.client.getServerCapabilities();
+  const isOpenedView = options?.openView?.role === "opened";
   const appBridge = new AppBridge(serverInfo.client, IMPLEMENTATION, {
     openLinks: {},
-    serverTools: serverCapabilities?.tools,
-    serverResources: serverCapabilities?.resources,
+    serverTools: isOpenedView && serverCapabilities?.tools ? {} : serverCapabilities?.tools,
+    serverResources: isOpenedView && serverCapabilities?.resources ? {} : serverCapabilities?.resources,
     // Declare support for model context updates
     updateModelContext: { text: {} },
   }, {
+    openView: options?.openView,
     // Pass initial host context with theme, display mode, and style variables
     hostContext: {
       theme: getTheme(),
@@ -300,12 +342,12 @@ export function newAppBridge(
       },
       containerDimensions: options?.containerDimensions ?? { maxHeight: 6000 },
       displayMode: options?.displayMode ?? "inline",
-      availableDisplayModes: ["inline", "fullscreen"],
+      availableDisplayModes: isOpenedView ? ["inline"] : ["inline", "fullscreen"],
     },
   });
 
   // Listen for theme changes (from toggle or system) and notify the app
-  onThemeChange((newTheme) => {
+  const unsubscribeTheme = onThemeChange((newTheme) => {
     log.info("Theme changed:", newTheme);
     appBridge.sendHostContextChange({ theme: newTheme });
   });
@@ -328,6 +370,7 @@ export function newAppBridge(
   // AppBridge inherits Protocol's onclose hook — chain disposal there.
   const prevOnclose = appBridge.onclose;
   appBridge.onclose = () => {
+    unsubscribeTheme();
     iframeResizeObserver.disconnect();
     prevOnclose?.();
   };
@@ -399,7 +442,7 @@ export function newAppBridge(
   // Handle display mode change requests from the app
   appBridge.onrequestdisplaymode = async (params) => {
     log.info("Display mode request from MCP App:", params);
-    const newMode = params.mode === "fullscreen" ? "fullscreen" : "inline";
+    const newMode = !isOpenedView && params.mode === "fullscreen" ? "fullscreen" : "inline";
     // Update host context and notify the app
     appBridge.sendHostContextChange({
       displayMode: newMode,

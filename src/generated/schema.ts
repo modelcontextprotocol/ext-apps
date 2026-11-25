@@ -7,6 +7,7 @@ import {
   CallToolResultSchema,
   EmbeddedResourceSchema,
   ImplementationSchema,
+  JSONObjectSchema,
   RequestIdSchema,
   ResourceLinkSchema,
   ToolSchema,
@@ -708,6 +709,42 @@ export const McpUiRequestDisplayModeResultSchema = z
   })
   .passthrough();
 
+/** Experimental Open View v1 advertisement from a View. */
+export const McpUiOpenViewAppCapabilitySchema = z.object({
+  version: z.literal(1),
+  role: z.union([z.literal("source"), z.literal("opened")]),
+});
+
+const OpenViewGenerationSchema = z.number().int().nonnegative();
+
+const ViewTargetSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
+
+/** Experimental metadata on the source tool under `_meta[OPEN_VIEW]`. */
+export const McpUiOpenViewToolMetaSchema = z.object({
+  targets: z.record(ViewTargetSchema, z.string()),
+});
+
+/** Experimental outcome and actual display mode, if the View opened. */
+export const McpUiOpenViewResultSchema = z.object({
+  status: z.union([
+    z.literal("opened"),
+    z.literal("unavailable"),
+    z.literal("denied"),
+    z.literal("failed"),
+    z.literal("stale"),
+  ]),
+  generation: OpenViewGenerationSchema,
+  displayMode: McpUiDisplayModeSchema.optional(),
+});
+
+/** Experimental notification of host dismissal of a secondary View. */
+export const McpUiViewClosedNotificationSchema = z.object({
+  method: z.literal("ui/notifications/view-closed"),
+  params: z.object({
+    generation: OpenViewGenerationSchema,
+  }),
+});
+
 /**
  * @description Tool visibility scope - who can access the tool.
  */
@@ -1056,3 +1093,38 @@ export const McpUiInitializeResultSchema = z
     ),
   })
   .passthrough();
+
+/** Experimental acknowledgement of Open View v1 by the host. */
+export const McpUiOpenViewHostCapabilitySchema = z.object({
+  version: z.literal(1),
+  /** @description Initial generation for the source session. Omitted for opened Views. */
+  generation: OpenViewGenerationSchema.optional().describe(
+    "Initial generation for the source session. Omitted for opened Views.",
+  ),
+});
+
+const ViewLaunchInputSchema = JSONObjectSchema.refine(
+  (value) => new TextEncoder().encode(JSON.stringify(value)).length <= 4096,
+  "View launch input exceeds 4096 bytes",
+);
+
+/** Experimental bootstrap passed under `hostContext[OPEN_VIEW]` to the opened View. */
+export const McpUiViewLaunchContextSchema = z.object({
+  target: ViewTargetSchema,
+  input: ViewLaunchInputSchema,
+});
+
+const OpenViewRequestParamsSchema = z.strictObject({
+  generation: OpenViewGenerationSchema,
+  /** @schema .int().positive() */
+  seq: z.number().int().positive(),
+  target: ViewTargetSchema,
+  input: ViewLaunchInputSchema,
+  preferredDisplayMode: McpUiDisplayModeSchema.optional(),
+});
+
+/** Experimental request to open a server-declared View in a separate surface. */
+export const McpUiOpenViewRequestSchema = z.object({
+  method: z.literal("ui/open-view"),
+  params: OpenViewRequestParamsSchema,
+});

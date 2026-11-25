@@ -48,6 +48,15 @@ type MethodSchema = ZodObject<{
 }>;
 
 import {
+  OPEN_VIEW,
+  McpUiOpenViewAppCapabilitySchema,
+  McpUiViewClosedNotificationSchema,
+  McpUiOpenViewRequestSchema,
+  McpUiOpenViewResultSchema,
+  type McpUiViewClosedNotification,
+  type McpUiOpenViewRequest,
+  type McpUiOpenViewResult,
+  type McpUiViewLaunchContext,
   type McpUiSandboxResourceReadyNotification,
   type McpUiSizeChangedNotification,
   type McpUiToolCancelledNotification,
@@ -210,6 +219,17 @@ export function buildAllowAttribute(
  */
 export type HostOptions = Omit<ProtocolOptions, "supportedProtocolVersions"> & {
   hostContext?: McpUiHostContext;
+  /** Experimental Open View role bound to this bridge by the host. */
+  openView?:
+    | {
+        role: "source";
+        /** Clear prior launch state and return a fresh generation for this initialization. */
+        startSession: () => number;
+        open: (
+          params: McpUiOpenViewRequest["params"],
+        ) => Promise<McpUiOpenViewResult>;
+      }
+    | { role: "opened"; launch: McpUiViewLaunchContext };
 };
 
 /**
@@ -307,6 +327,12 @@ export class AppBridge extends Protocol<BaseContext> {
   private _hostContext: McpUiHostContext = {};
   private _appInfo?: Implementation;
   private _initializedReceived = false;
+  private readonly _openView: HostOptions["openView"];
+  private _openViewNegotiated = false;
+  private _openViewReady = false;
+  private readonly _pendingOpenViewReplies = new Set<
+    (result: McpUiOpenViewResult) => void
+  >();
   private readonly _registeredEvents = new Set<keyof AppBridgeEventMap>();
   private readonly _events = new EventDispatcher<AppBridgeEventMap>();
   private readonly _methods = new MethodRegistry();
@@ -463,7 +489,10 @@ export class AppBridge extends Protocol<BaseContext> {
     if (!schema) throw new Error(`Unknown event: ${String(event)}`);
 
     const dispatch = (params: AppBridgeEventMap[K]) => {
-      if (event === "initialized") this._initializedReceived = true;
+      if (event === "initialized") {
+        this._initializedReceived = true;
+        this._openViewReady = this._openViewNegotiated;
+      }
       this._events.dispatch(event, params);
     };
 
@@ -540,6 +569,7 @@ export class AppBridge extends Protocol<BaseContext> {
     this._ensureEventSlot("initialized");
 
     this._hostContext = options?.hostContext || {};
+    this._openView = options?.openView;
 
     this.replaceRequestHandler(
       "ui/initialize",
@@ -549,6 +579,37 @@ export class AppBridge extends Protocol<BaseContext> {
       },
       (params) => this._onAppsInitialize(params),
     );
+
+    if (this._openView) {
+      this.replaceRequestHandler(
+        McpUiOpenViewRequestSchema.shape.method.value,
+        {
+          params: McpUiOpenViewRequestSchema.shape.params,
+          result: McpUiOpenViewResultSchema,
+        },
+        async (params) => {
+          if (
+            this._openView?.role !== "source" ||
+            !this.isOpenViewNegotiated()
+          ) {
+            throw new Error("Open View v1 was not negotiated for this source");
+          }
+          let invalidate!: (result: McpUiOpenViewResult) => void;
+          const invalidated = new Promise<McpUiOpenViewResult>((resolve) => {
+            invalidate = resolve;
+          });
+          this._pendingOpenViewReplies.add(invalidate);
+          try {
+            return await Promise.race([
+              invalidated,
+              this._openView.open(params),
+            ]);
+          } finally {
+            this._pendingOpenViewReplies.delete(invalidate);
+          }
+        },
+      );
+    }
 
     this.replaceRequestHandler("ping", (request, extra) => {
       this.onping?.(request.params, extra);
@@ -1616,6 +1677,22 @@ export class AppBridge extends Protocol<BaseContext> {
     return this._hostCapabilities;
   }
 
+  /** Whether the View completed the experimental Open View v1 handshake. */
+  isOpenViewNegotiated(): boolean {
+    return this._openViewReady;
+  }
+
+  /** Notify the negotiated source after a host-initiated dismissal. */
+  sendViewClosed(params: McpUiViewClosedNotification["params"]) {
+    if (this._openView?.role !== "source" || !this.isOpenViewNegotiated()) {
+      throw new Error("Open View v1 was not negotiated for this source");
+    }
+    return this.notification({
+      method: McpUiViewClosedNotificationSchema.shape.method.value,
+      params,
+    });
+  }
+
   /**
    * Handle the ui/initialize request from the guest.
    * @internal
@@ -1624,6 +1701,19 @@ export class AppBridge extends Protocol<BaseContext> {
     params: McpUiInitializeRequest["params"],
   ): Promise<McpUiInitializeResult> {
     const requestedVersion = params.protocolVersion;
+    this._openViewReady = false;
+    this._openViewNegotiated = false;
+    const generation =
+      this._openView?.role === "source"
+        ? this._openView.startSession()
+        : undefined;
+    if (generation !== undefined) {
+      // Settle replies before the replacement View can reuse JSON-RPC IDs.
+      for (const invalidate of this._pendingOpenViewReplies) {
+        invalidate({ status: "stale", generation });
+      }
+      this._pendingOpenViewReplies.clear();
+    }
 
     if (this._appInfo !== undefined) {
       console.warn(
@@ -1637,6 +1727,36 @@ export class AppBridge extends Protocol<BaseContext> {
     this._appCapabilities = params.appCapabilities;
     this._appInfo = params.appInfo;
 
+    const role = McpUiOpenViewAppCapabilitySchema.safeParse(
+      params.appCapabilities.experimental?.[OPEN_VIEW],
+    ).data?.role;
+    this._openViewNegotiated = !!role && role === this._openView?.role;
+    let hostCapabilities = this.getCapabilities();
+    let hostContext = this._hostContext;
+    if (hostCapabilities.experimental?.[OPEN_VIEW]) {
+      const experimental = { ...hostCapabilities.experimental };
+      delete experimental[OPEN_VIEW];
+      hostCapabilities = { ...hostCapabilities, experimental };
+    }
+    if (this._openViewNegotiated) {
+      hostCapabilities = {
+        ...hostCapabilities,
+        experimental: {
+          ...hostCapabilities.experimental,
+          [OPEN_VIEW]:
+            generation === undefined
+              ? { version: 1 }
+              : { version: 1, generation },
+        },
+      };
+      if (this._openView?.role === "opened") {
+        hostContext = {
+          ...hostContext,
+          [OPEN_VIEW]: this._openView.launch,
+        };
+      }
+    }
+
     const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(
       requestedVersion,
     )
@@ -1645,9 +1765,9 @@ export class AppBridge extends Protocol<BaseContext> {
 
     return {
       protocolVersion,
-      hostCapabilities: this.getCapabilities(),
+      hostCapabilities,
       hostInfo: this._hostInfo,
-      hostContext: this._hostContext,
+      hostContext,
     };
   }
 
@@ -2004,6 +2124,8 @@ export class AppBridge extends Protocol<BaseContext> {
       );
     }
     this._initializedReceived = false;
+    this._openViewNegotiated = false;
+    this._openViewReady = false;
     if (this._client) {
       // When a client was passed to the constructor, automatically forward
       // MCP requests/notifications between the view and the server
@@ -2019,7 +2141,10 @@ export class AppBridge extends Protocol<BaseContext> {
             { signal: extra.mcpReq.signal },
           );
         };
-        if (serverCapabilities.tools.listChanged) {
+        if (
+          serverCapabilities.tools.listChanged &&
+          this._openView?.role !== "opened"
+        ) {
           this._client.setNotificationHandler(
             "notifications/tools/list_changed",
             (n) => this.sendToolListChanged(n.params),
@@ -2045,7 +2170,10 @@ export class AppBridge extends Protocol<BaseContext> {
             { signal: extra.mcpReq.signal },
           );
         };
-        if (serverCapabilities.resources.listChanged) {
+        if (
+          serverCapabilities.resources.listChanged &&
+          this._openView?.role !== "opened"
+        ) {
           this._client.setNotificationHandler(
             "notifications/resources/list_changed",
             (n) => this.sendResourceListChanged(n.params),
@@ -2059,7 +2187,10 @@ export class AppBridge extends Protocol<BaseContext> {
             { signal: extra.mcpReq.signal },
           );
         };
-        if (serverCapabilities.prompts.listChanged) {
+        if (
+          serverCapabilities.prompts.listChanged &&
+          this._openView?.role !== "opened"
+        ) {
           this._client.setNotificationHandler(
             "notifications/prompts/list_changed",
             (n) => this.sendPromptListChanged(n.params),

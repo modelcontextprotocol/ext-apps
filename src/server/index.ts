@@ -57,6 +57,7 @@ import type { z } from "zod/v4";
 
 // Re-exports for convenience
 export { RESOURCE_URI_META_KEY, RESOURCE_MIME_TYPE };
+export { OPEN_VIEW } from "../spec.types.js";
 export type { ResourceMetadata, ToolCallback };
 
 /**
