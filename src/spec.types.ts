@@ -545,6 +545,12 @@ export interface McpUiAppCapabilities {
   };
   /** @description Display modes the app supports. */
   availableDisplayModes?: McpUiDisplayMode[];
+  /**
+   * @description Display mode in which the app prefers to be first shown.
+   *
+   * A hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.
+   */
+  preferredDisplayMode?: McpUiDisplayMode;
 }
 
 /**

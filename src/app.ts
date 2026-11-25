@@ -577,6 +577,23 @@ export class App extends Protocol<BaseContext> {
    *   { autoResize: true }, // options
    * );
    * ```
+   *
+   * @example Prefer to be first shown in fullscreen
+   * ```ts source="./app.examples.ts#App_constructor_preferredDisplayMode"
+   * const app = new App(
+   *   { name: "MyApp", version: "1.0.0" },
+   *   {
+   *     availableDisplayModes: ["inline", "fullscreen"],
+   *     preferredDisplayMode: "fullscreen",
+   *   },
+   * );
+   * await app.connect();
+   *
+   * // The host may ignore the preference: read the actual mode.
+   * const container = document.getElementById("main")!;
+   * const isFullscreen = app.getHostContext()?.displayMode === "fullscreen";
+   * container.classList.toggle("fullscreen", isFullscreen);
+   * ```
    */
   constructor(
     private _appInfo: Implementation,

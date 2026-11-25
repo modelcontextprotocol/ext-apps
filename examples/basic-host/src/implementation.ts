@@ -409,5 +409,25 @@ export function newAppBridge(
     return { mode: newMode };
   };
 
+  // Honor `appCapabilities.preferredDisplayMode`. It is a hint for how the
+  // app is first shown, so apply it once, as soon as the app has initialized
+  // (a repeated `ui/initialize` does not renew it). This host starts every
+  // app inline and offers only inline and fullscreen, so fullscreen is the
+  // one preference to act on, and only if the app also lists it as available.
+  const applyPreferredDisplayMode = () => {
+    appBridge.removeEventListener("initialized", applyPreferredDisplayMode);
+    const caps = appBridge.getAppCapabilities();
+    if (
+      caps?.preferredDisplayMode === "fullscreen" &&
+      caps.availableDisplayModes?.includes("fullscreen") &&
+      (options?.displayMode ?? "inline") === "inline"
+    ) {
+      log.info("Applying the app's preferred display mode: fullscreen");
+      appBridge.sendHostContextChange({ displayMode: "fullscreen" });
+      callbacks?.onDisplayModeChange?.("fullscreen");
+    }
+  };
+  appBridge.addEventListener("initialized", applyPreferredDisplayMode);
+
   return appBridge;
 }

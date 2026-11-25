@@ -54,6 +54,23 @@
             ],
             "description": "Display mode for UI presentation."
           }
+        },
+        "preferredDisplayMode": {
+          "description": "Display mode in which the app prefers to be first shown.\n\nA hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.",
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "inline"
+            },
+            {
+              "type": "string",
+              "const": "fullscreen"
+            },
+            {
+              "type": "string",
+              "const": "pip"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -2640,6 +2657,23 @@
                     ],
                     "description": "Display mode for UI presentation."
                   }
+                },
+                "preferredDisplayMode": {
+                  "description": "Display mode in which the app prefers to be first shown.\n\nA hint: the host chooses how it first shows the app and may ignore this value. The app reads the mode it is displayed in from `hostContext.displayMode`. Must also be listed in `availableDisplayModes`.",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "inline"
+                    },
+                    {
+                      "type": "string",
+                      "const": "fullscreen"
+                    },
+                    {
+                      "type": "string",
+                      "const": "pip"
+                    }
+                  ]
                 }
               },
               "additionalProperties": false,

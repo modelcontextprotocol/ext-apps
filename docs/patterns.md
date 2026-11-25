@@ -447,6 +447,25 @@ In fullscreen mode, remove the container's border radius so content extends to t
 }
 ```
 
+If your View is mainly useful on a large surface, declare `fullscreen` as its preferred display mode. This is a hint for how the host first shows the View. The host may ignore it, or apply it just after the View is first shown, so keep the `onhostcontextchanged` handler above:
+
+<!-- prettier-ignore -->
+```ts source="../src/app.examples.ts#App_constructor_preferredDisplayMode"
+const app = new App(
+  { name: "MyApp", version: "1.0.0" },
+  {
+    availableDisplayModes: ["inline", "fullscreen"],
+    preferredDisplayMode: "fullscreen",
+  },
+);
+await app.connect();
+
+// The host may ignore the preference: read the actual mode.
+const container = document.getElementById("main")!;
+const isFullscreen = app.getHostContext()?.displayMode === "fullscreen";
+container.classList.toggle("fullscreen", isFullscreen);
+```
+
 > [!NOTE]
 > For full examples that implement this pattern, see: [`examples/shadertoy-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/shadertoy-server), [`examples/pdf-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/pdf-server), and [`examples/map-server/`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/map-server).
 
