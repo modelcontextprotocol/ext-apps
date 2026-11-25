@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Delivery window</title>
+  </head>
+  <body>
+    <h1>Choose a delivery window</h1>
+    <form>
+      <fieldset disabled>
+        <label
+          >Delivery window
+          <select name="window">
+            <option value="morning">Morning</option>
+            <option value="afternoon">Afternoon</option>
+          </select></label
+        >
+        <button type="submit">Submit</button>
+        <button type="button" id="decline">Decline</button>
+        <button type="button" id="invalid">Send invalid answer</button>
+      </fieldset>
+    </form>
+    <script type="module" src="./src/elicitation-app.ts"></script>
+  </body>
+</html>

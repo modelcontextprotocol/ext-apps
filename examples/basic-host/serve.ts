@@ -124,7 +124,7 @@ sandboxApp.get(["/", "/sandbox.html"], (req, res) => {
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
 
-  res.sendFile(join(DIRECTORY, "sandbox.html"));
+  res.sendFile("sandbox.html", { root: DIRECTORY });
 });
 
 sandboxApp.use((_req, res) => {

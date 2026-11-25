@@ -529,6 +529,11 @@ export interface McpUiHostCapabilities {
     /** @description Host supports tool use via `tools` and `toolChoice` parameters. */
     tools?: {};
   };
+  /**
+   * @description Host can forward form-mode `elicitation/create` requests to
+   * this app and return its standard MCP `ElicitResult` to the server.
+   */
+  elicitation?: {};
 }
 
 /**
@@ -545,6 +550,11 @@ export interface McpUiAppCapabilities {
   };
   /** @description Display modes the app supports. */
   availableDisplayModes?: McpUiDisplayMode[];
+  /**
+   * @description App can render and resolve form-mode `elicitation/create`
+   * requests using the standard MCP request and result shapes.
+   */
+  elicitation?: {};
 }
 
 /**
@@ -855,4 +865,31 @@ export interface McpUiClientCapabilities {
    * Must include `"text/html;profile=mcp-app"` for MCP Apps support.
    */
   mimeTypes?: string[];
+  /**
+   * @description Client can use an MCP App to render form-mode elicitations
+   * when a request identifies a UI resource.
+   */
+  elicitation?: {};
+}
+
+/**
+ * @description MCP Apps capability settings advertised by servers to clients.
+ */
+export interface McpUiServerCapabilities {
+  /**
+   * @description Server may attach an MCP App resource to form-mode
+   * `elicitation/create` requests.
+   */
+  elicitation?: {};
+}
+
+/**
+ * @description MCP Apps metadata attached to a form-mode elicitation request.
+ */
+export interface McpUiElicitationMeta {
+  /**
+   * @description Absolute `ui://` URI of the MCP App resource that can render
+   * and resolve this elicitation.
+   */
+  resourceUri: string;
 }

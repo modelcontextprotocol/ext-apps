@@ -5,8 +5,8 @@
  */
 
 import { createMcpExpressApp } from "@modelcontextprotocol/express";
-import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
-import type { McpServer } from "@modelcontextprotocol/server";
+import { toNodeHandler } from "@modelcontextprotocol/node";
+import { createMcpHandler, type McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import cors from "cors";
 import type { Request, Response } from "express";
@@ -25,31 +25,10 @@ export async function startStreamableHTTPServer(
   const app = createMcpExpressApp({ host: "0.0.0.0" });
   app.use(cors());
 
-  app.all("/mcp", async (req: Request, res: Response) => {
-    const server = createServer();
-    const transport = new NodeStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-    });
-
-    res.on("close", () => {
-      transport.close().catch(() => {});
-      server.close().catch(() => {});
-    });
-
-    try {
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-    } catch (error) {
-      console.error("MCP error:", error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: "2.0",
-          error: { code: -32603, message: "Internal server error" },
-          id: null,
-        });
-      }
-    }
-  });
+  // Modern requests use the SDK's stateless MRTR handler. Its default legacy
+  // fallback retains the example's prior per-request 2025 behavior.
+  const handle = toNodeHandler(createMcpHandler(createServer));
+  app.all("/mcp", (req: Request, res: Response) => handle(req, res, req.body));
 
   const httpServer = app.listen(port, (err) => {
     if (err) {
