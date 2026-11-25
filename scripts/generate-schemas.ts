@@ -11,12 +11,14 @@
  * ### 1. Zod Import Path (`"zod"` → `"zod/v4"`)
  *
  * ts-to-zod generates `import { z } from "zod"`. We rewrite this to
- * `import { z } from "zod/v4"` because the generated schemas compose with
+ * `import * as z from "zod/v4"` because the generated schemas compose with
  * schemas imported from `@modelcontextprotocol/core`, which the SDK
  * constructs via `zod/v4`. Mixing schemas from the v3 and v4 APIs at runtime
  * fails with errors like `keyValidator._parse is not a function` (v3 internals
  * calling into v4 objects, or vice versa). The `zod/v4` subpath is exported by
  * both zod 3.25+ and zod 4.x, so the peerDependency range is preserved.
+ * The module namespace import lets consumer bundlers tree-shake unused Zod
+ * exports, including locales, instead of retaining the exported `z` object.
  *
  * ### 2. External Type References (`z.any()` → actual schemas)
  *
@@ -192,7 +194,7 @@ function postProcess(content: string): string {
   const mcpImports = EXTERNAL_TYPE_SCHEMAS.join(",\n  ");
   content = content.replace(
     'import { z } from "zod";',
-    `import { z } from "zod/v4";
+    `import * as z from "zod/v4";
 import {
   ${mcpImports},
 } from "@modelcontextprotocol/core";`,

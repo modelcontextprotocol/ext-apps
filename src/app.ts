@@ -92,7 +92,7 @@ import {
   standardSchemaToJsonSchema,
   validateStandardSchema,
 } from "./standard-schema.js";
-import { z, type ZodLiteral, type ZodObject, type ZodType } from "zod/v4";
+import { config, type ZodLiteral, type ZodObject, type ZodType } from "zod/v4";
 
 type UntypedHandlerSetter = (this: unknown, ...args: unknown[]) => void;
 
@@ -590,7 +590,7 @@ export class App extends Protocol<BaseContext> {
     this._methods.replace("notifications/progress");
 
     if (!options.allowUnsafeEval) {
-      z.config({ jitless: true });
+      config({ jitless: true });
     }
 
     this.replaceRequestHandler("ping", (request) => {
