@@ -13,12 +13,12 @@ test.setTimeout(120000);
 /** Wait for the MCP App to load inside nested iframes. */
 async function waitForAppLoad(page: Page) {
   const outerFrame = page.frameLocator("iframe").first();
-  await expect(outerFrame.locator("iframe")).toBeVisible({ timeout: 30000 });
+  await expect(outerFrame.locator("body")).toBeVisible({ timeout: 30000 });
 }
 
 /** Get the app frame locator (nested: sandbox > app) */
 function getAppFrame(page: Page) {
-  return page.frameLocator("iframe").first().frameLocator("iframe").first();
+  return page.frameLocator("iframe").first();
 }
 
 /** Load the PDF server and call display_pdf with the default PDF. */

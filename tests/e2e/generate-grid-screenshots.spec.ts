@@ -122,12 +122,11 @@ async function loadServer(page: Page, serverName: string) {
  * - grid-cell.png: 300x300 cropped thumbnail (top-aligned)
  */
 async function captureAppScreenshot(page: Page, outputDir: string) {
-  // Get the inner app iframe element
-  const outerFrame = page.frameLocator("iframe").nth(0);
-  const innerIframe = outerFrame.locator("iframe").nth(0);
+  // Get the app iframe element
+  const viewFrame = page.frameLocator("iframe").nth(0);
 
-  // Screenshot the inner iframe element
-  const screenshot = await innerIframe.screenshot();
+  // Screenshot the app iframe element
+  const screenshot = await viewFrame.screenshot();
 
   // Save full-size screenshot
   const screenshotPath = path.join(outputDir, "screenshot.png");
