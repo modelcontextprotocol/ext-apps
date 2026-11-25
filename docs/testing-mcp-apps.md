@@ -8,6 +8,24 @@ description: Test MCP Apps locally with the basic-host reference implementation 
 
 This guide covers two approaches for testing your MCP App: using the `basic-host` reference implementation for local development, or using an MCP Apps-compatible host like Claude\.ai or VS Code.
 
+## Validate against the specification
+
+The SDK ships a validator that checks your server and app against the app-side requirements of the MCP Apps specification — resource format, tool metadata, CSP declarations, and (with [Playwright](https://playwright.dev) installed) the app's observable protocol behavior under a mock host:
+
+```bash
+# Validate a running server (streamable HTTP)
+npx mcp-app-validator http://localhost:3001/mcp
+
+# Validate a server over stdio, or a built HTML document directly
+npx mcp-app-validator --stdio node dist/server.js
+npx mcp-app-validator --html dist/mcp-app.html
+
+# CI usage: JSON report, exit code 1 on any MUST-level violation
+npx mcp-app-validator http://localhost:3001/mcp --json
+```
+
+Every finding cites the rule it violates and the spec section the rule derives from. See the {@link validator! validator} API documentation to run it programmatically.
+
 ## Test with basic-host
 
 The [`basic-host`](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) example in this repository is a reference host implementation that lets you select a tool, call it, and see your App UI rendered in a sandboxed iframe.
