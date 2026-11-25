@@ -105,6 +105,9 @@ async function renderAbc(abcNotation: string): Promise<void> {
 
 const app = new App({ name: "Sheet Music App", version: "1.0.0" });
 
+// Whether the tool input was a file, whose notation comes with the result
+let openingFile = false;
+
 // Handle tool input - receives ABC notation from the host
 app.ontoolinput = (params) => {
   console.info("Received tool input:", params);
@@ -113,8 +116,27 @@ app.ontoolinput = (params) => {
 
   if (abcNotation) {
     renderAbc(abcNotation);
+  } else if (params.arguments?.file) {
+    // play-sheet-music-file: the notation comes with the tool result
+    openingFile = true;
+    setStatus("Opening file...");
   } else {
     setStatus("No ABC notation provided", true);
+  }
+};
+
+// Handle the result of play-sheet-music-file - receives the file's notation
+app.ontoolresult = (result) => {
+  if (!openingFile) return;
+
+  const { abcNotation } = (result.structuredContent ?? {}) as {
+    abcNotation?: unknown;
+  };
+  if (typeof abcNotation === "string") {
+    renderAbc(abcNotation);
+  } else {
+    const text = result.content?.find((c) => c.type === "text")?.text;
+    setStatus(text ?? "Could not open the file", true);
   }
 };
 

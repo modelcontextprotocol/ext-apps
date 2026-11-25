@@ -86,6 +86,8 @@ Exposes two tools demonstrating a polling pattern:
    - CPU model and core count
    - Total memory
 
+   It takes no arguments and only reads, so it also declares a `"global"` entrypoint (`_meta.ui.entrypoints`): a host can let the user open the monitor directly.
+
 2. **`poll-system-stats`** (App-only, `visibility: ["app"]`) — Returns dynamic metrics:
    - Per-core CPU timing data (idle/total counters)
    - Memory usage (used/free/percentage)

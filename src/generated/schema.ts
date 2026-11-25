@@ -716,6 +716,68 @@ export const McpUiToolVisibilitySchema = z
   .describe("Tool visibility scope - who can access the tool.");
 
 /**
+ * @description One way for the user to open a tool's view from the host's own UI.
+ */
+export const McpUiEntrypointSchema = z
+  .object({
+    /**
+     * @description Kind of entrypoint. The specification defines `"global"`,
+     * `"thread"` and `"file"`. Hosts ignore the types that they do not support.
+     */
+    type: z
+      .string()
+      .describe(
+        'Kind of entrypoint. The specification defines `"global"`,\n`"thread"` and `"file"`. Hosts ignore the types that they do not support.',
+      ),
+  })
+  .passthrough();
+
+/**
+ * @description The user can open the view as a starting point, e.g. from a list of apps.
+ * The host calls the tool with `{}`.
+ */
+export const McpUiGlobalEntrypointSchema = z.object({
+  type: z.literal("global"),
+});
+
+/**
+ * @description The user can open the view inside a conversation, to which it then belongs.
+ * The host calls the tool with `{}`.
+ */
+export const McpUiThreadEntrypointSchema = z.object({
+  type: z.literal("thread"),
+});
+
+/**
+ * @description The view handles files that the user opens in the host.
+ * The host calls the tool with the file as its one `x-mcp-file` argument.
+ * A file matches if either list has an item that matches it.
+ */
+export const McpUiFileEntrypointSchema = z.object({
+  type: z.literal("file"),
+  /**
+   * @description File name extensions that the view handles, each with its
+   * leading dot (e.g. `".csv"`). Compared without regard to case.
+   */
+  extensions: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'File name extensions that the view handles, each with its\nleading dot (e.g. `".csv"`). Compared without regard to case.',
+    ),
+  /**
+   * @description Media types that the view handles: exact (e.g. `"text/csv"`)
+   * or a whole type (e.g. `"image/*"`).
+   */
+  mimeTypes: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Media types that the view handles: exact (e.g. `"text/csv"`)\nor a whole type (e.g. `"image/*"`).',
+    ),
+});
+
+/**
  * @description UI-related metadata for tools.
  */
 export const McpUiToolMetaSchema = z.object({
@@ -738,6 +800,18 @@ export const McpUiToolMetaSchema = z.object({
     .optional()
     .describe(
       'Who can access this tool. Default: ["model", "app"]\n- "model": Tool visible to and callable by the agent\n- "app": Tool callable by the app from this server only',
+    ),
+  /**
+   * @description Ways for the user to open this tool's view from the host's own UI.
+   * Only has an effect on a tool that declares a UI resource.
+   * To ignore malformed entries as the specification requires, read it with the
+   * SDK's `getToolEntrypoints()`: `McpUiToolMetaSchema` rejects the whole object for one.
+   */
+  entrypoints: z
+    .array(McpUiEntrypointSchema)
+    .optional()
+    .describe(
+      "Ways for the user to open this tool's view from the host's own UI.\nOnly has an effect on a tool that declares a UI resource.\nTo ignore malformed entries as the specification requires, read it with the\nSDK's `getToolEntrypoints()`: `McpUiToolMetaSchema` rejects the whole object for one.",
     ),
   /**
    * `csp` belongs on the UI **resource** (see {@link McpUiResourceMeta}),

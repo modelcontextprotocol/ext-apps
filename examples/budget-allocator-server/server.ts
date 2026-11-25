@@ -276,7 +276,10 @@ export function createServer(): McpServer {
         "Returns budget configuration with 24 months of historical allocations and industry benchmarks by company stage. The widget is interactive and exposes tools for reading/modifying allocations, adjusting budgets, and comparing against industry benchmarks.",
       inputSchema: z.object({}),
       outputSchema: BudgetDataResponseSchema,
-      _meta: { ui: { resourceUri } },
+      annotations: { readOnlyHint: true },
+      // The tool takes no arguments and only reads, and the agent can work
+      // with the open widget: the user can add it to a conversation directly.
+      _meta: { ui: { resourceUri, entrypoints: [{ type: "thread" }] } },
     },
     async (): Promise<CallToolResult> => {
       const response: BudgetDataResponse = {

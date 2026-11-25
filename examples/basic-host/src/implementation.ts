@@ -96,8 +96,10 @@ export function callTool(
   serverInfo: ServerInfo,
   name: string,
   input: Record<string, unknown>,
+  // What to show of the input, and to send to the View, when not all of it (e.g. without a file's bytes)
+  shownInput: Record<string, unknown> = input,
 ): ToolCallInfo {
-  log.info("Calling tool", name, "with input", input);
+  log.info("Calling tool", name, "with input", shownInput);
   const resultPromise = serverInfo.client.callTool({ name, arguments: input }) as Promise<CallToolResult>;
 
   const tool = serverInfo.tools.get(name);
@@ -105,7 +107,7 @@ export function callTool(
     throw new Error(`Unknown tool: ${name}`);
   }
 
-  const toolCallInfo: ToolCallInfo = { serverInfo, tool, input, resultPromise };
+  const toolCallInfo: ToolCallInfo = { serverInfo, tool, input: shownInput, resultPromise };
 
   const uiResourceUri = getToolUiResourceUri(tool);
   if (uiResourceUri) {
