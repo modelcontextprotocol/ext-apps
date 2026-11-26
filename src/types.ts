@@ -78,6 +78,7 @@ export {
   INITIALIZED_METHOD,
   REQUEST_DISPLAY_MODE_METHOD,
   type McpUiTheme,
+  type McpUiContrastPreference,
   type McpUiDisplayMode,
   type McpUiStyleVariableKey,
   type McpUiStyles,
@@ -121,6 +122,7 @@ export {
 // Re-export all schemas from generated/schema.ts (already PascalCase)
 export {
   McpUiThemeSchema,
+  McpUiContrastPreferenceSchema,
   McpUiDisplayModeSchema,
   McpUiHostCssSchema,
   McpUiHostStylesSchema,

@@ -72,6 +72,24 @@
       },
       "additionalProperties": false
     },
+    "McpUiContrastPreference": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "no-preference"
+        },
+        {
+          "type": "string",
+          "const": "more"
+        },
+        {
+          "type": "string",
+          "const": "less"
+        }
+      ],
+      "description": "User's contrast preference, mirroring the CSS `prefers-contrast` media feature."
+    },
     "McpUiDisplayMode": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "anyOf": [
@@ -694,6 +712,23 @@
                 {
                   "type": "string",
                   "const": "dark"
+                }
+              ]
+            },
+            "prefersContrast": {
+              "description": "User's contrast preference, independent of theme. Absent means unknown.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "no-preference"
+                },
+                {
+                  "type": "string",
+                  "const": "more"
+                },
+                {
+                  "type": "string",
+                  "const": "less"
                 }
               ]
             },
@@ -1477,6 +1512,23 @@
             {
               "type": "string",
               "const": "dark"
+            }
+          ]
+        },
+        "prefersContrast": {
+          "description": "User's contrast preference, independent of theme. Absent means unknown.",
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "no-preference"
+            },
+            {
+              "type": "string",
+              "const": "more"
+            },
+            {
+              "type": "string",
+              "const": "less"
             }
           ]
         },
@@ -3098,6 +3150,23 @@
                 {
                   "type": "string",
                   "const": "dark"
+                }
+              ]
+            },
+            "prefersContrast": {
+              "description": "User's contrast preference, independent of theme. Absent means unknown.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "no-preference"
+                },
+                {
+                  "type": "string",
+                  "const": "more"
+                },
+                {
+                  "type": "string",
+                  "const": "less"
                 }
               ]
             },

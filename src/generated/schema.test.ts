@@ -15,6 +15,10 @@ export type McpUiThemeSchemaInferredType = z.infer<
   typeof generated.McpUiThemeSchema
 >;
 
+export type McpUiContrastPreferenceSchemaInferredType = z.infer<
+  typeof generated.McpUiContrastPreferenceSchema
+>;
+
 export type McpUiDisplayModeSchemaInferredType = z.infer<
   typeof generated.McpUiDisplayModeSchema
 >;
@@ -169,6 +173,12 @@ export type McpUiInitializeResultSchemaInferredType = z.infer<
 
 expectType<spec.McpUiTheme>({} as McpUiThemeSchemaInferredType);
 expectType<McpUiThemeSchemaInferredType>({} as spec.McpUiTheme);
+expectType<spec.McpUiContrastPreference>(
+  {} as McpUiContrastPreferenceSchemaInferredType,
+);
+expectType<McpUiContrastPreferenceSchemaInferredType>(
+  {} as spec.McpUiContrastPreference,
+);
 expectType<spec.McpUiDisplayMode>({} as McpUiDisplayModeSchemaInferredType);
 expectType<McpUiDisplayModeSchemaInferredType>({} as spec.McpUiDisplayMode);
 expectType<spec.McpUiStyleVariableKey>(

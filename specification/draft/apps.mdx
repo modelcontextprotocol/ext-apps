@@ -630,6 +630,8 @@ interface HostContext {
   };
   /** Current color theme preference */
   theme?: "light" | "dark";
+  /** User's contrast preference, independent of theme. See Contrast Preference section. */
+  prefersContrast?: "no-preference" | "more" | "less";
   /** Style configuration for theming. See Theming section for standardized variable names. */
   styles?: {
     /** CSS variables for theming */
@@ -688,6 +690,7 @@ Example:
     "hostInfo": { "name": "claude-desktop", "version": "1.0.0" },
     "hostContext": {
       "theme": "dark",
+      "prefersContrast": "more",
       "styles": {
         "variables": {
           "--color-background-primary": "light-dark(#ffffff, #171717)",
@@ -1075,6 +1078,36 @@ if (hostContext.styles?.css?.fonts) {
   applyHostFonts(hostContext.styles.css.fonts);
 }
 ```
+
+#### Contrast Preference
+
+Hosts can pass the user's contrast preference via `HostContext.prefersContrast`. Its values mirror the CSS [`prefers-contrast`](https://drafts.csswg.org/mediaqueries-5/#prefers-contrast) media feature:
+
+```typescript
+type McpUiContrastPreference = "no-preference" | "more" | "less";
+```
+
+- **no-preference**: The user has not asked for more or less contrast
+- **more**: The user prefers higher contrast
+- **less**: The user prefers lower contrast
+
+`prefersContrast` is independent of `theme`: a user can prefer more contrast with either a light or a dark theme.
+
+There is no `custom` value. As with [`navigator.preferences.contrast`](https://drafts.csswg.org/mediaqueries-5/#dom-preferencemanager-contrast), it is left out because it is tied to forced colors mode, which the browser applies to the View directly and which Views can detect with the `forced-colors` media query.
+
+**Host behavior:**
+- Host SHOULD determine `prefersContrast` from both its own settings and the operating system's. For example, a Host whose user has chosen a high contrast Host theme SHOULD send `"more"`, even if the operating system setting is off.
+- Host SHOULD omit `prefersContrast` if it cannot determine the user's preference. Views trust `prefersContrast` over their own media query, so sending `"no-preference"` without knowing could override a correct media query.
+- Host SHOULD send `ui/notifications/host-context-changed` with the new `prefersContrast` value when the preference changes.
+- If the Host sends `styles.variables`, the variables SHOULD already reflect the user's contrast preference. `prefersContrast` lets Views adjust styles they define themselves.
+
+**View behavior:**
+- If `prefersContrast` is present, View SHOULD use it instead of the `prefers-contrast` media query. The media query inside the View's iframe reflects only the browser and operating system, not the Host's own settings.
+- If `prefersContrast` is absent, the preference is unknown, and View SHOULD fall back to the `prefers-contrast` media query.
+
+Note that `"less"` asks for lower contrast, so styles for `"more"` shouldn't be applied to every value other than `"no-preference"`.
+
+Like `locale` and `timeZone`, `prefersContrast` reveals a user setting to the View, including Host settings such as a high contrast Host theme that the View could not otherwise detect. Hosts that limit what Views can learn about users can omit it, and Views then fall back to the media query.
 
 ### MCP Apps Specific Messages
 
