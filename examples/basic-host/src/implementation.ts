@@ -52,7 +52,7 @@ export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
 async function connectWithFallback(serverUrl: URL): Promise<Client> {
   // Try Streamable HTTP first (modern transport)
   try {
-    const client = new Client(IMPLEMENTATION);
+    const client = new Client(IMPLEMENTATION, { versionNegotiation: { mode: "auto" } });
     await client.connect(new StreamableHTTPClientTransport(serverUrl));
     log.info("Connected via Streamable HTTP transport");
     return client;
