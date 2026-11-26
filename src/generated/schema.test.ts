@@ -123,8 +123,16 @@ export type McpUiToolVisibilitySchemaInferredType = z.infer<
   typeof generated.McpUiToolVisibilitySchema
 >;
 
+export type McpUiToolPreloadSchemaInferredType = z.infer<
+  typeof generated.McpUiToolPreloadSchema
+>;
+
 export type McpUiToolMetaSchemaInferredType = z.infer<
   typeof generated.McpUiToolMetaSchema
+>;
+
+export type McpUiToolResultMetaSchemaInferredType = z.infer<
+  typeof generated.McpUiToolResultMetaSchema
 >;
 
 export type McpUiClientCapabilitiesSchemaInferredType = z.infer<
@@ -303,8 +311,16 @@ expectType<spec.McpUiToolVisibility>(
 expectType<McpUiToolVisibilitySchemaInferredType>(
   {} as spec.McpUiToolVisibility,
 );
+expectType<spec.McpUiToolPreload>({} as McpUiToolPreloadSchemaInferredType);
+expectType<McpUiToolPreloadSchemaInferredType>({} as spec.McpUiToolPreload);
 expectType<spec.McpUiToolMeta>({} as McpUiToolMetaSchemaInferredType);
 expectType<McpUiToolMetaSchemaInferredType>({} as spec.McpUiToolMeta);
+expectType<spec.McpUiToolResultMeta>(
+  {} as McpUiToolResultMetaSchemaInferredType,
+);
+expectType<McpUiToolResultMetaSchemaInferredType>(
+  {} as spec.McpUiToolResultMeta,
+);
 expectType<spec.McpUiClientCapabilities>(
   {} as McpUiClientCapabilitiesSchemaInferredType,
 );
