@@ -629,6 +629,13 @@ export interface McpUiResourceCsp {
    */
   resourceDomains?: string[];
   /**
+   * @description Whether the UI requires WebAssembly compilation.
+   *
+   * - Maps to the CSP `script-src` source expression `'wasm-unsafe-eval'`
+   * - Empty or false → WebAssembly compilation remains blocked by default
+   */
+  wasmUnsafeEval?: boolean;
+  /**
    * @description Origins for nested iframes.
    *
    * - Maps to CSP `frame-src` directive
