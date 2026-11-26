@@ -1346,18 +1346,20 @@ export class App extends Protocol<BaseContext> {
         ) => McpUiResourceTeardownResult | Promise<McpUiResourceTeardownResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced("onteardown", this._onteardown, callback);
+    const previous = this._onteardown;
+    this.warnIfRequestHandlerReplaced("onteardown", previous, callback);
     this._onteardown = callback;
+    if (!callback) {
+      if (previous) this.removeRequestHandler("ui/resource-teardown");
+      return;
+    }
     this.replaceRequestHandler(
       "ui/resource-teardown",
       {
         params: McpUiResourceTeardownRequestSchema.shape.params,
         result: McpUiResourceTeardownResultSchema,
       },
-      (params, extra) => {
-        if (!this._onteardown) throw new Error("No onteardown handler set");
-        return this._onteardown(params, extra);
-      },
+      (params, extra) => callback(params, extra),
     );
   }
 
@@ -1404,12 +1406,16 @@ export class App extends Protocol<BaseContext> {
         ) => Promise<CallToolResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced("oncalltool", this._oncalltool, callback);
+    const previous = this._oncalltool;
+    this.warnIfRequestHandlerReplaced("oncalltool", previous, callback);
     this._oncalltool = callback;
-    this.replaceRequestHandler("tools/call", (request, extra) => {
-      if (!this._oncalltool) throw new Error("No oncalltool handler set");
-      return this._oncalltool(request.params, extra);
-    });
+    if (!callback) {
+      if (previous) this.removeRequestHandler("tools/call");
+      return;
+    }
+    this.replaceRequestHandler("tools/call", (request, extra) =>
+      callback(request.params, extra),
+    );
   }
 
   /**
@@ -1471,16 +1477,16 @@ export class App extends Protocol<BaseContext> {
         ) => Promise<ListToolsResult>)
       | undefined,
   ) {
-    this.warnIfRequestHandlerReplaced(
-      "onlisttools",
-      this._onlisttools,
-      callback,
-    );
+    const previous = this._onlisttools;
+    this.warnIfRequestHandlerReplaced("onlisttools", previous, callback);
     this._onlisttools = callback;
-    this.replaceRequestHandler("tools/list", (request, extra) => {
-      if (!this._onlisttools) throw new Error("No onlisttools handler set");
-      return this._onlisttools(request.params, extra);
-    });
+    if (!callback) {
+      if (previous) this.removeRequestHandler("tools/list");
+      return;
+    }
+    this.replaceRequestHandler("tools/list", (request, extra) =>
+      callback(request.params, extra),
+    );
   }
 
   /**

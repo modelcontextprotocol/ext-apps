@@ -378,4 +378,64 @@ describe("App base MCP SDK v2 Protocol migration", () => {
     );
     expect(handledBy).toBe(2);
   });
+
+  it("clearing on* request setters with undefined unregisters the method and releases MethodRegistry", async () => {
+    const appWithoutTools = new App(
+      { name: "view-app", version: "1.0.0" },
+      {},
+      { autoResize: false },
+    );
+    expect(() => {
+      appWithoutTools.oncalltool = undefined;
+      appWithoutTools.onlisttools = undefined;
+    }).not.toThrow();
+
+    const pair = await connectPair();
+    connected.push(pair);
+
+    pair.app.onteardown = async () => ({});
+    pair.app.onteardown = undefined;
+    await expect(
+      pair.server.request(
+        { method: "ui/resource-teardown", params: {} },
+        z.object({}),
+      ),
+    ).rejects.toMatchObject({ code: -32601 });
+
+    let directTeardownCalls = 0;
+    pair.app.setRequestHandler(
+      "ui/resource-teardown",
+      { params: z.object({}) },
+      () => {
+        directTeardownCalls += 1;
+        return {};
+      },
+    );
+    pair.app.onteardown = undefined;
+    await pair.server.request(
+      { method: "ui/resource-teardown", params: {} },
+      z.object({}),
+    );
+    expect(directTeardownCalls).toBe(1);
+
+    pair.app.oncalltool = async () => ({ content: [] });
+    pair.app.onlisttools = async () => ({ tools: [] });
+    pair.app.oncalltool = undefined;
+    pair.app.onlisttools = undefined;
+
+    await expect(
+      pair.server.request({
+        method: "tools/call",
+        params: { name: "x", arguments: {} },
+      }),
+    ).rejects.toMatchObject({ code: -32601 });
+    await expect(
+      pair.server.request({ method: "tools/list", params: {} }),
+    ).rejects.toMatchObject({ code: -32601 });
+
+    expect(() => {
+      pair.app.setRequestHandler("tools/call", async () => ({ content: [] }));
+      pair.app.setRequestHandler("tools/list", async () => ({ tools: [] }));
+    }).not.toThrow();
+  });
 });
