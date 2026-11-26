@@ -20,6 +20,7 @@ import {
   startFileWatch,
   stopFileWatch,
   cliLocalFiles,
+  cliLocalDirs,
   isWritablePath,
   writeFlags,
   viewSourcePaths,
@@ -785,6 +786,106 @@ describe("createServer useClientRoots option", () => {
     // the roots refresh handler.
     expect(server.server.oninitialized).toBeFunction();
     server.close();
+  });
+
+  describe("refreshRoots against a live client", () => {
+    let savedDirs: Set<string>;
+    let savedCliDirs: Set<string>;
+    const tmpDirs: string[] = [];
+
+    const mkTmpDir = () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf-roots-"));
+      tmpDirs.push(dir);
+      return dir;
+    };
+
+    beforeEach(() => {
+      savedDirs = new Set(allowedLocalDirs);
+      savedCliDirs = new Set(cliLocalDirs);
+      allowedLocalDirs.clear();
+      cliLocalDirs.clear();
+    });
+
+    afterEach(() => {
+      allowedLocalDirs.clear();
+      cliLocalDirs.clear();
+      for (const d of savedDirs) allowedLocalDirs.add(d);
+      for (const d of savedCliDirs) cliLocalDirs.add(d);
+      while (tmpDirs.length) {
+        fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true });
+      }
+    });
+
+    // Poll until cond() holds; refreshRoots runs fire-and-forget from
+    // oninitialized / the list_changed notification handler, so the only
+    // observable signal is the allowedLocalDirs set itself.
+    async function waitFor(cond: () => boolean, ms = 3000): Promise<void> {
+      const deadline = Date.now() + ms;
+      while (!cond()) {
+        if (Date.now() > deadline) throw new Error("waitFor timed out");
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    }
+
+    async function connectWithRoots(
+      getRoots: () => Array<{ uri: string }>,
+    ): Promise<{ server: ReturnType<typeof createServer>; client: Client }> {
+      const server = createServer({ useClientRoots: true });
+      const client = new Client(
+        { name: "t", version: "1" },
+        { capabilities: { roots: { listChanged: true } } },
+      );
+      client.setRequestHandler("roots/list", async () => ({
+        roots: getRoots(),
+      }));
+      const [ct, st] = InMemoryTransport.createLinkedPair();
+      await Promise.all([server.connect(st), client.connect(ct)]);
+      return { server, client };
+    }
+
+    it("keeps CLI-arg directories when the client advertises roots but returns an empty list", async () => {
+      const cliDir = mkTmpDir();
+      const staleDir = mkTmpDir();
+      // Mirrors main(): a CLI-arg directory lands in both sets.
+      cliLocalDirs.add(cliDir);
+      allowedLocalDirs.add(cliDir);
+      // A directory granted by an earlier roots refresh — the next refresh
+      // is expected to revoke it, which also proves refreshRoots ran.
+      allowedLocalDirs.add(staleDir);
+
+      const { server, client } = await connectWithRoots(() => []);
+      try {
+        await waitFor(() => !allowedLocalDirs.has(staleDir));
+        expect(allowedLocalDirs.has(cliDir)).toBe(true);
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
+
+    it("still revokes a removed client root while keeping CLI-arg directories", async () => {
+      const cliDir = mkTmpDir();
+      const rootDir = mkTmpDir();
+      cliLocalDirs.add(cliDir);
+      allowedLocalDirs.add(cliDir);
+
+      let roots: Array<{ uri: string }> = [{ uri: pathToFileUrl(rootDir) }];
+      const { server, client } = await connectWithRoots(() => roots);
+      try {
+        // Initial refresh on init grants the client root.
+        await waitFor(() => allowedLocalDirs.has(rootDir));
+
+        // Client drops the root: the refresh must revoke it but leave the
+        // CLI-arg directory alone.
+        roots = [];
+        await client.sendRootsListChanged();
+        await waitFor(() => !allowedLocalDirs.has(rootDir));
+        expect(allowedLocalDirs.has(cliDir)).toBe(true);
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
   });
 });
 

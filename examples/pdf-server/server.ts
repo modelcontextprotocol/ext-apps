@@ -101,6 +101,15 @@ export const allowedLocalDirs = new Set<string>();
 export const cliLocalFiles = new Set<string>();
 
 /**
+ * Subset of allowedLocalDirs that came from CLI args (not MCP roots).
+ * refreshRoots() clears allowedLocalDirs on every refresh so the client can
+ * revoke previously-granted roots; entries in this set are re-added after
+ * each clear so a client that advertises the roots capability but returns
+ * an empty list cannot wipe directories the user passed on the command line.
+ */
+export const cliLocalDirs = new Set<string>();
+
+/**
  * Write-permission flags. Object wrapper (not a bare `let`) so main.ts can
  * mutate via the exported binding without re-import gymnastics — same
  * pattern as the Sets above.
@@ -963,6 +972,10 @@ async function refreshRoots(server: Server): Promise<void> {
   try {
     const { roots } = await server.listRoots();
     allowedLocalDirs.clear();
+    // CLI-arg directories are not roots — the client can't revoke them.
+    for (const dir of cliLocalDirs) {
+      allowedLocalDirs.add(dir);
+    }
     for (const root of roots) {
       if (isFileUrl(root.uri)) {
         const dir = fileUrlToPath(root.uri);
