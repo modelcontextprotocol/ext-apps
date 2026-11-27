@@ -1,0 +1,18 @@
+@if (!queryParams.hideThemeToggle) {
+  <app-theme-toggle />
+}
+
+@for (call of toolCalls(); track call.id) {
+  <app-tool-call-info-panel
+    [toolCallInfo]="call"
+    (close)="removeToolCall(call.id)"
+  />
+}
+
+<app-call-tool-panel
+  [servers]="servers()"
+  [initialServer]="queryParams.server"
+  [initialTool]="queryParams.tool"
+  [autoCall]="queryParams.call"
+  (toolCallCreated)="addToolCall($event)"
+/>

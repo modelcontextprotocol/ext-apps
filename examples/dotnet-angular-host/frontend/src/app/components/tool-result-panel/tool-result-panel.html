@@ -1,0 +1,7 @@
+@if (isLoading()) {
+  <div class="result-loading">Loading result...</div>
+} @else if (error()) {
+  <div class="result-error"><strong>ERROR:</strong> {{ error() }}</div>
+} @else {
+  <app-collapsible-panel icon="📤" label="Tool Result" [content]="resultJson()" />
+}
