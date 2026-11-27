@@ -268,7 +268,13 @@ export function webMcpExecuteInput(
   args: Record<string, unknown>,
 ): object {
   const copied = plain(args);
-  return frameTools.some((tool) => typeof tool?.inputSchema === "string")
+  return frameTools.some((tool) => {
+    try {
+      return typeof tool?.inputSchema === "string";
+    } catch {
+      return false;
+    }
+  })
     ? (JSON.stringify(copied) as unknown as object)
     : copied;
 }
