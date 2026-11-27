@@ -409,6 +409,7 @@ Example (app-only tool, hidden from model):
 - Resource MUST exist on the server
 - Host MUST use `resources/read` to fetch the referenced resource URI
 - Host MAY prefetch and cache UI resource content for performance optimization
+- When labeling host-provided chrome for a tool-instantiated View, Host SHOULD use the Tool's human-readable `title` when present, falling back to `name`
 - Since UI resources are primarily discovered through tool metadata, Servers MAY omit UI-only resources from `resources/list` and `notifications/resources/list_changed`
 
 #### Visibility:
