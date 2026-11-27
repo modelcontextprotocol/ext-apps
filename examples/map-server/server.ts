@@ -153,26 +153,10 @@ export function createServer(): McpServer {
       description:
         "Display an interactive world map zoomed to a specific bounding box. Use the GeoCode tool to find the bounding box of a location. The widget is interactive and exposes tools for navigation (fly to locations) and querying the current view.",
       inputSchema: z.object({
-        west: z
-          .number()
-          .optional()
-          .default(-0.5)
-          .describe("Western longitude (-180 to 180)"),
-        south: z
-          .number()
-          .optional()
-          .default(51.3)
-          .describe("Southern latitude (-90 to 90)"),
-        east: z
-          .number()
-          .optional()
-          .default(0.3)
-          .describe("Eastern longitude (-180 to 180)"),
-        north: z
-          .number()
-          .optional()
-          .default(51.7)
-          .describe("Northern latitude (-90 to 90)"),
+        west: z.number().optional().describe("Western longitude (-180 to 180)"),
+        south: z.number().optional().describe("Southern latitude (-90 to 90)"),
+        east: z.number().optional().describe("Eastern longitude (-180 to 180)"),
+        north: z.number().optional().describe("Northern latitude (-90 to 90)"),
         label: z
           .string()
           .optional()
@@ -180,17 +164,29 @@ export function createServer(): McpServer {
       }),
       _meta: { ui: { resourceUri } },
     },
-    async ({ west, south, east, north, label }): Promise<CallToolResult> => ({
-      content: [
-        {
-          type: "text",
-          text: `Displaying globe at: W:${west.toFixed(4)}, S:${south.toFixed(4)}, E:${east.toFixed(4)}, N:${north.toFixed(4)}${label ? ` (${label})` : ""}`,
+    async ({ west, south, east, north, label }): Promise<CallToolResult> => {
+      // Determine what to log based on whether coordinates were provided
+      const hasCoords =
+        west !== undefined &&
+        south !== undefined &&
+        east !== undefined &&
+        north !== undefined;
+      const text = hasCoords
+        ? `Displaying globe at: W:${west.toFixed(4)}, S:${south.toFixed(4)}, E:${east.toFixed(4)}, N:${north.toFixed(4)}${label ? ` (${label})` : ""}`
+        : `Displaying globe at default location${label ? ` (${label})` : ""}`;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text,
+          },
+        ],
+        _meta: {
+          viewUUID: randomUUID(),
         },
-      ],
-      _meta: {
-        viewUUID: randomUUID(),
-      },
-    }),
+      };
+    },
   );
 
   // geocode tool - searches for places using Nominatim (no UI)
