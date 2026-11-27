@@ -39,14 +39,17 @@ npm test
 # Check JSDoc comment syntax and `{@link}` references
 npm exec typedoc -- --treatValidationWarningsAsErrors --emit none
 
-# Regenerate package-lock.json
-# Note: repo .npmrc pins registry to npmjs.org, so a plain `npm i` is safe even
-# if your global npm config points elsewhere. The Docker step below is optional
-# — it locks linux-amd64 optionalDependencies (sharp, rollup, bun) for CI.
-rm -fR  package-lock.json node_modules && \
-  docker run  --rm -it --platform linux/amd64 -v $PWD:/src:rw -w /src node:latest npm i && \
-  rm -fR node_modules && \
-  npm  i  --cache=~/.npm-mcp-apps --registry=https://registry.npmjs.org/
+# Regenerate package-lock.json from scratch (the Docker step locks
+# linux-amd64 optionalDependencies — sharp, rollup, bun — for CI).
+# Use whatever registry your machine is configured for; the final --fix step
+# rewrites the committed lockfile to public registry.npmjs.org URLs.
+npm run update-lock:docker
+
+# Verify the lockfile only references the public npm registry (also runs in
+# CI and the pre-commit hook). Use --fix after `npm install <pkg>` against a
+# proxy registry to rewrite the resolved URLs.
+npm run lint:lockfile
+npm run lint:lockfile -- --fix
 ```
 
 ## Architecture
