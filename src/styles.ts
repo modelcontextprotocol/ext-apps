@@ -141,7 +141,9 @@ export function applyHostStyleVariables(
   root: HTMLElement = document.documentElement,
 ): void {
   for (const [key, value] of Object.entries(styles)) {
-    if (value !== undefined) {
+    if (value === undefined) {
+      root.style.removeProperty(key);
+    } else {
       root.style.setProperty(key, value);
     }
   }
