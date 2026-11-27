@@ -115,8 +115,9 @@ export class PostMessageTransport implements Transport {
   /**
    * Send a JSON-RPC message to the target window.
    *
-   * Messages are sent using `postMessage` with `"*"` origin, meaning they are visible
-   * to all frames. The receiver should validate the message source for security.
+   * Messages are sent to the `eventTarget` window using `postMessage` with
+   * `"*"` as `targetOrigin`, allowing delivery regardless of that window's
+   * origin. The receiver should validate the message source for security.
    *
    * @param message - JSON-RPC message to send
    * @param options - Optional send options (currently unused)
