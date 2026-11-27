@@ -2215,8 +2215,7 @@ export class App extends Protocol<BaseContext> {
       });
     };
 
-    sendBodySizeChanged();
-
+    // ResizeObserver will fire for initial layout and all subsequent changes
     const resizeObserver = new ResizeObserver(sendBodySizeChanged);
     // Observe both html and body to catch all size changes
     resizeObserver.observe(document.documentElement);
