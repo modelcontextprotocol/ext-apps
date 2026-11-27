@@ -552,9 +552,20 @@ export function normalizeArxivUrl(url: string): string {
   return url.replace("/abs/", "/pdf/").replace(/\.pdf$/, "");
 }
 
-export function fileUrlToPath(fileUrl: string): string {
+export function fileUrlToPath(
+  fileUrl: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
   // Support both file:// and computer:// (used by some clients for local files)
-  return decodeURIComponent(fileUrl.replace(/^(?:file|computer):\/\//, ""));
+  const decoded = decodeURIComponent(
+    fileUrl.replace(/^(?:file|computer):\/\//, ""),
+  );
+  // A Windows file URL keeps a slash before the drive letter
+  // (file:///C:/x -> "/C:/x"), which path.resolve would turn into "C:\C:\x".
+  if (platform === "win32" && /^\/[A-Za-z]:(?:[/\\]|$)/.test(decoded)) {
+    return decoded.slice(1);
+  }
+  return decoded;
 }
 
 export function pathToFileUrl(filePath: string): string {
