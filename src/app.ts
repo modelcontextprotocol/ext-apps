@@ -2335,7 +2335,7 @@ export class App extends Protocol<BaseContext> {
         this.syncWebMcpMirror(name);
       }
 
-      if (this.options?.autoResize) {
+      if (this.options?.autoResize !== false) {
         this.setupSizeChangedNotifications();
       }
     } catch (error) {
