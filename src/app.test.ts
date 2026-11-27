@@ -100,6 +100,97 @@ afterEach(async () => {
   );
 });
 
+describe("manual size notification cleanup", () => {
+  for (const pending of ["initial measurement", "resize measurement"]) {
+    it(`cancels a pending ${pending}`, async () => {
+      const frames = new Map<number, FrameRequestCallback>();
+      let nextFrame = 0;
+      let resize = () => {};
+      let disconnected = false;
+      let measurements = 0;
+      let height = 100;
+      const html = {
+        style: { height: "100%" },
+        getBoundingClientRect: () => {
+          measurements += 1;
+          return { height };
+        },
+      };
+      const globals = {
+        window: { innerWidth: 400 },
+        document: { documentElement: html, body: {} },
+        requestAnimationFrame: (callback: FrameRequestCallback) => {
+          const id = nextFrame++;
+          frames.set(id, callback);
+          return id;
+        },
+        cancelAnimationFrame: (id: number) => frames.delete(id),
+        ResizeObserver: class {
+          constructor(callback: () => void) {
+            resize = callback;
+          }
+          observe() {}
+          disconnect() {
+            disconnected = true;
+          }
+        },
+      };
+      const originals = new Map(
+        Object.keys(globals).map((key) => [
+          key,
+          Object.getOwnPropertyDescriptor(globalThis, key),
+        ]),
+      );
+      for (const [key, value] of Object.entries(globals)) {
+        Object.defineProperty(globalThis, key, { configurable: true, value });
+      }
+      const flushFrames = () => {
+        const callbacks = [...frames.values()];
+        frames.clear();
+        for (const callback of callbacks) callback(0);
+      };
+      try {
+        const pair = await connectPair();
+        connected.push(pair);
+        const sizeMessages = () =>
+          pair.sentByApp.filter(
+            (message) =>
+              "method" in message &&
+              message.method === "ui/notifications/size-changed",
+          );
+        const cleanup = pair.app.setupSizeChangedNotifications();
+        if (pending === "resize measurement") {
+          flushFrames();
+          expect(sizeMessages()).toHaveLength(1);
+          height = 200;
+          resize();
+          resize();
+        }
+        expect(frames.size).toBe(1);
+        const measurementsBeforeCleanup = measurements;
+        const messagesBeforeCleanup = sizeMessages().length;
+        cleanup();
+        cleanup();
+        flushFrames();
+        expect(disconnected).toBe(true);
+        expect(measurements).toBe(measurementsBeforeCleanup);
+        expect(sizeMessages()).toHaveLength(messagesBeforeCleanup);
+        expect(html.style.height).toBe("100%");
+
+        const nextCleanup = pair.app.setupSizeChangedNotifications();
+        flushFrames();
+        expect(sizeMessages()).toHaveLength(messagesBeforeCleanup + 1);
+        nextCleanup();
+      } finally {
+        for (const [key, descriptor] of originals) {
+          if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+          else Reflect.deleteProperty(globalThis, key);
+        }
+      }
+    });
+  }
+});
+
 describe("App base MCP SDK v2 Protocol migration", () => {
   it("performs only the Apps handshake — no MCP initialize on the wire", async () => {
     const pair = await connectPair();
