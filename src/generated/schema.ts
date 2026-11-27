@@ -336,6 +336,17 @@ export const McpUiResourcePermissionsSchema = z.object({
     .describe(
       "Request clipboard write access.\n\nMaps to Permission Policy `clipboard-write` feature.",
     ),
+  /**
+   * @description Request WebMCP tools access.
+   *
+   * Maps to Permission Policy `tools` feature.
+   */
+  tools: z
+    .object({})
+    .optional()
+    .describe(
+      "Request WebMCP tools access.\n\nMaps to Permission Policy `tools` feature.",
+    ),
 });
 
 /**
