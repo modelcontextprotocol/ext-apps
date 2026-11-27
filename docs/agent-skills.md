@@ -25,7 +25,7 @@ Install via Claude Code:
 
 ```
 /plugin marketplace add modelcontextprotocol/ext-apps
-/plugin install mcp-apps@modelcontextprotocol-ext-apps
+/plugin install mcp-apps@mcp-apps
 ```
 
 ### Option 2: Vercel Skills CLI
